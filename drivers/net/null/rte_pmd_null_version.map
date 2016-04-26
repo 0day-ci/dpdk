@@ -4,7 +4,7 @@ DPDK_2.0 {
 };
 
 DPDK_2.2 {
-	global:
+	global: this_pmd_driver*;
 
 	eth_dev_null_create;
 

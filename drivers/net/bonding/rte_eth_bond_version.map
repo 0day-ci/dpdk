@@ -17,6 +17,7 @@ DPDK_2.0 {
 	rte_eth_bond_slaves_get;
 	rte_eth_bond_xmit_policy_get;
 	rte_eth_bond_xmit_policy_set;
+	this_pmd_driver*;
 
 	local: *;
 };

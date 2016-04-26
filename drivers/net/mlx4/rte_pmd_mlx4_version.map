@@ -1,4 +1,5 @@
 DPDK_2.0 {
+	global: this_pmd_driver*;
 
 	local: *;
 };

@@ -1,3 +1,4 @@
 DPDK_16.04 {
+	global: this_pmd_driver*;
 	local: *;
 };
