@@ -464,7 +464,7 @@ virtio_dev_rx_queue_setup(struct rte_eth_dev *dev,
 void
 virtio_dev_rx_queue_release(void *rxq)
 {
-	virtio_dev_queue_release(rxq);
+	virtio_dev_queue_release(rxq, 1);
 }
 
 /*
@@ -539,7 +539,7 @@ virtio_dev_tx_queue_setup(struct rte_eth_dev *dev,
 void
 virtio_dev_tx_queue_release(void *txq)
 {
-	virtio_dev_queue_release(txq);
+	virtio_dev_queue_release(txq, 1);
 }
 
 static void

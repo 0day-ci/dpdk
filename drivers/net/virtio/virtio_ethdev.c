@@ -261,12 +261,18 @@ virtio_set_multiple_queues(struct rte_eth_dev *dev, uint16_t nb_queues)
 }
 
 void
-virtio_dev_queue_release(struct virtqueue *vq) {
+virtio_dev_queue_release(struct virtqueue *vq, int io_related)
+{
 	struct virtio_hw *hw;
 
 	if (vq) {
 		hw = vq->hw;
-		hw->vtpci_ops->del_queue(hw, vq);
+		if (io_related)
+			hw->vtpci_ops->del_queue(hw, vq);
+
+		rte_memzone_free(vq->mz);
+		if (vq->virtio_net_hdr_mz)
+			rte_memzone_free(vq->virtio_net_hdr_mz);
 
 		rte_free(vq->sw_ring);
 		rte_free(vq);
@@ -286,6 +292,7 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 	unsigned int vq_size, size;
 	struct virtio_hw *hw = dev->data->dev_private;
 	struct virtqueue *vq = NULL;
+	const char *queue_names[] = {"rvq", "txq", "cvq"};
 
 	PMD_INIT_LOG(DEBUG, "setting up queue: %u", vtpci_queue_idx);
 
@@ -305,34 +312,34 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 		return -EINVAL;
 	}
 
-	if (queue_type == VTNET_RQ) {
-		snprintf(vq_name, sizeof(vq_name), "port%d_rvq%d",
-			dev->data->port_id, queue_idx);
-		vq = rte_zmalloc(vq_name, sizeof(struct virtqueue) +
-			vq_size * sizeof(struct vq_desc_extra), RTE_CACHE_LINE_SIZE);
-		vq->sw_ring = rte_zmalloc_socket("rxq->sw_ring",
-			(RTE_PMD_VIRTIO_RX_MAX_BURST + vq_size) *
-			sizeof(vq->sw_ring[0]), RTE_CACHE_LINE_SIZE, socket_id);
-	} else if (queue_type == VTNET_TQ) {
-		snprintf(vq_name, sizeof(vq_name), "port%d_tvq%d",
-			dev->data->port_id, queue_idx);
-		vq = rte_zmalloc(vq_name, sizeof(struct virtqueue) +
-			vq_size * sizeof(struct vq_desc_extra), RTE_CACHE_LINE_SIZE);
-	} else if (queue_type == VTNET_CQ) {
-		snprintf(vq_name, sizeof(vq_name), "port%d_cvq",
-			dev->data->port_id);
-		vq = rte_zmalloc(vq_name, sizeof(struct virtqueue) +
-			vq_size * sizeof(struct vq_desc_extra),
-			RTE_CACHE_LINE_SIZE);
+	if (queue_type < VTNET_RQ || queue_type > VTNET_RQ) {
+		PMD_INIT_LOG(ERR, "invalid queue type: %d", queue_type);
+		return -EINVAL;
 	}
+
+	snprintf(vq_name, sizeof(vq_name), "port%d_%s%d",
+		 dev->data->port_id, queue_names[queue_type], queue_idx);
+	vq = rte_zmalloc(vq_name, sizeof(struct virtqueue) +
+			 vq_size * sizeof(struct vq_desc_extra),
+			 RTE_CACHE_LINE_SIZE);
 	if (vq == NULL) {
 		PMD_INIT_LOG(ERR, "Can not allocate virtqueue");
 		return -ENOMEM;
 	}
-	if (queue_type == VTNET_RQ && vq->sw_ring == NULL) {
-		PMD_INIT_LOG(ERR, "Can not allocate RX soft ring");
-		rte_free(vq);
-		return -ENOMEM;
+
+	if (queue_type == VTNET_RQ) {
+		size_t sz_sw;
+
+		sz_sw = (RTE_PMD_VIRTIO_RX_MAX_BURST + vq_size) *
+			sizeof(vq->sw_ring[0]);
+		vq->sw_ring = rte_zmalloc_socket("rxq->sw_ring", sz_sw,
+						 RTE_CACHE_LINE_SIZE,
+						 socket_id);
+		if (!vq->sw_ring) {
+			PMD_INIT_LOG(ERR, "Can not allocate RX soft ring");
+			virtio_dev_queue_release(vq, 0);
+			return -ENOMEM;
+		}
 	}
 
 	vq->hw = hw;
@@ -358,7 +365,7 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 		if (rte_errno == EEXIST)
 			mz = rte_memzone_lookup(vq_name);
 		if (mz == NULL) {
-			rte_free(vq);
+			virtio_dev_queue_release(vq, 0);
 			return -ENOMEM;
 		}
 	}
@@ -370,7 +377,7 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 	 */
 	if ((mz->phys_addr + vq->vq_ring_size - 1) >> (VIRTIO_PCI_QUEUE_ADDR_SHIFT + 32)) {
 		PMD_INIT_LOG(ERR, "vring address shouldn't be above 16TB!");
-		rte_free(vq);
+		virtio_dev_queue_release(vq, 0);
 		return -ENOMEM;
 	}
 
@@ -380,8 +387,6 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 	vq->vq_ring_virt_mem = mz->addr;
 	PMD_INIT_LOG(DEBUG, "vq->vq_ring_mem:      0x%"PRIx64, (uint64_t)mz->phys_addr);
 	PMD_INIT_LOG(DEBUG, "vq->vq_ring_virt_mem: 0x%"PRIx64, (uint64_t)(uintptr_t)mz->addr);
-	vq->virtio_net_hdr_mz  = NULL;
-	vq->virtio_net_hdr_mem = 0;
 
 	if (queue_type == VTNET_TQ) {
 		const struct rte_memzone *hdr_mz;
@@ -402,7 +407,7 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 			if (rte_errno == EEXIST)
 				hdr_mz = rte_memzone_lookup(vq_name);
 			if (hdr_mz == NULL) {
-				rte_free(vq);
+				virtio_dev_queue_release(vq, 0);
 				return -ENOMEM;
 			}
 		}
@@ -436,7 +441,7 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 				vq->virtio_net_hdr_mz =
 					rte_memzone_lookup(vq_name);
 			if (vq->virtio_net_hdr_mz == NULL) {
-				rte_free(vq);
+				virtio_dev_queue_release(vq, 0);
 				return -ENOMEM;
 			}
 		}
@@ -1184,7 +1189,7 @@ eth_virtio_dev_uninit(struct rte_eth_dev *eth_dev)
 	eth_dev->tx_pkt_burst = NULL;
 	eth_dev->rx_pkt_burst = NULL;
 
-	virtio_dev_queue_release(hw->cvq);
+	virtio_dev_queue_release(hw->cvq, 1);
 
 	rte_free(eth_dev->data->mac_addrs);
 	eth_dev->data->mac_addrs = NULL;

@@ -83,7 +83,7 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 			unsigned int socket_id,
 			struct virtqueue **pvq);
 
-void virtio_dev_queue_release(struct virtqueue *vq);
+void virtio_dev_queue_release(struct virtqueue *vq, int io_related);
 
 int  virtio_dev_rx_queue_setup(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 		uint16_t nb_rx_desc, unsigned int socket_id,
