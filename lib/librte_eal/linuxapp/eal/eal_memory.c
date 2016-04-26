@@ -1333,7 +1333,7 @@ rte_eal_hugepage_init(void)
 
 		if (new_memseg) {
 			j += 1;
-			if (j == RTE_MAX_MEMSEG)
+			if (j >= RTE_MAX_MEMSEG)
 				break;
 
 			mcfg->memseg[j].phys_addr = hugepage[i].physaddr;
