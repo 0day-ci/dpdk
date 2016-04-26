@@ -50,6 +50,9 @@ extern "C" {
 #include <sys/queue.h>
 
 #include <rte_log.h>
+#include <rte_config.h>
+#include <rte_common.h>
+#include <rte_pci.h>
 
 __attribute__((format(printf, 2, 0)))
 static inline void
@@ -131,6 +134,9 @@ struct rte_driver {
 	const char *name;                   /**< Driver name. */
 	rte_dev_init_t *init;              /**< Device init. function. */
 	rte_dev_uninit_t *uninit;          /**< Device uninit. function. */
+	union {
+		const struct rte_pci_id *pci_table;
+	};
 };
 
 /**
@@ -178,12 +184,27 @@ int rte_eal_vdev_init(const char *name, const char *args);
  */
 int rte_eal_vdev_uninit(const char *name);
 
+#ifdef RTE_BUILD_SHARED_LIB 
+#define DRIVER_EXPORT_NAME(name, idx) name##idx
+#define DECLARE_DRIVER_EXPORT(src, idx)\
+extern struct rte_driver DRIVER_EXPORT_NAME(this_pmd_driver, idx)\
+ __attribute__((alias(RTE_STR(src))))
+
+#define PMD_REGISTER_DRIVER(d)\
+void devinitfn_ ##d(void);\
+void __attribute__((constructor, used)) devinitfn_ ##d(void)\
+{\
+	rte_eal_driver_register(&d);\
+}\
+DECLARE_DRIVER_EXPORT(d, __COUNTER__)
+#else
 #define PMD_REGISTER_DRIVER(d)\
 void devinitfn_ ##d(void);\
 void __attribute__((constructor, used)) devinitfn_ ##d(void)\
 {\
 	rte_eal_driver_register(&d);\
 }
+#endif
 
 #ifdef __cplusplus
 }
