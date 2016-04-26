@@ -5815,6 +5815,7 @@ static struct rte_driver rte_mlx4_driver = {
 	.type = PMD_PDEV,
 	.name = MLX4_DRIVER_NAME,
 	.init = rte_mlx4_pmd_init,
+	.pci_table = mlx4_pci_id_map,
 };
 
 PMD_REGISTER_DRIVER(rte_mlx4_driver)

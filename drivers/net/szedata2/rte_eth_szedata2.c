@@ -1599,6 +1599,7 @@ static struct rte_driver rte_szedata2_driver = {
 	.name = RTE_SZEDATA2_DRIVER_NAME,
 	.init = rte_szedata2_init,
 	.uninit = rte_szedata2_uninit,
+	.pci_table = rte_szedata2_pci_id_table,
 };
 
 PMD_REGISTER_DRIVER(rte_szedata2_driver);

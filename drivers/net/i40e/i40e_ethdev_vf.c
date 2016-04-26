@@ -101,6 +101,9 @@ enum i40evf_aq_result {
 	I40EVF_MSG_CMD,      /* Read async command result */
 };
 
+int
+rte_i40evf_pmd_init(const char *name __rte_unused,
+		    const char *params __rte_unused);
 static int i40evf_dev_configure(struct rte_eth_dev *dev);
 static int i40evf_dev_start(struct rte_eth_dev *dev);
 static void i40evf_dev_stop(struct rte_eth_dev *dev);
@@ -1088,7 +1091,7 @@ i40evf_get_link_status(struct rte_eth_dev *dev, struct rte_eth_link *link)
 	return 0;
 }
 
-static const struct rte_pci_id pci_id_i40evf_map[] = {
+const struct rte_pci_id pci_id_i40evf_map[] = {
 #define RTE_PCI_DEV_ID_DECL_I40EVF(vend, dev) {RTE_PCI_DEVICE(vend, dev)},
 #include "rte_pci_dev_ids.h"
 { .vendor_id = 0, /* sentinel */ },
@@ -1544,7 +1547,7 @@ static struct eth_driver rte_i40evf_pmd = {
  * Invoked one at EAL init time.
  * Register itself as the [Virtual Poll Mode] Driver of PCI Fortville devices.
  */
-static int
+int
 rte_i40evf_pmd_init(const char *name __rte_unused,
 		    const char *params __rte_unused)
 {
@@ -1554,13 +1557,6 @@ rte_i40evf_pmd_init(const char *name __rte_unused,
 
 	return 0;
 }
-
-static struct rte_driver rte_i40evf_driver = {
-	.type = PMD_PDEV,
-	.init = rte_i40evf_pmd_init,
-};
-
-PMD_REGISTER_DRIVER(rte_i40evf_driver);
 
 static int
 i40evf_dev_configure(struct rte_eth_dev *dev)

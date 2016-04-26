@@ -2480,6 +2480,7 @@ nfp_net_pmd_init(const char *name __rte_unused,
 static struct rte_driver rte_nfp_net_driver = {
 	.type = PMD_PDEV,
 	.init = nfp_net_pmd_init,
+	.pci_table = pci_id_nfp_net_map,
 };
 
 PMD_REGISTER_DRIVER(rte_nfp_net_driver);

@@ -3053,6 +3053,7 @@ rte_pmd_fm10k_init(__rte_unused const char *name,
 static struct rte_driver rte_fm10k_driver = {
 	.type = PMD_PDEV,
 	.init = rte_pmd_fm10k_init,
+	.pci_table = pci_id_fm10k_map,
 };
 
 PMD_REGISTER_DRIVER(rte_fm10k_driver);

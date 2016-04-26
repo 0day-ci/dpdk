@@ -1456,6 +1456,7 @@ __rte_unused uint8_t is_rx)
 static struct rte_driver rte_virtio_driver = {
 	.type = PMD_PDEV,
 	.init = rte_virtio_pmd_init,
+	.pci_table = pci_id_virtio_map,
 };
 
 PMD_REGISTER_DRIVER(rte_virtio_driver);

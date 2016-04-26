@@ -682,6 +682,7 @@ rte_enic_pmd_init(__rte_unused const char *name,
 static struct rte_driver rte_enic_driver = {
 	.type = PMD_PDEV,
 	.init = rte_enic_pmd_init,
+	.pci_table = pci_id_enic_map,
 };
 
 PMD_REGISTER_DRIVER(rte_enic_driver);

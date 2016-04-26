@@ -952,6 +952,7 @@ vmxnet3_process_events(struct vmxnet3_hw *hw)
 static struct rte_driver rte_vmxnet3_driver = {
 	.type = PMD_PDEV,
 	.init = rte_vmxnet3_pmd_init,
+	.pci_table = pci_id_vmxnet3_map,
 };
 
 PMD_REGISTER_DRIVER(rte_vmxnet3_driver);

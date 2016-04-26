@@ -86,6 +86,10 @@
 #define E1000_INCVALUE_82576         (16 << IGB_82576_TSYNC_SHIFT)
 #define E1000_TSAUXC_DISABLE_SYSTIME 0x80000000
 
+int
+rte_igb_pmd_init(const char *name __rte_unused, const char *params __rte_unused);
+int
+rte_igbvf_pmd_init(const char *name __rte_unused, const char *params __rte_unused);
 static int  eth_igb_configure(struct rte_eth_dev *dev);
 static int  eth_igb_start(struct rte_eth_dev *dev);
 static void eth_igb_stop(struct rte_eth_dev *dev);
@@ -281,7 +285,7 @@ static enum e1000_fc_mode igb_fc_setting = e1000_fc_full;
 /*
  * The set of PCI devices this driver supports
  */
-static const struct rte_pci_id pci_id_igb_map[] = {
+const struct rte_pci_id pci_id_igb_map[] = {
 
 #define RTE_PCI_DEV_ID_DECL_IGB(vend, dev) {RTE_PCI_DEVICE(vend, dev)},
 #include "rte_pci_dev_ids.h"
@@ -292,7 +296,7 @@ static const struct rte_pci_id pci_id_igb_map[] = {
 /*
  * The set of PCI devices this driver supports (for 82576&I350 VF)
  */
-static const struct rte_pci_id pci_id_igbvf_map[] = {
+const struct rte_pci_id pci_id_igbvf_map[] = {
 
 #define RTE_PCI_DEV_ID_DECL_IGBVF(vend, dev) {RTE_PCI_DEVICE(vend, dev)},
 #include "rte_pci_dev_ids.h"
@@ -995,7 +999,7 @@ static struct eth_driver rte_igbvf_pmd = {
 	.dev_private_size = sizeof(struct e1000_adapter),
 };
 
-static int
+int
 rte_igb_pmd_init(const char *name __rte_unused, const char *params __rte_unused)
 {
 	rte_eth_driver_register(&rte_igb_pmd);
@@ -1018,7 +1022,7 @@ igb_vmdq_vlan_hw_filter_enable(struct rte_eth_dev *dev)
  * Invoked one at EAL init time.
  * Register itself as the [Virtual Poll Mode] Driver of PCI IGB devices.
  */
-static int
+int
 rte_igbvf_pmd_init(const char *name __rte_unused, const char *params __rte_unused)
 {
 	PMD_INIT_FUNC_TRACE();
@@ -4802,16 +4806,6 @@ eth_igb_set_eeprom(struct rte_eth_dev *dev,
 	return nvm->ops.write(hw,  first, length, data);
 }
 
-static struct rte_driver pmd_igb_drv = {
-	.type = PMD_PDEV,
-	.init = rte_igb_pmd_init,
-};
-
-static struct rte_driver pmd_igbvf_drv = {
-	.type = PMD_PDEV,
-	.init = rte_igbvf_pmd_init,
-};
-
 static int
 eth_igb_rx_queue_intr_disable(struct rte_eth_dev *dev, uint16_t queue_id)
 {
@@ -4973,5 +4967,3 @@ eth_igb_configure_msix_intr(struct rte_eth_dev *dev)
 	E1000_WRITE_FLUSH(hw);
 }
 
-PMD_REGISTER_DRIVER(pmd_igb_drv);
-PMD_REGISTER_DRIVER(pmd_igbvf_drv);

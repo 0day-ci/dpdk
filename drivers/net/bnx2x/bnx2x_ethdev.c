@@ -543,11 +543,13 @@ static int rte_bnx2xvf_pmd_init(const char *name __rte_unused, const char *param
 static struct rte_driver rte_bnx2x_driver = {
 	.type = PMD_PDEV,
 	.init = rte_bnx2x_pmd_init,
+	.pci_table = pci_id_bnx2x_map,
 };
 
 static struct rte_driver rte_bnx2xvf_driver = {
 	.type = PMD_PDEV,
 	.init = rte_bnx2xvf_pmd_init,
+	.pci_table = pci_id_bnx2xvf_map,
 };
 
 PMD_REGISTER_DRIVER(rte_bnx2x_driver);

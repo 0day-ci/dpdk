@@ -7134,11 +7134,13 @@ ixgbevf_dev_allmulticast_disable(struct rte_eth_dev *dev)
 static struct rte_driver rte_ixgbe_driver = {
 	.type = PMD_PDEV,
 	.init = rte_ixgbe_pmd_init,
+	.pci_table = pci_id_ixgbe_map,
 };
 
 static struct rte_driver rte_ixgbevf_driver = {
 	.type = PMD_PDEV,
 	.init = rte_ixgbevf_pmd_init,
+	.pci_table = pci_id_ixgbevf_map,
 };
 
 PMD_REGISTER_DRIVER(rte_ixgbe_driver);

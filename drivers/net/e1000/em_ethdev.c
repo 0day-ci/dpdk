@@ -60,7 +60,8 @@
 
 #define PMD_ROUNDUP(x,y)	(((x) + (y) - 1)/(y) * (y))
 
-
+int
+rte_em_pmd_init(const char *name __rte_unused, const char *params __rte_unused);
 static int eth_em_configure(struct rte_eth_dev *dev);
 static int eth_em_start(struct rte_eth_dev *dev);
 static void eth_em_stop(struct rte_eth_dev *dev);
@@ -136,7 +137,7 @@ static enum e1000_fc_mode em_fc_setting = e1000_fc_full;
 /*
  * The set of PCI devices this driver supports
  */
-static const struct rte_pci_id pci_id_em_map[] = {
+const struct rte_pci_id pci_id_em_map[] = {
 
 #define RTE_PCI_DEV_ID_DECL_EM(vend, dev) {RTE_PCI_DEVICE(vend, dev)},
 #include "rte_pci_dev_ids.h"
@@ -374,7 +375,7 @@ static struct eth_driver rte_em_pmd = {
 	.dev_private_size = sizeof(struct e1000_adapter),
 };
 
-static int
+int
 rte_em_pmd_init(const char *name __rte_unused, const char *params __rte_unused)
 {
 	rte_eth_driver_register(&rte_em_pmd);
@@ -1772,9 +1773,3 @@ eth_em_set_mc_addr_list(struct rte_eth_dev *dev,
 	return 0;
 }
 
-struct rte_driver em_pmd_drv = {
-	.type = PMD_PDEV,
-	.init = rte_em_pmd_init,
-};
-
-PMD_REGISTER_DRIVER(em_pmd_drv);

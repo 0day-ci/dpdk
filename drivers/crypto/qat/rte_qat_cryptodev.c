@@ -135,6 +135,7 @@ rte_qat_pmd_init(const char *name __rte_unused, const char *params __rte_unused)
 static struct rte_driver pmd_qat_drv = {
 	.type = PMD_PDEV,
 	.init = rte_qat_pmd_init,
+	.pci_table = pci_id_qat_map,
 };
 
 PMD_REGISTER_DRIVER(pmd_qat_drv);

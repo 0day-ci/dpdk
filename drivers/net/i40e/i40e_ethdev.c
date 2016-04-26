@@ -693,9 +693,23 @@ rte_i40e_pmd_init(const char *name __rte_unused,
 static struct rte_driver rte_i40e_driver = {
 	.type = PMD_PDEV,
 	.init = rte_i40e_pmd_init,
+	.pci_table = pci_id_i40e_map,
+};
+
+extern int
+rte_i40evf_pmd_init(const char *name __rte_unused,
+                    const char *params __rte_unused);
+
+extern const struct rte_pci_id pci_id_i40evf_map[];
+
+struct rte_driver rte_i40evf_driver = {
+	.type = PMD_PDEV,
+	.init = rte_i40evf_pmd_init,
+	.pci_table = pci_id_i40evf_map,
 };
 
 PMD_REGISTER_DRIVER(rte_i40e_driver);
+PMD_REGISTER_DRIVER(rte_i40evf_driver);
 
 /*
  * Initialize registers for flexible payload, which should be set by NVM.
