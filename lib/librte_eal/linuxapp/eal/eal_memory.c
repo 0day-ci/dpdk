@@ -1114,6 +1114,8 @@ rte_eal_hugepage_init(void)
 	 * processing done on these pages, shared memory will be created
 	 * at a later stage.
 	 */
+	if (nr_hugepages == 0)
+		goto fail;
 	tmp_hp = malloc(nr_hugepages * sizeof(struct hugepage_file));
 	if (tmp_hp == NULL)
 		goto fail;
