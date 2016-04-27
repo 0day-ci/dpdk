@@ -749,6 +749,7 @@ rte_lpm6_delete(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth)
 	int32_t rule_to_delete_index;
 	uint8_t ip_masked[RTE_LPM6_IPV6_ADDR_SIZE];
 	unsigned i;
+	int status = 0;
 
 	/*
 	 * Check input arguments.
@@ -790,12 +791,13 @@ rte_lpm6_delete(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth)
 	 * Add every rule again (except for the one that was removed from
 	 * the rules table).
 	 */
-	for (i = 0; i < lpm->used_rules; i++) {
-		rte_lpm6_add(lpm, lpm->rules_tbl[i].ip, lpm->rules_tbl[i].depth,
-				lpm->rules_tbl[i].next_hop);
+	for (i = 0; i < lpm->used_rules && status >= 0; i++) {
+		status = rte_lpm6_add(
+			lpm, lpm->rules_tbl[i].ip, lpm->rules_tbl[i].depth,
+			lpm->rules_tbl[i].next_hop);
 	}
 
-	return 0;
+	return status;
 }
 
 /*
