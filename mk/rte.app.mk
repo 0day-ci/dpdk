@@ -198,6 +198,10 @@ build: _postbuild
 
 exe2cmd = $(strip $(call dotfile,$(patsubst %,%.cmd,$(1))))
 
+ifeq ($(CONFIG_RTE_BUILD_SHARED_LIB),y)
+LDFLAGS += --rpath=$(RTE_SDK_BIN)/lib
+endif
+
 ifeq ($(LINK_USING_CC),1)
 override EXTRA_LDFLAGS := $(call linkerprefix,$(EXTRA_LDFLAGS))
 O_TO_EXE = $(CC) $(CFLAGS) $(LDFLAGS_$(@)) \
