@@ -34,6 +34,11 @@ This section should contain new features added in this release. Sample format:
 
   Refer to the previous release notes for examples.
 
+* **Added keepalive enhancements.**
+
+   Adds support for reporting LCore liveness to secondary processes and
+   support for idled CPUs.
+
 
 Resolved Issues
 ---------------
