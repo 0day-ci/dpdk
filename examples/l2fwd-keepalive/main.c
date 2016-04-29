@@ -72,6 +72,8 @@
 #include <rte_timer.h>
 #include <rte_keepalive.h>
 
+#include "shm.h"
+
 #define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
 
 #define NB_MBUF   8192
@@ -523,15 +525,23 @@ check_all_ports_link_status(uint8_t port_num, uint32_t port_mask)
 }
 
 static void
-dead_core(__attribute__((unused)) void *ptr_data, const int id_core)
+dead_core(void *ptr_data, const int id_core)
 {
 	printf("Dead core %i - restarting..\n", id_core);
 	if (rte_eal_get_lcore_state(id_core) == FINISHED) {
 		rte_eal_wait_lcore(id_core);
 		rte_eal_remote_launch(l2fwd_launch_one_lcore, NULL, id_core);
+		rte_keepalive_shm_dead((struct rte_keepalive_shm *)ptr_data,
+			id_core);
 	} else {
 		printf("..false positive!\n");
 	}
+}
+
+static void
+alive_core(void *ptr_data, const int id_core)
+{
+	rte_keepalive_shm_alive((struct rte_keepalive_shm *)ptr_data, id_core);
 }
 
 int
@@ -725,10 +735,18 @@ main(int argc, char **argv)
 	rte_timer_init(&stats_timer);
 
 	if (check_period > 0) {
+		struct rte_keepalive_shm *ka_shm;
+
+		ka_shm = rte_keepalive_shm_create();
+		if (ka_shm == NULL)
+			rte_exit(EXIT_FAILURE,
+				"rte_keepalive_shm_create() failed");
 		rte_global_keepalive_info =
-			rte_keepalive_create(&dead_core, NULL);
+			rte_keepalive_create(&dead_core, ka_shm);
 		if (rte_global_keepalive_info == NULL)
 			rte_exit(EXIT_FAILURE, "init_keep_alive() failed");
+		rte_keepalive_register_alive_callback(rte_global_keepalive_info,
+			alive_core, ka_shm);
 		rte_timer_init(&hb_timer);
 		if (rte_timer_reset(&hb_timer,
 				(check_period * rte_get_timer_hz()) / 1000,

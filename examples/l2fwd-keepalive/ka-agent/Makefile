@@ -39,12 +39,13 @@ RTE_TARGET ?= x86_64-native-linuxapp-gcc
 include $(RTE_SDK)/mk/rte.vars.mk
 
 # binary name
-APP = l2fwd-keepalive
+APP = ka-agent
 
 # all source are stored in SRCS-y
-SRCS-y := main.c shm.c
+SRCS-y := main.c
 
-CFLAGS += -O3
-CFLAGS += $(WERROR_FLAGS)
+CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR)/../
+
+EXTRA_CFLAGS += -O3 -g -Wfatal-errors
 
 include $(RTE_SDK)/mk/rte.extapp.mk
