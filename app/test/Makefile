@@ -77,6 +77,9 @@ SRCS-y += test.c
 SRCS-y += resource.c
 SRCS-y += test_resource.c
 $(eval $(call resource,test_resource_c,resource.c))
+$(eval $(call resource,test_resource_tar,resource.tar))
+resource.tar: test_resource.c
+	tar -C $(dir $<) -cf $@ $(notdir $<)
 SRCS-y += test_pci.c
 SRCS-y += test_prefetch.c
 SRCS-y += test_byteorder.c
@@ -196,6 +199,7 @@ CFLAGS += $(WERROR_FLAGS)
 CFLAGS += -D_GNU_SOURCE
 
 LDLIBS += -lm
+LDLIBS += -larchive
 
 # Disable VTA for memcpy test
 ifeq ($(CC), gcc)
