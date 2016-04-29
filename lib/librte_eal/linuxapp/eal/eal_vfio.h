@@ -143,6 +143,9 @@ int vfio_setup_device(const char *sysfs_base, const char *dev_addr,
 int vfio_enable(const char *modname);
 int vfio_is_enabled(const char *modname);
 
+int pci_vfio_enable(void);
+int pci_vfio_is_enabled(void);
+
 #define SOCKET_REQ_CONTAINER 0x100
 #define SOCKET_REQ_GROUP 0x200
 #define SOCKET_OK 0x0
