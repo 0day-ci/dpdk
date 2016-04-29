@@ -383,8 +383,8 @@ rte_eth_dev_count(void)
 static enum rte_eth_dev_type
 rte_eth_dev_get_device_type(uint8_t port_id)
 {
-	if (!rte_eth_dev_is_valid_port(port_id))
-		return RTE_ETH_DEV_UNKNOWN;
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, RTE_ETH_DEV_UNKNOWN);
+
 	return rte_eth_devices[port_id].dev_type;
 }
 
@@ -479,10 +479,7 @@ rte_eth_dev_is_detachable(uint8_t port_id)
 {
 	uint32_t dev_flags;
 
-	if (!rte_eth_dev_is_valid_port(port_id)) {
-		RTE_PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
-		return -EINVAL;
-	}
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
 	switch (rte_eth_devices[port_id].data->kdrv) {
 	case RTE_KDRV_IGB_UIO:
@@ -1994,10 +1991,7 @@ rte_eth_dev_rss_reta_query(uint8_t port_id,
 	struct rte_eth_dev *dev;
 	int ret;
 
-	if (port_id >= nb_ports) {
-		RTE_PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
-		return -ENODEV;
-	}
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
 	/* Check mask bits */
 	ret = rte_eth_check_reta_mask(reta_conf, reta_size);
@@ -2641,10 +2635,7 @@ rte_eth_dev_rx_intr_ctl(uint8_t port_id, int epfd, int op, void *data)
 	uint16_t qid;
 	int rc;
 
-	if (!rte_eth_dev_is_valid_port(port_id)) {
-		RTE_PMD_DEBUG_TRACE("Invalid port_id=%u\n", port_id);
-		return -ENODEV;
-	}
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
 	dev = &rte_eth_devices[port_id];
 	intr_handle = &dev->pci_dev->intr_handle;
@@ -2699,10 +2690,7 @@ rte_eth_dev_rx_intr_ctl_q(uint8_t port_id, uint16_t queue_id,
 	struct rte_intr_handle *intr_handle;
 	int rc;
 
-	if (!rte_eth_dev_is_valid_port(port_id)) {
-		RTE_PMD_DEBUG_TRACE("Invalid port_id=%u\n", port_id);
-		return -ENODEV;
-	}
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
 	dev = &rte_eth_devices[port_id];
 	if (queue_id >= dev->data->nb_rx_queues) {
@@ -2734,10 +2722,7 @@ rte_eth_dev_rx_intr_enable(uint8_t port_id,
 {
 	struct rte_eth_dev *dev;
 
-	if (!rte_eth_dev_is_valid_port(port_id)) {
-		RTE_PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
-		return -ENODEV;
-	}
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
 	dev = &rte_eth_devices[port_id];
 
@@ -2751,10 +2736,7 @@ rte_eth_dev_rx_intr_disable(uint8_t port_id,
 {
 	struct rte_eth_dev *dev;
 
-	if (!rte_eth_dev_is_valid_port(port_id)) {
-		RTE_PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
-		return -ENODEV;
-	}
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
 	dev = &rte_eth_devices[port_id];
 
@@ -3284,10 +3266,7 @@ rte_eth_dev_get_dcb_info(uint8_t port_id,
 {
 	struct rte_eth_dev *dev;
 
-	if (!rte_eth_dev_is_valid_port(port_id)) {
-		RTE_PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
-		return -ENODEV;
-	}
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
 	dev = &rte_eth_devices[port_id];
 	memset(dcb_info, 0, sizeof(struct rte_eth_dcb_info));
