@@ -59,6 +59,16 @@ typedef void (*rte_keepalive_failure_callback_t)(
 	const int id_core);
 
 /**
+ * Keepalive 'alive' callback.
+ *
+ *  Receives a data pointer passed to rte_keepalive_register_alive_callback()
+ *  and the id of the failed core.
+ */
+typedef void (*rte_keepalive_alive_callback_t)(
+	void *data,
+	const int id_core);
+
+/**
  * Keepalive state structure.
  * @internal
  */
@@ -104,5 +114,35 @@ void rte_keepalive_register_core(struct rte_keepalive *keepcfg,
  */
 void
 rte_keepalive_mark_alive(struct rte_keepalive *keepcfg);
+
+/**
+ * Per-core sleep-time indication.
+ * @param *keepcfg
+ *   Keepalive structure pointer
+ *
+ * This function needs to be called from within the main process loop of
+ * the LCore going to sleep.
+ */
+void
+rte_keepalive_mark_sleep(struct rte_keepalive *keepcfg);
+
+/**
+ * Registers a 'live core' callback.
+ *
+ * The complement of the 'dead core' callback. This is called when a
+ * core is known to be alive, and is intended for cases when an app
+ * needs to know 'liveness' beyond just knowing when a core has died.
+ *
+ * @param *keepcfg
+ *   Keepalive structure pointer
+ * @param callback
+ *   Function called upon detection of a dead core.
+ * @param data
+ *   Data pointer to be passed to function callback.
+ */
+void
+rte_keepalive_register_alive_callback(struct rte_keepalive *keepcfg,
+	rte_keepalive_alive_callback_t callback,
+	void *data);
 
 #endif /* _KEEPALIVE_H_ */

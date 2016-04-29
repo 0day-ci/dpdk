@@ -46,7 +46,8 @@ struct rte_keepalive {
 		ALIVE = 1,
 		MISSING = 0,
 		DEAD = 2,
-		GONE = 3
+		GONE = 3,
+		SLEEP = 4
 	} __rte_cache_aligned state_flags[RTE_KEEPALIVE_MAXCORES];
 
 	/** Last-seen-alive timestamps */
@@ -68,6 +69,15 @@ struct rte_keepalive {
 	void *callback_data;
 	uint64_t tsc_initial;
 	uint64_t tsc_mhz;
+
+	/** Live core handler. */
+	rte_keepalive_failure_callback_t alive_callback;
+
+	/**
+	 * Live core handler app data.
+	 * Pointer is passed to live core handler.
+	 */
+	void *alive_callback_data;
 };
 
 static void
@@ -95,6 +105,11 @@ rte_keepalive_dispatch_pings(__rte_unused void *ptr_timer,
 		case ALIVE: /* Alive */
 			keepcfg->state_flags[idx_core] = MISSING;
 			keepcfg->last_alive[idx_core] = rte_rdtsc();
+			if (keepcfg->alive_callback)
+				keepcfg->alive_callback(
+					keepcfg->alive_callback_data,
+					idx_core
+					);
 			break;
 		case MISSING: /* MIA */
 			print_trace("Core MIA. ", keepcfg, idx_core);
@@ -110,6 +125,8 @@ rte_keepalive_dispatch_pings(__rte_unused void *ptr_timer,
 					);
 			break;
 		case GONE: /* Buried */
+			break;
+		case SLEEP: /* Idled core */
 			break;
 		}
 	}
@@ -133,11 +150,19 @@ rte_keepalive_create(rte_keepalive_failure_callback_t callback,
 	return keepcfg;
 }
 
+void rte_keepalive_register_alive_callback(struct rte_keepalive *keepcfg,
+	rte_keepalive_failure_callback_t callback,
+	void *data)
+{
+	keepcfg->alive_callback = callback;
+	keepcfg->alive_callback_data = data;
+}
+
 void
 rte_keepalive_register_core(struct rte_keepalive *keepcfg, const int id_core)
 {
 	if (id_core < RTE_KEEPALIVE_MAXCORES) {
-		keepcfg->active_cores[id_core] = 1;
+		keepcfg->active_cores[id_core] = ALIVE;
 		keepcfg->last_alive[id_core] = rte_rdtsc();
 	}
 }
@@ -146,4 +171,10 @@ void
 rte_keepalive_mark_alive(struct rte_keepalive *keepcfg)
 {
 	keepcfg->state_flags[rte_lcore_id()] = ALIVE;
+}
+
+void
+rte_keepalive_mark_sleep(struct rte_keepalive *keepcfg)
+{
+	keepcfg->state_flags[rte_lcore_id()] = SLEEP;
 }
