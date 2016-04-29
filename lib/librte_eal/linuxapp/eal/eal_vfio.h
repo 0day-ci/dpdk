@@ -149,17 +149,6 @@ int vfio_is_enabled(const char *modname);
 #define SOCKET_NO_FD 0x1
 #define SOCKET_ERR 0xFF
 
-int vfio_type1_dma_map(int);
-int vfio_noiommu_dma_map(int);
-
-/* IOMMU types we support */
-static const struct vfio_iommu_type iommu_types[] = {
-	/* x86 IOMMU, otherwise known as type 1 */
-	{ RTE_VFIO_TYPE1, "Type 1", &vfio_type1_dma_map},
-	/* IOMMU-less mode */
-	{ RTE_VFIO_NOIOMMU, "No-IOMMU", &vfio_noiommu_dma_map},
-};
-
 #define VFIO_PRESENT
 #endif /* kernel version */
 #endif /* RTE_EAL_VFIO */
