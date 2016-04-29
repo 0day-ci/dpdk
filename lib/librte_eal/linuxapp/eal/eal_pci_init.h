@@ -87,13 +87,6 @@ int pci_vfio_map_resource(struct rte_pci_device *dev);
 int pci_vfio_get_group_fd(int iommu_group_fd);
 int pci_vfio_get_container_fd(void);
 
-/* socket comm protocol definitions */
-#define SOCKET_REQ_CONTAINER 0x100
-#define SOCKET_REQ_GROUP 0x200
-#define SOCKET_OK 0x0
-#define SOCKET_NO_FD 0x1
-#define SOCKET_ERR 0xFF
-
 #endif
 
 #endif /* EAL_PCI_INIT_H_ */

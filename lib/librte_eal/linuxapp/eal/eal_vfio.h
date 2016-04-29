@@ -115,6 +115,12 @@ vfio_set_iommu_type(int vfio_container_fd);
 int
 vfio_has_supported_extensions(int vfio_container_fd);
 
+#define SOCKET_REQ_CONTAINER 0x100
+#define SOCKET_REQ_GROUP 0x200
+#define SOCKET_OK 0x0
+#define SOCKET_NO_FD 0x1
+#define SOCKET_ERR 0xFF
+
 int vfio_type1_dma_map(int);
 int vfio_noiommu_dma_map(int);
 
