@@ -203,40 +203,6 @@ pci_vfio_set_bus_master(int dev_fd)
 	return 0;
 }
 
-/* check if we have any supported extensions */
-static int
-pci_vfio_has_supported_extensions(int vfio_container_fd) {
-	int ret;
-	unsigned idx, n_extensions = 0;
-	for (idx = 0; idx < RTE_DIM(iommu_types); idx++) {
-		const struct vfio_iommu_type *t = &iommu_types[idx];
-
-		ret = ioctl(vfio_container_fd, VFIO_CHECK_EXTENSION,
-				t->type_id);
-		if (ret < 0) {
-			RTE_LOG(ERR, EAL, "  could not get IOMMU type, "
-				"error %i (%s)\n", errno,
-				strerror(errno));
-			close(vfio_container_fd);
-			return -1;
-		} else if (ret == 1) {
-			/* we found a supported extension */
-			n_extensions++;
-		}
-		RTE_LOG(DEBUG, EAL, "  IOMMU type %d (%s) is %s\n",
-				t->type_id, t->name,
-				ret ? "supported" : "not supported");
-	}
-
-	/* if we didn't find any supported IOMMU types, fail */
-	if (!n_extensions) {
-		close(vfio_container_fd);
-		return -1;
-	}
-
-	return 0;
-}
-
 /* set up interrupt support (but not enable interrupts) */
 static int
 pci_vfio_setup_interrupts(struct rte_pci_device *dev, int vfio_dev_fd)
@@ -360,7 +326,7 @@ pci_vfio_get_container_fd(void)
 			return -1;
 		}
 
-		ret = pci_vfio_has_supported_extensions(vfio_container_fd);
+		ret = vfio_has_supported_extensions(vfio_container_fd);
 		if (ret) {
 			RTE_LOG(ERR, EAL, "  no supported IOMMU "
 					"extensions found!\n");

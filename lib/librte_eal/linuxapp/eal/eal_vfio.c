@@ -62,6 +62,39 @@ vfio_set_iommu_type(int vfio_container_fd) {
 }
 
 int
+vfio_has_supported_extensions(int vfio_container_fd) {
+	int ret;
+	unsigned idx, n_extensions = 0;
+	for (idx = 0; idx < RTE_DIM(iommu_types); idx++) {
+		const struct vfio_iommu_type *t = &iommu_types[idx];
+
+		ret = ioctl(vfio_container_fd, VFIO_CHECK_EXTENSION,
+				t->type_id);
+		if (ret < 0) {
+			RTE_LOG(ERR, EAL, "  could not get IOMMU type, "
+				"error %i (%s)\n", errno,
+				strerror(errno));
+			close(vfio_container_fd);
+			return -1;
+		} else if (ret == 1) {
+			/* we found a supported extension */
+			n_extensions++;
+		}
+		RTE_LOG(DEBUG, EAL, "  IOMMU type %d (%s) is %s\n",
+				t->type_id, t->name,
+				ret ? "supported" : "not supported");
+	}
+
+	/* if we didn't find any supported IOMMU types, fail */
+	if (!n_extensions) {
+		close(vfio_container_fd);
+		return -1;
+	}
+
+	return 0;
+}
+
+int
 vfio_type1_dma_map(int vfio_container_fd)
 {
 	const struct rte_memseg *ms = rte_eal_get_physmem_layout();

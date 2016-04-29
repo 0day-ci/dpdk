@@ -111,6 +111,10 @@ struct vfio_iommu_type {
 const struct vfio_iommu_type *
 vfio_set_iommu_type(int vfio_container_fd);
 
+/* check if we have any supported extensions */
+int
+vfio_has_supported_extensions(int vfio_container_fd);
+
 int vfio_type1_dma_map(int);
 int vfio_noiommu_dma_map(int);
 
