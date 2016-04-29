@@ -115,6 +115,10 @@ vfio_set_iommu_type(int vfio_container_fd);
 int
 vfio_has_supported_extensions(int vfio_container_fd);
 
+/* open container fd or get an existing one */
+int
+vfio_get_container_fd(void);
+
 #define SOCKET_REQ_CONTAINER 0x100
 #define SOCKET_REQ_GROUP 0x200
 #define SOCKET_OK 0x0
