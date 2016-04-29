@@ -60,6 +60,34 @@
 #define RTE_VFIO_NOIOMMU VFIO_NOIOMMU_IOMMU
 #endif
 
+#define VFIO_MAX_GROUPS 64
+
+/*
+ * Function prototypes for VFIO multiprocess sync functions
+ */
+int vfio_mp_sync_send_request(int socket, int req);
+int vfio_mp_sync_receive_request(int socket);
+int vfio_mp_sync_send_fd(int socket, int fd);
+int vfio_mp_sync_receive_fd(int socket);
+int vfio_mp_sync_connect_to_primary(void);
+
+/*
+ * we don't need to store device fd's anywhere since they can be obtained from
+ * the group fd via an ioctl() call.
+ */
+struct vfio_group {
+	int group_no;
+	int fd;
+};
+
+struct vfio_config {
+	int vfio_enabled;
+	int vfio_container_fd;
+	int vfio_container_has_dma;
+	int vfio_group_idx;
+	struct vfio_group vfio_groups[VFIO_MAX_GROUPS];
+};
+
 #define VFIO_PRESENT
 #endif /* kernel version */
 #endif /* RTE_EAL_VFIO */
