@@ -149,6 +149,8 @@ int vfio_is_enabled(const char *modname);
 #define SOCKET_NO_FD 0x1
 #define SOCKET_ERR 0xFF
 
+int vfio_mp_sync_setup(void);
+
 #define VFIO_PRESENT
 #endif /* kernel version */
 #endif /* RTE_EAL_VFIO */
