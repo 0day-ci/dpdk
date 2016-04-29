@@ -35,6 +35,7 @@
 #define _RESOURCE_H_
 
 #include <sys/queue.h>
+#include <stdio.h>
 #include <stddef.h>
 
 #include <rte_eal.h>
@@ -56,6 +57,9 @@ static inline size_t resource_size(const struct resource *r)
 }
 
 const struct resource *resource_find(const char *name);
+
+int resource_fwrite(const struct resource *r, FILE *f);
+int resource_fwrite_file(const struct resource *r, const char *fname);
 
 void __resource_register(struct resource *r);
 
