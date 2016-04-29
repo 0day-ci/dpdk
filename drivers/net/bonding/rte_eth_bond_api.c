@@ -247,6 +247,7 @@ rte_eth_bond_create(const char *name, uint8_t mode, uint8_t socket_id)
 	internals->active_slave_count = 0;
 	internals->rx_offload_capa = 0;
 	internals->tx_offload_capa = 0;
+	internals->max_rx_pktlen = 2048;
 
 	/* Initially allow to choose any offload type */
 	internals->flow_type_rss_offloads = ETH_RSS_PROTO_MASK;
@@ -331,9 +332,15 @@ __eth_bond_slave_add_lock_free(uint8_t bonded_port_id, uint8_t slave_port_id)
 
 	/* Add slave details to bonded device */
 	slave_eth_dev->data->dev_flags |= RTE_ETH_DEV_BONDED_SLAVE;
-	slave_add(internals, slave_eth_dev);
 
 	rte_eth_dev_info_get(slave_port_id, &dev_info);
+	if (dev_info.max_rx_pktlen < internals->max_rx_pktlen) {
+		RTE_BOND_LOG(ERR, "Slave (port %u) max_rx_pktlen too small",
+			     slave_port_id);
+		return -1;
+	}
+
+	slave_add(internals, slave_eth_dev);
 
 	/* We need to store slaves reta_size to be able to synchronize RETA for all
 	 * slave devices even if its sizes are different.
@@ -364,6 +371,9 @@ __eth_bond_slave_add_lock_free(uint8_t bonded_port_id, uint8_t slave_port_id)
 		internals->rx_offload_capa = dev_info.rx_offload_capa;
 		internals->tx_offload_capa = dev_info.tx_offload_capa;
 		internals->flow_type_rss_offloads = dev_info.flow_type_rss_offloads;
+
+		/* Inherit first slave's max rx packet size */
+		internals->max_rx_pktlen = dev_info.max_rx_pktlen;
 
 	} else {
 		/* Check slave link properties are supported if props are set,

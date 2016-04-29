@@ -1650,7 +1650,7 @@ bond_ethdev_info(struct rte_eth_dev *dev, struct rte_eth_dev_info *dev_info)
 
 	dev_info->max_mac_addrs = 1;
 
-	dev_info->max_rx_pktlen = (uint32_t)2048;
+	dev_info->max_rx_pktlen = internals->max_rx_pktlen;
 
 	dev_info->max_rx_queues = (uint16_t)128;
 	dev_info->max_tx_queues = (uint16_t)512;
