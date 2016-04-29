@@ -33,6 +33,37 @@ include $(RTE_SDK)/mk/rte.vars.mk
 
 ifeq ($(CONFIG_RTE_APP_TEST),y)
 
+ifeq ($(RTE_ARCH),arm)
+RTE_OBJCOPY_O = elf32-littlearm
+RTE_OBJCOPY_B = arm
+else ifeq ($(RTE_ARCH),arm64)
+RTE_OBJCOPY_O = elf64-littleaarch64
+RTE_OBJCOPY_B = aarch64
+else ifeq ($(RTE_ARCH),i686)
+RTE_OBJCOPY_O = elf32-i386
+RTE_OBJCOPY_B = i386
+else ifeq ($(RTE_ARCH),x86_64)
+RTE_OBJCOPY_O = elf64-x86-64
+RTE_OBJCOPY_B = i386:x86-64
+else ifeq ($(RTE_ARCH),x86_x32)
+RTE_OBJCOPY_O = elf32-x86-64
+RTE_OBJCOPY_B = i386:x86-64
+else
+$(error Unrecognized RTE_ARCH: $(RTE_ARCH))
+endif
+
+define resource
+SRCS-y += $(1).res.o
+$(1).res.o: $(2)
+	$(OBJCOPY) -I binary -B $(RTE_OBJCOPY_B) -O $(RTE_OBJCOPY_O)     \
+		--rename-section                                         \
+			.data=.rodata,alloc,load,data,contents,readonly  \
+		--redefine-sym _binary__dev_stdin_start=beg_$(1)         \
+		--redefine-sym _binary__dev_stdin_end=end_$(1)           \
+		--redefine-sym _binary__dev_stdin_size=siz_$(1)          \
+		/dev/stdin $$@ < $$<
+endef
+
 #
 # library name
 #
@@ -45,6 +76,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_CMDLINE) := commands.c
 SRCS-y += test.c
 SRCS-y += resource.c
 SRCS-y += test_resource.c
+$(eval $(call resource,test_resource_c,resource.c))
 SRCS-y += test_pci.c
 SRCS-y += test_prefetch.c
 SRCS-y += test_byteorder.c

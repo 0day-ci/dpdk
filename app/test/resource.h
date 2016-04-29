@@ -59,6 +59,11 @@ const struct resource *resource_find(const char *name);
 
 void __resource_register(struct resource *r);
 
+#define REGISTER_LINKED_RESOURCE(_n) \
+extern const char beg_ ##_n;         \
+extern const char end_ ##_n;         \
+REGISTER_RESOURCE(_n, &beg_ ##_n, &end_ ##_n); \
+
 #define REGISTER_RESOURCE(_n, _b, _e) \
 static struct resource linkres_ ##_n = {       \
 	.name = RTE_STR(_n),     \
