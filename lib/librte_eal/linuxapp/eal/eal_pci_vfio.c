@@ -203,29 +203,6 @@ pci_vfio_set_bus_master(int dev_fd)
 	return 0;
 }
 
-/* pick IOMMU type. returns a pointer to vfio_iommu_type or NULL for error */
-static const struct vfio_iommu_type *
-pci_vfio_set_iommu_type(int vfio_container_fd) {
-	unsigned idx;
-	for (idx = 0; idx < RTE_DIM(iommu_types); idx++) {
-		const struct vfio_iommu_type *t = &iommu_types[idx];
-
-		int ret = ioctl(vfio_container_fd, VFIO_SET_IOMMU,
-				t->type_id);
-		if (!ret) {
-			RTE_LOG(NOTICE, EAL, "  using IOMMU type %d (%s)\n",
-					t->type_id, t->name);
-			return t;
-		}
-		/* not an error, there may be more supported IOMMU types */
-		RTE_LOG(DEBUG, EAL, "  set IOMMU type %d (%s) failed, "
-				"error %i (%s)\n", t->type_id, t->name, errno,
-				strerror(errno));
-	}
-	/* if we didn't find a suitable IOMMU type, fail */
-	return NULL;
-}
-
 /* check if we have any supported extensions */
 static int
 pci_vfio_has_supported_extensions(int vfio_container_fd) {
@@ -689,7 +666,7 @@ pci_vfio_map_resource(struct rte_pci_device *dev)
 			vfio_cfg.vfio_container_has_dma == 0) {
 		/* select an IOMMU type which we will be using */
 		const struct vfio_iommu_type *t =
-				pci_vfio_set_iommu_type(vfio_cfg.vfio_container_fd);
+				vfio_set_iommu_type(vfio_cfg.vfio_container_fd);
 		if (!t) {
 			RTE_LOG(ERR, EAL, "  %s failed to select IOMMU type\n", pci_addr);
 			return -1;

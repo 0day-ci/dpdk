@@ -39,6 +39,28 @@
 
 #include "eal_vfio.h"
 
+const struct vfio_iommu_type *
+vfio_set_iommu_type(int vfio_container_fd) {
+	unsigned idx;
+	for (idx = 0; idx < RTE_DIM(iommu_types); idx++) {
+		const struct vfio_iommu_type *t = &iommu_types[idx];
+
+		int ret = ioctl(vfio_container_fd, VFIO_SET_IOMMU,
+				t->type_id);
+		if (!ret) {
+			RTE_LOG(NOTICE, EAL, "  using IOMMU type %d (%s)\n",
+					t->type_id, t->name);
+			return t;
+		}
+		/* not an error, there may be more supported IOMMU types */
+		RTE_LOG(DEBUG, EAL, "  set IOMMU type %d (%s) failed, "
+				"error %i (%s)\n", t->type_id, t->name, errno,
+				strerror(errno));
+	}
+	/* if we didn't find a suitable IOMMU type, fail */
+	return NULL;
+}
+
 int
 vfio_type1_dma_map(int vfio_container_fd)
 {

@@ -107,6 +107,10 @@ struct vfio_iommu_type {
 	vfio_dma_func_t dma_map_func;
 };
 
+/* pick IOMMU type. returns a pointer to vfio_iommu_type or NULL for error */
+const struct vfio_iommu_type *
+vfio_set_iommu_type(int vfio_container_fd);
+
 int vfio_type1_dma_map(int);
 int vfio_noiommu_dma_map(int);
 
