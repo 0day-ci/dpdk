@@ -119,6 +119,13 @@ vfio_has_supported_extensions(int vfio_container_fd);
 int
 vfio_get_container_fd(void);
 
+/* parse IOMMU group number for a device
+ * returns 1 on success, -1 for errors, 0 for non-existent group
+ */
+int
+vfio_get_group_no(const char *sysfs_base,
+		const char *dev_addr, int *iommu_group_no);
+
 #define SOCKET_REQ_CONTAINER 0x100
 #define SOCKET_REQ_GROUP 0x200
 #define SOCKET_OK 0x0

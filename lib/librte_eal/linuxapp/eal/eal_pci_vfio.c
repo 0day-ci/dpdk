@@ -401,43 +401,7 @@ pci_vfio_get_group_fd(int iommu_group_no)
 static int
 pci_vfio_get_group_no(const char *pci_addr, int *iommu_group_no)
 {
-	char linkname[PATH_MAX];
-	char filename[PATH_MAX];
-	char *tok[16], *group_tok, *end;
-	int ret;
-
-	memset(linkname, 0, sizeof(linkname));
-	memset(filename, 0, sizeof(filename));
-
-	/* try to find out IOMMU group for this device */
-	snprintf(linkname, sizeof(linkname),
-			 SYSFS_PCI_DEVICES "/%s/iommu_group", pci_addr);
-
-	ret = readlink(linkname, filename, sizeof(filename));
-
-	/* if the link doesn't exist, no VFIO for us */
-	if (ret < 0)
-		return 0;
-
-	ret = rte_strsplit(filename, sizeof(filename),
-			tok, RTE_DIM(tok), '/');
-
-	if (ret <= 0) {
-		RTE_LOG(ERR, EAL, "  %s cannot get IOMMU group\n", pci_addr);
-		return -1;
-	}
-
-	/* IOMMU group is always the last token */
-	errno = 0;
-	group_tok = tok[ret - 1];
-	end = group_tok;
-	*iommu_group_no = strtol(group_tok, &end, 10);
-	if ((end != group_tok && *end != '\0') || errno != 0) {
-		RTE_LOG(ERR, EAL, "  %s error parsing IOMMU number!\n", pci_addr);
-		return -1;
-	}
-
-	return 1;
+	return vfio_get_group_no(SYSFS_PCI_DEVICES, pci_addr, iommu_group_no);
 }
 
 static void

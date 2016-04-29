@@ -163,6 +163,49 @@ vfio_get_container_fd(void)
 }
 
 int
+vfio_get_group_no(const char *sysfs_base,
+		const char *dev_addr, int *iommu_group_no)
+{
+	char linkname[PATH_MAX];
+	char filename[PATH_MAX];
+	char *tok[16], *group_tok, *end;
+	int ret;
+
+	memset(linkname, 0, sizeof(linkname));
+	memset(filename, 0, sizeof(filename));
+
+	/* try to find out IOMMU group for this device */
+	snprintf(linkname, sizeof(linkname),
+			 "%s/%s/iommu_group", sysfs_base, dev_addr);
+
+	ret = readlink(linkname, filename, sizeof(filename));
+
+	/* if the link doesn't exist, no VFIO for us */
+	if (ret < 0)
+		return 0;
+
+	ret = rte_strsplit(filename, sizeof(filename),
+			tok, RTE_DIM(tok), '/');
+
+	if (ret <= 0) {
+		RTE_LOG(ERR, EAL, "  %s cannot get IOMMU group\n", dev_addr);
+		return -1;
+	}
+
+	/* IOMMU group is always the last token */
+	errno = 0;
+	group_tok = tok[ret - 1];
+	end = group_tok;
+	*iommu_group_no = strtol(group_tok, &end, 10);
+	if ((end != group_tok && *end != '\0') || errno != 0) {
+		RTE_LOG(ERR, EAL, "  %s error parsing IOMMU number!\n", dev_addr);
+		return -1;
+	}
+
+	return 1;
+}
+
+int
 vfio_type1_dma_map(int vfio_container_fd)
 {
 	const struct rte_memseg *ms = rte_eal_get_physmem_layout();
