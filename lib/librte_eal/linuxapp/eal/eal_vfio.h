@@ -88,6 +88,13 @@ struct vfio_config {
 	struct vfio_group vfio_groups[VFIO_MAX_GROUPS];
 };
 
+#define VFIO_DIR "/dev/vfio"
+#define VFIO_CONTAINER_PATH "/dev/vfio/vfio"
+#define VFIO_GROUP_FMT "/dev/vfio/%u"
+#define VFIO_NOIOMMU_GROUP_FMT "/dev/vfio/noiommu-%u"
+#define VFIO_GET_REGION_ADDR(x) ((uint64_t) x << 40ULL)
+#define VFIO_GET_REGION_IDX(x) (x >> 40)
+
 #define VFIO_PRESENT
 #endif /* kernel version */
 #endif /* RTE_EAL_VFIO */
