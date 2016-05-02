@@ -70,7 +70,7 @@
 #include "rte_ethdev.h"
 
 static const char *MZ_RTE_ETH_DEV_DATA = "rte_eth_dev_data";
-struct rte_eth_dev rte_eth_devices[RTE_MAX_ETHPORTS];
+struct rte_eth_dev rte_eth_devices[RTE_MAX_ETHPORTS] __rte_cache_aligned;
 static struct rte_eth_dev_data *rte_eth_dev_data;
 static uint8_t nb_ports;
 
