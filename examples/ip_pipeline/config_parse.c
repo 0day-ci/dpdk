@@ -1114,61 +1114,29 @@ parse_pipeline_pcap_sink(struct app_params *app,
 static int
 parse_pipeline_pktq_in(struct app_params *app,
 	struct app_pipeline_params *p,
-	const char *value)
+	char *value)
 {
-	const char *next = value;
-	char *end;
-	char name[APP_PARAM_NAME_SIZE];
-	size_t name_len;
 
-	while (*next != '\0') {
+	while (1) {
 		enum app_pktq_in_type type;
 		int id;
-		char *end_space;
-		char *end_tab;
+		char *token = strtok_r(value, PARSE_DELIMITER, &value);
 
-		next = skip_white_spaces(next);
-		if (!next)
+		if (token == NULL)
 			break;
 
-		end_space = strchr(next, ' ');
-		end_tab = strchr(next, '	');
-
-		if (end_space && (!end_tab))
-			end = end_space;
-		else if ((!end_space) && end_tab)
-			end = end_tab;
-		else if (end_space && end_tab)
-			end = RTE_MIN(end_space, end_tab);
-		else
-			end = NULL;
-
-		if (!end)
-			name_len = strlen(next);
-		else
-			name_len = end - next;
-
-		if (name_len == 0 || name_len == sizeof(name))
-			return -EINVAL;
-
-		strncpy(name, next, name_len);
-		name[name_len] = '\0';
-		next += name_len;
-		if (*next != '\0')
-			next++;
-
-		if (validate_name(name, "RXQ", 2) == 0) {
+		if (validate_name(token, "RXQ", 2) == 0) {
 			type = APP_PKTQ_IN_HWQ;
-			id = APP_PARAM_ADD(app->hwq_in_params, name);
-		} else if (validate_name(name, "SWQ", 1) == 0) {
+			id = APP_PARAM_ADD(app->hwq_in_params, token);
+		} else if (validate_name(token, "SWQ", 1) == 0) {
 			type = APP_PKTQ_IN_SWQ;
-			id = APP_PARAM_ADD(app->swq_params, name);
-		} else if (validate_name(name, "TM", 1) == 0) {
+			id = APP_PARAM_ADD(app->swq_params, token);
+		} else if (validate_name(token, "TM", 1) == 0) {
 			type = APP_PKTQ_IN_TM;
-			id = APP_PARAM_ADD(app->tm_params, name);
-		} else if (validate_name(name, "SOURCE", 1) == 0) {
+			id = APP_PARAM_ADD(app->tm_params, token);
+		} else if (validate_name(token, "SOURCE", 1) == 0) {
 			type = APP_PKTQ_IN_SOURCE;
-			id = APP_PARAM_ADD(app->source_params, name);
+			id = APP_PARAM_ADD(app->source_params, token);
 		} else
 			return -EINVAL;
 
@@ -1186,60 +1154,28 @@ parse_pipeline_pktq_in(struct app_params *app,
 static int
 parse_pipeline_pktq_out(struct app_params *app,
 	struct app_pipeline_params *p,
-	const char *value)
+	char *value)
 {
-	const char *next = value;
-	char *end;
-	char name[APP_PARAM_NAME_SIZE];
-	size_t name_len;
-
-	while (*next != '\0') {
-		enum app_pktq_out_type type;
+	while (1) {
+		enum app_pktq_in_type type;
 		int id;
-		char *end_space;
-		char *end_tab;
+		char *token = strtok_r(value, PARSE_DELIMITER, &value);
 
-		next = skip_white_spaces(next);
-		if (!next)
+		if (token == NULL)
 			break;
 
-		end_space = strchr(next, ' ');
-		end_tab = strchr(next, '	');
-
-		if (end_space && (!end_tab))
-			end = end_space;
-		else if ((!end_space) && end_tab)
-			end = end_tab;
-		else if (end_space && end_tab)
-			end = RTE_MIN(end_space, end_tab);
-		else
-			end = NULL;
-
-		if (!end)
-			name_len = strlen(next);
-		else
-			name_len = end - next;
-
-		if (name_len == 0 || name_len == sizeof(name))
-			return -EINVAL;
-
-		strncpy(name, next, name_len);
-		name[name_len] = '\0';
-		next += name_len;
-		if (*next != '\0')
-			next++;
-		if (validate_name(name, "TXQ", 2) == 0) {
+		if (validate_name(token, "TXQ", 2) == 0) {
 			type = APP_PKTQ_OUT_HWQ;
-			id = APP_PARAM_ADD(app->hwq_out_params, name);
-		} else if (validate_name(name, "SWQ", 1) == 0) {
+			id = APP_PARAM_ADD(app->hwq_out_params, token);
+		} else if (validate_name(token, "SWQ", 1) == 0) {
 			type = APP_PKTQ_OUT_SWQ;
-			id = APP_PARAM_ADD(app->swq_params, name);
-		} else if (validate_name(name, "TM", 1) == 0) {
+			id = APP_PARAM_ADD(app->swq_params, token);
+		} else if (validate_name(token, "TM", 1) == 0) {
 			type = APP_PKTQ_OUT_TM;
-			id = APP_PARAM_ADD(app->tm_params, name);
-		} else if (validate_name(name, "SINK", 1) == 0) {
+			id = APP_PARAM_ADD(app->tm_params, token);
+		} else if (validate_name(token, "SINK", 1) == 0) {
 			type = APP_PKTQ_OUT_SINK;
-			id = APP_PARAM_ADD(app->sink_params, name);
+			id = APP_PARAM_ADD(app->sink_params, token);
 		} else
 			return -EINVAL;
 
@@ -1257,56 +1193,23 @@ parse_pipeline_pktq_out(struct app_params *app,
 static int
 parse_pipeline_msgq_in(struct app_params *app,
 	struct app_pipeline_params *p,
-	const char *value)
+	char *value)
 {
-	const char *next = value;
-	char *end;
-	char name[APP_PARAM_NAME_SIZE];
-	size_t name_len;
-	ssize_t idx;
+	while (1) {
+		int id;
+		char *token = strtok_r(value, PARSE_DELIMITER, &value);
 
-	while (*next != '\0') {
-		char *end_space;
-		char *end_tab;
-
-		next = skip_white_spaces(next);
-		if (!next)
+		if (token == NULL)
 			break;
 
-		end_space = strchr(next, ' ');
-		end_tab = strchr(next, '	');
-
-		if (end_space && (!end_tab))
-			end = end_space;
-		else if ((!end_space) && end_tab)
-			end = end_tab;
-		else if (end_space && end_tab)
-			end = RTE_MIN(end_space, end_tab);
-		else
-			end = NULL;
-
-		if (!end)
-			name_len = strlen(next);
-		else
-			name_len = end - next;
-
-		if (name_len == 0 || name_len == sizeof(name))
+		if (validate_name(token, "MSGQ", 1) != 0)
 			return -EINVAL;
 
-		strncpy(name, next, name_len);
-		name[name_len] = '\0';
-		next += name_len;
-		if (*next != '\0')
-			next++;
+		id = APP_PARAM_ADD(app->msgq_params, token);
+		if (id < 0)
+			return id;
 
-		if (validate_name(name, "MSGQ", 1) != 0)
-			return -EINVAL;
-
-		idx = APP_PARAM_ADD(app->msgq_params, name);
-		if (idx < 0)
-			return idx;
-
-		p->msgq_in[p->n_msgq_in] = idx;
+		p->msgq_in[p->n_msgq_in] = id;
 		p->n_msgq_in++;
 	}
 
@@ -1316,56 +1219,22 @@ parse_pipeline_msgq_in(struct app_params *app,
 static int
 parse_pipeline_msgq_out(struct app_params *app,
 	struct app_pipeline_params *p,
-	const char *value)
+	char *value)
 {
-	const char *next = value;
-	char *end;
-	char name[APP_PARAM_NAME_SIZE];
-	size_t name_len;
-	ssize_t idx;
+	while (1) {
+		int id;
+		char *token = strtok_r(value, PARSE_DELIMITER, &value);
 
-	while (*next != '\0') {
-		char *end_space;
-		char *end_tab;
-
-		next = skip_white_spaces(next);
-		if (!next)
+		if (token == NULL)
 			break;
-
-		end_space = strchr(next, ' ');
-		end_tab = strchr(next, '	');
-
-		if (end_space && (!end_tab))
-			end = end_space;
-		else if ((!end_space) && end_tab)
-			end = end_tab;
-		else if (end_space && end_tab)
-			end = RTE_MIN(end_space, end_tab);
-		else
-			end = NULL;
-
-		if (!end)
-			name_len = strlen(next);
-		else
-			name_len = end - next;
-
-		if (name_len == 0 || name_len == sizeof(name))
+		if (validate_name(token, "MSGQ", 1) != 0)
 			return -EINVAL;
 
-		strncpy(name, next, name_len);
-		name[name_len] = '\0';
-		next += name_len;
-		if (*next != '\0')
-			next++;
+		id = APP_PARAM_ADD(app->msgq_params, token);
+		if (id < 0)
+			return id;
 
-		if (validate_name(name, "MSGQ", 1) != 0)
-			return -EINVAL;
-
-		idx = APP_PARAM_ADD(app->msgq_params, name);
-		if (idx < 0)
-			return idx;
-
-		p->msgq_out[p->n_msgq_out] = idx;
+		p->msgq_out[p->n_msgq_out] = id;
 		p->n_msgq_out++;
 	}
 
