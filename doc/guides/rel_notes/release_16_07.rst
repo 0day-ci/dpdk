@@ -34,6 +34,8 @@ This section should contain new features added in this release. Sample format:
 
   Refer to the previous release notes for examples.
 
+* **Added NSH packet recognition in i40e.**
+
 
 Resolved Issues
 ---------------
