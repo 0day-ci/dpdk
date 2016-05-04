@@ -222,40 +222,37 @@ bnx2x_xmit_pkts(void *p_txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 	struct bnx2x_tx_queue *txq;
 	struct bnx2x_softc *sc;
 	struct bnx2x_fastpath *fp;
-	uint32_t burst, nb_tx;
-	struct rte_mbuf **m = tx_pkts;
-	int ret;
+	uint32_t ret;
+	uint16_t nb_tx_pkts;
+	uint16_t nb_pkt_sent = 0;
 
 	txq = p_txq;
 	sc = txq->sc;
 	fp = &sc->fp[txq->queue_id];
 
-	nb_tx = nb_pkts;
+	if ((unlikely((txq->nb_tx_desc - txq->nb_tx_avail) >
+					txq->tx_free_thresh)))
+		bnx2x_txeof(sc, fp);
 
-	do {
-		burst = RTE_MIN(nb_pkts, RTE_PMD_BNX2X_TX_MAX_BURST);
+	nb_tx_pkts = RTE_MIN(nb_pkts, txq->nb_tx_avail / BDS_PER_TX_PKT);
 
-		ret = bnx2x_tx_encap(txq, m, burst);
-		if (unlikely(ret)) {
-			PMD_TX_LOG(ERR, "tx_encap failed!");
-		}
+	if (unlikely(nb_tx_pkts == 0))
+		return 0;
 
-		bnx2x_update_fp_sb_idx(fp);
+	while (nb_tx_pkts--) {
+		struct rte_mbuf *m = *tx_pkts++;
+		assert(m != NULL);
+		ret = bnx2x_tx_encap(txq, m);
+		fp->tx_db.data.prod += ret;
+		nb_pkt_sent++;
+	}
 
-		if ((txq->nb_tx_desc - txq->nb_tx_avail) > txq->tx_free_thresh) {
-			bnx2x_txeof(sc, fp);
-		}
+	bnx2x_update_fp_sb_idx(fp);
+	mb();
+	DOORBELL(sc, txq->queue_id, fp->tx_db.raw);
+	mb();
 
-		if (unlikely(ret == -ENOMEM)) {
-			break;
-		}
-
-		m += burst;
-		nb_pkts -= burst;
-
-	} while (nb_pkts);
-
-	return nb_tx - nb_pkts;
+	return nb_pkt_sent;
 }
 
 int
