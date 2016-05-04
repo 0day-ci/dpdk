@@ -34,6 +34,7 @@
 #ifndef _E1000_ETHDEV_H_
 #define _E1000_ETHDEV_H_
 #include <rte_time.h>
+#include <rte_spinlock.h>
 
 /* need update link, bit flag */
 #define E1000_FLAG_NEED_LINK_UPDATE (uint32_t)(1 << 0)
@@ -261,6 +262,9 @@ struct e1000_adapter {
 	struct rte_timecounter  systime_tc;
 	struct rte_timecounter  rx_tstamp_tc;
 	struct rte_timecounter  tx_tstamp_tc;
+	eth_rx_burst_t rx_backup;
+	eth_tx_burst_t tx_backup;
+	rte_spinlock_t vf_reset_lock;
 };
 
 #define E1000_DEV_PRIVATE(adapter) \
@@ -315,6 +319,14 @@ uint16_t eth_igb_xmit_pkts(void *txq, struct rte_mbuf **tx_pkts,
 
 uint16_t eth_igb_recv_pkts(void *rxq, struct rte_mbuf **rx_pkts,
 		uint16_t nb_pkts);
+
+uint16_t eth_igbvf_xmit_pkts_fake(void *txq,
+				  struct rte_mbuf **tx_pkts,
+				  uint16_t nb_pkts);
+
+uint16_t eth_igbvf_recv_pkts_fake(void *rxq,
+				  struct rte_mbuf **rx_pkts,
+				  uint16_t nb_pkts);
 
 uint16_t eth_igb_recv_scattered_pkts(void *rxq,
 		struct rte_mbuf **rx_pkts, uint16_t nb_pkts);
@@ -387,5 +399,7 @@ void em_txq_info_get(struct rte_eth_dev *dev, uint16_t queue_id,
 	struct rte_eth_txq_info *qinfo);
 
 void igb_pf_host_uninit(struct rte_eth_dev *dev);
+
+void igbvf_dev_link_up_down_handler(struct rte_eth_dev *dev);
 
 #endif /* _E1000_ETHDEV_H_ */

@@ -117,6 +117,7 @@ struct igb_rx_queue {
 	struct igb_rx_entry *sw_ring;   /**< address of RX software ring. */
 	struct rte_mbuf *pkt_first_seg; /**< First segment of current packet. */
 	struct rte_mbuf *pkt_last_seg;  /**< Last segment of current packet. */
+	struct rte_eth_dev  *dev; /**< device this queue belongs to. */
 	uint16_t            nb_rx_desc; /**< number of RX descriptors. */
 	uint16_t            rx_tail;    /**< current value of RDT register. */
 	uint16_t            nb_rx_hold; /**< number of held free RX desc. */
@@ -185,6 +186,7 @@ struct igb_tx_queue {
 	uint64_t               tx_ring_phys_addr; /**< TX ring DMA address. */
 	struct igb_tx_entry    *sw_ring; /**< virtual address of SW ring. */
 	volatile uint32_t      *tdt_reg_addr; /**< Address of TDT register. */
+	struct rte_eth_dev     *dev; /**< device this queue belongs to. */
 	uint32_t               txd_type;      /**< Device-specific TXD type */
 	uint16_t               nb_tx_desc;    /**< number of TX descriptors. */
 	uint16_t               tx_tail; /**< Current value of TDT register. */
@@ -1344,6 +1346,7 @@ eth_igb_tx_queue_setup(struct rte_eth_dev *dev,
 		return -ENOMEM;
 	}
 
+	txq->dev = dev;
 	txq->nb_tx_desc = nb_desc;
 	txq->pthresh = tx_conf->tx_thresh.pthresh;
 	txq->hthresh = tx_conf->tx_thresh.hthresh;
@@ -1461,6 +1464,7 @@ eth_igb_rx_queue_setup(struct rte_eth_dev *dev,
 			  RTE_CACHE_LINE_SIZE);
 	if (rxq == NULL)
 		return -ENOMEM;
+	rxq->dev = dev;
 	rxq->mb_pool = mp;
 	rxq->nb_rx_desc = nb_desc;
 	rxq->pthresh = rx_conf->rx_thresh.pthresh;
@@ -2523,4 +2527,38 @@ igb_txq_info_get(struct rte_eth_dev *dev, uint16_t queue_id,
 	qinfo->conf.tx_thresh.pthresh = txq->pthresh;
 	qinfo->conf.tx_thresh.hthresh = txq->hthresh;
 	qinfo->conf.tx_thresh.wthresh = txq->wthresh;
+}
+
+/**
+ * A function for link up/down.
+ * Handle the link up/down event but not receiving.
+ */
+uint16_t
+eth_igbvf_xmit_pkts_fake(void *tx_queue,
+			 struct rte_mbuf __rte_unused **tx_pkts,
+			 uint16_t __rte_unused nb_pkts)
+{
+	struct igb_tx_queue *txq;
+
+	txq = tx_queue;
+	igbvf_dev_link_up_down_handler(txq->dev);
+
+	return 0;
+}
+
+/**
+ * A function for link up/down.
+ * Handle the link up/down event but not transmitting.
+ */
+uint16_t
+eth_igbvf_recv_pkts_fake(void *rx_queue,
+			 struct rte_mbuf __rte_unused **rx_pkts,
+			 uint16_t __rte_unused nb_pkts)
+{
+	struct igb_rx_queue *rxq;
+
+	rxq = rx_queue;
+	igbvf_dev_link_up_down_handler(rxq->dev);
+
+	return 0;
 }
