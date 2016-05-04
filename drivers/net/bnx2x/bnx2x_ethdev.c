@@ -276,6 +276,9 @@ static void
 bnx2x_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 {
 	struct bnx2x_softc *sc = dev->data->dev_private;
+	uint32_t brb_truncate_discard;
+	uint64_t brb_drops;
+	uint64_t brb_truncates;
 
 	PMD_INIT_FUNC_TRACE();
 
@@ -316,6 +319,77 @@ bnx2x_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 	stats->rx_nombuf =
 		HILO_U64(sc->eth_stats.no_buff_discard_hi,
 				sc->eth_stats.no_buff_discard_lo);
+
+	brb_drops =
+		HILO_U64(sc->eth_stats.brb_drop_hi,
+			 sc->eth_stats.brb_drop_lo);
+
+	brb_truncates =
+		HILO_U64(sc->eth_stats.brb_truncate_hi,
+			 sc->eth_stats.brb_truncate_lo);
+
+	brb_truncate_discard = sc->eth_stats.brb_truncate_discard;
+
+	stats->imissed = brb_drops + brb_truncates +
+			 brb_truncate_discard + stats->rx_nombuf;
+}
+
+#define BNX2X_EXTENDED_STATS 9
+
+static int
+bnx2x_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstats *xstats,
+		     unsigned int n)
+{
+	struct bnx2x_softc *sc = dev->data->dev_private;
+	unsigned int num = BNX2X_EXTENDED_STATS;
+
+	if (n < num)
+		return num;
+
+	num = 0;
+
+	bnx2x_stats_handle(sc, STATS_EVENT_UPDATE);
+
+	snprintf(xstats[num].name, sizeof(xstats[num].name), "rx_buf_drops");
+	xstats[num++].value = HILO_U64(sc->eth_stats.brb_drop_hi,
+				       sc->eth_stats.brb_drop_lo);
+
+	snprintf(xstats[num].name, sizeof(xstats[num].name),
+		 "rx_buf_truncates");
+	xstats[num++].value = HILO_U64(sc->eth_stats.brb_truncate_hi,
+				       sc->eth_stats.brb_truncate_lo);
+
+	snprintf(xstats[num].name, sizeof(xstats[num].name),
+		 "rx_buf_truncate_discard");
+	xstats[num++].value = sc->eth_stats.brb_truncate_discard;
+
+	snprintf(xstats[num].name, sizeof(xstats[num].name),
+		 "mac_filter_discard");
+	xstats[num++].value = sc->eth_stats.mac_filter_discard;
+
+	snprintf(xstats[num].name, sizeof(xstats[num].name),
+		 "no_match_vlan_tag_discard");
+	xstats[num++].value = sc->eth_stats.mf_tag_discard;
+
+	snprintf(xstats[num].name, sizeof(xstats[num].name), "tx_pause");
+	xstats[num++].value = HILO_U64(sc->eth_stats.pause_frames_sent_hi,
+				       sc->eth_stats.pause_frames_sent_lo);
+
+	snprintf(xstats[num].name, sizeof(xstats[num].name), "rx_pause");
+	xstats[num++].value = HILO_U64(sc->eth_stats.pause_frames_received_hi,
+				       sc->eth_stats.pause_frames_received_lo);
+
+	snprintf(xstats[num].name, sizeof(xstats[num].name),
+		 "tx_prio_flow_ctrl");
+	xstats[num++].value = HILO_U64(sc->eth_stats.pfc_frames_sent_hi,
+				       sc->eth_stats.pfc_frames_sent_lo);
+
+	snprintf(xstats[num].name, sizeof(xstats[num].name),
+		 "rx_prio_flow_ctrl");
+	xstats[num++].value = HILO_U64(sc->eth_stats.pfc_frames_received_hi,
+				       sc->eth_stats.pfc_frames_received_lo);
+
+	return num;
 }
 
 static void
@@ -360,6 +434,7 @@ static const struct eth_dev_ops bnx2x_eth_dev_ops = {
 	.allmulticast_disable         = bnx2x_dev_allmulticast_disable,
 	.link_update                  = bnx2x_dev_link_update,
 	.stats_get                    = bnx2x_dev_stats_get,
+	.xstats_get                   = bnx2x_dev_xstats_get,
 	.dev_infos_get                = bnx2x_dev_infos_get,
 	.rx_queue_setup               = bnx2x_dev_rx_queue_setup,
 	.rx_queue_release             = bnx2x_dev_rx_queue_release,
@@ -383,6 +458,7 @@ static const struct eth_dev_ops bnx2xvf_eth_dev_ops = {
 	.allmulticast_disable         = bnx2x_dev_allmulticast_disable,
 	.link_update                  = bnx2xvf_dev_link_update,
 	.stats_get                    = bnx2x_dev_stats_get,
+	.xstats_get                   = bnx2x_dev_xstats_get,
 	.dev_infos_get                = bnx2x_dev_infos_get,
 	.rx_queue_setup               = bnx2x_dev_rx_queue_setup,
 	.rx_queue_release             = bnx2x_dev_rx_queue_release,
