@@ -3369,3 +3369,20 @@ rte_eth_dev_l2_tunnel_offload_set(uint8_t port_id,
 				-ENOTSUP);
 	return (*dev->dev_ops->l2_tunnel_offload_set)(dev, l2_tunnel, mask, en);
 }
+
+int
+rte_eth_dev_mq_mode_set(uint8_t port_id,
+			enum rte_eth_rx_mq_mode rx_mq_mode,
+			enum rte_eth_tx_mq_mode tx_mq_mode)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+
+	dev->data->dev_conf.rxmode.mq_mode = rx_mq_mode;
+	dev->data->dev_conf.txmode.mq_mode = tx_mq_mode;
+
+	return 0;
+}

@@ -132,3 +132,10 @@ DPDK_16.04 {
 	rte_eth_tx_buffer_set_err_callback;
 
 } DPDK_2.2;
+
+DPDK_16.07 {
+	global:
+
+	rte_eth_dev_mq_mode_set;
+
+} DPDK_16.04;

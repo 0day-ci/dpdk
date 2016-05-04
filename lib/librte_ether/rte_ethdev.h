@@ -4253,6 +4253,25 @@ rte_eth_dev_l2_tunnel_offload_set(uint8_t port_id,
 				  uint32_t mask,
 				  uint8_t en);
 
+/**
+ * Set RX & TX multi_queue mode.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param rx_mq_mode
+ *   RX multi_queue mode.
+ * @param tx_mq_mode
+ *   TX multi_queue mode.
+ *
+ * @return
+ *   - (0) if successful.
+ *   - (-ENODEV) if port identifier is invalid.
+ */
+int
+rte_eth_dev_mq_mode_set(uint8_t port_id,
+			enum rte_eth_rx_mq_mode rx_mq_mode,
+			enum rte_eth_tx_mq_mode tx_mq_mode);
+
 #ifdef __cplusplus
 }
 #endif
