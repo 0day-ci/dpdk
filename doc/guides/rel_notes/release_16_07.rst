@@ -34,7 +34,7 @@ This section should contain new features added in this release. Sample format:
 
   Refer to the previous release notes for examples.
 
-* **Added mailbox interruption support for ixgbe VF.**
+* **Added mailbox interruption support for ixgbe/igb VF.**
 
   When the link becomes down or up, PF will use mailbox message to notice
   VF. To handle this link up/down event, add the mailbox interruption
