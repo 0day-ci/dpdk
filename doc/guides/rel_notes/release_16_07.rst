@@ -40,6 +40,11 @@ This section should contain new features added in this release. Sample format:
   VF. To handle this link up/down event, add the mailbox interruption
   support to receive the message.
 
+* **Added the support of automatic link recovery for ixgbe VF.**
+
+  When the physical link becomes down and recover later, VF will receive
+  the mailbox message for that. VF handles this message by resetting the
+  VF port. Then the VF link can recover automatically.
 
 Resolved Issues
 ---------------

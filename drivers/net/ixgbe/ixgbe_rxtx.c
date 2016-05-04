@@ -2344,6 +2344,7 @@ ixgbe_dev_tx_queue_setup(struct rte_eth_dev *dev,
 		return -ENOMEM;
 	}
 
+	txq->dev = dev;
 	txq->nb_tx_desc = nb_desc;
 	txq->tx_rs_thresh = tx_rs_thresh;
 	txq->tx_free_thresh = tx_free_thresh;
@@ -2623,6 +2624,7 @@ ixgbe_dev_rx_queue_setup(struct rte_eth_dev *dev,
 				 RTE_CACHE_LINE_SIZE, socket_id);
 	if (rxq == NULL)
 		return -ENOMEM;
+	rxq->dev = dev;
 	rxq->mb_pool = mp;
 	rxq->nb_rx_desc = nb_desc;
 	rxq->rx_free_thresh = rx_conf->rx_free_thresh;
@@ -5244,4 +5246,36 @@ int __attribute__((weak))
 ixgbe_rxq_vec_setup(struct ixgbe_rx_queue __rte_unused *rxq)
 {
 	return -1;
+}
+
+/**
+ * A function for link up/down.
+ * Handle the link up/down event but not receiving.
+ */
+uint16_t
+ixgbevf_recv_pkts_fake(void *rx_queue,
+		       struct rte_mbuf __rte_unused **rx_pkts,
+		       uint16_t __rte_unused nb_pkts)
+{
+	struct ixgbe_rx_queue *rxq;
+
+	rxq = rx_queue;
+	ixgbevf_dev_link_up_down_handler(rxq->dev);
+	return 0;
+}
+
+/**
+ * A function for link up/down.
+ * Handle the link up/down event but not transmitting.
+ */
+uint16_t
+ixgbevf_xmit_pkts_fake(void *tx_queue,
+		       struct rte_mbuf __rte_unused **tx_pkts,
+		       uint16_t __rte_unused nb_pkts)
+{
+	struct ixgbe_tx_queue *txq;
+
+	txq = tx_queue;
+	ixgbevf_dev_link_up_down_handler(txq->dev);
+	return 0;
 }

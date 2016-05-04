@@ -589,6 +589,8 @@ static const struct eth_dev_ops ixgbevf_eth_dev_ops = {
 	.rss_hash_conf_get    = ixgbe_dev_rss_hash_conf_get,
 };
 
+static const struct eth_dev_ops ixgbevf_eth_dev_ops_fake = {NULL};
+
 /* store statistics names and its offset in stats structure */
 struct rte_ixgbe_xstats_name_off {
 	char name[RTE_ETH_XSTATS_NAME_SIZE];
@@ -1322,12 +1324,15 @@ eth_ixgbevf_dev_init(struct rte_eth_dev *eth_dev)
 	struct ixgbe_hwstrip *hwstrip =
 		IXGBE_DEV_PRIVATE_TO_HWSTRIP_BITMAP(eth_dev->data->dev_private);
 	struct ether_addr *perm_addr = (struct ether_addr *) hw->mac.perm_addr;
+	struct ixgbe_adapter *adapter =
+		(struct ixgbe_adapter *)eth_dev->data->dev_private;
 
 	PMD_INIT_FUNC_TRACE();
 
 	eth_dev->dev_ops = &ixgbevf_eth_dev_ops;
 	eth_dev->rx_pkt_burst = &ixgbe_recv_pkts;
 	eth_dev->tx_pkt_burst = &ixgbe_xmit_pkts;
+	rte_spinlock_init(&adapter->vf_reset_lock);
 
 	/* for secondary processes, we don't initialise any further as primary
 	 * has already done this work. Only check we don't need a different
@@ -7152,14 +7157,93 @@ ixgbevf_dev_allmulticast_disable(struct rte_eth_dev *dev)
 static void ixgbevf_mbx_process(struct rte_eth_dev *dev)
 {
 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct ixgbe_adapter *adapter =
+		(struct ixgbe_adapter *)dev->data->dev_private;
 	u32 in_msg = 0;
 
 	if (ixgbe_read_mbx(hw, &in_msg, 1, 0))
 		return;
 
 	/* PF reset VF event */
-	if (in_msg == IXGBE_PF_CONTROL_MSG)
+	if (in_msg == IXGBE_PF_CONTROL_MSG) {
 		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_RESET);
+
+		/* Stop the ops and rx/tx */
+		if (dev->data->dev_started) {
+			PMD_DRV_LOG(DEBUG, "Link up/down event detected.");
+			dev->dev_ops = &ixgbevf_eth_dev_ops_fake;
+
+			adapter->rx_backup = dev->rx_pkt_burst;
+			adapter->tx_backup = dev->tx_pkt_burst;
+			dev->rx_pkt_burst = ixgbevf_recv_pkts_fake;
+			dev->tx_pkt_burst = ixgbevf_xmit_pkts_fake;
+		}
+	}
+}
+
+void
+ixgbevf_dev_link_up_down_handler(struct rte_eth_dev *dev)
+{
+	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct ixgbe_adapter *adapter =
+		(struct ixgbe_adapter *)dev->data->dev_private;
+	int diag;
+	uint32_t vteiam;
+
+	/* Only one working core need to performance VF reset */
+	if (rte_spinlock_trylock(&adapter->vf_reset_lock)) {
+		/**
+		 * When fake rec/xmit is replaced, working thread may is running
+		 * into real RX/TX func, so wait long enough to assume all
+		 * working thread exit. The assumption is it will spend less
+		 * than 100us for each execution of RX and TX func.
+		 */
+		rte_delay_us(100);
+
+		do {
+			dev->data->dev_started = 0;
+			ixgbevf_dev_stop(dev);
+			rte_delay_us(1000000);
+
+			diag = ixgbevf_dev_start(dev);
+			if (diag) {
+				PMD_INIT_LOG(ERR, "Ixgbe VF reset: "
+					     "Failed to start device.");
+				return;
+			}
+			dev->data->dev_started = 1;
+			ixgbevf_dev_stats_reset(dev);
+			if (dev->data->dev_conf.intr_conf.lsc == 0)
+			diag = ixgbe_dev_link_update(dev, 0);
+			if (diag) {
+				PMD_INIT_LOG(INFO, "Ixgbe VF reset: "
+					     "Failed to update link.");
+			}
+
+			/**
+			 * When the PF link is down, there has chance
+			 * that VF cannot operate its registers. Will
+			 * check if the registers is written
+			 * successfully. If not, repeat stop/start until
+			 * the PF link is up, in other words, until the
+			 * registers can be written.
+			 */
+			vteiam = IXGBE_READ_REG(hw, IXGBE_VTEIAM);
+		/* Reference ixgbevf_intr_enable when checking */
+		} while (vteiam != IXGBE_VF_IRQ_ENABLE_MASK);
+
+		dev->rx_pkt_burst = adapter->rx_backup;
+		dev->tx_pkt_burst = adapter->tx_backup;
+		dev->dev_ops = &ixgbevf_eth_dev_ops;
+
+		/**
+		 * Wait a while to ensure other working thread is running with
+		 * real rx/tx func. Can avoid other working thread runs into and
+		 * reset device again.
+		 */
+		rte_delay_us(100);
+		rte_spinlock_unlock(&adapter->vf_reset_lock);
+	}
 }
 
 static int

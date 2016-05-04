@@ -38,6 +38,7 @@
 #include "base/ixgbe_dcb_82598.h"
 #include "ixgbe_bypass.h"
 #include <rte_time.h>
+#include <rte_spinlock.h>
 
 /* need update link, bit flag */
 #define IXGBE_FLAG_NEED_LINK_UPDATE (uint32_t)(1 << 0)
@@ -289,6 +290,9 @@ struct ixgbe_adapter {
 	struct rte_timecounter      systime_tc;
 	struct rte_timecounter      rx_tstamp_tc;
 	struct rte_timecounter      tx_tstamp_tc;
+	eth_rx_burst_t              rx_backup;
+	eth_tx_burst_t              tx_backup;
+	rte_spinlock_t              vf_reset_lock;
 };
 
 #define IXGBE_DEV_PRIVATE_TO_HW(adapter)\
@@ -396,6 +400,14 @@ uint16_t ixgbe_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
 uint16_t ixgbe_xmit_pkts_simple(void *tx_queue, struct rte_mbuf **tx_pkts,
 		uint16_t nb_pkts);
 
+uint16_t ixgbevf_recv_pkts_fake(void *rx_queue,
+				struct rte_mbuf **rx_pkts,
+				uint16_t nb_pkts);
+
+uint16_t ixgbevf_xmit_pkts_fake(void *tx_queue,
+				struct rte_mbuf **tx_pkts,
+				uint16_t nb_pkts);
+
 int ixgbe_dev_rss_hash_update(struct rte_eth_dev *dev,
 			      struct rte_eth_rss_conf *rss_conf);
 
@@ -442,4 +454,6 @@ uint32_t ixgbe_convert_vm_rx_mask_to_val(uint16_t rx_mask, uint32_t orig_val);
 
 int ixgbe_fdir_ctrl_func(struct rte_eth_dev *dev,
 			enum rte_filter_op filter_op, void *arg);
+
+void ixgbevf_dev_link_up_down_handler(struct rte_eth_dev *dev);
 #endif /* _IXGBE_ETHDEV_H_ */

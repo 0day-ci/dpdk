@@ -125,6 +125,7 @@ struct ixgbe_rx_queue {
 	struct ixgbe_scattered_rx_entry *sw_sc_ring; /**< address of scattered Rx software ring. */
 	struct rte_mbuf *pkt_first_seg; /**< First segment of current packet. */
 	struct rte_mbuf *pkt_last_seg; /**< Last segment of current packet. */
+	struct rte_eth_dev *dev; /**< device this queue belongs to. */
 	uint64_t            mbuf_initializer; /**< value to init mbufs */
 	uint16_t            nb_rx_desc; /**< number of RX descriptors. */
 	uint16_t            rx_tail;  /**< current value of RDT register. */
@@ -212,6 +213,7 @@ struct ixgbe_tx_queue {
 		struct ixgbe_tx_entry_v *sw_ring_v; /**< address of SW ring for vector PMD */
 	};
 	volatile uint32_t   *tdt_reg_addr; /**< Address of TDT register. */
+	struct rte_eth_dev  *dev; /**< device this queue belongs to. */
 	uint16_t            nb_tx_desc;    /**< number of TX descriptors. */
 	uint16_t            tx_tail;       /**< current value of TDT reg. */
 	/**< Start freeing TX buffers if there are less free descriptors than
