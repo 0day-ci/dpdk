@@ -1623,6 +1623,7 @@ bond_ethdev_stop(struct rte_eth_dev *eth_dev)
 
 		bond_mode_8023ad_stop(eth_dev);
 
+		rte_rwlock_read_lock(&internals->rwlock);
 		/* Discard all messages to/from mode 4 state machines */
 		for (i = 0; i < internals->active_slave_count; i++) {
 			port = &mode_8023ad_ports[internals->active_slaves[i]];
@@ -1635,15 +1636,20 @@ bond_ethdev_stop(struct rte_eth_dev *eth_dev)
 			while (rte_ring_dequeue(port->tx_ring, &pkt) != -ENOENT)
 				rte_pktmbuf_free(pkt);
 		}
+		rte_rwlock_read_unlock(&internals->rwlock);
 	}
 
 	if (internals->mode == BONDING_MODE_TLB ||
 			internals->mode == BONDING_MODE_ALB) {
 		bond_tlb_disable(internals);
+
+		rte_rwlock_read_lock(&internals->rwlock);
 		for (i = 0; i < internals->active_slave_count; i++)
 			tlb_last_obytets[internals->active_slaves[i]] = 0;
+		rte_rwlock_read_unlock(&internals->rwlock);
 	}
 
+	rte_rwlock_write_lock(&internals->rwlock);
 	internals->active_slave_count = 0;
 	internals->link_status_polling_enabled = 0;
 	for (i = 0; i < internals->slave_count; i++)
@@ -1651,6 +1657,7 @@ bond_ethdev_stop(struct rte_eth_dev *eth_dev)
 
 	eth_dev->data->dev_link.link_status = ETH_LINK_DOWN;
 	eth_dev->data->dev_started = 0;
+	rte_rwlock_write_unlock(&internals->rwlock);
 }
 
 void
