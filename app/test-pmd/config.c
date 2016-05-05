@@ -92,6 +92,7 @@
 #include <rte_ether.h>
 #include <rte_ethdev.h>
 #include <rte_string_fns.h>
+#include <rte_cycles.h>
 
 #include "testpmd.h"
 
@@ -150,6 +151,10 @@ print_ethaddr(const char *name, struct ether_addr *eth_addr)
 void
 nic_stats_display(portid_t port_id)
 {
+	static uint64_t sum_rx[RTE_MAX_ETHPORTS];
+	static uint64_t sum_tx[RTE_MAX_ETHPORTS];
+	static uint64_t cycles[RTE_MAX_ETHPORTS];
+	uint64_t pkt_rx, pkt_tx, cycle;
 	struct rte_eth_stats stats;
 	struct rte_port *port = &ports[port_id];
 	uint8_t i;
@@ -208,6 +213,21 @@ nic_stats_display(portid_t port_id)
 			       i, stats.q_opackets[i], stats.q_obytes[i]);
 		}
 	}
+
+	cycle = cycles[port_id];
+	cycles[port_id] = rte_rdtsc();
+	if (cycle > 0)
+		cycle = cycles[port_id] - cycle;
+
+	pkt_rx = stats.ipackets - sum_rx[port_id];
+	pkt_tx = stats.opackets - sum_tx[port_id];
+	sum_rx[port_id] = stats.ipackets;
+	sum_tx[port_id] = stats.opackets;
+	printf("\n  Throughput (since last show)\n");
+	printf("  RX-pps: %12"PRIu64"\n"
+			"  TX-pps: %12"PRIu64"\n",
+			cycle > 0 ? pkt_rx * rte_get_tsc_hz() / cycle : 0,
+			cycle > 0 ? pkt_tx * rte_get_tsc_hz() / cycle : 0);
 
 	printf("  %s############################%s\n",
 	       nic_stats_border, nic_stats_border);
