@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -35,7 +35,7 @@
 #define _RTE_ETH_BOND_PRIVATE_H_
 
 #include <rte_ethdev.h>
-#include <rte_spinlock.h>
+#include <rte_rwlock.h>
 
 #include "rte_eth_bond.h"
 #include "rte_eth_bond_8023ad_private.h"
@@ -115,7 +115,7 @@ struct bond_dev_private {
 	uint8_t port_id;					/**< Port Id of Bonded Port */
 	uint8_t mode;						/**< Link Bonding Mode */
 
-	rte_spinlock_t lock;
+	rte_rwlock_t rwlock;
 
 	uint8_t primary_port;				/**< Primary Slave Port */
 	uint8_t current_primary_port;		/**< Primary Slave Port */

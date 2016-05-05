@@ -227,7 +227,7 @@ rte_eth_bond_create(const char *name, uint8_t mode, uint8_t socket_id)
 	eth_dev->data->drv_name = pmd_bond_driver_name;
 	eth_dev->data->numa_node =  socket_id;
 
-	rte_spinlock_init(&internals->lock);
+	rte_rwlock_init(&internals->rwlock);
 
 	internals->port_id = eth_dev->data->port_id;
 	internals->mode = BONDING_MODE_INVALID;
@@ -451,11 +451,11 @@ rte_eth_bond_slave_add(uint8_t bonded_port_id, uint8_t slave_port_id)
 	bonded_eth_dev = &rte_eth_devices[bonded_port_id];
 	internals = bonded_eth_dev->data->dev_private;
 
-	rte_spinlock_lock(&internals->lock);
+	rte_rwlock_write_lock(&internals->rwlock);
 
 	retval = __eth_bond_slave_add_lock_free(bonded_port_id, slave_port_id);
 
-	rte_spinlock_unlock(&internals->lock);
+	rte_rwlock_write_unlock(&internals->rwlock);
 
 	return retval;
 }
@@ -553,11 +553,11 @@ rte_eth_bond_slave_remove(uint8_t bonded_port_id, uint8_t slave_port_id)
 	bonded_eth_dev = &rte_eth_devices[bonded_port_id];
 	internals = bonded_eth_dev->data->dev_private;
 
-	rte_spinlock_lock(&internals->lock);
+	rte_rwlock_write_lock(&internals->rwlock);
 
 	retval = __eth_bond_slave_remove_lock_free(bonded_port_id, slave_port_id);
 
-	rte_spinlock_unlock(&internals->lock);
+	rte_rwlock_write_unlock(&internals->rwlock);
 
 	return retval;
 }

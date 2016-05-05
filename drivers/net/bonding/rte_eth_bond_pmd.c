@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -1750,37 +1750,36 @@ bond_ethdev_slave_link_status_change_monitor(void *cb_arg)
 		!internals->link_status_polling_enabled)
 		return;
 
-	/* If device is currently being configured then don't check slaves link
-	 * status, wait until next period */
-	if (rte_spinlock_trylock(&internals->lock)) {
-		if (internals->slave_count > 0)
-			polling_slave_found = 0;
+	rte_rwlock_read_lock(&internals->rwlock);
+	if (internals->slave_count > 0)
+		polling_slave_found = 0;
 
-		for (i = 0; i < internals->slave_count; i++) {
-			if (!internals->slaves[i].link_status_poll_enabled)
-				continue;
+	for (i = 0; i < internals->slave_count; i++) {
+		if (!internals->slaves[i].link_status_poll_enabled)
+			continue;
 
-			slave_ethdev = &rte_eth_devices[internals->slaves[i].port_id];
-			polling_slave_found = 1;
+		slave_ethdev = &rte_eth_devices[internals->slaves[i].port_id];
+		polling_slave_found = 1;
 
-			/* Update slave link status */
-			(*slave_ethdev->dev_ops->link_update)(slave_ethdev,
-					internals->slaves[i].link_status_wait_to_complete);
+		/* Update slave link status */
+		(*slave_ethdev->dev_ops->link_update)(slave_ethdev,
+			internals->slaves[i].link_status_wait_to_complete);
 
-			/* if link status has changed since last checked then call lsc
-			 * event callback */
-			if (slave_ethdev->data->dev_link.link_status !=
-					internals->slaves[i].last_link_status) {
-				internals->slaves[i].last_link_status =
-						slave_ethdev->data->dev_link.link_status;
+		/* if link status has changed since last checked then call lsc
+		 * event callback
+		 */
+		if (slave_ethdev->data->dev_link.link_status !=
+			internals->slaves[i].last_link_status) {
+			internals->slaves[i].last_link_status =
+				slave_ethdev->data->dev_link.link_status;
 
-				bond_ethdev_lsc_event_callback(internals->slaves[i].port_id,
-						RTE_ETH_EVENT_INTR_LSC,
-						&bonded_ethdev->data->port_id);
-			}
+			bond_ethdev_lsc_event_callback(
+					internals->slaves[i].port_id,
+					RTE_ETH_EVENT_INTR_LSC,
+					&bonded_ethdev->data->port_id);
 		}
-		rte_spinlock_unlock(&internals->lock);
 	}
+	rte_rwlock_read_unlock(&internals->rwlock);
 
 	if (polling_slave_found)
 		/* Set alarm to continue monitoring link status of slave ethdev's */
