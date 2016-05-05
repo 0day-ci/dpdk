@@ -34,6 +34,13 @@ This section should contain new features added in this release. Sample format:
 
   Refer to the previous release notes for examples.
 
+* **Updated the i40e base driver.**
+
+  The i40e base driver was updated with changes which includes the
+  following:
+
+  * Add new X722 and XXV710 device IDs
+
 
 Resolved Issues
 ---------------
