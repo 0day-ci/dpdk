@@ -328,6 +328,7 @@ The commandline options are:
     Set the forwarding mode where ``mode`` is one of the following::
 
        io (the default)
+       io_retry
        mac
        mac_retry
        mac_swap

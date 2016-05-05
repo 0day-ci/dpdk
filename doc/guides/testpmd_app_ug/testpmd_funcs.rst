@@ -98,9 +98,11 @@ Start packet forwarding with current configuration::
 start tx_first
 ~~~~~~~~~~~~~~
 
-Start packet forwarding with current configuration after sending one burst of packets::
+Start packet forwarding with current configuration after sending specified number of bursts of packets::
 
-   testpmd> start tx_first
+   testpmd> start tx_first (""|burst_num)
+
+The default burst number is 1 when ``burst_num`` not presented.
 
 stop
 ~~~~
@@ -249,7 +251,7 @@ set fwd
 
 Set the packet forwarding mode::
 
-   testpmd> set fwd (io|mac|mac_retry|macswap|flowgen| \
+   testpmd> set fwd (io|io_retry|mac|mac_retry|macswap|flowgen| \
                      rxonly|txonly|csum|icmpecho)
 
 The available information categories are:
@@ -257,6 +259,8 @@ The available information categories are:
 * ``io``: Forwards packets "as-is" in I/O mode.
   This is the fastest possible forwarding operation as it does not access packets data.
   This is the default mode.
+
+* ``io_retry``: Forwards packets "as-is" in I/O retry mode.
 
 * ``mac``: Changes the source and the destination Ethernet addresses of packets before forwarding them.
 
