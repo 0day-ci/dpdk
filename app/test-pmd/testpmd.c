@@ -1560,6 +1560,7 @@ pmd_test_exit(void)
 
 	if (ports != NULL) {
 		no_link_check = 1;
+		nb_fwd_ports = 0;
 		FOREACH_PORT(pt_id, ports) {
 			printf("\nShutting down port %d...\n", pt_id);
 			fflush(stdout);

@@ -1424,8 +1424,10 @@ pkt_fwd_config_display(struct fwd_config *cfg)
 void
 fwd_config_display(void)
 {
-	fwd_config_setup();
-	pkt_fwd_config_display(&cur_fwd_config);
+	if (cur_fwd_config.nb_fwd_ports)
+		pkt_fwd_config_display(&cur_fwd_config);
+	else
+		printf("Please set portlist first\n");
 }
 
 int
@@ -1529,6 +1531,8 @@ set_fwd_ports_list(unsigned int *portlist, unsigned int nb_pt)
 		       (unsigned int) nb_fwd_ports, nb_pt);
 		nb_fwd_ports = (portid_t) nb_pt;
 	}
+
+	fwd_config_setup();
 }
 
 void
