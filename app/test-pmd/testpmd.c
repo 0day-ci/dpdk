@@ -1003,7 +1003,7 @@ start_packet_forwarding(int with_tx_first)
 	if(!no_flush_rx)
 		flush_fwd_rx_queues();
 
-	fwd_config_setup();
+	fwd_config_display();
 	rxtx_config_display();
 
 	for (i = 0; i < cur_fwd_config.nb_fwd_ports; i++) {
