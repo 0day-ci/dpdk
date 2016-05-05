@@ -49,6 +49,7 @@ SRCS-y += parameters.c
 SRCS-$(CONFIG_RTE_LIBRTE_CMDLINE) += cmdline.c
 SRCS-y += config.c
 SRCS-y += iofwd.c
+SRCS-y += iofwd-retry.c
 SRCS-y += macfwd.c
 SRCS-y += macfwd-retry.c
 SRCS-y += macswap.c
