@@ -1819,9 +1819,11 @@ bond_ethdev_link_update(struct rte_eth_dev *bonded_eth_dev,
 {
 	struct bond_dev_private *internals = bonded_eth_dev->data->dev_private;
 
+	rte_rwlock_read_lock(&internals->rwlock);
 	if (!bonded_eth_dev->data->dev_started ||
 		internals->active_slave_count == 0) {
 		bonded_eth_dev->data->dev_link.link_status = ETH_LINK_DOWN;
+		rte_rwlock_read_unlock(&internals->rwlock);
 		return 0;
 	} else {
 		struct rte_eth_dev *slave_eth_dev;
@@ -1840,7 +1842,7 @@ bond_ethdev_link_update(struct rte_eth_dev *bonded_eth_dev,
 
 		bonded_eth_dev->data->dev_link.link_status = link_up;
 	}
-
+	rte_rwlock_read_unlock(&internals->rwlock);
 	return 0;
 }
 
