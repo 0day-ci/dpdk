@@ -8,3 +8,10 @@ DPDK_16.04 {
 
 	local: *;
 };
+
+DPDK_16.07 {
+	global:
+
+	rte_eth_from_vhost;
+
+} DPDK_16.04;

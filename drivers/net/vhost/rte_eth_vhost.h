@@ -102,6 +102,25 @@ struct rte_eth_vhost_queue_event {
 int rte_eth_vhost_get_queue_event(uint8_t port_id,
 		struct rte_eth_vhost_queue_event *event);
 
+/**
+ * API to create vhost PMD
+ *
+ * @param name
+ *  Vhost device name
+ * @param iface_name
+ *  Vhost interface name
+ * @param numa_node
+ *  Socket id
+ * @param mb_pool
+ *  Memory pool
+ *
+ * @return
+ *  - On success, port_id.
+ *  - On failure, a negative value.
+ */
+int rte_eth_from_vhost(const char *name, char *iface_name,
+		const unsigned int numa_node, struct rte_mempool *mb_pool);
+
 #ifdef __cplusplus
 }
 #endif

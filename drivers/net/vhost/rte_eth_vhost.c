@@ -796,6 +796,123 @@ error:
 	return -1;
 }
 
+static int
+rte_eth_from_vhost_create(const char *name, char *iface_name,
+		const unsigned int numa_node, struct rte_mempool *mb_pool)
+{
+	struct rte_eth_dev_data *data = NULL;
+	struct rte_eth_dev *eth_dev = NULL;
+	struct pmd_internal *internal = NULL;
+	struct internal_list *list;
+	int nb_queues = 1;
+	uint16_t nb_rx_queues = nb_queues;
+	uint16_t nb_tx_queues = nb_queues;
+	struct vhost_queue *vq;
+	int i;
+
+	int port_id = eth_dev_vhost_create(name, iface_name, nb_queues,
+			numa_node);
+
+	if (port_id < 0)
+		return -1;
+
+	eth_dev = &rte_eth_devices[port_id];
+	data = eth_dev->data;
+	internal = data->dev_private;
+	list = find_internal_resource(internal->iface_name);
+
+	data->rx_queues = rte_zmalloc_socket(name,
+			sizeof(void *) * nb_rx_queues, 0, numa_node);
+	if (data->rx_queues == NULL)
+		goto error;
+
+	data->tx_queues = rte_zmalloc_socket(name,
+			sizeof(void *) * nb_tx_queues, 0, numa_node);
+	if (data->tx_queues == NULL)
+		goto error;
+
+	for (i = 0; i < nb_rx_queues; i++) {
+		vq = rte_zmalloc_socket(NULL, sizeof(struct vhost_queue),
+				RTE_CACHE_LINE_SIZE, numa_node);
+		if (vq == NULL) {
+			RTE_LOG(ERR, PMD,
+				"Failed to allocate memory for rx queue\n");
+			goto error;
+		}
+		vq->mb_pool = mb_pool;
+		vq->virtqueue_id = i * VIRTIO_QNUM + VIRTIO_TXQ;
+		data->rx_queues[i] = vq;
+	}
+
+	for (i = 0; i < nb_tx_queues; i++) {
+		vq = rte_zmalloc_socket(NULL, sizeof(struct vhost_queue),
+				RTE_CACHE_LINE_SIZE, numa_node);
+		if (vq == NULL) {
+			RTE_LOG(ERR, PMD,
+				"Failed to allocate memory for tx queue\n");
+			goto error;
+		}
+		vq->mb_pool = mb_pool;
+		vq->virtqueue_id = i * VIRTIO_QNUM + VIRTIO_RXQ;
+		data->tx_queues[i] = vq;
+	}
+
+	return port_id;
+
+error:
+	pthread_mutex_lock(&internal_list_lock);
+	TAILQ_REMOVE(&internal_list, list, next);
+	pthread_mutex_unlock(&internal_list_lock);
+
+	if (internal)
+		free(internal->dev_name);
+	free(vring_states[port_id]);
+	free(data->mac_addrs);
+	rte_eth_dev_release_port(eth_dev);
+	if (data->rx_queues) {
+		for (i = 0; i < nb_rx_queues; i++) {
+			vq = data->rx_queues[i];
+			free(vq);
+		}
+		rte_free(data->rx_queues);
+	}
+	if (data->tx_queues) {
+		for (i = 0; i < nb_tx_queues; i++) {
+			vq = data->tx_queues[i];
+			free(vq);
+		}
+		rte_free(data->tx_queues);
+	}
+	rte_free(internal);
+	rte_free(list);
+	rte_free(data);
+
+	return -1;
+}
+
+int
+rte_eth_from_vhost(const char *name, char *iface_name,
+		const unsigned int numa_node, struct rte_mempool *mb_pool)
+{
+	int port_id;
+	int ret;
+
+	port_id = rte_eth_from_vhost_create(name, iface_name, numa_node,
+			mb_pool);
+	if (port_id < 0)
+		return port_id;
+
+	ret = rte_vhost_driver_register(iface_name);
+	if (ret < 0)
+		return ret;
+
+	ret = vhost_driver_session_start();
+	if (ret < 0)
+		return ret;
+
+	return port_id;
+}
+
 static inline int
 open_iface(const char *key __rte_unused, const char *value, void *extra_args)
 {
