@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -40,6 +40,7 @@
 #include "app.h"
 #include "pipeline_common_fe.h"
 #include "pipeline_routing.h"
+#include "parser.h"
 
 struct app_pipeline_routing_route {
 	struct pipeline_routing_route_key key;
@@ -853,1376 +854,587 @@ app_pipeline_routing_delete_default_arp_entry(struct app_params *app,
 	return 0;
 }
 
-static int
-parse_labels(char *string, uint32_t *labels, uint32_t *n_labels)
-{
-	uint32_t n_max_labels = *n_labels, count = 0;
+/*
+ * route cmd
+ */
 
-	/* Check for void list of labels */
-	if (strcmp(string, "<void>") == 0) {
-		*n_labels = 0;
-		return 0;
+struct cmd_route_result {
+	cmdline_fixed_string_t p_string;
+	uint32_t p;
+	cmdline_fixed_string_t route_string;
+	cmdline_multi_string_t multi_string;
+};
+
+static void
+cmd_route_parsed(
+	void *parsed_result,
+	__rte_unused struct cmdline *cl,
+	void *data)
+{
+	struct cmd_route_result *params = parsed_result;
+	struct app_params *app = data;
+
+	char *tokens[16];
+	uint32_t n_tokens = RTE_DIM(tokens);
+	int status;
+
+	struct in_addr ipv4;
+	struct in_addr nh_ipv4;
+	struct ether_addr mac_addr;
+	uint32_t depth;
+	uint32_t port_id;
+	uint32_t svlan;
+	uint32_t cvlan;
+	uint32_t mpls_labels[PIPELINE_ROUTING_MPLS_LABELS_MAX];
+	uint32_t n_labels = RTE_DIM(mpls_labels);
+
+	status = parse_tokenize_string(params->multi_string, tokens, &n_tokens);
+	if (status != 0) {
+		printf("Command \"route\": Too many parameters.\n");
+		return;
 	}
 
-	/* At least one label should be present */
-	for ( ; (*string != '\0'); ) {
-		char *next;
-		int value;
-
-		if (count >= n_max_labels)
-			return -1;
-
-		if (count > 0) {
-			if (string[0] != ':')
-				return -1;
-
-			string++;
+	/* "route add" or "route add default" */
+	if ((n_tokens > 0) && (0 == strcmp(tokens[0], "add"))) {
+		if (n_tokens < 3) {
+			printf("Not enough parameters for \"route add\" or"
+					"\"route add default\".\n");
+			return;
 		}
 
-		value = strtol(string, &next, 10);
-		if (next == string)
-			return -1;
-		string = next;
+		/* route add */
+		if (0 == parse_ipv4_addr(tokens[1], &ipv4)) {
+			struct pipeline_routing_route_key key;
+			struct pipeline_routing_route_data route_data;
 
-		labels[count++] = (uint32_t) value;
+			if (n_tokens < 7) {
+				printf("Not enough parameters for \"route add\".\n");
+				return;
+			}
+			if (parser_read_uint32(&depth, tokens[2])) {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is depth.\n",
+					tokens[2]);
+				return;
+			}
+			if (strcmp(tokens[3], "port")) {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is word \"port\".\n",
+					tokens[3]);
+				return;
+			}
+			if (parser_read_uint32(&port_id, tokens[4])) {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is port id.\n",
+					tokens[4]);
+				return;
+			}
+			if (strcmp(tokens[5], "ether")) {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is word \"ether\".\n",
+					tokens[5]);
+				return;
+			}
+
+			if (0 == parse_mac_addr(tokens[6], &mac_addr)) {
+				route_data.flags = 0;
+			}
+			else if (0 == parse_ipv4_addr(tokens[6], &nh_ipv4)) {
+				route_data.flags = PIPELINE_ROUTING_ROUTE_ARP;
+			}
+			else {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is MAC address or next hop IPv4"
+					" address.\n",
+					tokens[6]);
+				return;
+			}
+
+			if (n_tokens > 7) {
+				if (0 == strcmp(tokens[7], "mpls")) {
+					if (n_tokens != 9) {
+						printf(
+						"Incorrect number of parameters for route add mpls.\n");
+						return;
+					}
+					if (parse_mpls_labels(tokens[8], mpls_labels, &n_labels)) {
+						printf("Incorrect parameter: \"%s\"."
+							" Expected parameter is mpls labels.\n",
+							tokens[8]);
+						return;
+					}
+					route_data.flags |= PIPELINE_ROUTING_ROUTE_MPLS;
+				}
+				else if (0 == strcmp(tokens[7], "qinq")) {
+					if (n_tokens != 10) {
+						printf(
+						"Incorrect number of parameters for route add qinq.\n");
+						return;
+					}
+					if (parser_read_uint32(&svlan, tokens[8])) {
+						printf("Incorrect parameter: \"%s\"."
+							" Expected parameter is svlan.\n",
+							tokens[8]);
+						return;
+					}
+					if (parser_read_uint32(&cvlan, tokens[9])) {
+						printf("Incorrect parameter: \"%s\"."
+							" Expected parameter is cvlan.\n",
+							tokens[9]);
+						return;
+					}
+					route_data.flags |= PIPELINE_ROUTING_ROUTE_QINQ;
+				}
+				else {
+					printf("Incorrect parameter: \"%s\"."
+						" Expected parameter is word \"mpls\" or \"qinq\".\n",
+						tokens[7]);
+					return;
+				}
+			}
+
+			switch (route_data.flags) {
+			case 0:
+				/* route add (mpls = no, qinq = no, arp = no) */
+				/* route add <ipaddr> <depth> port <port ID> ether <macaddr> */
+				route_data.port_id = port_id;
+				route_data.ethernet.macaddr = mac_addr;
+				break;
+			case PIPELINE_ROUTING_ROUTE_ARP:
+				/* route add (mpls = no, qinq = no, arp = yes) */
+				/* route add <ipaddr> <depth> port <port ID> ether <ipaddr> */
+				route_data.port_id = port_id;
+				route_data.ethernet.ip = rte_bswap32((uint32_t) nh_ipv4.s_addr);
+				break;
+			case PIPELINE_ROUTING_ROUTE_MPLS:
+				/* route add (mpls = yes, qinq = no, arp = no) */
+				/* route add <ipaddr> <depth> port <port ID> ether <macaddr>
+				 * mpls <mpls labels> */
+			{
+				uint32_t i;
+
+				route_data.port_id = port_id;
+				route_data.ethernet.macaddr = mac_addr;
+				for (i = 0; i < n_labels; i++)
+					route_data.l2.mpls.labels[i] = mpls_labels[i];
+				route_data.l2.mpls.n_labels = n_labels;
+			}
+				break;
+			case PIPELINE_ROUTING_ROUTE_MPLS | PIPELINE_ROUTING_ROUTE_ARP:
+				/* route add (mpls = yes, qinq = no, arp = yes) */
+				/* route add <ipaddr> <depth> port <port ID> ether <ipaddr>
+				 * mpls <mpls labels> */
+			{
+				uint32_t i;
+
+				route_data.port_id = port_id;
+				route_data.ethernet.ip = rte_bswap32((uint32_t) nh_ipv4.s_addr);
+				for (i = 0; i < n_labels; i++)
+					route_data.l2.mpls.labels[i] = mpls_labels[i];
+				route_data.l2.mpls.n_labels = n_labels;
+			}
+				break;
+			case PIPELINE_ROUTING_ROUTE_QINQ:
+				/* route add (mpls = no, qinq = yes, arp = no) */
+				/* route add <ipaddr> <depth> port <port ID> ether <macaddr>
+				 * qinq <svlan> <cvlan> */
+				route_data.port_id = port_id;
+				route_data.ethernet.macaddr = mac_addr;
+				route_data.l2.qinq.svlan = svlan;
+				route_data.l2.qinq.cvlan = cvlan;
+				break;
+			case PIPELINE_ROUTING_ROUTE_QINQ | PIPELINE_ROUTING_ROUTE_ARP:
+				/* route add (mpls = no, qinq = yes, arp = yes) */
+				/* route add <ipaddr> <depth> port <port ID> ether <ipaddr>
+				 * qinq <svlan> <cvlan> */
+				route_data.port_id = port_id;
+				route_data.ethernet.ip = rte_bswap32((uint32_t) nh_ipv4.s_addr);
+				route_data.l2.qinq.svlan = svlan;
+				route_data.l2.qinq.cvlan = cvlan;
+				break;
+			default:
+				break;
+			}
+
+			key.type = PIPELINE_ROUTING_ROUTE_IPV4;
+			key.key.ipv4.ip = rte_bswap32((uint32_t) ipv4.s_addr);
+			key.key.ipv4.depth = depth;
+
+			status = app_pipeline_routing_add_route(app,
+				params->p,
+				&key,
+				&route_data);
+			if (status != 0)
+				printf("Command \"route add\" failed.\n");
+
+			return;
+		}
+		/* route add default */
+		else if (0 == strcmp(tokens[1], "default")) {
+			if (n_tokens != 3) {
+				printf(
+				"Incorrect number of parameters for route add default.\n");
+				return;
+			}
+			if (parser_read_uint32(&port_id, tokens[2])) {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is port id.\n",
+					tokens[2]);
+				return;
+			}
+
+			status = app_pipeline_routing_add_default_route(app,
+				params->p,
+				port_id);
+			if (status != 0)
+				printf("Command \"route add default\" failed.\n");
+
+			return;
+		}
+		else {
+			printf("Incorrect parameter: \"%s\"."
+				" Expected parameter is IPv4 address or word \"default\".\n",
+				tokens[1]);
+			return;
+		}
 	}
 
-	*n_labels = count;
-	return 0;
-}
+	/* "route del" or "route del default" */
+	if ((n_tokens > 0) && (0 == strcmp(tokens[0], "del"))) {
+		if (n_tokens < 2) {
+			printf("Not enough parameters for \"route del\" or"
+					"\"route del default\".\n");
+			return;
+		}
 
-/*
- * route add (mpls = no, qinq = no, arp = no)
- */
+		/* route del <ipaddr> <depth> */
+		if (0 == parse_ipv4_addr(tokens[1], &ipv4)) {
+			struct pipeline_routing_route_key key;
 
-struct cmd_route_add1_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t route_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_ipaddr_t ip;
-	uint32_t depth;
-	cmdline_fixed_string_t port_string;
-	uint32_t port;
-	cmdline_fixed_string_t ether_string;
-	struct ether_addr macaddr;
-};
+			if (n_tokens != 3) {
+				printf(
+				"Incorrect number of parameters for route del.\n");
+				return;
+			}
+			if (parser_read_uint32(&depth, tokens[2])) {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is depth.\n",
+					tokens[2]);
+				return;
+			}
 
-static void
-cmd_route_add1_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_route_add1_result *params = parsed_result;
-	struct app_params *app = data;
-	struct pipeline_routing_route_key key;
-	struct pipeline_routing_route_data route_data;
-	int status;
+			key.type = PIPELINE_ROUTING_ROUTE_IPV4;
+			key.key.ipv4.ip = rte_bswap32((uint32_t) ipv4.s_addr);
+			key.key.ipv4.depth = depth;
 
-	/* Create route */
-	key.type = PIPELINE_ROUTING_ROUTE_IPV4;
-	key.key.ipv4.ip = rte_bswap32((uint32_t) params->ip.addr.ipv4.s_addr);
-	key.key.ipv4.depth = params->depth;
+			status = app_pipeline_routing_delete_route(app, params->p, &key);
+			if (status != 0)
+				printf("Command \"route del\" failed.\n");
 
-	route_data.flags = 0;
-	route_data.port_id = params->port;
-	route_data.ethernet.macaddr = params->macaddr;
+			return;
+		}
+		/* route del default */
+		else if (0 == strcmp(tokens[1], "default")) {
+			if (n_tokens != 2) {
+				printf(
+				"Incorrect number of parameters for route del default.\n");
+				return;
+			}
 
-	status = app_pipeline_routing_add_route(app,
-		params->p,
-		&key,
-		&route_data);
+			status = app_pipeline_routing_delete_default_route(app, params->p);
+			if (status != 0)
+				printf("Command \"route del default\" failed.\n");
 
-	if (status != 0) {
-		printf("Command failed\n");
+			return;
+		}
+		else {
+			printf("Incorrect parameter: \"%s\"."
+				" Expected parameter is IPv4 or word \"default\".\n",
+				tokens[1]);
+			return;
+		}
+	}
+
+	/* route ls */
+	if ((n_tokens > 0) && (0 == strcmp(tokens[0], "ls"))) {
+		if (n_tokens > 1) {
+			printf("Incorrect number of parameters for route ls.\n");
+			return;
+		}
+
+		status = app_pipeline_routing_route_ls(app, params->p);
+		if (status != 0)
+			printf("Command \"route ls\" failed.\n");
+
 		return;
 	}
+
+	printf("Command \"route\" failed."
+		" Expected parameter is \"add\" or \"del\" or \"ls\".\n");
+	return;
 }
 
-static cmdline_parse_token_string_t cmd_route_add1_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add1_result, p_string,
-	"p");
+static cmdline_parse_token_string_t cmd_route_p_string =
+	TOKEN_STRING_INITIALIZER(struct cmd_route_result, p_string, "p");
 
-static cmdline_parse_token_num_t cmd_route_add1_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add1_result, p, UINT32);
+static cmdline_parse_token_num_t cmd_route_p =
+	TOKEN_NUM_INITIALIZER(struct cmd_route_result, p, UINT32);
 
-static cmdline_parse_token_string_t cmd_route_add1_route_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add1_result, route_string,
-	"route");
+static cmdline_parse_token_string_t cmd_route_route_string =
+	TOKEN_STRING_INITIALIZER(struct cmd_route_result, route_string, "route");
 
-static cmdline_parse_token_string_t cmd_route_add1_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add1_result, add_string,
-	"add");
+static cmdline_parse_token_string_t cmd_route_multi_string =
+	TOKEN_STRING_INITIALIZER(struct cmd_route_result, multi_string,
+	TOKEN_STRING_MULTI);
 
-static cmdline_parse_token_ipaddr_t cmd_route_add1_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_route_add1_result, ip);
-
-static cmdline_parse_token_num_t cmd_route_add1_depth =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add1_result, depth, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add1_port_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add1_result, port_string,
-	"port");
-
-static cmdline_parse_token_num_t cmd_route_add1_port =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add1_result, port, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add1_ether_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add1_result, ether_string,
-	"ether");
-
-static cmdline_parse_token_etheraddr_t cmd_route_add1_macaddr =
-	TOKEN_ETHERADDR_INITIALIZER(struct cmd_route_add1_result, macaddr);
-
-static cmdline_parse_inst_t cmd_route_add1 = {
-	.f = cmd_route_add1_parsed,
+static cmdline_parse_inst_t cmd_route = {
+	.f = cmd_route_parsed,
 	.data = NULL,
-	.help_str = "Route add (mpls = no, qinq = no, arp = no)",
+	.help_str =
+		"\n add <ipaddr> <depth> port <port ID> ether <macaddr> : Route add"
+		" (mpls = no, qinq = no, arp = no)"
+		"\n add <ipaddr> <depth> port <port ID> ether <ipaddr> : Route add"
+		" (mpls = no, qinq = no, arp = yes)"
+		"\n add <ipaddr> <depth> port <port ID> ether <macaddr> qinq <svlan>"
+		" <cvlan> : Route add (qinq = yes, arp = no)"
+		"\n add <ipaddr> <depth> port <port ID> ether <ipaddr> qinq <svlan>"
+		" <cvlan> : Route add (qinq = yes, arp = yes)"
+		"\n add <ipaddr> <depth> port <port ID> ether <macaddr> mpls"
+		" <mpls labels> : Route add (mpls = yes, arp = no)"
+		"\n add <ipaddr> <depth> port <port ID> ether <ipaddr> mpls"
+		" <mpls labels> : Route add (mpls = yes, arp = yes)"
+		"\n add default <port ID> : Route default set"
+		"\n del <ipaddr> <depth> : Route delete"
+		"\n del default : Route default clear"
+		"\n ls : Route list",
 	.tokens = {
-		(void *)&cmd_route_add1_p_string,
-		(void *)&cmd_route_add1_p,
-		(void *)&cmd_route_add1_route_string,
-		(void *)&cmd_route_add1_add_string,
-		(void *)&cmd_route_add1_ip,
-		(void *)&cmd_route_add1_depth,
-		(void *)&cmd_route_add1_port_string,
-		(void *)&cmd_route_add1_port,
-		(void *)&cmd_route_add1_ether_string,
-		(void *)&cmd_route_add1_macaddr,
+		(void *)&cmd_route_p_string,
+		(void *)&cmd_route_p,
+		(void *)&cmd_route_route_string,
+		(void *)&cmd_route_multi_string,
 		NULL,
 	},
 };
 
 /*
- * route add (mpls = no, qinq = no, arp = yes)
+ * arp cmd
  */
 
-struct cmd_route_add2_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t route_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_ipaddr_t ip;
-	uint32_t depth;
-	cmdline_fixed_string_t port_string;
-	uint32_t port;
-	cmdline_fixed_string_t ether_string;
-	cmdline_ipaddr_t nh_ip;
-};
-
-static void
-cmd_route_add2_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_route_add2_result *params = parsed_result;
-	struct app_params *app = data;
-	struct pipeline_routing_route_key key;
-	struct pipeline_routing_route_data route_data;
-	int status;
-
-	/* Create route */
-	key.type = PIPELINE_ROUTING_ROUTE_IPV4;
-	key.key.ipv4.ip = rte_bswap32((uint32_t) params->ip.addr.ipv4.s_addr);
-	key.key.ipv4.depth = params->depth;
-
-	route_data.flags = PIPELINE_ROUTING_ROUTE_ARP;
-	route_data.port_id = params->port;
-	route_data.ethernet.ip =
-		rte_bswap32((uint32_t) params->nh_ip.addr.ipv4.s_addr);
-
-	status = app_pipeline_routing_add_route(app,
-		params->p,
-		&key,
-		&route_data);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_route_add2_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add2_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_route_add2_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add2_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add2_route_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add2_result, route_string,
-	"route");
-
-static cmdline_parse_token_string_t cmd_route_add2_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add2_result, add_string,
-	"add");
-
-static cmdline_parse_token_ipaddr_t cmd_route_add2_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_route_add2_result, ip);
-
-static cmdline_parse_token_num_t cmd_route_add2_depth =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add2_result, depth, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add2_port_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add2_result, port_string,
-	"port");
-
-static cmdline_parse_token_num_t cmd_route_add2_port =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add2_result, port, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add2_ether_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add2_result, ether_string,
-	"ether");
-
-static cmdline_parse_token_ipaddr_t cmd_route_add2_nh_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_route_add2_result, nh_ip);
-
-static cmdline_parse_inst_t cmd_route_add2 = {
-	.f = cmd_route_add2_parsed,
-	.data = NULL,
-	.help_str = "Route add (mpls = no, qinq = no, arp = yes)",
-	.tokens = {
-		(void *)&cmd_route_add2_p_string,
-		(void *)&cmd_route_add2_p,
-		(void *)&cmd_route_add2_route_string,
-		(void *)&cmd_route_add2_add_string,
-		(void *)&cmd_route_add2_ip,
-		(void *)&cmd_route_add2_depth,
-		(void *)&cmd_route_add2_port_string,
-		(void *)&cmd_route_add2_port,
-		(void *)&cmd_route_add2_ether_string,
-		(void *)&cmd_route_add2_nh_ip,
-		NULL,
-	},
-};
-
-/*
- * route add (mpls = no, qinq = yes, arp = no)
- */
-
-struct cmd_route_add3_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t route_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_ipaddr_t ip;
-	uint32_t depth;
-	cmdline_fixed_string_t port_string;
-	uint32_t port;
-	cmdline_fixed_string_t ether_string;
-	struct ether_addr macaddr;
-	cmdline_fixed_string_t qinq_string;
-	uint32_t svlan;
-	uint32_t cvlan;
-};
-
-static void
-cmd_route_add3_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_route_add3_result *params = parsed_result;
-	struct app_params *app = data;
-	struct pipeline_routing_route_key key;
-	struct pipeline_routing_route_data route_data;
-	int status;
-
-	/* Create route */
-	key.type = PIPELINE_ROUTING_ROUTE_IPV4;
-	key.key.ipv4.ip = rte_bswap32((uint32_t) params->ip.addr.ipv4.s_addr);
-	key.key.ipv4.depth = params->depth;
-
-	route_data.flags = PIPELINE_ROUTING_ROUTE_QINQ;
-	route_data.port_id = params->port;
-	route_data.ethernet.macaddr = params->macaddr;
-	route_data.l2.qinq.svlan = params->svlan;
-	route_data.l2.qinq.cvlan = params->cvlan;
-
-	status = app_pipeline_routing_add_route(app,
-		params->p,
-		&key,
-		&route_data);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_route_add3_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add3_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_route_add3_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add3_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add3_route_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add3_result, route_string,
-	"route");
-
-static cmdline_parse_token_string_t cmd_route_add3_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add3_result, add_string,
-	"add");
-
-static cmdline_parse_token_ipaddr_t cmd_route_add3_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_route_add3_result, ip);
-
-static cmdline_parse_token_num_t cmd_route_add3_depth =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add3_result, depth, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add3_port_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add3_result, port_string,
-	"port");
-
-static cmdline_parse_token_num_t cmd_route_add3_port =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add3_result, port, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add3_ether_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add3_result, ether_string,
-	"ether");
-
-static cmdline_parse_token_etheraddr_t cmd_route_add3_macaddr =
-	TOKEN_ETHERADDR_INITIALIZER(struct cmd_route_add3_result, macaddr);
-
-static cmdline_parse_token_string_t cmd_route_add3_qinq_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add3_result, qinq_string,
-	"qinq");
-
-static cmdline_parse_token_num_t cmd_route_add3_svlan =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add3_result, svlan, UINT32);
-
-static cmdline_parse_token_num_t cmd_route_add3_cvlan =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add3_result, cvlan, UINT32);
-
-static cmdline_parse_inst_t cmd_route_add3 = {
-	.f = cmd_route_add3_parsed,
-	.data = NULL,
-	.help_str = "Route add (qinq = yes, arp = no)",
-	.tokens = {
-		(void *)&cmd_route_add3_p_string,
-		(void *)&cmd_route_add3_p,
-		(void *)&cmd_route_add3_route_string,
-		(void *)&cmd_route_add3_add_string,
-		(void *)&cmd_route_add3_ip,
-		(void *)&cmd_route_add3_depth,
-		(void *)&cmd_route_add3_port_string,
-		(void *)&cmd_route_add3_port,
-		(void *)&cmd_route_add3_ether_string,
-		(void *)&cmd_route_add3_macaddr,
-		(void *)&cmd_route_add3_qinq_string,
-		(void *)&cmd_route_add3_svlan,
-		(void *)&cmd_route_add3_cvlan,
-		NULL,
-	},
-};
-
-/*
- * route add (mpls = no, qinq = yes, arp = yes)
- */
-
-struct cmd_route_add4_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t route_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_ipaddr_t ip;
-	uint32_t depth;
-	cmdline_fixed_string_t port_string;
-	uint32_t port;
-	cmdline_fixed_string_t ether_string;
-	cmdline_ipaddr_t nh_ip;
-	cmdline_fixed_string_t qinq_string;
-	uint32_t svlan;
-	uint32_t cvlan;
-};
-
-static void
-cmd_route_add4_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_route_add4_result *params = parsed_result;
-	struct app_params *app = data;
-	struct pipeline_routing_route_key key;
-	struct pipeline_routing_route_data route_data;
-	int status;
-
-	/* Create route */
-	key.type = PIPELINE_ROUTING_ROUTE_IPV4;
-	key.key.ipv4.ip = rte_bswap32((uint32_t) params->ip.addr.ipv4.s_addr);
-	key.key.ipv4.depth = params->depth;
-
-	route_data.flags = PIPELINE_ROUTING_ROUTE_QINQ |
-		PIPELINE_ROUTING_ROUTE_ARP;
-	route_data.port_id = params->port;
-	route_data.ethernet.ip =
-		rte_bswap32((uint32_t) params->nh_ip.addr.ipv4.s_addr);
-	route_data.l2.qinq.svlan = params->svlan;
-	route_data.l2.qinq.cvlan = params->cvlan;
-
-	status = app_pipeline_routing_add_route(app,
-		params->p,
-		&key,
-		&route_data);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_route_add4_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add4_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_route_add4_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add4_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add4_route_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add4_result, route_string,
-	"route");
-
-static cmdline_parse_token_string_t cmd_route_add4_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add4_result, add_string,
-	"add");
-
-static cmdline_parse_token_ipaddr_t cmd_route_add4_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_route_add4_result, ip);
-
-static cmdline_parse_token_num_t cmd_route_add4_depth =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add4_result, depth, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add4_port_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add4_result, port_string,
-	"port");
-
-static cmdline_parse_token_num_t cmd_route_add4_port =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add4_result, port, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add4_ether_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add4_result, ether_string,
-	"ether");
-
-static cmdline_parse_token_ipaddr_t cmd_route_add4_nh_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_route_add4_result, nh_ip);
-
-static cmdline_parse_token_string_t cmd_route_add4_qinq_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add4_result, qinq_string,
-	"qinq");
-
-static cmdline_parse_token_num_t cmd_route_add4_svlan =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add4_result, svlan, UINT32);
-
-static cmdline_parse_token_num_t cmd_route_add4_cvlan =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add4_result, cvlan, UINT32);
-
-static cmdline_parse_inst_t cmd_route_add4 = {
-	.f = cmd_route_add4_parsed,
-	.data = NULL,
-	.help_str = "Route add (qinq = yes, arp = yes)",
-	.tokens = {
-		(void *)&cmd_route_add4_p_string,
-		(void *)&cmd_route_add4_p,
-		(void *)&cmd_route_add4_route_string,
-		(void *)&cmd_route_add4_add_string,
-		(void *)&cmd_route_add4_ip,
-		(void *)&cmd_route_add4_depth,
-		(void *)&cmd_route_add4_port_string,
-		(void *)&cmd_route_add4_port,
-		(void *)&cmd_route_add4_ether_string,
-		(void *)&cmd_route_add4_nh_ip,
-		(void *)&cmd_route_add4_qinq_string,
-		(void *)&cmd_route_add4_svlan,
-		(void *)&cmd_route_add4_cvlan,
-		NULL,
-	},
-};
-
-/*
- * route add (mpls = yes, qinq = no, arp = no)
- */
-
-struct cmd_route_add5_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t route_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_ipaddr_t ip;
-	uint32_t depth;
-	cmdline_fixed_string_t port_string;
-	uint32_t port;
-	cmdline_fixed_string_t ether_string;
-	struct ether_addr macaddr;
-	cmdline_fixed_string_t mpls_string;
-	cmdline_fixed_string_t mpls_labels;
-};
-
-static void
-cmd_route_add5_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_route_add5_result *params = parsed_result;
-	struct app_params *app = data;
-	struct pipeline_routing_route_key key;
-	struct pipeline_routing_route_data route_data;
-	uint32_t mpls_labels[PIPELINE_ROUTING_MPLS_LABELS_MAX];
-	uint32_t n_labels = RTE_DIM(mpls_labels);
-	uint32_t i;
-	int status;
-
-	/* Parse MPLS labels */
-	status = parse_labels(params->mpls_labels, mpls_labels, &n_labels);
-	if (status) {
-		printf("MPLS labels parse error\n");
-		return;
-	}
-
-	/* Create route */
-	key.type = PIPELINE_ROUTING_ROUTE_IPV4;
-	key.key.ipv4.ip = rte_bswap32((uint32_t) params->ip.addr.ipv4.s_addr);
-	key.key.ipv4.depth = params->depth;
-
-	route_data.flags = PIPELINE_ROUTING_ROUTE_MPLS;
-	route_data.port_id = params->port;
-	route_data.ethernet.macaddr = params->macaddr;
-	for (i = 0; i < n_labels; i++)
-		route_data.l2.mpls.labels[i] = mpls_labels[i];
-	route_data.l2.mpls.n_labels = n_labels;
-
-	status = app_pipeline_routing_add_route(app,
-		params->p,
-		&key,
-		&route_data);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_route_add5_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add5_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_route_add5_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add5_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add5_route_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add5_result, route_string,
-	"route");
-
-static cmdline_parse_token_string_t cmd_route_add5_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add5_result, add_string,
-	"add");
-
-static cmdline_parse_token_ipaddr_t cmd_route_add5_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_route_add5_result, ip);
-
-static cmdline_parse_token_num_t cmd_route_add5_depth =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add5_result, depth, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add5_port_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add5_result, port_string,
-	"port");
-
-static cmdline_parse_token_num_t cmd_route_add5_port =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add5_result, port, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add5_ether_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add5_result, ether_string,
-	"ether");
-
-static cmdline_parse_token_etheraddr_t cmd_route_add5_macaddr =
-	TOKEN_ETHERADDR_INITIALIZER(struct cmd_route_add5_result, macaddr);
-
-static cmdline_parse_token_string_t cmd_route_add5_mpls_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add5_result, mpls_string,
-	"mpls");
-
-static cmdline_parse_token_string_t cmd_route_add5_mpls_labels =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add5_result, mpls_labels,
-	NULL);
-
-static cmdline_parse_inst_t cmd_route_add5 = {
-	.f = cmd_route_add5_parsed,
-	.data = NULL,
-	.help_str = "Route add (mpls = yes, arp = no)",
-	.tokens = {
-		(void *)&cmd_route_add5_p_string,
-		(void *)&cmd_route_add5_p,
-		(void *)&cmd_route_add5_route_string,
-		(void *)&cmd_route_add5_add_string,
-		(void *)&cmd_route_add5_ip,
-		(void *)&cmd_route_add5_depth,
-		(void *)&cmd_route_add5_port_string,
-		(void *)&cmd_route_add5_port,
-		(void *)&cmd_route_add5_ether_string,
-		(void *)&cmd_route_add5_macaddr,
-		(void *)&cmd_route_add5_mpls_string,
-		(void *)&cmd_route_add5_mpls_labels,
-		NULL,
-	},
-};
-
-/*
- * route add (mpls = yes, qinq = no, arp = yes)
- */
-
-struct cmd_route_add6_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t route_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_ipaddr_t ip;
-	uint32_t depth;
-	cmdline_fixed_string_t port_string;
-	uint32_t port;
-	cmdline_fixed_string_t ether_string;
-	cmdline_ipaddr_t nh_ip;
-	cmdline_fixed_string_t mpls_string;
-	cmdline_fixed_string_t mpls_labels;
-};
-
-static void
-cmd_route_add6_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_route_add6_result *params = parsed_result;
-	struct app_params *app = data;
-	struct pipeline_routing_route_key key;
-	struct pipeline_routing_route_data route_data;
-	uint32_t mpls_labels[PIPELINE_ROUTING_MPLS_LABELS_MAX];
-	uint32_t n_labels = RTE_DIM(mpls_labels);
-	uint32_t i;
-	int status;
-
-	/* Parse MPLS labels */
-	status = parse_labels(params->mpls_labels, mpls_labels, &n_labels);
-	if (status) {
-		printf("MPLS labels parse error\n");
-		return;
-	}
-
-	/* Create route */
-	key.type = PIPELINE_ROUTING_ROUTE_IPV4;
-	key.key.ipv4.ip = rte_bswap32((uint32_t) params->ip.addr.ipv4.s_addr);
-	key.key.ipv4.depth = params->depth;
-
-	route_data.flags = PIPELINE_ROUTING_ROUTE_MPLS |
-		PIPELINE_ROUTING_ROUTE_ARP;
-	route_data.port_id = params->port;
-	route_data.ethernet.ip =
-		rte_bswap32((uint32_t) params->nh_ip.addr.ipv4.s_addr);
-	for (i = 0; i < n_labels; i++)
-		route_data.l2.mpls.labels[i] = mpls_labels[i];
-	route_data.l2.mpls.n_labels = n_labels;
-
-	status = app_pipeline_routing_add_route(app,
-		params->p,
-		&key,
-		&route_data);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_route_add6_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add6_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_route_add6_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add6_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add6_route_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add6_result, route_string,
-	"route");
-
-static cmdline_parse_token_string_t cmd_route_add6_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add6_result, add_string,
-	"add");
-
-static cmdline_parse_token_ipaddr_t cmd_route_add6_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_route_add6_result, ip);
-
-static cmdline_parse_token_num_t cmd_route_add6_depth =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add6_result, depth, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add6_port_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add6_result, port_string,
-	"port");
-
-static cmdline_parse_token_num_t cmd_route_add6_port =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add6_result, port, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_add6_ether_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add6_result, ether_string,
-	"ether");
-
-static cmdline_parse_token_ipaddr_t cmd_route_add6_nh_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_route_add6_result, nh_ip);
-
-static cmdline_parse_token_string_t cmd_route_add6_mpls_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add6_result, mpls_string,
-	"mpls");
-
-static cmdline_parse_token_string_t cmd_route_add6_mpls_labels =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add6_result, mpls_labels,
-	NULL);
-
-static cmdline_parse_inst_t cmd_route_add6 = {
-	.f = cmd_route_add6_parsed,
-	.data = NULL,
-	.help_str = "Route add (mpls = yes, arp = yes)",
-	.tokens = {
-		(void *)&cmd_route_add6_p_string,
-		(void *)&cmd_route_add6_p,
-		(void *)&cmd_route_add6_route_string,
-		(void *)&cmd_route_add6_add_string,
-		(void *)&cmd_route_add6_ip,
-		(void *)&cmd_route_add6_depth,
-		(void *)&cmd_route_add6_port_string,
-		(void *)&cmd_route_add6_port,
-		(void *)&cmd_route_add6_ether_string,
-		(void *)&cmd_route_add6_nh_ip,
-		(void *)&cmd_route_add6_mpls_string,
-		(void *)&cmd_route_add6_mpls_labels,
-		NULL,
-	},
-};
-
-/*
- * route del
- */
-
-struct cmd_route_del_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t route_string;
-	cmdline_fixed_string_t del_string;
-	cmdline_ipaddr_t ip;
-	uint32_t depth;
-};
-
-static void
-cmd_route_del_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_route_del_result *params = parsed_result;
-	struct app_params *app = data;
-	struct pipeline_routing_route_key key;
-
-	int status;
-
-	/* Create route */
-	key.type = PIPELINE_ROUTING_ROUTE_IPV4;
-	key.key.ipv4.ip = rte_bswap32((uint32_t) params->ip.addr.ipv4.s_addr);
-	key.key.ipv4.depth = params->depth;
-
-	status = app_pipeline_routing_delete_route(app, params->p, &key);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_route_del_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_del_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_route_del_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_del_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_del_route_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_del_result, route_string,
-	"route");
-
-static cmdline_parse_token_string_t cmd_route_del_del_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_del_result, del_string,
-	"del");
-
-static cmdline_parse_token_ipaddr_t cmd_route_del_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_route_del_result, ip);
-
-static cmdline_parse_token_num_t cmd_route_del_depth =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_del_result, depth, UINT32);
-
-static cmdline_parse_inst_t cmd_route_del = {
-	.f = cmd_route_del_parsed,
-	.data = NULL,
-	.help_str = "Route delete",
-	.tokens = {
-		(void *)&cmd_route_del_p_string,
-		(void *)&cmd_route_del_p,
-		(void *)&cmd_route_del_route_string,
-		(void *)&cmd_route_del_del_string,
-		(void *)&cmd_route_del_ip,
-		(void *)&cmd_route_del_depth,
-		NULL,
-	},
-};
-
-/*
- * route add default
- */
-
-struct cmd_route_add_default_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t route_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_fixed_string_t default_string;
-	uint32_t port;
-};
-
-static void
-cmd_route_add_default_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	void *data)
-{
-	struct cmd_route_add_default_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	status = app_pipeline_routing_add_default_route(app, params->p,
-			params->port);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_route_add_default_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add_default_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_route_add_default_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add_default_result, p, UINT32);
-
-cmdline_parse_token_string_t cmd_route_add_default_route_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add_default_result,
-		route_string, "route");
-
-cmdline_parse_token_string_t cmd_route_add_default_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add_default_result,
-		add_string, "add");
-
-cmdline_parse_token_string_t cmd_route_add_default_default_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_add_default_result,
-	default_string, "default");
-
-cmdline_parse_token_num_t cmd_route_add_default_port =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_add_default_result,
-		port, UINT32);
-
-cmdline_parse_inst_t cmd_route_add_default = {
-	.f = cmd_route_add_default_parsed,
-	.data = NULL,
-	.help_str = "Route default set",
-	.tokens = {
-		(void *)&cmd_route_add_default_p_string,
-		(void *)&cmd_route_add_default_p,
-		(void *)&cmd_route_add_default_route_string,
-		(void *)&cmd_route_add_default_add_string,
-		(void *)&cmd_route_add_default_default_string,
-		(void *)&cmd_route_add_default_port,
-		NULL,
-	},
-};
-
-/*
- * route del default
- */
-
-struct cmd_route_del_default_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t route_string;
-	cmdline_fixed_string_t del_string;
-	cmdline_fixed_string_t default_string;
-};
-
-static void
-cmd_route_del_default_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	 void *data)
-{
-	struct cmd_route_del_default_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	status = app_pipeline_routing_delete_default_route(app, params->p);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_route_del_default_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_del_default_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_route_del_default_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_del_default_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_del_default_route_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_del_default_result,
-		route_string, "route");
-
-static cmdline_parse_token_string_t cmd_route_del_default_del_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_del_default_result,
-		del_string, "del");
-
-static cmdline_parse_token_string_t cmd_route_del_default_default_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_del_default_result,
-	default_string, "default");
-
-
-static cmdline_parse_inst_t cmd_route_del_default = {
-	.f = cmd_route_del_default_parsed,
-	.data = NULL,
-	.help_str = "Route default clear",
-	.tokens = {
-		(void *)&cmd_route_del_default_p_string,
-		(void *)&cmd_route_del_default_p,
-		(void *)&cmd_route_del_default_route_string,
-		(void *)&cmd_route_del_default_del_string,
-		(void *)&cmd_route_del_default_default_string,
-		NULL,
-	},
-};
-
-/*
- * route ls
- */
-
-struct cmd_route_ls_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t route_string;
-	cmdline_fixed_string_t ls_string;
-};
-
-static void
-cmd_route_ls_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_route_ls_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	status = app_pipeline_routing_route_ls(app, params->p);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_route_ls_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_ls_result, p_string, "p");
-
-static cmdline_parse_token_num_t cmd_route_ls_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_route_ls_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_route_ls_route_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_ls_result,
-	route_string, "route");
-
-static cmdline_parse_token_string_t cmd_route_ls_ls_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_route_ls_result, ls_string,
-	"ls");
-
-static cmdline_parse_inst_t cmd_route_ls = {
-	.f = cmd_route_ls_parsed,
-	.data = NULL,
-	.help_str = "Route list",
-	.tokens = {
-		(void *)&cmd_route_ls_p_string,
-		(void *)&cmd_route_ls_p,
-		(void *)&cmd_route_ls_route_string,
-		(void *)&cmd_route_ls_ls_string,
-		NULL,
-	},
-};
-
-/*
- * arp add
- */
-
-struct cmd_arp_add_result {
+struct cmd_arp_result {
 	cmdline_fixed_string_t p_string;
 	uint32_t p;
 	cmdline_fixed_string_t arp_string;
-	cmdline_fixed_string_t add_string;
+	cmdline_multi_string_t multi_string;
+};
+
+static void
+cmd_arp_parsed(
+	void *parsed_result,
+	__rte_unused struct cmdline *cl,
+	void *data)
+{
+	struct cmd_arp_result *params = parsed_result;
+	struct app_params *app = data;
+
+	char *tokens[16];
+	uint32_t n_tokens = RTE_DIM(tokens);
+	int status;
+
+	struct in_addr ipv4;
+	struct ether_addr mac_addr;
 	uint32_t port_id;
-	cmdline_ipaddr_t ip;
-	struct ether_addr macaddr;
 
-};
-
-static void
-cmd_arp_add_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_arp_add_result *params = parsed_result;
-	struct app_params *app = data;
-
-	struct pipeline_routing_arp_key key;
-	int status;
-
-	key.type = PIPELINE_ROUTING_ARP_IPV4;
-	key.key.ipv4.port_id = params->port_id;
-	key.key.ipv4.ip = rte_cpu_to_be_32(params->ip.addr.ipv4.s_addr);
-
-	status = app_pipeline_routing_add_arp_entry(app,
-		params->p,
-		&key,
-		&params->macaddr);
-
+	status = parse_tokenize_string(params->multi_string, tokens, &n_tokens);
 	if (status != 0) {
-		printf("Command failed\n");
+		printf("Command \"arp\": Too many parameters.\n");
 		return;
 	}
-}
 
-static cmdline_parse_token_string_t cmd_arp_add_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_add_result, p_string,
-	"p");
+	/* "arp add" or "arp add default" */
+	if ((n_tokens > 0) && (0 == strcmp(tokens[0], "add"))) {
+		if (n_tokens < 3) {
+			printf("Not enough parameters for \"arp add\" or"
+					"\"arp add default\".\n");
+			return;
+		}
 
-static cmdline_parse_token_num_t cmd_arp_add_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_arp_add_result, p, UINT32);
+		/* arp add <port ID> <ipaddr> <macaddr> */
+		if (0 == parser_read_uint32(&port_id, tokens[1])) {
+			struct pipeline_routing_arp_key key;
 
-static cmdline_parse_token_string_t cmd_arp_add_arp_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_add_result, arp_string, "arp");
+			if (n_tokens != 4) {
+				printf(
+				"Incorrect number of parameters for arp add.\n");
+				return;
+			}
+			if(parse_ipv4_addr(tokens[2], &ipv4)) {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is IPv4.\n",
+					tokens[2]);
+				return;
+			}
+			if(parse_mac_addr(tokens[3], &mac_addr)) {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is MAC address.\n",
+					tokens[3]);
+				return;
+			}
 
-static cmdline_parse_token_string_t cmd_arp_add_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_add_result, add_string, "add");
+			key.type = PIPELINE_ROUTING_ARP_IPV4;
+			key.key.ipv4.port_id = port_id;
+			key.key.ipv4.ip = rte_cpu_to_be_32(ipv4.s_addr);
 
-static cmdline_parse_token_num_t cmd_arp_add_port_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_arp_add_result, port_id, UINT32);
+			status = app_pipeline_routing_add_arp_entry(app,
+				params->p,
+				&key,
+				&mac_addr);
+			if (status != 0)
+				printf("Command \"arp add\" failed.\n");
 
-static cmdline_parse_token_ipaddr_t cmd_arp_add_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_arp_add_result, ip);
+			return;
+		}
+		/* arp add default <port ID> */
+		else if (0 == strcmp(tokens[1], "default")) {
+			if (n_tokens != 3) {
+				printf(
+				"Incorrect number of parameters for arp add default.\n");
+				return;
+			}
+			if (parser_read_uint32(&port_id, tokens[2])) {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is port id.\n",
+					tokens[2]);
+				return;
+			}
 
-static cmdline_parse_token_etheraddr_t cmd_arp_add_macaddr =
-	TOKEN_ETHERADDR_INITIALIZER(struct cmd_arp_add_result, macaddr);
+			status = app_pipeline_routing_add_default_arp_entry(app,
+				params->p,
+				port_id);
+			if (status != 0)
+				printf("Command \"arp add default\" failed.\n");
 
-static cmdline_parse_inst_t cmd_arp_add = {
-	.f = cmd_arp_add_parsed,
-	.data = NULL,
-	.help_str = "ARP add",
-	.tokens = {
-		(void *)&cmd_arp_add_p_string,
-		(void *)&cmd_arp_add_p,
-		(void *)&cmd_arp_add_arp_string,
-		(void *)&cmd_arp_add_add_string,
-		(void *)&cmd_arp_add_port_id,
-		(void *)&cmd_arp_add_ip,
-		(void *)&cmd_arp_add_macaddr,
-		NULL,
-	},
-};
+			return;
+		}
+		else {
+			printf("Incorrect parameter: \"%s\"."
+				" Expected parameter is port id or word \"default\".\n",
+				tokens[1]);
+			return;
+		}
+	}
 
-/*
- * arp del
- */
+	/* "arp del" or "arp del default" */
+	if ((n_tokens > 0) && (0 == strcmp(tokens[0], "del"))) {
+		if (n_tokens < 2) {
+			printf("Not enough parameters for \"arp del\" or"
+					"\"arp del default\".\n");
+			return;
+		}
 
-struct cmd_arp_del_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t arp_string;
-	cmdline_fixed_string_t del_string;
-	uint32_t port_id;
-	cmdline_ipaddr_t ip;
-};
+		/* arp del <port ID> <ipaddr> */
+		if (0 == parser_read_uint32(&port_id, tokens[1])) {
+			struct pipeline_routing_arp_key key;
 
-static void
-cmd_arp_del_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_arp_del_result *params = parsed_result;
-	struct app_params *app = data;
+			if (n_tokens != 3) {
+				printf(
+				"Incorrect number of parameters for \"arp del\".\n");
+				return;
+			}
+			if (parse_ipv4_addr(tokens[2], &ipv4)) {
+				printf("Incorrect parameter: \"%s\"."
+					" Expected parameter is IPv4.\n",
+					tokens[2]);
+				return;
+			}
 
-	struct pipeline_routing_arp_key key;
-	int status;
+			key.type = PIPELINE_ROUTING_ARP_IPV4;
+			key.key.ipv4.ip = rte_cpu_to_be_32(ipv4.s_addr);
+			key.key.ipv4.port_id = port_id;
 
-	key.type = PIPELINE_ROUTING_ARP_IPV4;
-	key.key.ipv4.ip = rte_cpu_to_be_32(params->ip.addr.ipv4.s_addr);
-	key.key.ipv4.port_id = params->port_id;
+			status = app_pipeline_routing_delete_arp_entry(app,
+				params->p,
+				&key);
+			if (status != 0)
+				printf("Command \"arp del\" failed.\n");
 
-	status = app_pipeline_routing_delete_arp_entry(app, params->p, &key);
+			return;
+		}
+		/* arp del default */
+		else if (0 == strcmp(tokens[1], "default")) {
+			if (n_tokens != 2) {
+				printf(
+				"Incorrect number of parameters for \"arp del default\".\n");
+				return;
+			}
 
-	if (status != 0) {
-		printf("Command failed\n");
+			status = app_pipeline_routing_delete_default_arp_entry(app,
+				params->p);
+			if (status != 0)
+				printf("Command \"arp del default\" failed.\n");
+
+			return;
+		}
+		else {
+			printf("Incorrect parameter: \"%s\"."
+				" Expected parameter is port id or word \"default\".\n",
+				tokens[1]);
+			return;
+		}
+	}
+
+	/* arp ls */
+	if ((n_tokens > 0) && (0 == strcmp(tokens[0], "ls"))) {
+		if (n_tokens > 1) {
+			printf("Incorrect number of parameters for arp ls.\n");
+			return;
+		}
+
+		status = app_pipeline_routing_arp_ls(app, params->p);
+		if (status != 0)
+			printf("Command \"arp ls\" failed.\n");
+
 		return;
 	}
+
+	printf("Command \"arp\" failed."
+		" Expected parameter is \"add\" or \"del\" or \"ls\".\n");
+	return;
 }
 
-static cmdline_parse_token_string_t cmd_arp_del_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_del_result, p_string,
-	"p");
+static cmdline_parse_token_string_t cmd_arp_p_string =
+	TOKEN_STRING_INITIALIZER(struct cmd_arp_result, p_string, "p");
 
-static cmdline_parse_token_num_t cmd_arp_del_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_arp_del_result, p, UINT32);
+static cmdline_parse_token_num_t cmd_arp_p =
+	TOKEN_NUM_INITIALIZER(struct cmd_arp_result, p, UINT32);
 
-static cmdline_parse_token_string_t cmd_arp_del_arp_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_del_result, arp_string, "arp");
+static cmdline_parse_token_string_t cmd_arp_arp_string =
+	TOKEN_STRING_INITIALIZER(struct cmd_arp_result, arp_string, "arp");
 
-static cmdline_parse_token_string_t cmd_arp_del_del_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_del_result, del_string, "del");
+static cmdline_parse_token_string_t cmd_arp_multi_string =
+	TOKEN_STRING_INITIALIZER(struct cmd_arp_result, multi_string,
+	TOKEN_STRING_MULTI);
 
-static cmdline_parse_token_num_t cmd_arp_del_port_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_arp_del_result, port_id, UINT32);
-
-static cmdline_parse_token_ipaddr_t cmd_arp_del_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_arp_del_result, ip);
-
-static cmdline_parse_inst_t cmd_arp_del = {
-	.f = cmd_arp_del_parsed,
+static cmdline_parse_inst_t cmd_arp = {
+	.f = cmd_arp_parsed,
 	.data = NULL,
-	.help_str = "ARP delete",
+	.help_str =
+		"\n add <port ID> <ipaddr> <macaddr> : ARP add"
+		"\n add default <port ID> : ARP add default"
+		"\n del <port ID> <ipaddr> : ARP delete"
+		"\n del default : ARP delete default"
+		"\n ls : ARP list",
 	.tokens = {
-		(void *)&cmd_arp_del_p_string,
-		(void *)&cmd_arp_del_p,
-		(void *)&cmd_arp_del_arp_string,
-		(void *)&cmd_arp_del_del_string,
-		(void *)&cmd_arp_del_port_id,
-		(void *)&cmd_arp_del_ip,
-		NULL,
-	},
-};
-
-/*
- * arp add default
- */
-
-struct cmd_arp_add_default_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t arp_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_fixed_string_t default_string;
-	uint32_t port_id;
-};
-
-static void
-cmd_arp_add_default_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_arp_add_default_result *params = parsed_result;
-	struct app_params *app = data;
-
-	int status;
-
-	status = app_pipeline_routing_add_default_arp_entry(app,
-		params->p,
-		params->port_id);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_arp_add_default_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_add_default_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_arp_add_default_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_arp_add_default_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_arp_add_default_arp_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_add_default_result, arp_string,
-	"arp");
-
-static cmdline_parse_token_string_t cmd_arp_add_default_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_add_default_result, add_string,
-	"add");
-
-static cmdline_parse_token_string_t cmd_arp_add_default_default_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_add_default_result,
-		default_string, "default");
-
-static cmdline_parse_token_num_t cmd_arp_add_default_port_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_arp_add_default_result, port_id,
-	UINT32);
-
-static cmdline_parse_inst_t cmd_arp_add_default = {
-	.f = cmd_arp_add_default_parsed,
-	.data = NULL,
-	.help_str = "ARP add default",
-	.tokens = {
-		(void *)&cmd_arp_add_default_p_string,
-		(void *)&cmd_arp_add_default_p,
-		(void *)&cmd_arp_add_default_arp_string,
-		(void *)&cmd_arp_add_default_add_string,
-		(void *)&cmd_arp_add_default_default_string,
-		(void *)&cmd_arp_add_default_port_id,
-		NULL,
-	},
-};
-
-/*
- * arp del default
- */
-
-struct cmd_arp_del_default_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t arp_string;
-	cmdline_fixed_string_t del_string;
-	cmdline_fixed_string_t default_string;
-};
-
-static void
-cmd_arp_del_default_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_arp_del_default_result *params = parsed_result;
-	struct app_params *app = data;
-
-	int status;
-
-	status = app_pipeline_routing_delete_default_arp_entry(app, params->p);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-static cmdline_parse_token_string_t cmd_arp_del_default_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_del_default_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_arp_del_default_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_arp_del_default_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_arp_del_default_arp_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_del_default_result, arp_string,
-	"arp");
-
-static cmdline_parse_token_string_t cmd_arp_del_default_del_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_del_default_result, del_string,
-	"del");
-
-static cmdline_parse_token_string_t cmd_arp_del_default_default_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_del_default_result,
-		default_string, "default");
-
-static cmdline_parse_inst_t cmd_arp_del_default = {
-	.f = cmd_arp_del_default_parsed,
-	.data = NULL,
-	.help_str = "ARP delete default",
-	.tokens = {
-		(void *)&cmd_arp_del_default_p_string,
-		(void *)&cmd_arp_del_default_p,
-		(void *)&cmd_arp_del_default_arp_string,
-		(void *)&cmd_arp_del_default_del_string,
-		(void *)&cmd_arp_del_default_default_string,
-		NULL,
-	},
-};
-
-/*
- * arp ls
- */
-
-struct cmd_arp_ls_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t p;
-	cmdline_fixed_string_t arp_string;
-	cmdline_fixed_string_t ls_string;
-};
-
-static void
-cmd_arp_ls_parsed(
-	void *parsed_result,
-	__rte_unused struct cmdline *cl,
-	void *data)
-{
-	struct cmd_arp_ls_result *params = parsed_result;
-	struct app_params *app = data;
-	struct pipeline_routing *p;
-
-	p = app_pipeline_data_fe(app, params->p, &pipeline_routing);
-	if (p == NULL)
-		return;
-
-	app_pipeline_routing_arp_ls(app, params->p);
-}
-
-static cmdline_parse_token_string_t cmd_arp_ls_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_ls_result, p_string,
-	"p");
-
-static cmdline_parse_token_num_t cmd_arp_ls_p =
-	TOKEN_NUM_INITIALIZER(struct cmd_arp_ls_result, p, UINT32);
-
-static cmdline_parse_token_string_t cmd_arp_ls_arp_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_ls_result, arp_string,
-	"arp");
-
-static cmdline_parse_token_string_t cmd_arp_ls_ls_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_arp_ls_result, ls_string,
-	"ls");
-
-static cmdline_parse_inst_t cmd_arp_ls = {
-	.f = cmd_arp_ls_parsed,
-	.data = NULL,
-	.help_str = "ARP list",
-	.tokens = {
-		(void *)&cmd_arp_ls_p_string,
-		(void *)&cmd_arp_ls_p,
-		(void *)&cmd_arp_ls_arp_string,
-		(void *)&cmd_arp_ls_ls_string,
+		(void *)&cmd_arp_p_string,
+		(void *)&cmd_arp_p,
+		(void *)&cmd_arp_arp_string,
+		(void *)&cmd_arp_multi_string,
 		NULL,
 	},
 };
 
 static cmdline_parse_ctx_t pipeline_cmds[] = {
-	(cmdline_parse_inst_t *)&cmd_route_add1,
-	(cmdline_parse_inst_t *)&cmd_route_add2,
-	(cmdline_parse_inst_t *)&cmd_route_add3,
-	(cmdline_parse_inst_t *)&cmd_route_add4,
-	(cmdline_parse_inst_t *)&cmd_route_add5,
-	(cmdline_parse_inst_t *)&cmd_route_add6,
-	(cmdline_parse_inst_t *)&cmd_route_del,
-	(cmdline_parse_inst_t *)&cmd_route_add_default,
-	(cmdline_parse_inst_t *)&cmd_route_del_default,
-	(cmdline_parse_inst_t *)&cmd_route_ls,
-	(cmdline_parse_inst_t *)&cmd_arp_add,
-	(cmdline_parse_inst_t *)&cmd_arp_del,
-	(cmdline_parse_inst_t *)&cmd_arp_add_default,
-	(cmdline_parse_inst_t *)&cmd_arp_del_default,
-	(cmdline_parse_inst_t *)&cmd_arp_ls,
+	(cmdline_parse_inst_t *)&cmd_route,
+	(cmdline_parse_inst_t *)&cmd_arp,
 	NULL,
 };
 
