@@ -540,6 +540,11 @@ struct i40e_adapter {
 	struct rte_timecounter systime_tc;
 	struct rte_timecounter rx_tstamp_tc;
 	struct rte_timecounter tx_tstamp_tc;
+
+	/* VF reset variable must put at the end of the structure */
+	rte_spinlock_t vf_reset_lock;
+	rte_spinlock_t reset_trigger_lock;
+	uint8_t reset_number;
 };
 
 int i40e_dev_switch_queues(struct i40e_pf *pf, bool on);
@@ -592,6 +597,8 @@ void i40e_rxq_info_get(struct rte_eth_dev *dev, uint16_t queue_id,
 	struct rte_eth_rxq_info *qinfo);
 void i40e_txq_info_get(struct rte_eth_dev *dev, uint16_t queue_id,
 	struct rte_eth_txq_info *qinfo);
+
+void i40evf_emulate_vf_reset(uint8_t port_id);
 
 /* I40E_DEV_PRIVATE_TO */
 #define I40E_DEV_PRIVATE_TO_PF(adapter) \

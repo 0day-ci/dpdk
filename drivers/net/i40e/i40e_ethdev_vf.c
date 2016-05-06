@@ -157,6 +157,11 @@ i40evf_dev_rx_queue_intr_disable(struct rte_eth_dev *dev, uint16_t queue_id);
 static void i40evf_handle_pf_event(__rte_unused struct rte_eth_dev *dev,
 				   uint8_t *msg,
 				   uint16_t msglen);
+static int i40evf_dev_uninit(struct rte_eth_dev *eth_dev);
+static int i40evf_dev_init(struct rte_eth_dev *eth_dev);
+static void i40evf_dev_close(struct rte_eth_dev *dev);
+static int i40evf_dev_start(struct rte_eth_dev *dev);
+static int i40evf_dev_configure(struct rte_eth_dev *dev);
 
 /* Default hash key buffer for RSS */
 static uint32_t rss_key_default[I40E_VFQF_HKEY_MAX_INDEX + 1];
@@ -1306,18 +1311,155 @@ i40evf_uninit_vf(struct rte_eth_dev *dev)
 }
 
 static void
-i40evf_handle_pf_event(__rte_unused struct rte_eth_dev *dev,
-			   uint8_t *msg,
-			   __rte_unused uint16_t msglen)
+i40e_vf_queue_reset(struct rte_eth_dev *dev)
+{
+	uint16_t i;
+
+	for (i = 0; i < dev->data->nb_rx_queues; i++) {
+		struct i40e_rx_queue *rxq = dev->data->rx_queues[i];
+
+		if (rxq->q_set) {
+			i40e_dev_rx_queue_setup(dev,
+						rxq->queue_id,
+						rxq->nb_rx_desc,
+						rxq->socket_id,
+						&rxq->rxconf,
+						rxq->mp);
+		}
+	}
+	for (i = 0; i < dev->data->nb_tx_queues; i++) {
+		struct i40e_tx_queue *txq = dev->data->tx_queues[i];
+
+		if (txq->q_set) {
+			i40e_dev_tx_queue_setup(dev,
+						txq->queue_id,
+						txq->nb_tx_desc,
+						txq->socket_id,
+						&txq->txconf);
+		}
+	}
+}
+
+static void
+i40e_vf_reset_dev(struct rte_eth_dev *dev)
+{
+	struct i40e_adapter *adapter =
+		I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
+
+	i40evf_dev_close(dev);
+	PMD_DRV_LOG(DEBUG, "i40evf dev close complete");
+	i40evf_dev_uninit(dev);
+	PMD_DRV_LOG(DEBUG, "i40evf dev detached");
+	memset(dev->data->dev_private, 0,
+	       (uint64_t)&adapter->vf_reset_lock - (uint64_t)adapter);
+
+	i40evf_dev_configure(dev);
+	i40evf_dev_init(dev);
+	PMD_DRV_LOG(DEBUG, "i40evf dev attached");
+	i40e_vf_queue_reset(dev);
+	PMD_DRV_LOG(DEBUG, "i40evf queue reset");
+	i40evf_dev_start(dev);
+	PMD_DRV_LOG(DEBUG, "i40evf dev restart");
+}
+
+static void
+i40e_vf_reset_handler(struct rte_eth_dev *dev)
+{
+	struct i40e_adapter *adapter =
+		I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
+
+	if (rte_spinlock_trylock(&adapter->vf_reset_lock)) {
+		while (1) {
+			i40e_vf_reset_dev(dev);
+			rte_spinlock_lock(&adapter->reset_trigger_lock);
+			if (2 != adapter->reset_number) {
+				adapter->reset_number = 0;
+				rte_delay_us(100);
+				rte_spinlock_unlock(&adapter->vf_reset_lock);
+				break;
+			} else {
+				adapter->reset_number = 1;
+			}
+			rte_spinlock_unlock(&adapter->reset_trigger_lock);
+		};
+	}
+}
+
+static uint16_t
+i40evf_recv_pkts_detach(void *rx_queue,
+			struct rte_mbuf __rte_unused **rx_pkts,
+			uint16_t __rte_unused nb_pkts)
+{
+	struct i40e_rx_queue *rxq = (struct i40e_rx_queue *)rx_queue;
+	uint8_t port_id = rxq->port_id;
+
+	i40e_vf_reset_handler(&rte_eth_devices[port_id]);
+
+	return 0;
+}
+
+static uint16_t
+i40evf_xmit_pkts_detach(void *tx_queue,
+			struct rte_mbuf __rte_unused **tx_pkts,
+			uint16_t __rte_unused nb_pkts)
+{
+	struct i40e_tx_queue *txq = (struct i40e_tx_queue *)tx_queue;
+	uint8_t port_id = txq->port_id;
+
+	i40e_vf_reset_handler(&rte_eth_devices[port_id]);
+	return 0;
+}
+
+static void
+i40evf_handle_vf_reset(struct rte_eth_dev *dev)
+{
+	dev->rx_pkt_burst = i40evf_recv_pkts_detach;
+	dev->tx_pkt_burst = i40evf_xmit_pkts_detach;
+
+	rte_delay_us(10);
+}
+
+void
+i40evf_emulate_vf_reset(uint8_t port_id)
+{
+	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
+	struct i40e_adapter *adapter =
+		I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
+
+	rte_spinlock_lock(&adapter->reset_trigger_lock);
+	if (0 == adapter->reset_number) {
+		i40evf_handle_vf_reset(dev);
+		adapter->reset_number = 1;
+	} else {
+		adapter->reset_number = 2;
+	}
+	rte_spinlock_unlock(&adapter->reset_trigger_lock);
+}
+
+static void
+i40evf_handle_pf_event(struct rte_eth_dev *dev,
+		       uint8_t *msg,
+		       __rte_unused uint16_t msglen)
 {
 	struct i40e_virtchnl_pf_event *pf_msg =
 			(struct i40e_virtchnl_pf_event *)msg;
 	struct i40e_vf *vf = I40EVF_DEV_PRIVATE_TO_VF(dev->data->dev_private);
+	struct i40e_adapter *adapter =
+		I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
 
 	switch (pf_msg->event) {
 	case I40E_VIRTCHNL_EVENT_RESET_IMPENDING:
 		PMD_DRV_LOG(DEBUG, "VIRTCHNL_EVENT_RESET_IMPENDING event\n");
 		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_RESET);
+
+		rte_spinlock_lock(&adapter->reset_trigger_lock);
+		if (0 == adapter->reset_number) {
+			i40evf_handle_vf_reset(dev);
+			adapter->reset_number = 1;
+		} else {
+			adapter->reset_number = 2;
+		}
+		rte_spinlock_unlock(&adapter->vf_reset_lock);
 		break;
 	case I40E_VIRTCHNL_EVENT_LINK_CHANGE:
 		PMD_DRV_LOG(DEBUG, "VIRTCHNL_EVENT_LINK_CHANGE event\n");

@@ -34,6 +34,11 @@ This section should contain new features added in this release. Sample format:
 
   Refer to the previous release notes for examples.
 
+* **Added user unaware VF reset in i40e VF driver.**
+
+  A new feature has been added to allow i40e VF driver to handle the VF reset
+  event from PF, and all the operation for VF reset should not be noticed by the
+  application.
 
 Resolved Issues
 ---------------
