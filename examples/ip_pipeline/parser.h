@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,9 @@
 #ifndef __INCLUDE_PARSER_H__
 #define __INCLUDE_PARSER_H__
 
+#include <rte_ip.h>
+#include <rte_ether.h>
+
 int
 parser_read_arg_bool(const char *p);
 
@@ -44,7 +47,28 @@ int
 parser_read_uint32(uint32_t *value, const char *p);
 
 int
+parser_read_uint16(uint16_t *value, const char *p);
+
+int
+parser_read_uint8(uint8_t *value, const char *p);
+
+int
+parse_tokenize_string(char *string, char *tokens[], uint32_t *n_tokens);
+
+int
 parse_hex_string(char *src, uint8_t *dst, uint32_t *size);
+
+int
+parse_mpls_labels(char *string, uint32_t *labels, uint32_t *n_labels);
+
+int
+parse_ipv4_addr(const char *token, struct in_addr *ipv4);
+
+int
+parse_ipv6_addr(const char *token, struct in6_addr *ipv6);
+
+int
+parse_mac_addr(const char *token, struct ether_addr *addr);
 
 #endif
 
