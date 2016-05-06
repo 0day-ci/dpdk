@@ -581,7 +581,11 @@ int bnxt_hwrm_ring_alloc(struct bnxt *bp,
 		break;
 	case HWRM_RING_ALLOC_INPUT_RING_TYPE_CMPL:
 		req.ring_type = ring_type;
-		req.int_mode = HWRM_RING_ALLOC_INPUT_INT_MODE_POLL;
+		/*
+		 * TODO: Some HWRM versions crash with
+		 * HWRM_RING_ALLOC_INPUT_INT_MODE_POLL
+		 */
+		req.int_mode = HWRM_RING_ALLOC_INPUT_INT_MODE_MSIX;
 		req.length = rte_cpu_to_le_32(ring->ring_size);
 		break;
 	default:
