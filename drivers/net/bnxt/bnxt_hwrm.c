@@ -43,8 +43,10 @@
 #include "bnxt_filter.h"
 #include "bnxt_hwrm.h"
 #include "bnxt_rxq.h"
+#include "bnxt_rxr.h"
 #include "bnxt_ring.h"
 #include "bnxt_txq.h"
+#include "bnxt_txr.h"
 #include "bnxt_vnic.h"
 #include "hsi_struct_def_dpdk.h"
 
@@ -204,6 +206,49 @@ int bnxt_hwrm_clear_filter(struct bnxt *bp,
 	filter->fw_l2_filter_id = -1;
 
 	return 0;
+}
+
+int bnxt_hwrm_set_filter(struct bnxt *bp,
+			 struct bnxt_vnic_info *vnic,
+			 struct bnxt_filter_info *filter)
+{
+	int rc = 0;
+	struct hwrm_cfa_l2_filter_alloc_input req = {.req_type = 0 };
+	struct hwrm_cfa_l2_filter_alloc_output *resp = bp->hwrm_cmd_resp_addr;
+	uint32_t enables = 0;
+
+	HWRM_PREP(req, CFA_L2_FILTER_ALLOC, -1, resp);
+
+	req.flags = rte_cpu_to_le_32(filter->flags);
+
+	enables = filter->enables |
+	      HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_DST_ID;
+	req.dst_id = rte_cpu_to_le_16(vnic->fw_vnic_id);
+
+	if (enables &
+	    HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_L2_ADDR)
+		memcpy(req.l2_addr, filter->l2_addr,
+		       ETHER_ADDR_LEN);
+	if (enables &
+	    HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_L2_ADDR_MASK)
+		memcpy(req.l2_addr_mask, filter->l2_addr_mask,
+		       ETHER_ADDR_LEN);
+	if (enables &
+	    HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_L2_OVLAN)
+		req.l2_ovlan = filter->l2_ovlan;
+	if (enables &
+	    HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_L2_OVLAN_MASK)
+		req.l2_ovlan_mask = filter->l2_ovlan_mask;
+
+	req.enables = rte_cpu_to_le_32(enables);
+
+	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
+
+	HWRM_CHECK_RESULT;
+
+	filter->fw_l2_filter_id = rte_le_to_cpu_64(resp->l2_filter_id);
+
+	return rc;
 }
 
 int bnxt_hwrm_exec_fwd_resp(struct bnxt *bp, void *fwd_cmd)
@@ -699,6 +744,28 @@ int bnxt_hwrm_stat_ctx_alloc(struct bnxt *bp,
 	return rc;
 }
 
+int bnxt_hwrm_stat_ctx_free(struct bnxt *bp,
+			    struct bnxt_cp_ring_info *cpr, unsigned idx)
+{
+	int rc;
+	struct hwrm_stat_ctx_free_input req = {.req_type = 0 };
+	struct hwrm_stat_ctx_free_output *resp = bp->hwrm_cmd_resp_addr;
+
+	HWRM_PREP(req, STAT_CTX_FREE, -1, resp);
+
+	req.stat_ctx_id = rte_cpu_to_le_16(cpr->hw_stats_ctx_id);
+	req.seq_id = rte_cpu_to_le_16(bp->hwrm_cmd_seq++);
+
+	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
+
+	HWRM_CHECK_RESULT;
+
+	cpr->hw_stats_ctx_id = HWRM_NA_SIGNATURE;
+	bp->grp_info[idx].fw_stats_ctx = cpr->hw_stats_ctx_id;
+
+	return rc;
+}
+
 int bnxt_hwrm_vnic_alloc(struct bnxt *bp, struct bnxt_vnic_info *vnic)
 {
 	int rc = 0, i, j;
@@ -875,6 +942,28 @@ int bnxt_clear_all_hwrm_stat_ctxs(struct bnxt *bp)
 	return 0;
 }
 
+int bnxt_free_all_hwrm_stat_ctxs(struct bnxt *bp)
+{
+	int rc;
+	unsigned i;
+	struct bnxt_cp_ring_info *cpr;
+
+	for (i = 0; i < bp->rx_cp_nr_rings + bp->tx_cp_nr_rings; i++) {
+		unsigned idx = i + 1;
+
+		if (i >= bp->rx_cp_nr_rings)
+			cpr = bp->tx_queues[i - bp->rx_cp_nr_rings]->cp_ring;
+		else
+			cpr = bp->rx_queues[i]->cp_ring;
+		if (cpr->hw_stats_ctx_id != HWRM_NA_SIGNATURE) {
+			rc = bnxt_hwrm_stat_ctx_free(bp, cpr, idx);
+			if (rc)
+				return rc;
+		}
+	}
+	return 0;
+}
+
 int bnxt_alloc_all_hwrm_stat_ctxs(struct bnxt *bp)
 {
 	unsigned i;
@@ -925,6 +1014,84 @@ int bnxt_free_all_hwrm_ring_grps(struct bnxt *bp)
 	return rc;
 }
 
+static void bnxt_free_cp_ring(struct bnxt *bp,
+			      struct bnxt_cp_ring_info *cpr, unsigned idx)
+{
+	struct bnxt_ring_struct *cp_ring = cpr->cp_ring_struct;
+
+	bnxt_hwrm_ring_free(bp, cp_ring,
+			HWRM_RING_FREE_INPUT_RING_TYPE_CMPL);
+	cp_ring->fw_ring_id = INVALID_HW_RING_ID;
+	bp->grp_info[idx].cp_fw_ring_id = INVALID_HW_RING_ID;
+	memset(cpr->cp_desc_ring, 0, cpr->cp_ring_struct->ring_size *
+			sizeof(*cpr->cp_desc_ring));
+	cpr->cp_raw_cons = 0;
+}
+
+int bnxt_free_all_hwrm_rings(struct bnxt *bp)
+{
+	unsigned i;
+	int rc = 0;
+
+	for (i = 0; i < bp->tx_cp_nr_rings; i++) {
+		struct bnxt_tx_queue *txq = bp->tx_queues[i];
+		struct bnxt_tx_ring_info *txr = txq->tx_ring;
+		struct bnxt_ring_struct *ring = txr->tx_ring_struct;
+		struct bnxt_cp_ring_info *cpr = txq->cp_ring;
+		unsigned idx = bp->rx_cp_nr_rings + i + 1;
+
+		if (ring->fw_ring_id != INVALID_HW_RING_ID) {
+			bnxt_hwrm_ring_free(bp, ring,
+					HWRM_RING_FREE_INPUT_RING_TYPE_TX);
+			ring->fw_ring_id = INVALID_HW_RING_ID;
+			memset(txr->tx_desc_ring, 0,
+					txr->tx_ring_struct->ring_size *
+					sizeof(*txr->tx_desc_ring));
+			memset(txr->tx_buf_ring, 0,
+					txr->tx_ring_struct->ring_size *
+					sizeof(*txr->tx_buf_ring));
+			txr->tx_prod = 0;
+			txr->tx_cons = 0;
+		}
+		if (cpr->cp_ring_struct->fw_ring_id != INVALID_HW_RING_ID)
+			bnxt_free_cp_ring(bp, cpr, idx);
+	}
+
+	for (i = 0; i < bp->rx_cp_nr_rings; i++) {
+		struct bnxt_rx_queue *rxq = bp->rx_queues[i];
+		struct bnxt_rx_ring_info *rxr = rxq->rx_ring;
+		struct bnxt_ring_struct *ring = rxr->rx_ring_struct;
+		struct bnxt_cp_ring_info *cpr = rxq->cp_ring;
+		unsigned idx = i + 1;
+
+		if (ring->fw_ring_id != INVALID_HW_RING_ID) {
+			bnxt_hwrm_ring_free(bp, ring,
+					HWRM_RING_FREE_INPUT_RING_TYPE_RX);
+			ring->fw_ring_id = INVALID_HW_RING_ID;
+			bp->grp_info[idx].rx_fw_ring_id = INVALID_HW_RING_ID;
+			memset(rxr->rx_desc_ring, 0,
+					rxr->rx_ring_struct->ring_size *
+					sizeof(*rxr->rx_desc_ring));
+			memset(rxr->rx_buf_ring, 0,
+					rxr->rx_ring_struct->ring_size *
+					sizeof(*rxr->rx_buf_ring));
+			rxr->rx_prod = 0;
+		}
+		if (cpr->cp_ring_struct->fw_ring_id != INVALID_HW_RING_ID)
+			bnxt_free_cp_ring(bp, cpr, idx);
+	}
+
+	/* Default completion ring */
+	{
+		struct bnxt_cp_ring_info *cpr = bp->def_cp_ring;
+
+		if (cpr->cp_ring_struct->fw_ring_id != INVALID_HW_RING_ID)
+			bnxt_free_cp_ring(bp, cpr, 0);
+	}
+
+	return rc;
+}
+
 int bnxt_alloc_all_hwrm_ring_grps(struct bnxt *bp)
 {
 	uint16_t i;
@@ -970,6 +1137,58 @@ int bnxt_alloc_hwrm_resources(struct bnxt *bp)
 	rte_spinlock_init(&bp->hwrm_lock);
 
 	return 0;
+}
+
+int bnxt_clear_hwrm_vnic_filters(struct bnxt *bp, struct bnxt_vnic_info *vnic)
+{
+	struct bnxt_filter_info *filter;
+	int rc = 0;
+
+	STAILQ_FOREACH(filter, &vnic->filter, next) {
+		rc = bnxt_hwrm_clear_filter(bp, filter);
+		if (rc)
+			break;
+	}
+	return rc;
+}
+
+int bnxt_set_hwrm_vnic_filters(struct bnxt *bp, struct bnxt_vnic_info *vnic)
+{
+	struct bnxt_filter_info *filter;
+	int rc = 0;
+
+	STAILQ_FOREACH(filter, &vnic->filter, next) {
+		rc = bnxt_hwrm_set_filter(bp, vnic, filter);
+		if (rc)
+			break;
+	}
+	return rc;
+}
+
+void bnxt_free_all_hwrm_resources(struct bnxt *bp)
+{
+	struct bnxt_vnic_info *vnic;
+	unsigned i;
+
+	if (bp->vnic_info == NULL)
+		return;
+
+	vnic = &bp->vnic_info[0];
+	bnxt_hwrm_cfa_l2_clear_rx_mask(bp, vnic);
+
+	/* VNIC resources */
+	for (i = 0; i < bp->nr_vnics; i++) {
+		struct bnxt_vnic_info *vnic = &bp->vnic_info[i];
+
+		bnxt_clear_hwrm_vnic_filters(bp, vnic);
+
+		bnxt_hwrm_vnic_ctx_free(bp, vnic);
+		bnxt_hwrm_vnic_free(bp, vnic);
+	}
+	/* Ring resources */
+	bnxt_free_all_hwrm_rings(bp);
+	bnxt_free_all_hwrm_ring_grps(bp);
+	bnxt_free_all_hwrm_stat_ctxs(bp);
 }
 
 static uint16_t bnxt_parse_eth_link_duplex(uint32_t conf_link_speed)

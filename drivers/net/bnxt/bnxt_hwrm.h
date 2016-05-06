@@ -47,6 +47,9 @@ int bnxt_hwrm_cfa_l2_clear_rx_mask(struct bnxt *bp,
 int bnxt_hwrm_cfa_l2_set_rx_mask(struct bnxt *bp, struct bnxt_vnic_info *vnic);
 int bnxt_hwrm_clear_filter(struct bnxt *bp,
 			   struct bnxt_filter_info *filter);
+int bnxt_hwrm_set_filter(struct bnxt *bp,
+			 struct bnxt_vnic_info *vnic,
+			 struct bnxt_filter_info *filter);
 
 int bnxt_hwrm_exec_fwd_resp(struct bnxt *bp, void *fwd_cmd);
 
@@ -70,6 +73,8 @@ int bnxt_hwrm_ring_grp_free(struct bnxt *bp, unsigned idx);
 int bnxt_hwrm_stat_clear(struct bnxt *bp, struct bnxt_cp_ring_info *cpr);
 int bnxt_hwrm_stat_ctx_alloc(struct bnxt *bp,
 			     struct bnxt_cp_ring_info *cpr, unsigned idx);
+int bnxt_hwrm_stat_ctx_free(struct bnxt *bp,
+			    struct bnxt_cp_ring_info *cpr, unsigned idx);
 
 int bnxt_hwrm_ver_get(struct bnxt *bp);
 
@@ -83,8 +88,13 @@ int bnxt_hwrm_vnic_rss_cfg(struct bnxt *bp,
 
 int bnxt_alloc_all_hwrm_stat_ctxs(struct bnxt *bp);
 int bnxt_clear_all_hwrm_stat_ctxs(struct bnxt *bp);
+int bnxt_free_all_hwrm_stat_ctxs(struct bnxt *bp);
+int bnxt_free_all_hwrm_rings(struct bnxt *bp);
 int bnxt_free_all_hwrm_ring_grps(struct bnxt *bp);
 int bnxt_alloc_all_hwrm_ring_grps(struct bnxt *bp);
+int bnxt_set_hwrm_vnic_filters(struct bnxt *bp, struct bnxt_vnic_info *vnic);
+int bnxt_clear_hwrm_vnic_filters(struct bnxt *bp, struct bnxt_vnic_info *vnic);
+void bnxt_free_all_hwrm_resources(struct bnxt *bp);
 void bnxt_free_hwrm_resources(struct bnxt *bp);
 int bnxt_alloc_hwrm_resources(struct bnxt *bp);
 int bnxt_set_hwrm_link_config(struct bnxt *bp, bool link_up);
