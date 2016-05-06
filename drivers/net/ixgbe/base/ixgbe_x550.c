@@ -775,7 +775,7 @@ static s32 ixgbe_enable_eee_x550(struct ixgbe_hw *hw)
 				      autoneg_eee_reg);
 	} else if (hw->device_id == IXGBE_DEV_ID_X550EM_X_KR) {
 
-		status = ixgbe_read_iosf_sb_reg_x550(hw,
+		status = hw->mac.ops.read_iosf_sb_reg(hw,
 				     IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
 				     IXGBE_SB_IOSF_TARGET_KR_PHY, &link_reg);
 		if (status != IXGBE_SUCCESS)
@@ -787,7 +787,7 @@ static s32 ixgbe_enable_eee_x550(struct ixgbe_hw *hw)
 		/* Don't advertise FEC capability when EEE enabled. */
 		link_reg &= ~IXGBE_KRM_LINK_CTRL_1_TETH_AN_CAP_FEC;
 
-		status = ixgbe_write_iosf_sb_reg_x550(hw,
+		status = hw->mac.ops.write_iosf_sb_reg(hw,
 				      IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
 				      IXGBE_SB_IOSF_TARGET_KR_PHY, link_reg);
 		if (status != IXGBE_SUCCESS)
@@ -821,7 +821,7 @@ static s32 ixgbe_disable_eee_x550(struct ixgbe_hw *hw)
 				      IXGBE_MDIO_AUTO_NEG_DEV_TYPE,
 				      autoneg_eee_reg);
 	} else if (hw->device_id == IXGBE_DEV_ID_X550EM_X_KR) {
-		status = ixgbe_read_iosf_sb_reg_x550(hw,
+		status = hw->mac.ops.read_iosf_sb_reg(hw,
 				     IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
 				     IXGBE_SB_IOSF_TARGET_KR_PHY, &link_reg);
 		if (status != IXGBE_SUCCESS)
@@ -833,7 +833,7 @@ static s32 ixgbe_disable_eee_x550(struct ixgbe_hw *hw)
 		/* Advertise FEC capability when EEE is disabled. */
 		link_reg |= IXGBE_KRM_LINK_CTRL_1_TETH_AN_CAP_FEC;
 
-		status = ixgbe_write_iosf_sb_reg_x550(hw,
+		status = hw->mac.ops.write_iosf_sb_reg(hw,
 				      IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
 				      IXGBE_SB_IOSF_TARGET_KR_PHY, link_reg);
 		if (status != IXGBE_SUCCESS)
@@ -1791,9 +1791,9 @@ STATIC s32 ixgbe_setup_kr_speed_x550em(struct ixgbe_hw *hw,
 	s32 status;
 	u32 reg_val;
 
-	status = ixgbe_read_iosf_sb_reg_x550(hw,
-		IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
-		IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
+	status = hw->mac.ops.read_iosf_sb_reg(hw,
+		      IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
+		      IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
 	if (status)
 		return status;
 
@@ -1811,9 +1811,9 @@ STATIC s32 ixgbe_setup_kr_speed_x550em(struct ixgbe_hw *hw,
 
 	/* Restart auto-negotiation. */
 	reg_val |= IXGBE_KRM_LINK_CTRL_1_TETH_AN_RESTART;
-	status = ixgbe_write_iosf_sb_reg_x550(hw,
-		IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
-		IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
+	status = hw->mac.ops.write_iosf_sb_reg(hw,
+		       IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
+		       IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
 
 	return status;
 }
@@ -2470,57 +2470,57 @@ s32 ixgbe_setup_phy_loopback_x550em(struct ixgbe_hw *hw)
 	u32 reg_val;
 
 	/* Disable AN and force speed to 10G Serial. */
-	status = ixgbe_read_iosf_sb_reg_x550(hw,
-		IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
-		IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
+	status = hw->mac.ops.read_iosf_sb_reg(hw,
+		      IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
+		      IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
 	if (status != IXGBE_SUCCESS)
 		return status;
 	reg_val &= ~IXGBE_KRM_LINK_CTRL_1_TETH_AN_ENABLE;
 	reg_val &= ~IXGBE_KRM_LINK_CTRL_1_TETH_FORCE_SPEED_MASK;
 	reg_val |= IXGBE_KRM_LINK_CTRL_1_TETH_FORCE_SPEED_10G;
-	status = ixgbe_write_iosf_sb_reg_x550(hw,
-		IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
-		IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
+	status = hw->mac.ops.write_iosf_sb_reg(hw,
+		       IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
+		       IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
 	if (status != IXGBE_SUCCESS)
 		return status;
 
 	/* Set near-end loopback clocks. */
-	status = ixgbe_read_iosf_sb_reg_x550(hw,
-		IXGBE_KRM_PORT_CAR_GEN_CTRL(hw->bus.lan_id),
-		IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
+	status = hw->mac.ops.read_iosf_sb_reg(hw,
+		      IXGBE_KRM_PORT_CAR_GEN_CTRL(hw->bus.lan_id),
+		      IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
 	if (status != IXGBE_SUCCESS)
 		return status;
 	reg_val |= IXGBE_KRM_PORT_CAR_GEN_CTRL_NELB_32B;
 	reg_val |= IXGBE_KRM_PORT_CAR_GEN_CTRL_NELB_KRPCS;
-	status = ixgbe_write_iosf_sb_reg_x550(hw,
-		IXGBE_KRM_PORT_CAR_GEN_CTRL(hw->bus.lan_id),
-		IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
+	status = hw->mac.ops.write_iosf_sb_reg(hw,
+		       IXGBE_KRM_PORT_CAR_GEN_CTRL(hw->bus.lan_id),
+		       IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
 	if (status != IXGBE_SUCCESS)
 		return status;
 
 	/* Set loopback enable. */
-	status = ixgbe_read_iosf_sb_reg_x550(hw,
-		IXGBE_KRM_PMD_DFX_BURNIN(hw->bus.lan_id),
-		IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
+	status = hw->mac.ops.read_iosf_sb_reg(hw,
+		      IXGBE_KRM_PMD_DFX_BURNIN(hw->bus.lan_id),
+		      IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
 	if (status != IXGBE_SUCCESS)
 		return status;
 	reg_val |= IXGBE_KRM_PMD_DFX_BURNIN_TX_RX_KR_LB_MASK;
-	status = ixgbe_write_iosf_sb_reg_x550(hw,
-		IXGBE_KRM_PMD_DFX_BURNIN(hw->bus.lan_id),
-		IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
+	status = hw->mac.ops.write_iosf_sb_reg(hw,
+		       IXGBE_KRM_PMD_DFX_BURNIN(hw->bus.lan_id),
+		       IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
 	if (status != IXGBE_SUCCESS)
 		return status;
 
 	/* Training bypass. */
-	status = ixgbe_read_iosf_sb_reg_x550(hw,
-		IXGBE_KRM_RX_TRN_LINKUP_CTRL(hw->bus.lan_id),
-		IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
+	status = hw->mac.ops.read_iosf_sb_reg(hw,
+		      IXGBE_KRM_RX_TRN_LINKUP_CTRL(hw->bus.lan_id),
+		      IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
 	if (status != IXGBE_SUCCESS)
 		return status;
 	reg_val |= IXGBE_KRM_RX_TRN_LINKUP_CTRL_PROTOCOL_BYPASS;
-	status = ixgbe_write_iosf_sb_reg_x550(hw,
-		IXGBE_KRM_RX_TRN_LINKUP_CTRL(hw->bus.lan_id),
-		IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
+	status = hw->mac.ops.write_iosf_sb_reg(hw,
+		       IXGBE_KRM_RX_TRN_LINKUP_CTRL(hw->bus.lan_id),
+		       IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
 
 	return status;
 }
@@ -3357,9 +3357,9 @@ s32 ixgbe_setup_fc_X550em(struct ixgbe_hw *hw)
 	}
 
 	if (hw->device_id == IXGBE_DEV_ID_X550EM_X_KR) {
-		ret_val = ixgbe_read_iosf_sb_reg_x550(hw,
-			IXGBE_KRM_AN_CNTL_1(hw->bus.lan_id),
-			IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
+		ret_val = hw->mac.ops.read_iosf_sb_reg(hw,
+			       IXGBE_KRM_AN_CNTL_1(hw->bus.lan_id),
+			       IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
 		if (ret_val != IXGBE_SUCCESS)
 			goto out;
 		reg_val &= ~(IXGBE_KRM_AN_CNTL_1_SYM_PAUSE |
@@ -3368,9 +3368,9 @@ s32 ixgbe_setup_fc_X550em(struct ixgbe_hw *hw)
 			reg_val |= IXGBE_KRM_AN_CNTL_1_SYM_PAUSE;
 		if (asm_dir)
 			reg_val |= IXGBE_KRM_AN_CNTL_1_ASM_PAUSE;
-		ret_val = ixgbe_write_iosf_sb_reg_x550(hw,
-			IXGBE_KRM_AN_CNTL_1(hw->bus.lan_id),
-			IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
+		ret_val = hw->mac.ops.write_iosf_sb_reg(hw,
+				IXGBE_KRM_AN_CNTL_1(hw->bus.lan_id),
+				IXGBE_SB_IOSF_TARGET_KR_PHY, reg_val);
 
 		/* This device does not fully support AN. */
 		hw->fc.disable_fc_autoneg = true;
