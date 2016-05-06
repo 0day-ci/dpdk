@@ -46,10 +46,13 @@
 #include <time.h>
 
 #include "test.h"
+#include "resource.h"
 
 #include "rte_lpm.h"
 #include "test_lpm_routes.h"
 #include "test_xmmt_ops.h"
+
+REGISTER_LINKED_RESOURCE(test_lpm_data)
 
 #define TEST_LPM_ASSERT(cond) do {                                            \
 	if (!(cond)) {                                                        \
