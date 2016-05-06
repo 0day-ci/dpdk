@@ -182,6 +182,11 @@ app_msg_send_recv(struct app_params *app,
 	return msg_recv;
 }
 
+struct app_link_params *
+app_pipeline_track_pktq_out_to_link(struct app_params *app,
+	uint32_t pipeline_id,
+	uint32_t pktq_out_id);
+
 int
 app_pipeline_ping(struct app_params *app,
 	uint32_t pipeline_id);

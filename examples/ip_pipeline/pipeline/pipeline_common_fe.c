@@ -49,6 +49,94 @@
 
 #include "pipeline_common_fe.h"
 
+struct app_link_params *
+app_pipeline_track_pktq_out_to_link(struct app_params *app,
+	uint32_t pipeline_id,
+	uint32_t pktq_out_id)
+{
+	struct app_pipeline_params *p;
+
+	/* Check input arguments */
+	if (app == NULL)
+		return NULL;
+
+	APP_PARAM_FIND_BY_ID(app->pipeline_params, "PIPELINE", pipeline_id, p);
+	if (p == NULL)
+		return NULL;
+
+	for ( ; ; ) {
+		struct app_pktq_out_params *pktq_out =
+			&p->pktq_out[pktq_out_id];
+
+		switch (pktq_out->type) {
+		case APP_PKTQ_OUT_HWQ:
+		{
+			struct app_pktq_hwq_out_params *hwq_out;
+
+			hwq_out = &app->hwq_out_params[pktq_out->id];
+
+			return app_get_link_for_txq(app, hwq_out);
+		}
+
+		case APP_PKTQ_OUT_SWQ:
+		{
+			struct app_pipeline_data *pdata;
+			struct app_pktq_swq_params *swq;
+			uint32_t pktq_in_id;
+			int status;
+
+			swq = &app->swq_params[pktq_out->id];
+			p = app_swq_get_reader(app, swq, &pktq_in_id);
+			if (p == NULL)
+				return NULL;
+
+			pipeline_id = p - app->pipeline_params;
+			pdata = &app->pipeline_data[pipeline_id];
+			if (pdata->ptype->be_ops->f_track == NULL)
+				return NULL;
+
+			status = pdata->ptype->be_ops->f_track(pdata->be,
+				pktq_in_id,
+				&pktq_out_id);
+			if (status)
+				return NULL;
+
+			break;
+		}
+
+		case APP_PKTQ_OUT_TM:
+		{
+			struct app_pipeline_data *pdata;
+			struct app_pktq_tm_params *tm;
+			uint32_t pktq_in_id;
+			int status;
+
+			tm = &app->tm_params[pktq_out->id];
+			p = app_tm_get_reader(app, tm, &pktq_in_id);
+			if (p == NULL)
+				return NULL;
+
+			pipeline_id = p - app->pipeline_params;
+			pdata = &app->pipeline_data[pipeline_id];
+			if (pdata->ptype->be_ops->f_track == NULL)
+				return NULL;
+
+			status = pdata->ptype->be_ops->f_track(pdata->be,
+				pktq_in_id,
+				&pktq_out_id);
+			if (status)
+				return NULL;
+
+			break;
+		}
+
+		case APP_PKTQ_OUT_SINK:
+		default:
+			return NULL;
+		}
+	}
+}
+
 int
 app_pipeline_ping(struct app_params *app,
 	uint32_t pipeline_id)

@@ -665,6 +665,40 @@ app_swq_get_readers(struct app_params *app, struct app_pktq_swq_params *swq)
 	return n_readers;
 }
 
+static inline struct app_pipeline_params *
+app_swq_get_reader(struct app_params *app, struct app_pktq_swq_params *swq,
+	uint32_t *pktq_in_id)
+{
+	struct app_pipeline_params *reader;
+	uint32_t pos = swq - app->swq_params;
+	uint32_t n_pipelines = RTE_MIN(app->n_pipelines,
+		RTE_DIM(app->pipeline_params));
+	uint32_t n_readers = 0, id, i;
+
+	for (i = 0; i < n_pipelines; i++) {
+		struct app_pipeline_params *p = &app->pipeline_params[i];
+		uint32_t n_pktq_in = RTE_MIN(p->n_pktq_in, RTE_DIM(p->pktq_in));
+		uint32_t j;
+
+		for (j = 0; j < n_pktq_in; j++) {
+			struct app_pktq_in_params *pktq = &p->pktq_in[j];
+
+			if ((pktq->type == APP_PKTQ_IN_SWQ) &&
+				(pktq->id == pos)) {
+				n_readers++;
+				reader = p;
+				id = j;
+			}
+		}
+	}
+
+	if (n_readers != 1)
+		return NULL;
+
+	*pktq_in_id = id;
+	return reader;
+}
+
 static inline uint32_t
 app_tm_get_readers(struct app_params *app, struct app_pktq_tm_params *tm)
 {
@@ -688,6 +722,40 @@ app_tm_get_readers(struct app_params *app, struct app_pktq_tm_params *tm)
 	}
 
 	return n_readers;
+}
+
+static inline struct app_pipeline_params *
+app_tm_get_reader(struct app_params *app, struct app_pktq_tm_params *tm,
+	uint32_t *pktq_in_id)
+{
+	struct app_pipeline_params *reader;
+	uint32_t pos = tm - app->tm_params;
+	uint32_t n_pipelines = RTE_MIN(app->n_pipelines,
+		RTE_DIM(app->pipeline_params));
+	uint32_t n_readers = 0, id, i;
+
+	for (i = 0; i < n_pipelines; i++) {
+		struct app_pipeline_params *p = &app->pipeline_params[i];
+		uint32_t n_pktq_in = RTE_MIN(p->n_pktq_in, RTE_DIM(p->pktq_in));
+		uint32_t j;
+
+		for (j = 0; j < n_pktq_in; j++) {
+			struct app_pktq_in_params *pktq = &p->pktq_in[j];
+
+			if ((pktq->type == APP_PKTQ_IN_TM) &&
+				(pktq->id == pos)) {
+				n_readers++;
+				reader = p;
+				id = j;
+			}
+		}
+	}
+
+	if (n_readers != 1)
+		return NULL;
+
+	*pktq_in_id = id;
+	return reader;
 }
 
 static inline uint32_t
@@ -789,6 +857,41 @@ app_swq_get_writers(struct app_params *app, struct app_pktq_swq_params *swq)
 	return n_writers;
 }
 
+static inline struct app_pipeline_params *
+app_swq_get_writer(struct app_params *app, struct app_pktq_swq_params *swq,
+	uint32_t *pktq_out_id)
+{
+	struct app_pipeline_params *writer;
+	uint32_t pos = swq - app->swq_params;
+	uint32_t n_pipelines = RTE_MIN(app->n_pipelines,
+		RTE_DIM(app->pipeline_params));
+	uint32_t n_writers = 0, id, i;
+
+	for (i = 0; i < n_pipelines; i++) {
+		struct app_pipeline_params *p = &app->pipeline_params[i];
+		uint32_t n_pktq_out = RTE_MIN(p->n_pktq_out,
+			RTE_DIM(p->pktq_out));
+		uint32_t j;
+
+		for (j = 0; j < n_pktq_out; j++) {
+			struct app_pktq_out_params *pktq = &p->pktq_out[j];
+
+			if ((pktq->type == APP_PKTQ_OUT_SWQ) &&
+				(pktq->id == pos)) {
+				n_writers++;
+				writer = p;
+				id = j;
+			}
+		}
+	}
+
+	if (n_writers != 1)
+		return NULL;
+
+	*pktq_out_id = id;
+	return writer;
+}
+
 static inline uint32_t
 app_tm_get_writers(struct app_params *app, struct app_pktq_tm_params *tm)
 {
@@ -813,6 +916,40 @@ app_tm_get_writers(struct app_params *app, struct app_pktq_tm_params *tm)
 	}
 
 	return n_writers;
+}
+
+static inline struct app_pipeline_params *
+app_tm_get_writer(struct app_params *app, struct app_pktq_tm_params *tm,
+	uint32_t *pktq_out_id)
+{
+	struct app_pipeline_params *writer;
+	uint32_t pos = tm - app->tm_params;
+	uint32_t n_pipelines = RTE_MIN(app->n_pipelines,
+		RTE_DIM(app->pipeline_params));
+	uint32_t n_writers = 0, id, i;
+
+	for (i = 0; i < n_pipelines; i++) {
+		struct app_pipeline_params *p = &app->pipeline_params[i];
+		uint32_t n_pktq_out = RTE_MIN(p->n_pktq_out,
+			RTE_DIM(p->pktq_out));
+		uint32_t j;
+
+		for (j = 0; j < n_pktq_out; j++) {
+			struct app_pktq_out_params *pktq = &p->pktq_out[j];
+
+			if ((pktq->type == APP_PKTQ_OUT_TM) &&
+				(pktq->id == pos))
+				n_writers++;
+				writer = p;
+				id = j;
+		}
+	}
+
+	if (n_writers != 1)
+		return NULL;
+
+	*pktq_out_id = id;
+	return writer;
 }
 
 static inline uint32_t
