@@ -1267,9 +1267,59 @@ cmdline_parse_inst_t cmd_run = {
 	},
 };
 
+struct cmd_multirun_file_result {
+	cmdline_fixed_string_t run_string;
+	char file_name[APP_FILE_NAME_SIZE];
+	uint32_t count;
+	uint32_t interval;
+};
+
+static void
+cmd_multirun_parsed(
+	void *parsed_result,
+	struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_multirun_file_result *params = parsed_result;
+	uint32_t i;
+
+	for (i = 0; i < params->count; i++) {
+		app_run_file(cl->ctx, params->file_name);
+		sleep(params->interval);
+	}
+}
+
+cmdline_parse_token_string_t cmd_multirun_run_string =
+	TOKEN_STRING_INITIALIZER(struct cmd_multirun_file_result, run_string,
+		"run");
+
+cmdline_parse_token_string_t cmd_multirun_file_name =
+	TOKEN_STRING_INITIALIZER(struct cmd_multirun_file_result, file_name, NULL);
+
+static cmdline_parse_token_num_t cmd_multirun_count =
+	TOKEN_NUM_INITIALIZER(struct cmd_multirun_file_result, count, UINT32);
+
+static cmdline_parse_token_num_t cmd_multirun_interval =
+	TOKEN_NUM_INITIALIZER(struct cmd_multirun_file_result, interval, UINT32);
+
+cmdline_parse_inst_t cmd_multirun = {
+	.f = cmd_multirun_parsed,
+	.data = NULL,
+	.help_str = "Run CLI script file",
+	.tokens = {
+		(void *) &cmd_multirun_run_string,
+		(void *) &cmd_multirun_file_name,
+		(void *) &cmd_multirun_count,
+		(void *) &cmd_multirun_interval,
+		NULL,
+	},
+};
+
+
 static cmdline_parse_ctx_t pipeline_common_cmds[] = {
 	(cmdline_parse_inst_t *) &cmd_quit,
 	(cmdline_parse_inst_t *) &cmd_run,
+	(cmdline_parse_inst_t *) &cmd_multirun,
 
 	(cmdline_parse_inst_t *) &cmd_link_config,
 	(cmdline_parse_inst_t *) &cmd_link_up,
