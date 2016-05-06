@@ -30,9 +30,11 @@
  *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/queue.h>
 #include <netinet/in.h>
 
@@ -50,6 +52,8 @@
 #include "app.h"
 #include "pipeline_common_fe.h"
 #include "pipeline_firewall.h"
+#include "parser.h"
+
 
 #define BUF_SIZE		1024
 
@@ -276,26 +280,32 @@ static int
 app_pipeline_add_bulk_parse_file(char *filename,
 		struct app_pipeline_add_bulk_params *params)
 {
-	FILE *f;
+	FILE *f = NULL;
 	char file_buf[BUF_SIZE];
-	uint32_t i;
+	uint32_t i, line = 0;
 	int status = 0;
 
 	f = fopen(filename, "r");
-	if (f == NULL)
+	if (f == NULL) {
+		if (getcwd(file_buf, sizeof(file_buf)) != NULL)
+			printf("not found file %s in the current working dir %s\n",
+					filename, file_buf);
 		return -1;
+	}
 
 	params->n_keys = 0;
 	while (fgets(file_buf, BUF_SIZE, f) != NULL)
-		params->n_keys++;
+		if (file_buf[0] != '\0' && file_buf[0] != '\n' && file_buf[0] != '#')
+			params->n_keys++;
 	rewind(f);
 
 	if (params->n_keys == 0) {
+		printf("not found any keys in the file %s\n", filename);
 		status = -1;
 		goto end;
 	}
 
-	params->keys = rte_malloc(NULL,
+	params->keys = rte_zmalloc(NULL,
 			params->n_keys * sizeof(struct pipeline_firewall_key),
 			RTE_CACHE_LINE_SIZE);
 	if (params->keys == NULL) {
@@ -321,137 +331,152 @@ app_pipeline_add_bulk_parse_file(char *filename,
 
 	i = 0;
 	while (fgets(file_buf, BUF_SIZE, f) != NULL) {
-		char *str;
+		char *tokens[17];
+		uint32_t n_tokens = RTE_DIM(tokens);
+		status = parse_tokenize_string(file_buf, tokens, &n_tokens);
+		uint32_t priority = 0;
+		struct in_addr sipaddr;
+		uint32_t sipdepth = 0;
+		struct in_addr dipaddr;
+		uint32_t dipdepth = 0;
+		uint16_t sport0 = 0;
+		uint16_t sport1 = 0;
+		uint16_t dport0 = 0;
+		uint16_t dport1 = 0;
+		uint8_t proto = 0;
+		uint8_t protomask = 0;
+		uint32_t port_id = 0;
 
-		str = strtok(file_buf, " ");
-		if (str == NULL) {
+		if (n_tokens == 0 || tokens[0][0] == '#') {
+			line++;
+			continue;
+		}
+
+		if (status != 0) {
+			printf("Too many tokens\n");
 			status = -1;
 			goto end;
 		}
-		params->priorities[i] = atoi(str);
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (n_tokens != 15) {
+			printf("Bad number of tokens at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_ip = atoi(str)<<24;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (strcmp(tokens[0], "priority") != 0) {
+			printf("Incorrect string for priority at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_ip |= atoi(str)<<16;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parser_read_uint32(&priority, tokens[1])) {
+			printf("Incorrect format for priority at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_ip |= atoi(str)<<8;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (strcmp(tokens[2], "ipv4")) {
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_ip |= atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		if (parse_ipv4_addr(tokens[3], &sipaddr)) {
+			printf("Incorrect format for sipaddr at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_ip_mask = atoi(str);
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parser_read_uint32(&sipdepth, tokens[4])) {
+			printf("Incorrect format for sipdepth at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_ip = atoi(str)<<24;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parse_ipv4_addr(tokens[5], &dipaddr)) {
+			printf("Incorrect format for dipaddr at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_ip |= atoi(str)<<16;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parser_read_uint32(&dipdepth, tokens[6])) {
+			printf("Incorrect format for dipdepth at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_ip |= atoi(str)<<8;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parser_read_uint16(&sport0, tokens[7])) {
+			printf("Incorrect format for sport0 at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_ip |= atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		if (parser_read_uint16(&sport1, tokens[8])) {
+			printf("Incorrect format for sport1 at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_ip_mask = atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		if (parser_read_uint16(&dport0, tokens[9])) {
+			printf("Incorrect format for dport0 at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_port_from = atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		if (parser_read_uint16(&dport1, tokens[10])) {
+			printf("Incorrect format for dport1 at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_port_to = atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		if (parser_read_uint8(&proto, tokens[11])) {
+			printf("Incorrect format for proto at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_port_from = atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		char *e;
+		protomask = strtoul(tokens[12], &e, 16);
+		if (*e || errno == EINVAL || errno == ERANGE) {
+			printf("Incorrect format for protomask - should be in hex  at line"
+					" %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_port_to = atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		if (strcmp(tokens[13], "port")) {
+			printf("string supported port at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.proto = atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		if (parser_read_uint32(&port_id, tokens[14])) {
+			printf("Incorrect format for port ID at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		/* Need to add 2 to str to skip leading 0x */
-		params->keys[i].key.ipv4_5tuple.proto_mask = strtol(str+2, NULL, 16);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
-			status = -1;
-			goto end;
-		}
-		params->port_ids[i] = atoi(str);
 		params->keys[i].type = PIPELINE_FIREWALL_IPV4_5TUPLE;
+		params->keys[i].key.ipv4_5tuple.src_ip = rte_bswap32(
+			(uint32_t) sipaddr.s_addr);
+		params->keys[i].key.ipv4_5tuple.src_ip_mask = sipdepth;
+		params->keys[i].key.ipv4_5tuple.dst_ip = rte_bswap32(
+			(uint32_t) dipaddr.s_addr);
+		params->keys[i].key.ipv4_5tuple.dst_ip_mask = dipdepth;
+		params->keys[i].key.ipv4_5tuple.src_port_from = sport0;
+		params->keys[i].key.ipv4_5tuple.src_port_to = sport1;
+		params->keys[i].key.ipv4_5tuple.dst_port_from = dport0;
+		params->keys[i].key.ipv4_5tuple.dst_port_to = dport1;
+		params->keys[i].key.ipv4_5tuple.proto = proto;
+		params->keys[i].key.ipv4_5tuple.proto_mask = protomask;
 
+		params->port_ids[i] = port_id;
+		params->priorities[i] = priority;
+
+		line++;
 		i++;
+
+
 	}
 
 end:
@@ -463,26 +488,32 @@ static int
 app_pipeline_del_bulk_parse_file(char *filename,
 		struct app_pipeline_del_bulk_params *params)
 {
-	FILE *f;
+	FILE *f = NULL;
 	char file_buf[BUF_SIZE];
-	uint32_t i;
+	uint32_t i, line = 0;
 	int status = 0;
 
 	f = fopen(filename, "r");
-	if (f == NULL)
+	if (f == NULL) {
+		if (getcwd(file_buf, sizeof(file_buf)) != NULL)
+			printf("not found file %s in the current working dir %s\n",
+					filename, file_buf);
 		return -1;
+	}
 
 	params->n_keys = 0;
 	while (fgets(file_buf, BUF_SIZE, f) != NULL)
-		params->n_keys++;
+		if (file_buf[0] != '\0' && file_buf[0] != '\n' && file_buf[0] != '#')
+			params->n_keys++;
 	rewind(f);
 
 	if (params->n_keys == 0) {
+		printf("not found any keys in the file %s\n", filename);
 		status = -1;
 		goto end;
 	}
 
-	params->keys = rte_malloc(NULL,
+	params->keys = rte_zmalloc(NULL,
 			params->n_keys * sizeof(struct pipeline_firewall_key),
 			RTE_CACHE_LINE_SIZE);
 	if (params->keys == NULL) {
@@ -492,124 +523,123 @@ app_pipeline_del_bulk_parse_file(char *filename,
 
 	i = 0;
 	while (fgets(file_buf, BUF_SIZE, f) != NULL) {
-		char *str;
+		char *tokens[17];
+		uint32_t n_tokens = RTE_DIM(tokens);
+		status = parse_tokenize_string(file_buf, tokens, &n_tokens);
+		struct in_addr sipaddr;
+		uint32_t sipdepth = 0;
+		struct in_addr dipaddr;
+		uint32_t dipdepth;
+		uint16_t sport0 = 0;
+		uint16_t sport1 = 0;
+		uint16_t dport0 = 0;
+		uint16_t dport1 = 0;
+		uint8_t proto = 0;
+		uint8_t protomask = 0;
 
-		str = strtok(file_buf, " .");
-		if (str == NULL) {
+		if (n_tokens == 0 || tokens[0][0] == '#') {
+					line++;
+					continue;
+				}
+
+		if (status != 0) {
+			printf("Too many tokens\n");
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_ip = atoi(str)<<24;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (n_tokens != 11) {
+			status = -1;
+			printf("\nToo many tokens in bulk file at line %d\n", line + 1);
+			goto end;
+		}
+
+		if (strcmp(tokens[0], "ipv4")) {
+			printf("\nThe line should begin with string 'ipv4' %d\n", line + 1);
+			status = -1;
+			goto end;		}
+
+		if (parse_ipv4_addr(tokens[1], &sipaddr)) {
+			printf("\nIncorrect format for sipaddr at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_ip |= atoi(str)<<16;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parser_read_uint32(&sipdepth, tokens[2])) {
+			printf("\nIncorrect format for sipdepth at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_ip |= atoi(str)<<8;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parse_ipv4_addr(tokens[3], &dipaddr)) {
+			printf("\nIncorrect format for dipaddr at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_ip |= atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		if (parser_read_uint32(&dipdepth, tokens[4])) {
+			printf("\nIncorrect format for dipdepth at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_ip_mask = atoi(str);
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parser_read_uint16(&sport0, tokens[5])) {
+			printf("\nIncorrect format for sport0 at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_ip = atoi(str)<<24;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parser_read_uint16(&sport1, tokens[6])) {
+			printf("\nIncorrect format for sport1 at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_ip |= atoi(str)<<16;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parser_read_uint16(&dport0, tokens[7])) {
+			printf("\nIncorrect format for dport0 at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_ip |= atoi(str)<<8;
 
-		str = strtok(NULL, " .");
-		if (str == NULL) {
+		if (parser_read_uint16(&dport1, tokens[8])) {
+			printf("\nIncorrect format for dport1 at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_ip |= atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		if (parser_read_uint8(&proto, tokens[9])) {
+			printf("\nIncorrect format for proto at line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.dst_ip_mask = atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
+		char *e;
+		protomask = strtoul(tokens[10], &e, 16);
+		if (*e || errno == EINVAL || errno == ERANGE) {
+			printf("\nIncorrect format for protomask - should be in hex  at "
+					"line %d\n", line + 1);
 			status = -1;
 			goto end;
 		}
-		params->keys[i].key.ipv4_5tuple.src_port_from = atoi(str);
 
-		str = strtok(NULL, " ");
-		if (str == NULL) {
-			status = -1;
-			goto end;
-		}
-		params->keys[i].key.ipv4_5tuple.src_port_to = atoi(str);
-
-		str = strtok(NULL, " ");
-		if (str == NULL) {
-			status = -1;
-			goto end;
-		}
-		params->keys[i].key.ipv4_5tuple.dst_port_from = atoi(str);
-
-		str = strtok(NULL, " ");
-		if (str == NULL) {
-			status = -1;
-			goto end;
-		}
-		params->keys[i].key.ipv4_5tuple.dst_port_to = atoi(str);
-
-		str = strtok(NULL, " ");
-		if (str == NULL) {
-			status = -1;
-			goto end;
-		}
-		params->keys[i].key.ipv4_5tuple.proto = atoi(str);
-
-		str = strtok(NULL, " ");
-		if (str == NULL) {
-			status = -1;
-			goto end;
-		}
-		/* Need to add 2 to str to skip leading 0x */
-		params->keys[i].key.ipv4_5tuple.proto_mask = strtol(str+2, NULL, 16);
 
 		params->keys[i].type = PIPELINE_FIREWALL_IPV4_5TUPLE;
+		params->keys[i].key.ipv4_5tuple.src_ip = rte_bswap32(
+			(uint32_t) sipaddr.s_addr);
+		params->keys[i].key.ipv4_5tuple.src_ip_mask = sipdepth;
+		params->keys[i].key.ipv4_5tuple.dst_ip = rte_bswap32(
+			(uint32_t) dipaddr.s_addr);
+		params->keys[i].key.ipv4_5tuple.dst_ip_mask = dipdepth;
+		params->keys[i].key.ipv4_5tuple.src_port_from = sport0;
+		params->keys[i].key.ipv4_5tuple.src_port_to = sport1;
+		params->keys[i].key.ipv4_5tuple.dst_port_from = dport0;
+		params->keys[i].key.ipv4_5tuple.dst_port_to = dport1;
+		params->keys[i].key.ipv4_5tuple.proto = proto;
+		params->keys[i].key.ipv4_5tuple.proto_mask = protomask;
 
+		line++;
 		i++;
+
 	}
 
 	for (i = 0; i < params->n_keys; i++) {
@@ -1196,663 +1226,483 @@ app_pipeline_firewall_delete_default_rule(struct app_params *app,
 	return 0;
 }
 
-/*
- * p firewall add ipv4
- */
-
-struct cmd_firewall_add_ipv4_result {
+struct cmd_firewall_parsed_result {
 	cmdline_fixed_string_t p_string;
 	uint32_t pipeline_id;
 	cmdline_fixed_string_t firewall_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_fixed_string_t ipv4_string;
-	int32_t priority;
-	cmdline_ipaddr_t src_ip;
-	uint32_t src_ip_mask;
-	cmdline_ipaddr_t dst_ip;
-	uint32_t dst_ip_mask;
-	uint16_t src_port_from;
-	uint16_t src_port_to;
-	uint16_t dst_port_from;
-	uint16_t dst_port_to;
-	uint8_t proto;
-	uint8_t proto_mask;
-	uint8_t port_id;
+	cmdline_multi_string_t multi_string;
 };
 
-static void
-cmd_firewall_add_ipv4_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	void *data)
-{
-	struct cmd_firewall_add_ipv4_result *params = parsed_result;
+static void cmd_firewall_parsed(void *parsed_result,
+		__attribute__((unused))  struct cmdline *cl, void *data) {
+	struct cmd_firewall_parsed_result *params = parsed_result;
 	struct app_params *app = data;
+	int status;
 	struct pipeline_firewall_key key;
-	int status;
 
-	key.type = PIPELINE_FIREWALL_IPV4_5TUPLE;
-	key.key.ipv4_5tuple.src_ip = rte_bswap32(
-		(uint32_t) params->src_ip.addr.ipv4.s_addr);
-	key.key.ipv4_5tuple.src_ip_mask = params->src_ip_mask;
-	key.key.ipv4_5tuple.dst_ip = rte_bswap32(
-		(uint32_t) params->dst_ip.addr.ipv4.s_addr);
-	key.key.ipv4_5tuple.dst_ip_mask = params->dst_ip_mask;
-	key.key.ipv4_5tuple.src_port_from = params->src_port_from;
-	key.key.ipv4_5tuple.src_port_to = params->src_port_to;
-	key.key.ipv4_5tuple.dst_port_from = params->dst_port_from;
-	key.key.ipv4_5tuple.dst_port_to = params->dst_port_to;
-	key.key.ipv4_5tuple.proto = params->proto;
-	key.key.ipv4_5tuple.proto_mask = params->proto_mask;
-
-	status = app_pipeline_firewall_add_rule(app,
-		params->pipeline_id,
-		&key,
-		params->priority,
-		params->port_id);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-cmdline_parse_token_string_t cmd_firewall_add_ipv4_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_ipv4_result, p_string,
-		"p");
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_pipeline_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result, pipeline_id,
-		UINT32);
-
-cmdline_parse_token_string_t cmd_firewall_add_ipv4_firewall_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_ipv4_result,
-		firewall_string, "firewall");
-
-cmdline_parse_token_string_t cmd_firewall_add_ipv4_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_ipv4_result,
-		add_string, "add");
-
-cmdline_parse_token_string_t cmd_firewall_add_ipv4_ipv4_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_ipv4_result,
-		ipv4_string, "ipv4");
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_priority =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result, priority,
-		INT32);
-
-cmdline_parse_token_ipaddr_t cmd_firewall_add_ipv4_src_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_firewall_add_ipv4_result, src_ip);
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_src_ip_mask =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result, src_ip_mask,
-		UINT32);
-
-cmdline_parse_token_ipaddr_t cmd_firewall_add_ipv4_dst_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_firewall_add_ipv4_result, dst_ip);
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_dst_ip_mask =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result, dst_ip_mask,
-		UINT32);
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_src_port_from =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result,
-		src_port_from, UINT16);
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_src_port_to =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result,
-		src_port_to, UINT16);
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_dst_port_from =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result,
-		dst_port_from, UINT16);
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_dst_port_to =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result,
-		dst_port_to, UINT16);
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_proto =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result,
-		proto, UINT8);
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_proto_mask =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result,
-		proto_mask, UINT8);
-
-cmdline_parse_token_num_t cmd_firewall_add_ipv4_port_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_ipv4_result,
-		port_id, UINT8);
-
-cmdline_parse_inst_t cmd_firewall_add_ipv4 = {
-	.f = cmd_firewall_add_ipv4_parsed,
-	.data = NULL,
-	.help_str = "Firewall rule add",
-	.tokens = {
-		(void *) &cmd_firewall_add_ipv4_p_string,
-		(void *) &cmd_firewall_add_ipv4_pipeline_id,
-		(void *) &cmd_firewall_add_ipv4_firewall_string,
-		(void *) &cmd_firewall_add_ipv4_add_string,
-		(void *) &cmd_firewall_add_ipv4_ipv4_string,
-		(void *) &cmd_firewall_add_ipv4_priority,
-		(void *) &cmd_firewall_add_ipv4_src_ip,
-		(void *) &cmd_firewall_add_ipv4_src_ip_mask,
-		(void *) &cmd_firewall_add_ipv4_dst_ip,
-		(void *) &cmd_firewall_add_ipv4_dst_ip_mask,
-		(void *) &cmd_firewall_add_ipv4_src_port_from,
-		(void *) &cmd_firewall_add_ipv4_src_port_to,
-		(void *) &cmd_firewall_add_ipv4_dst_port_from,
-		(void *) &cmd_firewall_add_ipv4_dst_port_to,
-		(void *) &cmd_firewall_add_ipv4_proto,
-		(void *) &cmd_firewall_add_ipv4_proto_mask,
-		(void *) &cmd_firewall_add_ipv4_port_id,
-		NULL,
-	},
-};
-
-/*
- * p firewall del ipv4
- */
-
-struct cmd_firewall_del_ipv4_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t pipeline_id;
-	cmdline_fixed_string_t firewall_string;
-	cmdline_fixed_string_t del_string;
-	cmdline_fixed_string_t ipv4_string;
-	cmdline_ipaddr_t src_ip;
-	uint32_t src_ip_mask;
-	cmdline_ipaddr_t dst_ip;
-	uint32_t dst_ip_mask;
-	uint16_t src_port_from;
-	uint16_t src_port_to;
-	uint16_t dst_port_from;
-	uint16_t dst_port_to;
+	uint32_t priority;
+	struct in_addr sipaddr;
+	uint32_t sipdepth;
+	struct in_addr dipaddr;
+	uint32_t dipdepth;
+	uint16_t sport0;
+	uint16_t sport1;
+	uint16_t dport0;
+	uint16_t dport1;
 	uint8_t proto;
-	uint8_t proto_mask;
-};
+	uint8_t protomask;
+	uint32_t port_id;
+	char *filepath;
 
-static void
-cmd_firewall_del_ipv4_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	void *data)
-{
-	struct cmd_firewall_del_ipv4_result *params = parsed_result;
-	struct app_params *app = data;
-	struct pipeline_firewall_key key;
-	int status;
-
-	key.type = PIPELINE_FIREWALL_IPV4_5TUPLE;
-	key.key.ipv4_5tuple.src_ip = rte_bswap32(
-		(uint32_t) params->src_ip.addr.ipv4.s_addr);
-	key.key.ipv4_5tuple.src_ip_mask = params->src_ip_mask;
-	key.key.ipv4_5tuple.dst_ip = rte_bswap32(
-		(uint32_t) params->dst_ip.addr.ipv4.s_addr);
-	key.key.ipv4_5tuple.dst_ip_mask = params->dst_ip_mask;
-	key.key.ipv4_5tuple.src_port_from = params->src_port_from;
-	key.key.ipv4_5tuple.src_port_to = params->src_port_to;
-	key.key.ipv4_5tuple.dst_port_from = params->dst_port_from;
-	key.key.ipv4_5tuple.dst_port_to = params->dst_port_to;
-	key.key.ipv4_5tuple.proto = params->proto;
-	key.key.ipv4_5tuple.proto_mask = params->proto_mask;
-
-	status = app_pipeline_firewall_delete_rule(app,
-		params->pipeline_id,
-		&key);
+	char *tokens[17];
+	uint32_t n_tokens = RTE_DIM(tokens);
+	status = parse_tokenize_string(params->multi_string, tokens, &n_tokens);
 
 	if (status != 0) {
-		printf("Command failed\n");
+		printf("Too many tokens\n");
 		return;
 	}
-}
 
-cmdline_parse_token_string_t cmd_firewall_del_ipv4_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_ipv4_result, p_string,
-		"p");
-
-cmdline_parse_token_num_t cmd_firewall_del_ipv4_pipeline_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_ipv4_result, pipeline_id,
-		UINT32);
-
-cmdline_parse_token_string_t cmd_firewall_del_ipv4_firewall_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_ipv4_result,
-		firewall_string, "firewall");
-
-cmdline_parse_token_string_t cmd_firewall_del_ipv4_del_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_ipv4_result,
-		del_string, "del");
-
-cmdline_parse_token_string_t cmd_firewall_del_ipv4_ipv4_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_ipv4_result,
-		ipv4_string, "ipv4");
-
-cmdline_parse_token_ipaddr_t cmd_firewall_del_ipv4_src_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_firewall_del_ipv4_result, src_ip);
-
-cmdline_parse_token_num_t cmd_firewall_del_ipv4_src_ip_mask =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_ipv4_result, src_ip_mask,
-		UINT32);
-
-cmdline_parse_token_ipaddr_t cmd_firewall_del_ipv4_dst_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_firewall_del_ipv4_result, dst_ip);
-
-cmdline_parse_token_num_t cmd_firewall_del_ipv4_dst_ip_mask =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_ipv4_result, dst_ip_mask,
-		UINT32);
-
-cmdline_parse_token_num_t cmd_firewall_del_ipv4_src_port_from =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_ipv4_result,
-		src_port_from, UINT16);
-
-cmdline_parse_token_num_t cmd_firewall_del_ipv4_src_port_to =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_ipv4_result, src_port_to,
-		UINT16);
-
-cmdline_parse_token_num_t cmd_firewall_del_ipv4_dst_port_from =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_ipv4_result,
-		dst_port_from, UINT16);
-
-cmdline_parse_token_num_t cmd_firewall_del_ipv4_dst_port_to =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_ipv4_result,
-		dst_port_to, UINT16);
-
-cmdline_parse_token_num_t cmd_firewall_del_ipv4_proto =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_ipv4_result,
-		proto, UINT8);
-
-cmdline_parse_token_num_t cmd_firewall_del_ipv4_proto_mask =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_ipv4_result, proto_mask,
-		UINT8);
-
-cmdline_parse_inst_t cmd_firewall_del_ipv4 = {
-	.f = cmd_firewall_del_ipv4_parsed,
-	.data = NULL,
-	.help_str = "Firewall rule delete",
-	.tokens = {
-		(void *) &cmd_firewall_del_ipv4_p_string,
-		(void *) &cmd_firewall_del_ipv4_pipeline_id,
-		(void *) &cmd_firewall_del_ipv4_firewall_string,
-		(void *) &cmd_firewall_del_ipv4_del_string,
-		(void *) &cmd_firewall_del_ipv4_ipv4_string,
-		(void *) &cmd_firewall_del_ipv4_src_ip,
-		(void *) &cmd_firewall_del_ipv4_src_ip_mask,
-		(void *) &cmd_firewall_del_ipv4_dst_ip,
-		(void *) &cmd_firewall_del_ipv4_dst_ip_mask,
-		(void *) &cmd_firewall_del_ipv4_src_port_from,
-		(void *) &cmd_firewall_del_ipv4_src_port_to,
-		(void *) &cmd_firewall_del_ipv4_dst_port_from,
-		(void *) &cmd_firewall_del_ipv4_dst_port_to,
-		(void *) &cmd_firewall_del_ipv4_proto,
-		(void *) &cmd_firewall_del_ipv4_proto_mask,
-		NULL,
-	},
-};
-
-/*
- * p firewall add bulk
- */
-
-struct cmd_firewall_add_bulk_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t pipeline_id;
-	cmdline_fixed_string_t firewall_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_fixed_string_t bulk_string;
-	cmdline_fixed_string_t file_path;
-};
-
-static void
-cmd_firewall_add_bulk_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	void *data)
-{
-	struct cmd_firewall_add_bulk_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	struct app_pipeline_add_bulk_params add_bulk_params;
-
-	status = app_pipeline_add_bulk_parse_file(params->file_path, &add_bulk_params);
-	if (status != 0) {
-		printf("Command failed\n");
-		goto end;
-	}
-
-	status = app_pipeline_firewall_add_bulk(app, params->pipeline_id, add_bulk_params.keys,
-			add_bulk_params.n_keys, add_bulk_params.priorities, add_bulk_params.port_ids);
-	if (status != 0) {
-		printf("Command failed\n");
-		goto end;
-	}
-
-end:
-	rte_free(add_bulk_params.keys);
-	rte_free(add_bulk_params.priorities);
-	rte_free(add_bulk_params.port_ids);
-}
-
-cmdline_parse_token_string_t cmd_firewall_add_bulk_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_bulk_result, p_string,
-		"p");
-
-cmdline_parse_token_num_t cmd_firewall_add_bulk_pipeline_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_bulk_result, pipeline_id,
-		UINT32);
-
-cmdline_parse_token_string_t cmd_firewall_add_bulk_firewall_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_bulk_result,
-		firewall_string, "firewall");
-
-cmdline_parse_token_string_t cmd_firewall_add_bulk_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_bulk_result,
-		add_string, "add");
-
-cmdline_parse_token_string_t cmd_firewall_add_bulk_bulk_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_bulk_result,
-		bulk_string, "bulk");
-
-cmdline_parse_token_string_t cmd_firewall_add_bulk_file_path_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_bulk_result,
-		file_path, NULL);
-
-cmdline_parse_inst_t cmd_firewall_add_bulk = {
-	.f = cmd_firewall_add_bulk_parsed,
-	.data = NULL,
-	.help_str = "Firewall rule add bulk",
-	.tokens = {
-		(void *) &cmd_firewall_add_bulk_p_string,
-		(void *) &cmd_firewall_add_bulk_pipeline_id,
-		(void *) &cmd_firewall_add_bulk_firewall_string,
-		(void *) &cmd_firewall_add_bulk_add_string,
-		(void *) &cmd_firewall_add_bulk_bulk_string,
-		(void *) &cmd_firewall_add_bulk_file_path_string,
-		NULL,
-	},
-};
-
-/*
- * p firewall del bulk
- */
-
-struct cmd_firewall_del_bulk_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t pipeline_id;
-	cmdline_fixed_string_t firewall_string;
-	cmdline_fixed_string_t del_string;
-	cmdline_fixed_string_t bulk_string;
-	cmdline_fixed_string_t file_path;
-};
-
-static void
-cmd_firewall_del_bulk_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	void *data)
-{
-	struct cmd_firewall_del_bulk_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	struct app_pipeline_del_bulk_params del_bulk_params;
-
-	status = app_pipeline_del_bulk_parse_file(params->file_path, &del_bulk_params);
-	if (status != 0) {
-		printf("Command failed\n");
-		goto end;
-	}
-
-	status = app_pipeline_firewall_delete_bulk(app, params->pipeline_id,
-			del_bulk_params.keys, del_bulk_params.n_keys);
-	if (status != 0) {
-		printf("Command failed\n");
-		goto end;
-	}
-
-end:
-	rte_free(del_bulk_params.keys);
-}
-
-cmdline_parse_token_string_t cmd_firewall_del_bulk_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_bulk_result, p_string,
-		"p");
-
-cmdline_parse_token_num_t cmd_firewall_del_bulk_pipeline_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_bulk_result, pipeline_id,
-		UINT32);
-
-cmdline_parse_token_string_t cmd_firewall_del_bulk_firewall_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_bulk_result,
-		firewall_string, "firewall");
-
-cmdline_parse_token_string_t cmd_firewall_del_bulk_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_bulk_result,
-		del_string, "del");
-
-cmdline_parse_token_string_t cmd_firewall_del_bulk_bulk_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_bulk_result,
-		bulk_string, "bulk");
-
-cmdline_parse_token_string_t cmd_firewall_del_bulk_file_path_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_bulk_result,
-		file_path, NULL);
-
-cmdline_parse_inst_t cmd_firewall_del_bulk = {
-	.f = cmd_firewall_del_bulk_parsed,
-	.data = NULL,
-	.help_str = "Firewall rule del bulk",
-	.tokens = {
-		(void *) &cmd_firewall_del_bulk_p_string,
-		(void *) &cmd_firewall_del_bulk_pipeline_id,
-		(void *) &cmd_firewall_del_bulk_firewall_string,
-		(void *) &cmd_firewall_del_bulk_add_string,
-		(void *) &cmd_firewall_del_bulk_bulk_string,
-		(void *) &cmd_firewall_del_bulk_file_path_string,
-		NULL,
-	},
-};
-
-/*
- * p firewall add default
- */
-struct cmd_firewall_add_default_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t pipeline_id;
-	cmdline_fixed_string_t firewall_string;
-	cmdline_fixed_string_t add_string;
-	cmdline_fixed_string_t default_string;
-	uint8_t port_id;
-};
-
-static void
-cmd_firewall_add_default_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	void *data)
-{
-	struct cmd_firewall_add_default_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	status = app_pipeline_firewall_add_default_rule(app,
-		params->pipeline_id,
-		params->port_id);
-
-	if (status != 0) {
-		printf("Command failed\n");
+	if ((n_tokens > 0) && (0 != strcmp(tokens[0], "add")) && (0 != strcmp(tokens[0], "del"))
+			&& (0 != strcmp(tokens[0], "ls"))) {
+		printf("Usage: \n p <id> firewall add ... \n p <id> firewall del... \n p <id> firewall ls\n");
 		return;
 	}
+
+	/* Parsing add command*/
+	if ((n_tokens > 0) && (0 == strcmp(tokens[0], "add"))) {
+		if (n_tokens > 18) {
+			printf("Command failed firewall add too many arguments\n");
+			return;
+		}
+		if (n_tokens < 2) {
+			printf(
+					"Usage: \n p <id> firewall add priority ... \n p <id> "
+					"firewall add bulk ... \n p <id> firewall default ..\n");
+			return;
+		}
+
+		/* Parsing add priority */
+		if (0 == strcmp(tokens[1], "priority")) {
+
+			if (n_tokens > 16) {
+				printf(
+						"Usage\n too many arguments\n p <pipeline ID> firewall "
+						"add priority <priority> ipv4 <sipaddr> <sipdepth> "
+						"<dipaddr> <dipdepth> <sport0> <sport1> <dport0> "
+						"<dport1> <proto> <protomask> port <port ID>\n");
+				return;
+			}
+
+			if (n_tokens < 16) {
+				printf(
+						"Usage\nnot enough arguments\n p <pipeline ID> firewall"
+						" add priority <priority> ipv4 <sipaddr> <sipdepth>"
+						" <dipaddr> <dipdepth> <sport0> <sport1> <dport0> "
+						"<dport1> <proto> <protomask> port <port ID>\n");
+				return;
+			}
+
+			if (parser_read_uint32(&priority, tokens[2])) {
+				printf("Incorrect format for priority\n");
+				return;
+			}
+
+			if (strcmp(tokens[3], "ipv4")) {
+				printf("string  supported ipv4\n");
+				return;
+			}
+
+			if (parse_ipv4_addr(tokens[4], &sipaddr)) {
+				printf("Incorrect format for sipaddr\n");
+				return;
+			}
+
+			if (parser_read_uint32(&sipdepth, tokens[5])) {
+				printf("Incorrect format for sipdepth\n");
+				return;
+			}
+
+			if (parse_ipv4_addr(tokens[6], &dipaddr)) {
+				printf("Incorrect format for dipaddr\n");
+				return;
+			}
+
+			if (parser_read_uint32(&dipdepth, tokens[7])) {
+				printf("Incorrect format for dipdepth\n");
+				return;
+			}
+
+			if (parser_read_uint16(&sport0, tokens[8])) {
+				printf("Incorrect format for sport0\n");
+				return;
+			}
+
+			if (parser_read_uint16(&sport1, tokens[9])) {
+				printf("Incorrect format for sport1\n");
+				return;
+			}
+
+			if (parser_read_uint16(&dport0, tokens[10])) {
+				printf("Incorrect format for dport0\n");
+				return;
+			}
+
+			if (parser_read_uint16(&dport1, tokens[11])) {
+				printf("Incorrect format for dport1\n");
+				return;
+			}
+
+			if (parser_read_uint8(&proto, tokens[12])) {
+				printf("Incorrect format for proto\n");
+				return;
+			}
+
+			char *e;
+			protomask = strtoul(tokens[13], &e, 16);
+			if (*e || errno == EINVAL || errno == ERANGE) {
+				printf("Incorrect format for protomask - should be in hex \n");
+				return;
+			}
+
+			if (strcmp(tokens[14], "port")) {
+				printf("string  supported port\n");
+				return;
+			}
+
+			if (parser_read_uint32(&port_id, tokens[15])) {
+				printf("Incorrect format for port ID\n");
+				return;
+			}
+
+			key.type = PIPELINE_FIREWALL_IPV4_5TUPLE;
+			key.key.ipv4_5tuple.src_ip = rte_bswap32((uint32_t) sipaddr.s_addr);
+			key.key.ipv4_5tuple.src_ip_mask = sipdepth;
+			key.key.ipv4_5tuple.dst_ip = rte_bswap32((uint32_t) dipaddr.s_addr);
+			key.key.ipv4_5tuple.dst_ip_mask = dipdepth;
+			key.key.ipv4_5tuple.src_port_from = sport0;
+			key.key.ipv4_5tuple.src_port_to = sport1;
+			key.key.ipv4_5tuple.dst_port_from = dport0;
+			key.key.ipv4_5tuple.dst_port_to = dport1;
+			key.key.ipv4_5tuple.proto = proto;
+			key.key.ipv4_5tuple.proto_mask = protomask;
+
+			status = app_pipeline_firewall_add_rule(app, params->pipeline_id,
+					&key, priority, port_id);
+
+			if (status != 0)
+				printf("Command failed\n");
+
+			return;
+
+		}
+
+		/* Parsing add default */
+		if ((0 == strcmp(tokens[1], "default"))
+				&& (0 != strcmp(tokens[1], "bulk"))
+				&& (0 != strcmp(tokens[1], "priority"))) {
+			if (n_tokens > 3) {
+				printf(
+						"too many arguments: \np <pipeline ID> firewall add "
+						"default <port ID>");
+				return;
+			}
+
+			if (n_tokens < 3) {
+				printf(
+						"not enough arguments \np <pipeline ID> firewall add "
+						"default <port ID>");
+				return;
+			}
+
+			if (parser_read_uint32(&port_id, tokens[2])) {
+				printf("Incorrect format for port ID\n");
+				return;
+			}
+
+			status = app_pipeline_firewall_add_default_rule(app,
+					params->pipeline_id, port_id);
+
+			if (status != 0)
+				printf("Command failed\n");
+
+			return;
+		}
+
+		/* Parsing add bulk */
+		if (0 == strcmp(tokens[1], "bulk")) {
+			if (n_tokens > 3) {
+				printf(
+						"too many arguments: \np <pipeline ID> firewall add "
+						"bulk <file>");
+				return;
+			}
+
+			if (n_tokens < 3) {
+				printf(
+						"not enough arguments \np <pipeline ID> firewall add "
+						"bulk <file>");
+				return;
+			}
+
+			filepath = tokens[2];
+			printf("%s", filepath);
+
+			struct app_pipeline_add_bulk_params add_bulk_params;
+			memset(&add_bulk_params, 0, sizeof(struct app_pipeline_add_bulk_params));
+
+			status = app_pipeline_add_bulk_parse_file(filepath,
+					&add_bulk_params);
+			if (status != 0) {
+				printf("Command failed\n");
+				goto end;
+			}
+
+			status = app_pipeline_firewall_add_bulk(app, params->pipeline_id,
+					add_bulk_params.keys, add_bulk_params.n_keys,
+					add_bulk_params.priorities, add_bulk_params.port_ids);
+			if (status != 0) {
+				printf("Command failed\n");
+				goto end;
+			}
+
+			return;
+
+			end:
+			rte_free(add_bulk_params.keys);
+			rte_free(add_bulk_params.priorities);
+			rte_free(add_bulk_params.port_ids);
+			return;
+
+		}
+	}
+
+	/* Parsing del command */
+	if ((n_tokens > 0) && (0 == strcmp(tokens[0], "del"))) {
+		if (n_tokens > 15) {
+			printf("Command failed firewall add too many arguments\n");
+			return;
+		}
+		if (n_tokens < 2) {
+			printf(
+					"Usage: \n p <id> firewall del ipv4 ... \n p <id> firewall "
+					"del bulk ... \n p <id> firewall del default ...\n");
+			return;
+		}
+
+		if (strcmp(tokens[1], "ipv4") == 0) {
+			if (n_tokens > 12) {
+				printf(
+						"too many arguments: \np <pipeline ID> firewall del"
+						" ipv4 .. ");
+				return;
+			}
+
+			if (n_tokens < 12) {
+				printf(
+						"not enough arguments \np <pipeline ID> firewall del"
+						" ipv4 .. ");
+				return;
+			}
+
+			if (parse_ipv4_addr(tokens[2], &sipaddr)) {
+				printf("Incorrect format for sipaddr\n");
+				return;
+			}
+
+			if (parser_read_uint32(&sipdepth, tokens[3])) {
+				printf("Incorrect format for sipdepth\n");
+				return;
+			}
+
+			if (parse_ipv4_addr(tokens[4], &dipaddr)) {
+				printf("Incorrect format for dipaddr\n");
+				return;
+			}
+
+			if (parser_read_uint32(&dipdepth, tokens[5])) {
+				printf("Incorrect format for dipdepth\n");
+				return;
+			}
+
+			if (parser_read_uint16(&sport0, tokens[6])) {
+				printf("Incorrect format for sport0\n");
+				return;
+			}
+
+			if (parser_read_uint16(&sport1, tokens[7])) {
+				printf("Incorrect format for sport1\n");
+				return;
+			}
+			if (parser_read_uint16(&dport0, tokens[8])) {
+				printf("Incorrect format for dport0\n");
+				return;
+			}
+
+			if (parser_read_uint16(&dport1, tokens[9])) {
+				printf("Incorrect format for dport1\n");
+				return;
+			}
+
+			if (parser_read_uint8(&proto, tokens[10])) {
+				printf("Incorrect format for proto\n");
+				return;
+			}
+
+			char *e;
+			protomask = strtoul(tokens[11], &e, 16);
+			if (*e || errno == EINVAL || errno == ERANGE) {
+				printf("Incorrect format for protomask - should be in hex \n");
+				return;
+			}
+
+			key.type = PIPELINE_FIREWALL_IPV4_5TUPLE;
+			key.key.ipv4_5tuple.src_ip = rte_bswap32((uint32_t) sipaddr.s_addr);
+			key.key.ipv4_5tuple.src_ip_mask = sipdepth;
+			key.key.ipv4_5tuple.dst_ip = rte_bswap32((uint32_t) dipaddr.s_addr);
+			key.key.ipv4_5tuple.dst_ip_mask = dipdepth;
+			key.key.ipv4_5tuple.src_port_from = sport0;
+			key.key.ipv4_5tuple.src_port_to = sport1;
+			key.key.ipv4_5tuple.dst_port_from = dport0;
+			key.key.ipv4_5tuple.dst_port_to = dport1;
+			key.key.ipv4_5tuple.proto = proto;
+			key.key.ipv4_5tuple.proto_mask = protomask;
+
+			status = app_pipeline_firewall_delete_rule(app, params->pipeline_id,
+					&key);
+
+			if (status != 0)
+				printf("Command failed\n");
+
+			return;
+		}
+
+		/* del bulk */
+		if (strcmp(tokens[1], "bulk") == 0) {
+			if (n_tokens > 3) {
+				printf(
+						"too many arguments: \np <pipeline ID> firewall del "
+						"bulk <file>");
+				return;
+			}
+
+			if (n_tokens < 3) {
+				printf(
+						"not enough arguments \np <pipeline ID> firewall del"
+						" bulk <file>");
+				return;
+			}
+
+			filepath = tokens[2];
+			struct app_pipeline_del_bulk_params del_bulk_params;
+			memset(&del_bulk_params, 0, sizeof(struct app_pipeline_del_bulk_params));
+
+			status = app_pipeline_del_bulk_parse_file(filepath,
+					&del_bulk_params);
+			if (status != 0) {
+				printf("Command failed\n");
+				goto end1;
+			}
+
+			status = app_pipeline_firewall_delete_bulk(app, params->pipeline_id,
+					del_bulk_params.keys, del_bulk_params.n_keys);
+			if (status != 0) {
+				printf("Command failed\n");
+				goto end1;
+			}
+			return;
+
+			end1: rte_free(del_bulk_params.keys);
+			return;
+
+		}
+
+		if (strcmp(tokens[1], "default") == 0) {
+			if (n_tokens > 2) {
+				printf(
+						"too many arguments: \np <pipeline ID> firewall del "
+						"default");
+				return;
+			}
+
+			if (n_tokens < 2) {
+				printf(
+						"not enough arguments \np <pipeline ID> firewall del "
+						"default");
+				return;
+			}
+
+			status = app_pipeline_firewall_delete_default_rule(app,
+					params->pipeline_id);
+
+			if (status != 0)
+				printf("Command failed\n");
+
+			return;
+
+		}
+	}
+
+	/* Parsing ls command */
+	if ((n_tokens > 0) && (0 == strcmp(tokens[0], "ls"))) {
+
+		if (n_tokens > 1) {
+			printf("Command firewall ls too many arguments\n");
+			return;
+		}
+
+		status = app_pipeline_firewall_ls(app, params->pipeline_id);
+
+		if (status != 0)
+			printf("Command firewall ls failed\n");
+
+		return;
+
+	}
+
 }
 
-cmdline_parse_token_string_t cmd_firewall_add_default_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_default_result,
-		p_string, "p");
+cmdline_parse_token_string_t cmd_firewall_p_string =
+	TOKEN_STRING_INITIALIZER(struct cmd_firewall_parsed_result, p_string,
+		"p");
 
-cmdline_parse_token_num_t cmd_firewall_add_default_pipeline_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_default_result,
-		pipeline_id, UINT32);
+cmdline_parse_token_num_t cmd_firewall_pipeline_id =
+	TOKEN_NUM_INITIALIZER(struct cmd_firewall_parsed_result, pipeline_id,
+		UINT32);
 
-cmdline_parse_token_string_t cmd_firewall_add_default_firewall_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_default_result,
+cmdline_parse_token_string_t cmd_firewall_firewall_string =
+	TOKEN_STRING_INITIALIZER(struct cmd_firewall_parsed_result,
 	firewall_string, "firewall");
 
-cmdline_parse_token_string_t cmd_firewall_add_default_add_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_default_result,
-	add_string, "add");
+static cmdline_parse_token_string_t cmd_firewall_multi_string =
+	TOKEN_STRING_INITIALIZER(struct cmd_firewall_parsed_result, multi_string,
+	TOKEN_STRING_MULTI);
 
-cmdline_parse_token_string_t cmd_firewall_add_default_default_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_add_default_result,
-		default_string, "default");
-
-cmdline_parse_token_num_t cmd_firewall_add_default_port_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_add_default_result, port_id,
-		UINT8);
-
-cmdline_parse_inst_t cmd_firewall_add_default = {
-	.f = cmd_firewall_add_default_parsed,
+cmdline_parse_inst_t cmd_firewall = {
+	.f = cmd_firewall_parsed,
 	.data = NULL,
-	.help_str = "Firewall default rule add",
+	.help_str = "\n p <pipeline ID> firewall add priority <priority> ipv4 "
+				"<sipaddr> <sipdepth> <dipaddr> <dipdepth> <sport0> <sport1> "
+				"<dport0> <dport1> <proto> <protomask> port <port ID> \n"
+				"\n p <pipeline ID> firewall add bulk <file>  \n"
+				"\n p <pipeline ID> firewall add default <port ID>\n"
+				"\n p <pipeline ID> firewall del ipv4 <sipaddr> <sipdepth>"
+				"<dipaddr> <dipdepth> <sport0> <sport1> <dport0> <dport1> "
+				"<proto> <protomask> \n"
+				"\n p <pipeline ID> firewall del bulk <file> \n"
+				"\n p <pipeline ID> firewall del default \n"
+				"\n p <pipeline ID> firewall ls \n",
 	.tokens = {
-		(void *) &cmd_firewall_add_default_p_string,
-		(void *) &cmd_firewall_add_default_pipeline_id,
-		(void *) &cmd_firewall_add_default_firewall_string,
-		(void *) &cmd_firewall_add_default_add_string,
-		(void *) &cmd_firewall_add_default_default_string,
-		(void *) &cmd_firewall_add_default_port_id,
-		NULL,
-	},
-};
-
-/*
- * p firewall del default
- */
-struct cmd_firewall_del_default_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t pipeline_id;
-	cmdline_fixed_string_t firewall_string;
-	cmdline_fixed_string_t del_string;
-	cmdline_fixed_string_t default_string;
-};
-
-static void
-cmd_firewall_del_default_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	void *data)
-{
-	struct cmd_firewall_del_default_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	status = app_pipeline_firewall_delete_default_rule(app,
-		params->pipeline_id);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-cmdline_parse_token_string_t cmd_firewall_del_default_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_default_result,
-		p_string, "p");
-
-cmdline_parse_token_num_t cmd_firewall_del_default_pipeline_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_del_default_result,
-		pipeline_id, UINT32);
-
-cmdline_parse_token_string_t cmd_firewall_del_default_firewall_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_default_result,
-	firewall_string, "firewall");
-
-cmdline_parse_token_string_t cmd_firewall_del_default_del_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_default_result,
-		del_string, "del");
-
-cmdline_parse_token_string_t cmd_firewall_del_default_default_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_del_default_result,
-		default_string, "default");
-
-cmdline_parse_inst_t cmd_firewall_del_default = {
-	.f = cmd_firewall_del_default_parsed,
-	.data = NULL,
-	.help_str = "Firewall default rule delete",
-	.tokens = {
-		(void *) &cmd_firewall_del_default_p_string,
-		(void *) &cmd_firewall_del_default_pipeline_id,
-		(void *) &cmd_firewall_del_default_firewall_string,
-		(void *) &cmd_firewall_del_default_del_string,
-		(void *) &cmd_firewall_del_default_default_string,
-		NULL,
-	},
-};
-
-/*
- * p firewall ls
- */
-
-struct cmd_firewall_ls_result {
-	cmdline_fixed_string_t p_string;
-	uint32_t pipeline_id;
-	cmdline_fixed_string_t firewall_string;
-	cmdline_fixed_string_t ls_string;
-};
-
-static void
-cmd_firewall_ls_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	void *data)
-{
-	struct cmd_firewall_ls_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	status = app_pipeline_firewall_ls(app, params->pipeline_id);
-
-	if (status != 0) {
-		printf("Command failed\n");
-		return;
-	}
-}
-
-cmdline_parse_token_string_t cmd_firewall_ls_p_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_ls_result, p_string,
-		"p");
-
-cmdline_parse_token_num_t cmd_firewall_ls_pipeline_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_firewall_ls_result, pipeline_id,
-		UINT32);
-
-cmdline_parse_token_string_t cmd_firewall_ls_firewall_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_ls_result,
-	firewall_string, "firewall");
-
-cmdline_parse_token_string_t cmd_firewall_ls_ls_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_firewall_ls_result, ls_string,
-	"ls");
-
-cmdline_parse_inst_t cmd_firewall_ls = {
-	.f = cmd_firewall_ls_parsed,
-	.data = NULL,
-	.help_str = "Firewall rule list",
-	.tokens = {
-		(void *) &cmd_firewall_ls_p_string,
-		(void *) &cmd_firewall_ls_pipeline_id,
-		(void *) &cmd_firewall_ls_firewall_string,
-		(void *) &cmd_firewall_ls_ls_string,
+		(void *) &cmd_firewall_p_string,
+		(void *) &cmd_firewall_pipeline_id,
+		(void *) &cmd_firewall_firewall_string,
+		(void *)&cmd_firewall_multi_string,
 		NULL,
 	},
 };
 
 static cmdline_parse_ctx_t pipeline_cmds[] = {
-	(cmdline_parse_inst_t *) &cmd_firewall_add_ipv4,
-	(cmdline_parse_inst_t *) &cmd_firewall_del_ipv4,
-	(cmdline_parse_inst_t *) &cmd_firewall_add_bulk,
-	(cmdline_parse_inst_t *) &cmd_firewall_del_bulk,
-	(cmdline_parse_inst_t *) &cmd_firewall_add_default,
-	(cmdline_parse_inst_t *) &cmd_firewall_del_default,
-	(cmdline_parse_inst_t *) &cmd_firewall_ls,
+	(cmdline_parse_inst_t *) &cmd_firewall,
 	NULL,
 };
 
