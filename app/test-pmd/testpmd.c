@@ -75,6 +75,7 @@
 #ifdef RTE_LIBRTE_PMD_XENVIRT
 #include <rte_eth_xenvirt.h>
 #endif
+#include <rte_pdump.h>
 
 #include "testpmd.h"
 #include "mempool_osdep.h"
@@ -2018,6 +2019,8 @@ signal_handler(int signum)
 	if (signum == SIGINT || signum == SIGTERM) {
 		printf("\nSignal %d received, preparing to exit...\n",
 				signum);
+		/* uninitialize packet capture framework */
+		rte_pdump_uninit();
 		force_quit();
 		/* exit with the expected status */
 		signal(signum, SIG_DFL);
@@ -2037,6 +2040,9 @@ main(int argc, char** argv)
 	diag = rte_eal_init(argc, argv);
 	if (diag < 0)
 		rte_panic("Cannot init EAL\n");
+
+	/* initialize packet capture framework */
+	rte_pdump_init();
 
 	nb_ports = (portid_t) rte_eth_dev_count();
 	if (nb_ports == 0)
