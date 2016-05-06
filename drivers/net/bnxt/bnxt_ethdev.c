@@ -390,6 +390,16 @@ static void bnxt_dev_stop_op(struct rte_eth_dev *eth_dev)
 	bnxt_shutdown_nic(bp);
 }
 
+static void bnxt_dev_close_op(struct rte_eth_dev *eth_dev)
+{
+	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
+
+	bnxt_free_tx_mbufs(bp);
+	bnxt_free_rx_mbufs(bp);
+	bnxt_free_mem(bp);
+	rte_free(eth_dev->data->mac_addrs);
+}
+
 static int bnxt_link_update_op(struct rte_eth_dev *eth_dev,
 			       int wait_to_complete)
 {
@@ -492,6 +502,7 @@ static struct eth_dev_ops bnxt_dev_ops = {
 	.dev_configure = bnxt_dev_configure_op,
 	.dev_start = bnxt_dev_start_op,
 	.dev_stop = bnxt_dev_stop_op,
+	.dev_close = bnxt_dev_close_op,
 	.stats_get = bnxt_stats_get_op,
 	.stats_reset = bnxt_stats_reset_op,
 	.rx_queue_setup = bnxt_rx_queue_setup_op,
