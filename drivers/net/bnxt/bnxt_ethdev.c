@@ -390,6 +390,24 @@ static void bnxt_dev_stop_op(struct rte_eth_dev *eth_dev)
 	bnxt_shutdown_nic(bp);
 }
 
+static int bnxt_dev_set_link_up_op(struct rte_eth_dev *eth_dev)
+{
+	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
+
+	eth_dev->data->dev_link.link_status = 1;
+	bnxt_set_hwrm_link_config(bp, true);
+	return 0;
+}
+
+static int bnxt_dev_set_link_down_op(struct rte_eth_dev *eth_dev)
+{
+	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
+
+	eth_dev->data->dev_link.link_status = 0;
+	bnxt_set_hwrm_link_config(bp, false);
+	return 0;
+}
+
 static void bnxt_dev_close_op(struct rte_eth_dev *eth_dev)
 {
 	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
@@ -569,6 +587,8 @@ static struct eth_dev_ops bnxt_dev_ops = {
 	.dev_configure = bnxt_dev_configure_op,
 	.dev_start = bnxt_dev_start_op,
 	.dev_stop = bnxt_dev_stop_op,
+	.dev_set_link_up = bnxt_dev_set_link_up_op,
+	.dev_set_link_down = bnxt_dev_set_link_down_op,
 	.dev_close = bnxt_dev_close_op,
 	.stats_get = bnxt_stats_get_op,
 	.stats_reset = bnxt_stats_reset_op,
