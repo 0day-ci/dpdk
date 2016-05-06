@@ -39,6 +39,7 @@
 #include <rte_version.h>
 
 #include "bnxt.h"
+#include "bnxt_filter.h"
 #include "bnxt_hwrm.h"
 #include "hsi_struct_def_dpdk.h"
 
@@ -134,6 +135,26 @@ static int bnxt_hwrm_send_message(struct bnxt *bp, void *msg, uint32_t msg_len)
 			return rc; \
 		} \
 	}
+
+int bnxt_hwrm_clear_filter(struct bnxt *bp,
+			   struct bnxt_filter_info *filter)
+{
+	int rc = 0;
+	struct hwrm_cfa_l2_filter_free_input req = {.req_type = 0 };
+	struct hwrm_cfa_l2_filter_free_output *resp = bp->hwrm_cmd_resp_addr;
+
+	HWRM_PREP(req, CFA_L2_FILTER_FREE, -1, resp);
+
+	req.l2_filter_id = rte_cpu_to_le_64(filter->fw_l2_filter_id);
+
+	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
+
+	HWRM_CHECK_RESULT;
+
+	filter->fw_l2_filter_id = -1;
+
+	return 0;
+}
 
 int bnxt_hwrm_exec_fwd_resp(struct bnxt *bp, void *fwd_cmd)
 {
