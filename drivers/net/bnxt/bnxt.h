@@ -42,9 +42,6 @@
 #include <rte_lcore.h>
 #include <rte_spinlock.h>
 
-/* TODO make bnxt.def_cp_ring a pointer to avoid this... */
-#include "bnxt_cpr.h"
-
 #define BNXT_MAX_MTU		9000
 #define VLAN_TAG_SIZE		4
 
@@ -141,7 +138,7 @@ struct bnxt {
 	struct bnxt_tx_queue **tx_queues;
 
 	/* Default completion ring */
-	struct bnxt_cp_ring_info	def_cp_ring;
+	struct bnxt_cp_ring_info	*def_cp_ring;
 
 	unsigned		nr_vnics;
 

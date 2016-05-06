@@ -34,8 +34,6 @@
 #ifndef _BNXT_CPR_H_
 #define _BNXT_CPR_H_
 
-#include "hsi_struct_def_dpdk.h"
-
 #define CMP_VALID(cmp, raw_cons, ring)					\
 	(!!(((struct cmpl_base *)(cmp))->info3_v & CMPL_BASE_V) ==	\
 	 !((raw_cons) & ((ring)->ring_size)))

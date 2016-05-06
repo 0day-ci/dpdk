@@ -35,6 +35,7 @@
 #include "bnxt_cpr.h"
 #include "bnxt_hwrm.h"
 #include "bnxt_ring.h"
+#include "hsi_struct_def_dpdk.h"
 
 /*
  * Async event handling
@@ -118,7 +119,7 @@ reject:
 /* For the default completion ring only */
 void bnxt_free_def_cp_ring(struct bnxt *bp)
 {
-	struct bnxt_cp_ring_info *cpr = &bp->def_cp_ring;
+	struct bnxt_cp_ring_info *cpr = bp->def_cp_ring;
 	struct bnxt_ring_struct *ring = cpr->cp_ring_struct;
 
 	bnxt_free_ring(ring);
@@ -127,7 +128,7 @@ void bnxt_free_def_cp_ring(struct bnxt *bp)
 /* For the default completion ring only */
 void bnxt_init_def_ring_struct(struct bnxt *bp)
 {
-	struct bnxt_cp_ring_info *cpr = &bp->def_cp_ring;
+	struct bnxt_cp_ring_info *cpr = bp->def_cp_ring;
 	struct bnxt_ring_struct *ring = cpr->cp_ring_struct;
 
 	ring->bd = (void *)cpr->cp_desc_ring;
