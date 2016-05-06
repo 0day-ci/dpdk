@@ -34,6 +34,11 @@ This section should contain new features added in this release. Sample format:
 
   Refer to the previous release notes for examples.
 
+* **Added support of AES counter mode for Intel QuickAssist devices.**
+
+  Enabled support for the AES CTR algorithm for Intel QuickAssist devices.
+  Provided support for algorithm-chaining operations.
+
 
 Resolved Issues
 ---------------
