@@ -71,6 +71,7 @@ Programmer's Guide
     writing_efficient_code
     profile_app
     glossary
+    pdump_library
 
 
 **Figures**

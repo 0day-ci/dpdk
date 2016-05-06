@@ -34,6 +34,10 @@ This section should contain new features added in this release. Sample format:
 
   Refer to the previous release notes for examples.
 
+* **Added packet capturing support.**
+
+  Now users have facility to capture packets on dpdk ports using librte_pdump
+  and app/pdump tool.
 
 Resolved Issues
 ---------------
@@ -90,6 +94,7 @@ This section should contain API changes. Sample format:
   ibadcrc, ibadlen, imcasts, fdirmatch, fdirmiss,
   tx_pause_xon, rx_pause_xon, tx_pause_xoff, rx_pause_xoff.
 
+* Now function ``rte_eth_dev_get_port_by_name`` changed to public API.
 
 ABI Changes
 -----------
@@ -101,6 +106,8 @@ ABI Changes
 * The ``rte_port_source_params`` structure has new fields to support PCAP file.
   It was already in release 16.04 with ``RTE_NEXT_ABI`` flag.
 
+* The ``rte_eth_dev_info`` structure has new fields ``nb_rx_queues`` and ``nb_tx_queues``
+  to support number of queues configured by software.
 
 Shared Library Versions
 -----------------------
