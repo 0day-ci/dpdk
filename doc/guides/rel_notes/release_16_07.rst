@@ -34,6 +34,17 @@ This section should contain new features added in this release. Sample format:
 
   Refer to the previous release notes for examples.
 
+* **Updated the ixgbe base driver.**
+  The i40e base driver was updated with changes including the
+  following:
+
+  * Added sgmii link for X550.
+  * Added mac link setup for x550a SFP and SFP+.
+  * Added KR support for x550em_a.
+  * Added new phy definitions for M88E1500.
+  * Added support for the VLVF to be bypassed when adding/removing a VFTA entry.
+  * Added x550a flow control auto negotiation support.
+
 
 Resolved Issues
 ---------------
