@@ -1041,6 +1041,7 @@ s32 ixgbe_get_phy_token(struct ixgbe_hw *hw)
 	token_cmd.hdr.cmd = FW_PHY_TOKEN_REQ_CMD;
 	token_cmd.hdr.buf_len = FW_PHY_TOKEN_REQ_LEN;
 	token_cmd.hdr.cmd_or_resp.cmd_resv = 0;
+	token_cmd.hdr.checksum = FW_DEFAULT_CHECKSUM;
 	token_cmd.port_number = hw->bus.lan_id;
 	token_cmd.command_type = FW_PHY_TOKEN_REQ;
 	token_cmd.pad = 0;
@@ -1071,6 +1072,7 @@ s32 ixgbe_put_phy_token(struct ixgbe_hw *hw)
 	token_cmd.hdr.cmd = FW_PHY_TOKEN_REQ_CMD;
 	token_cmd.hdr.buf_len = FW_PHY_TOKEN_REQ_LEN;
 	token_cmd.hdr.cmd_or_resp.cmd_resv = 0;
+	token_cmd.hdr.checksum = FW_DEFAULT_CHECKSUM;
 	token_cmd.port_number = hw->bus.lan_id;
 	token_cmd.command_type = FW_PHY_TOKEN_REL;
 	token_cmd.pad = 0;
