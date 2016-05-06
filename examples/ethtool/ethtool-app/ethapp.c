@@ -98,6 +98,8 @@ cmdline_parse_token_string_t pcmd_rxmode_token_cmd =
 	TOKEN_STRING_INITIALIZER(struct pcmd_int_params, cmd, "rxmode");
 cmdline_parse_token_string_t pcmd_portstats_token_cmd =
 	TOKEN_STRING_INITIALIZER(struct pcmd_int_params, cmd, "portstats");
+cmdline_parse_token_string_t pcmd_xstats_token_cmd =
+	TOKEN_STRING_INITIALIZER(struct pcmd_int_params, cmd, "xstats");
 cmdline_parse_token_num_t pcmd_int_token_port =
 	TOKEN_NUM_INITIALIZER(struct pcmd_int_params, port, UINT16);
 
@@ -551,6 +553,49 @@ static void pcmd_portstats_callback(__rte_unused void *ptr_params,
 		printf("Port %i: Error fetching statistics\n", params->port);
 }
 
+static void pcmd_xstats_callback(__rte_unused void *ptr_params,
+	__rte_unused struct cmdline *ctx,
+	__rte_unused void *ptr_data)
+{
+	struct rte_eth_xstats xstats[256];
+	struct pcmd_int_params *params = ptr_params;
+	int cnt_xstats, idx_xstat, idx_name;
+	struct rte_eth_xstats_name *ptr_names;
+
+	if (!rte_eth_dev_is_valid_port(params->port)) {
+		printf("Error: Invalid port number %i\n", params->port);
+		return;
+	}
+
+	cnt_xstats = rte_eth_xstats_count(params->port);
+	if (cnt_xstats  < 0) {
+		printf("Port %i: %s\n", params->port, strerror(-cnt_xstats));
+		return;
+	}
+	printf("Number of xstats: %i\n", cnt_xstats);
+	ptr_names = malloc(sizeof(struct rte_eth_xstats_name) * cnt_xstats);
+	if (cnt_xstats != rte_eth_xstats_names(
+			params->port, ptr_names, cnt_xstats)) {
+		printf("Error: Fetched and expected counts mismatch\n");
+		return;
+	}
+
+	cnt_xstats = rte_eth_xstats_get(params->port, xstats, 256);
+	if (cnt_xstats < 0) {
+		printf("Error: Unable to get xstats (%s)\n",
+			strerror(-cnt_xstats));
+		return;
+	}
+	for (idx_xstat = 0; idx_xstat < cnt_xstats; idx_xstat++)
+		for (idx_name = 0; idx_name < cnt_xstats; idx_name++)
+			if (ptr_names[idx_name].id == xstats[idx_xstat].id) {
+				printf("%s: %lu\n", ptr_names[idx_name].name,
+					xstats[idx_xstat].value);
+				break;
+			}
+	free(ptr_names);
+}
+
 static void pcmd_ringparam_callback(__rte_unused void *ptr_params,
 	__rte_unused struct cmdline *ctx,
 	void *ptr_data)
@@ -789,6 +834,17 @@ cmdline_parse_inst_t pcmd_portstats = {
 		NULL
 	},
 };
+cmdline_parse_inst_t pcmd_xstats = {
+	.f = pcmd_xstats_callback,
+	.data = NULL,
+	.help_str = "xstats <port_id>\n"
+		"     Print port eth xstats",
+	.tokens = {
+		(void *)&pcmd_xstats_token_cmd,
+		(void *)&pcmd_int_token_port,
+		NULL
+	},
+};
 cmdline_parse_inst_t pcmd_ringparam = {
 	.f = pcmd_ringparam_callback,
 	.data = NULL,
@@ -857,6 +913,7 @@ cmdline_parse_ctx_t list_prompt_commands[] = {
 	(cmdline_parse_inst_t *)&pcmd_stop,
 	(cmdline_parse_inst_t *)&pcmd_validate,
 	(cmdline_parse_inst_t *)&pcmd_vlan,
+	(cmdline_parse_inst_t *)&pcmd_xstats,
 	(cmdline_parse_inst_t *)&pcmd_quit,
 	NULL
 };
