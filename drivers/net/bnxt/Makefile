@@ -56,6 +56,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_BNXT_PMD) += bnxt_ring.c
 SRCS-$(CONFIG_RTE_LIBRTE_BNXT_PMD) += bnxt_rxq.c
 SRCS-$(CONFIG_RTE_LIBRTE_BNXT_PMD) += bnxt_stats.c
 SRCS-$(CONFIG_RTE_LIBRTE_BNXT_PMD) += bnxt_txq.c
+SRCS-$(CONFIG_RTE_LIBRTE_BNXT_PMD) += bnxt_txr.c
 SRCS-$(CONFIG_RTE_LIBRTE_BNXT_PMD) += bnxt_vnic.c
 
 #
