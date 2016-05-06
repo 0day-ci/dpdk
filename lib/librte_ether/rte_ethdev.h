@@ -882,6 +882,9 @@ struct rte_eth_dev_info {
 	struct rte_eth_desc_lim rx_desc_lim;  /**< RX descriptors limits */
 	struct rte_eth_desc_lim tx_desc_lim;  /**< TX descriptors limits */
 	uint32_t speed_capa;  /**< Supported speeds bitmap (ETH_LINK_SPEED_). */
+	/** Configured number of rx/tx queues */
+	uint16_t nb_rx_queues; /**< Number of RX queues. */
+	uint16_t nb_tx_queues; /**< Number of TX queues. */
 };
 
 /**
@@ -3826,6 +3829,33 @@ void *rte_eth_add_rx_callback(uint8_t port_id, uint16_t queue_id,
 		rte_rx_callback_fn fn, void *user_param);
 
 /**
+ * Add a callback that must be called first on packet RX on a given port and queue.
+ *
+ * This API configures a first function to be called for each burst of
+ * packets received on a given NIC port queue. The return value is a pointer
+ * that can be used to later remove the callback using
+ * rte_eth_remove_rx_callback().
+ *
+ * Multiple functions are called in the order that they are added.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param queue_id
+ *   The queue on the Ethernet device on which the callback is to be added.
+ * @param fn
+ *   The callback function
+ * @param user_param
+ *   A generic pointer parameter which will be passed to each invocation of the
+ *   callback function on this port and queue.
+ *
+ * @return
+ *   NULL on error.
+ *   On success, a pointer value which can later be used to remove the callback.
+ */
+void *rte_eth_add_first_rx_callback(uint8_t port_id, uint16_t queue_id,
+		rte_rx_callback_fn fn, void *user_param);
+
+/**
  * Add a callback to be called on packet TX on a given port and queue.
  *
  * This API configures a function to be called for each burst of
@@ -4252,6 +4282,21 @@ rte_eth_dev_l2_tunnel_offload_set(uint8_t port_id,
 				  struct rte_eth_l2_tunnel_conf *l2_tunnel,
 				  uint32_t mask,
 				  uint8_t en);
+
+/**
+ * Get the port id from pci adrress or device name
+ * Ex: 0000:2:00.0 or vdev name eth_pcap0
+ *
+ * @param name
+ *  pci address or name of the device
+ * @param port_id
+ *   pointer to port identifier of the device
+ * @return
+ *   - (0) if successful.
+ *   - (-ENODEV) on failure.
+ */
+int
+rte_eth_dev_get_port_by_name(const char *name, uint8_t *port_id);
 
 #ifdef __cplusplus
 }
