@@ -165,7 +165,7 @@ int bnxt_alloc_filter_mem(struct bnxt *bp)
 	filter_mem = rte_zmalloc("bnxt_filter_info",
 				 max_filters * sizeof(struct bnxt_filter_info),
 				 0);
-	if (filter_mem == NULL) {
+	if (!filter_mem) {
 		RTE_LOG(ERR, PMD, "Failed to alloc memory for %d filters",
 			max_filters);
 		return -ENOMEM;

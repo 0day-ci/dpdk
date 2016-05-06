@@ -431,7 +431,7 @@ int bnxt_hwrm_ver_get(struct bnxt *bp)
 		rte_free(bp->hwrm_cmd_resp_addr);
 
 		bp->hwrm_cmd_resp_addr = rte_malloc(type, max_resp_len, 0);
-		if (bp->hwrm_cmd_resp_addr == NULL) {
+		if (!bp->hwrm_cmd_resp_addr) {
 			rc = -ENOMEM;
 			goto error;
 		}
@@ -1171,7 +1171,7 @@ int bnxt_alloc_hwrm_resources(struct bnxt *bp)
 	bp->max_req_len = HWRM_MAX_REQ_LEN;
 	bp->max_resp_len = HWRM_MAX_RESP_LEN;
 	bp->hwrm_cmd_resp_addr = rte_malloc(type, bp->max_resp_len, 0);
-	if (bp->hwrm_cmd_resp_addr == NULL)
+	if (!bp->hwrm_cmd_resp_addr)
 		return -ENOMEM;
 	bp->hwrm_cmd_resp_dma_addr =
 		rte_malloc_virt2phy(bp->hwrm_cmd_resp_addr);
@@ -1211,7 +1211,7 @@ void bnxt_free_all_hwrm_resources(struct bnxt *bp)
 	struct bnxt_vnic_info *vnic;
 	unsigned i;
 
-	if (bp->vnic_info == NULL)
+	if (!bp->vnic_info)
 		return;
 
 	vnic = &bp->vnic_info[0];

@@ -143,7 +143,7 @@ int bnxt_alloc_rings(struct bnxt *bp, uint16_t qidx,
 					 SOCKET_ID_ANY,
 					 RTE_MEMZONE_2MB |
 					 RTE_MEMZONE_SIZE_HINT_ONLY);
-		if (mz == NULL)
+		if (!mz)
 			return -ENOMEM;
 	}
 	memset(mz->addr, 0, mz->len);

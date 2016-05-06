@@ -535,7 +535,7 @@ static void bnxt_promiscuous_enable_op(struct rte_eth_dev *eth_dev)
 	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
 	struct bnxt_vnic_info *vnic;
 
-	if (bp->vnic_info == NULL)
+	if (!bp->vnic_info)
 		return;
 
 	vnic = &bp->vnic_info[0];
@@ -549,7 +549,7 @@ static void bnxt_promiscuous_disable_op(struct rte_eth_dev *eth_dev)
 	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
 	struct bnxt_vnic_info *vnic;
 
-	if (bp->vnic_info == NULL)
+	if (!bp->vnic_info)
 		return;
 
 	vnic = &bp->vnic_info[0];
@@ -563,7 +563,7 @@ static void bnxt_allmulticast_enable_op(struct rte_eth_dev *eth_dev)
 	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
 	struct bnxt_vnic_info *vnic;
 
-	if (bp->vnic_info == NULL)
+	if (!bp->vnic_info)
 		return;
 
 	vnic = &bp->vnic_info[0];
@@ -577,7 +577,7 @@ static void bnxt_allmulticast_disable_op(struct rte_eth_dev *eth_dev)
 	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
 	struct bnxt_vnic_info *vnic;
 
-	if (bp->vnic_info == NULL)
+	if (!bp->vnic_info)
 		return;
 
 	vnic = &bp->vnic_info[0];
@@ -955,7 +955,7 @@ bnxt_dev_init(struct rte_eth_dev *eth_dev)
 	}
 	eth_dev->data->mac_addrs = rte_zmalloc("bnxt_mac_addr_tbl",
 					ETHER_ADDR_LEN * MAX_NUM_MAC_ADDR, 0);
-	if (eth_dev->data->mac_addrs == NULL) {
+	if (!eth_dev->data->mac_addrs) {
 		RTE_LOG(ERR, PMD,
 			"Failed to alloc %u bytes needed to store MAC addr tbl",
 			ETHER_ADDR_LEN * MAX_NUM_MAC_ADDR);
