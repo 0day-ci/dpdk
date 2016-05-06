@@ -52,20 +52,12 @@ static struct rte_pci_id bnxt_pci_id_map[] = {
 	{.device_id = 0},
 };
 
-static void bnxt_dev_close_op(struct rte_eth_dev *eth_dev)
-{
-	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
-
-	rte_free(eth_dev->data->mac_addrs);
-	bnxt_free_hwrm_resources(bp);
-}
-
 /*
  * Initialization
  */
 
 static struct eth_dev_ops bnxt_dev_ops = {
-	.dev_close = bnxt_dev_close_op,
+0
 };
 
 static bool bnxt_vf_pciid(uint16_t id)
@@ -123,7 +115,8 @@ bnxt_dev_init(struct rte_eth_dev *eth_dev)
 			eth_dev->pci_dev->addr.function < 4) {
 		RTE_LOG(ERR, PMD, "Function not enabled %x:\n",
 			eth_dev->pci_dev->addr.function);
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto error;
 	}
 
 	rte_eth_copy_pci_info(eth_dev, eth_dev->pci_dev);
@@ -148,11 +141,11 @@ bnxt_dev_init(struct rte_eth_dev *eth_dev)
 	if (rc) {
 		RTE_LOG(ERR, PMD,
 			"hwrm resource allocation failure rc: %x\n", rc);
-		goto error;
+		goto error_free;
 	}
 	rc = bnxt_hwrm_ver_get(bp);
 	if (rc)
-		goto error;
+		goto error_free;
 	bnxt_hwrm_queue_qportcfg(bp);
 
 	/* Get the MAX capabilities for this function */
@@ -177,17 +170,38 @@ bnxt_dev_init(struct rte_eth_dev *eth_dev)
 		memcpy(bp->mac_addr, bp->vf.mac_addr, sizeof(bp->mac_addr));
 	memcpy(&eth_dev->data->mac_addrs[0], bp->mac_addr, ETHER_ADDR_LEN);
 
-	return -EPERM;
+	rc = bnxt_hwrm_func_driver_register(bp, 0,
+					    bp->pf.vf_req_fwd);
+	if (rc) {
+		RTE_LOG(ERR, PMD,
+			"Failed to register driver");
+		rc = -EBUSY;
+		goto error_free;
+	}
+
+	RTE_LOG(INFO, PMD,
+		DRV_MODULE_NAME " found at mem %" PRIx64 ", node addr %pM\n",
+		eth_dev->pci_dev->mem_resource[0].phys_addr,
+		eth_dev->pci_dev->mem_resource[0].addr);
+
+	return 0;
 
 error_free:
-	bnxt_dev_close_op(eth_dev);
+	eth_dev->driver->eth_dev_uninit(eth_dev);
 error:
 	return rc;
 }
 
 static int
-bnxt_dev_uninit(struct rte_eth_dev *eth_dev __rte_unused) {
-	return 0;
+bnxt_dev_uninit(struct rte_eth_dev *eth_dev) {
+	struct bnxt *bp = eth_dev->data->dev_private;
+	int rc;
+
+	if (eth_dev->data->mac_addrs)
+		rte_free(eth_dev->data->mac_addrs);
+	rc = bnxt_hwrm_func_driver_unregister(bp, 0);
+	bnxt_free_hwrm_resources(bp);
+	return rc;
 }
 
 static struct eth_driver bnxt_rte_pmd = {
@@ -198,7 +212,7 @@ static struct eth_driver bnxt_rte_pmd = {
 		    },
 	.eth_dev_init = bnxt_dev_init,
 	.eth_dev_uninit = bnxt_dev_uninit,
-	.dev_private_size = 32 /* this must be non-zero apparently */,
+	.dev_private_size = sizeof(struct bnxt),
 };
 
 static int bnxt_rte_pmd_init(const char *name, const char *params __rte_unused)
