@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -48,6 +48,7 @@
 #include <cmdline.h>
 
 #include "pipeline_common_fe.h"
+#include "parser.h"
 
 int
 app_pipeline_ping(struct app_params *app,
@@ -963,219 +964,136 @@ print_link_info(struct app_link_params *p)
 	printf("\n");
 }
 
-struct cmd_link_config_result {
-	cmdline_fixed_string_t link_string;
-	uint32_t link_id;
-	cmdline_fixed_string_t config_string;
-	cmdline_ipaddr_t ip;
-	uint32_t depth;
-};
-
-static void
-cmd_link_config_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	 void *data)
-{
-	struct cmd_link_config_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	uint32_t link_id = params->link_id;
-	uint32_t ip  = rte_bswap32((uint32_t) params->ip.addr.ipv4.s_addr);
-	uint32_t depth = params->depth;
-
-	status = app_link_config(app, link_id, ip, depth);
-	if (status)
-		printf("Command failed\n");
-	else {
-		struct app_link_params *p;
-
-		APP_PARAM_FIND_BY_ID(app->link_params, "LINK", link_id, p);
-		print_link_info(p);
-	}
-}
-
-cmdline_parse_token_string_t cmd_link_config_link_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_link_config_result, link_string,
-		"link");
-
-cmdline_parse_token_num_t cmd_link_config_link_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_link_config_result, link_id, UINT32);
-
-cmdline_parse_token_string_t cmd_link_config_config_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_link_config_result, config_string,
-		"config");
-
-cmdline_parse_token_ipaddr_t cmd_link_config_ip =
-	TOKEN_IPV4_INITIALIZER(struct cmd_link_config_result, ip);
-
-cmdline_parse_token_num_t cmd_link_config_depth =
-	TOKEN_NUM_INITIALIZER(struct cmd_link_config_result, depth, UINT32);
-
-cmdline_parse_inst_t cmd_link_config = {
-	.f = cmd_link_config_parsed,
-	.data = NULL,
-	.help_str = "Link configuration",
-	.tokens = {
-		(void *)&cmd_link_config_link_string,
-		(void *)&cmd_link_config_link_id,
-		(void *)&cmd_link_config_config_string,
-		(void *)&cmd_link_config_ip,
-		(void *)&cmd_link_config_depth,
-		NULL,
-	},
-};
-
 /*
- * link up
+ * link command
  */
 
-struct cmd_link_up_result {
+struct cmd_link_parsed_result {
 	cmdline_fixed_string_t link_string;
-	uint32_t link_id;
-	cmdline_fixed_string_t up_string;
+	cmdline_fixed_string_t command_string;
 };
 
 static void
-cmd_link_up_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	void *data)
-{
-	struct cmd_link_up_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	status = app_link_up(app, params->link_id);
-	if (status != 0)
-		printf("Command failed\n");
-	else {
-		struct app_link_params *p;
-
-		APP_PARAM_FIND_BY_ID(app->link_params, "LINK", params->link_id,
-			p);
-		print_link_info(p);
-	}
-}
-
-cmdline_parse_token_string_t cmd_link_up_link_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_link_up_result, link_string,
-		"link");
-
-cmdline_parse_token_num_t cmd_link_up_link_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_link_up_result, link_id, UINT32);
-
-cmdline_parse_token_string_t cmd_link_up_up_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_link_up_result, up_string, "up");
-
-cmdline_parse_inst_t cmd_link_up = {
-	.f = cmd_link_up_parsed,
-	.data = NULL,
-	.help_str = "Link UP",
-	.tokens = {
-		(void *)&cmd_link_up_link_string,
-		(void *)&cmd_link_up_link_id,
-		(void *)&cmd_link_up_up_string,
-		NULL,
-	},
-};
-
-/*
- * link down
- */
-
-struct cmd_link_down_result {
-	cmdline_fixed_string_t link_string;
-	uint32_t link_id;
-	cmdline_fixed_string_t down_string;
-};
-
-static void
-cmd_link_down_parsed(
-	void *parsed_result,
-	__attribute__((unused)) struct cmdline *cl,
-	void *data)
-{
-	struct cmd_link_down_result *params = parsed_result;
-	struct app_params *app = data;
-	int status;
-
-	status = app_link_down(app, params->link_id);
-	if (status != 0)
-		printf("Command failed\n");
-	else {
-		struct app_link_params *p;
-
-		APP_PARAM_FIND_BY_ID(app->link_params, "LINK", params->link_id,
-			p);
-		print_link_info(p);
-	}
-}
-
-cmdline_parse_token_string_t cmd_link_down_link_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_link_down_result, link_string,
-		"link");
-
-cmdline_parse_token_num_t cmd_link_down_link_id =
-	TOKEN_NUM_INITIALIZER(struct cmd_link_down_result, link_id, UINT32);
-
-cmdline_parse_token_string_t cmd_link_down_down_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_link_down_result, down_string,
-		"down");
-
-cmdline_parse_inst_t cmd_link_down = {
-	.f = cmd_link_down_parsed,
-	.data = NULL,
-	.help_str = "Link DOWN",
-	.tokens = {
-		(void *) &cmd_link_down_link_string,
-		(void *) &cmd_link_down_link_id,
-		(void *) &cmd_link_down_down_string,
-		NULL,
-	},
-};
-
-/*
- * link ls
- */
-
-struct cmd_link_ls_result {
-	cmdline_fixed_string_t link_string;
-	cmdline_fixed_string_t ls_string;
-};
-
-static void
-cmd_link_ls_parsed(
+cmd_link_parsed(
 	__attribute__((unused)) void *parsed_result,
 	__attribute__((unused)) struct cmdline *cl,
 	 void *data)
 {
-	struct app_params *app = data;
+	int status;
+	uint32_t n_tokens;
+	char *tokens[256];
 	uint32_t link_id;
+	uint32_t depth;
 
-	for (link_id = 0; link_id < app->n_links; link_id++) {
-		struct app_link_params *p;
+	struct in_addr ipaddr_ipv4;
 
-		APP_PARAM_FIND_BY_ID(app->link_params, "LINK", link_id, p);
-		print_link_info(p);
+	struct app_params *app = data;
+	struct cmd_link_parsed_result *results =
+			(struct cmd_link_parsed_result *)parsed_result;
+
+	n_tokens = RTE_DIM(tokens);
+	status = parse_tokenize_string(results->command_string, tokens, &n_tokens);
+
+	if (status == -E2BIG)
+		printf("Number of parameters exceeds tokenizer limit\n");
+	else
+		printf("Command tokenizer error\n");
+
+	if (n_tokens < 1) {
+		printf("Not enough arguments for link command\n");
+		return;
 	}
+
+	/* handle link id, if provided */
+	if (parser_read_uint32(&link_id, tokens[0]) == 0) {
+		/* link <link ID> config <ipaddr> <depth>
+		 * link <link ID> up
+		 * link <link ID> down
+		 */
+
+		if (n_tokens < 2) {
+			printf("Not enough arguments for \"link <id> [config|up|down] ...\" command\n");
+			return;
+		}
+
+		if (strcmp(tokens[1], "config") == 0) {
+			/* link config */
+
+			if (n_tokens < 4) {
+				printf("Not enough arguments for \"link config ...\" command\n");
+				return;
+			}
+
+			if (parse_ipv4_addr(tokens[2], &ipaddr_ipv4) != 0) {
+				printf("Incorrect format of IPv4 source address\n");
+				return;
+			}
+
+			if (parser_read_uint32(&depth, tokens[3]) != 0) {
+				printf("Incorrect format for depth\n");
+				return;
+			}
+
+			status = app_link_config(app, link_id,
+					rte_bswap32((uint32_t) ipaddr_ipv4.s_addr), depth);
+		}
+		else if (strcmp(tokens[1], "up") == 0)
+			/* link up */
+			status = app_link_up(app, link_id);
+		else if (strcmp(tokens[1], "down") == 0)
+			/* link down */
+			status = app_link_down(app, link_id);
+		else {
+			printf("Incorrect link command: acceptable is link <id> [config|up|down]\n");
+			return;
+		}
+
+		if (status != 0)
+			printf("Command failed\n");
+		else {
+			struct app_link_params *p;
+
+			APP_PARAM_FIND_BY_ID(app->link_params, "LINK", link_id, p);
+			print_link_info(p);
+		}
+		return;
+
+	} else if (strcmp(tokens[0], "ls") == 0) {
+		/* link ls */
+
+		if (n_tokens > 1) {
+			printf("Too many arguments for \"link ls\"\n");
+			return;
+		}
+
+		for (link_id = 0; link_id < app->n_links; link_id++) {
+			struct app_link_params *p;
+
+			APP_PARAM_FIND_BY_ID(app->link_params, "LINK", link_id, p);
+			print_link_info(p);
+		}
+		return;
+
+	}
+
+	printf("Incorrect link command: should be \"link ls\" or \"link <id> [config|up|down] ...\"\n");
 }
 
-cmdline_parse_token_string_t cmd_link_ls_link_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_link_ls_result, link_string,
+cmdline_parse_token_string_t cmd_link_parsed_link_string =
+		TOKEN_STRING_INITIALIZER(struct cmd_link_parsed_result, link_string,
 		"link");
 
-cmdline_parse_token_string_t cmd_link_ls_ls_string =
-	TOKEN_STRING_INITIALIZER(struct cmd_link_ls_result, ls_string, "ls");
+cmdline_parse_token_string_t cmd_link_parsed_command_string =
+		TOKEN_STRING_INITIALIZER(struct cmd_link_parsed_result, command_string,
+		TOKEN_STRING_MULTI);
 
-cmdline_parse_inst_t cmd_link_ls = {
-	.f = cmd_link_ls_parsed,
+cmdline_parse_inst_t cmd_link_parsed_all = {
+	.f = cmd_link_parsed,
 	.data = NULL,
-	.help_str = "Link list",
+	.help_str = "Link",
 	.tokens = {
-		(void *)&cmd_link_ls_link_string,
-		(void *)&cmd_link_ls_ls_string,
+		(void *)&cmd_link_parsed_link_string,
+		(void *)&cmd_link_parsed_command_string,
 		NULL,
 	},
 };
@@ -1270,12 +1188,7 @@ cmdline_parse_inst_t cmd_run = {
 static cmdline_parse_ctx_t pipeline_common_cmds[] = {
 	(cmdline_parse_inst_t *) &cmd_quit,
 	(cmdline_parse_inst_t *) &cmd_run,
-
-	(cmdline_parse_inst_t *) &cmd_link_config,
-	(cmdline_parse_inst_t *) &cmd_link_up,
-	(cmdline_parse_inst_t *) &cmd_link_down,
-	(cmdline_parse_inst_t *) &cmd_link_ls,
-
+	(cmdline_parse_inst_t *) &cmd_link_parsed_all,
 	(cmdline_parse_inst_t *) &cmd_ping,
 	(cmdline_parse_inst_t *) &cmd_stats_port_in,
 	(cmdline_parse_inst_t *) &cmd_stats_port_out,
