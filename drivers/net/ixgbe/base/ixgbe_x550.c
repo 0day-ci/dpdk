@@ -564,9 +564,14 @@ s32 ixgbe_init_ops_X550EM(struct ixgbe_hw *hw)
 	else
 		mac->ops.setup_fc = ixgbe_setup_fc_X550em;
 
-
-	if (hw->device_id != IXGBE_DEV_ID_X550EM_X_KR)
+	switch (hw->device_id) {
+	case IXGBE_DEV_ID_X550EM_X_KR:
+	case IXGBE_DEV_ID_X550EM_A_KR:
+	case IXGBE_DEV_ID_X550EM_A_KR_L:
+		break;
+	default:
 		mac->ops.setup_eee = NULL;
+	}
 
 	/* PHY */
 	phy->ops.init = ixgbe_init_phy_ops_X550em;
@@ -773,11 +778,16 @@ static s32 ixgbe_enable_eee_x550(struct ixgbe_hw *hw)
 		hw->phy.ops.write_reg(hw, IXGBE_MDIO_AUTO_NEG_EEE_ADVT,
 				      IXGBE_MDIO_AUTO_NEG_DEV_TYPE,
 				      autoneg_eee_reg);
-	} else if (hw->device_id == IXGBE_DEV_ID_X550EM_X_KR) {
+		return IXGBE_SUCCESS;
+	}
 
+	switch (hw->device_id) {
+	case IXGBE_DEV_ID_X550EM_X_KR:
+	case IXGBE_DEV_ID_X550EM_A_KR:
+	case IXGBE_DEV_ID_X550EM_A_KR_L:
 		status = hw->mac.ops.read_iosf_sb_reg(hw,
-				     IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
-				     IXGBE_SB_IOSF_TARGET_KR_PHY, &link_reg);
+				      IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
+				      IXGBE_SB_IOSF_TARGET_KR_PHY, &link_reg);
 		if (status != IXGBE_SUCCESS)
 			return status;
 
@@ -788,10 +798,13 @@ static s32 ixgbe_enable_eee_x550(struct ixgbe_hw *hw)
 		link_reg &= ~IXGBE_KRM_LINK_CTRL_1_TETH_AN_CAP_FEC;
 
 		status = hw->mac.ops.write_iosf_sb_reg(hw,
-				      IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
-				      IXGBE_SB_IOSF_TARGET_KR_PHY, link_reg);
+				       IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
+				       IXGBE_SB_IOSF_TARGET_KR_PHY, link_reg);
 		if (status != IXGBE_SUCCESS)
 			return status;
+		break;
+	default:
+		break;
 	}
 
 	return IXGBE_SUCCESS;
@@ -820,7 +833,13 @@ static s32 ixgbe_disable_eee_x550(struct ixgbe_hw *hw)
 		hw->phy.ops.write_reg(hw, IXGBE_MDIO_AUTO_NEG_EEE_ADVT,
 				      IXGBE_MDIO_AUTO_NEG_DEV_TYPE,
 				      autoneg_eee_reg);
-	} else if (hw->device_id == IXGBE_DEV_ID_X550EM_X_KR) {
+		return IXGBE_SUCCESS;
+	}
+
+	switch (hw->device_id) {
+	case IXGBE_DEV_ID_X550EM_X_KR:
+	case IXGBE_DEV_ID_X550EM_A_KR:
+	case IXGBE_DEV_ID_X550EM_A_KR_L:
 		status = hw->mac.ops.read_iosf_sb_reg(hw,
 				     IXGBE_KRM_LINK_CTRL_1(hw->bus.lan_id),
 				     IXGBE_SB_IOSF_TARGET_KR_PHY, &link_reg);
@@ -838,6 +857,9 @@ static s32 ixgbe_disable_eee_x550(struct ixgbe_hw *hw)
 				      IXGBE_SB_IOSF_TARGET_KR_PHY, link_reg);
 		if (status != IXGBE_SUCCESS)
 			return status;
+		break;
+	default:
+		break;
 	}
 
 	return IXGBE_SUCCESS;
@@ -2085,10 +2107,13 @@ s32 ixgbe_init_ext_t_x550em(struct ixgbe_hw *hw)
  *  ixgbe_setup_kr_x550em - Configure the KR PHY.
  *  @hw: pointer to hardware structure
  *
- *  Configures the integrated KR PHY.
+ *  Configures the integrated KR PHY for X550EM_x.
  **/
 s32 ixgbe_setup_kr_x550em(struct ixgbe_hw *hw)
 {
+	if (hw->mac.type != ixgbe_mac_X550EM_x)
+		return IXGBE_SUCCESS;
+
 	return ixgbe_setup_kr_speed_x550em(hw, hw->phy.autoneg_advertised);
 }
 
@@ -3356,7 +3381,10 @@ s32 ixgbe_setup_fc_X550em(struct ixgbe_hw *hw)
 		goto out;
 	}
 
-	if (hw->device_id == IXGBE_DEV_ID_X550EM_X_KR) {
+	switch (hw->device_id) {
+	case IXGBE_DEV_ID_X550EM_X_KR:
+	case IXGBE_DEV_ID_X550EM_A_KR:
+	case IXGBE_DEV_ID_X550EM_A_KR_L:
 		ret_val = hw->mac.ops.read_iosf_sb_reg(hw,
 			       IXGBE_KRM_AN_CNTL_1(hw->bus.lan_id),
 			       IXGBE_SB_IOSF_TARGET_KR_PHY, &reg_val);
@@ -3374,6 +3402,9 @@ s32 ixgbe_setup_fc_X550em(struct ixgbe_hw *hw)
 
 		/* This device does not fully support AN. */
 		hw->fc.disable_fc_autoneg = true;
+		break;
+	default:
+		break;
 	}
 
 out:
