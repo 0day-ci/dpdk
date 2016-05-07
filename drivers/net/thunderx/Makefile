@@ -1,6 +1,6 @@
 #   BSD LICENSE
 #
-#   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+#   Copyright(c) 2016 Cavium Networks. All rights reserved.
 #   All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or without
@@ -13,7 +13,7 @@
 #       notice, this list of conditions and the following disclaimer in
 #       the documentation and/or other materials provided with the
 #       distribution.
-#     * Neither the name of Intel Corporation nor the names of its
+#     * Neither the name of Cavium Networks nor the names of its
 #       contributors may be used to endorse or promote products derived
 #       from this software without specific prior written permission.
 #
@@ -28,34 +28,37 @@
 #   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 #   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 #   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_AF_PACKET) += af_packet
-DIRS-$(CONFIG_RTE_LIBRTE_BNX2X_PMD) += bnx2x
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_BOND) += bonding
-DIRS-$(CONFIG_RTE_LIBRTE_CXGBE_PMD) += cxgbe
-DIRS-$(CONFIG_RTE_LIBRTE_E1000_PMD) += e1000
-DIRS-$(CONFIG_RTE_LIBRTE_ENA_PMD) += ena
-DIRS-$(CONFIG_RTE_LIBRTE_ENIC_PMD) += enic
-DIRS-$(CONFIG_RTE_LIBRTE_FM10K_PMD) += fm10k
-DIRS-$(CONFIG_RTE_LIBRTE_I40E_PMD) += i40e
-DIRS-$(CONFIG_RTE_LIBRTE_IXGBE_PMD) += ixgbe
-DIRS-$(CONFIG_RTE_LIBRTE_MLX4_PMD) += mlx4
-DIRS-$(CONFIG_RTE_LIBRTE_MLX5_PMD) += mlx5
-DIRS-$(CONFIG_RTE_LIBRTE_MPIPE_PMD) += mpipe
-DIRS-$(CONFIG_RTE_LIBRTE_NFP_PMD) += nfp
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_NULL) += null
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_PCAP) += pcap
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_RING) += ring
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_SZEDATA2) += szedata2
-DIRS-$(CONFIG_RTE_LIBRTE_THUNDERX_NICVF_PMD) += thunderx
-DIRS-$(CONFIG_RTE_LIBRTE_VIRTIO_PMD) += virtio
-DIRS-$(CONFIG_RTE_LIBRTE_VMXNET3_PMD) += vmxnet3
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_XENVIRT) += xenvirt
+#
+# library name
+#
+LIB = librte_pmd_thunderx_nicvf.a
 
-ifeq ($(CONFIG_RTE_LIBRTE_VHOST),y)
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_VHOST) += vhost
-endif # $(CONFIG_RTE_LIBRTE_VHOST)
+CFLAGS += $(WERROR_FLAGS)
 
-include $(RTE_SDK)/mk/rte.subdir.mk
+EXPORT_MAP := rte_pmd_thunderx_nicvf_version.map
+
+LIBABIVER := 1
+
+OBJS_BASE_DRIVER=$(patsubst %.c,%.o,$(notdir $(wildcard $(SRCDIR)/base/*.c)))
+$(foreach obj, $(OBJS_BASE_DRIVER), $(eval CFLAGS_$(obj)+=$(CFLAGS_BASE_DRIVER)))
+
+VPATH += $(SRCDIR)/base
+
+#
+# all source are stored in SRCS-y
+#
+SRCS-$(CONFIG_RTE_LIBRTE_THUNDERX_NICVF_PMD) += nicvf_hw.c
+SRCS-$(CONFIG_RTE_LIBRTE_THUNDERX_NICVF_PMD) += nicvf_mbox.c
+SRCS-$(CONFIG_RTE_LIBRTE_THUNDERX_NICVF_PMD) += nicvf_ethdev.c
+
+
+# this lib depends upon:
+DEPDIRS-$(CONFIG_RTE_LIBRTE_THUNDERX_NICVF_PMD) += lib/librte_eal lib/librte_ether
+DEPDIRS-$(CONFIG_RTE_LIBRTE_THUNDERX_NICVF_PMD) += lib/librte_mempool lib/librte_mbuf
+DEPDIRS-$(CONFIG_RTE_LIBRTE_THUNDERX_NICVF_PMD) += lib/librte_net lib/librte_malloc
+
+include $(RTE_SDK)/mk/rte.lib.mk
