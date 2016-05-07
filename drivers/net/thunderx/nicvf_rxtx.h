@@ -33,6 +33,7 @@
 #ifndef __THUNDERX_NICVF_RXTX_H__
 #define __THUNDERX_NICVF_RXTX_H__
 
+#include <rte_byteorder.h>
 #include <rte_ethdev.h>
 
 #define NICVF_TX_OFFLOAD_MASK (PKT_TX_IP_CKSUM | PKT_TX_L4_MASK)
@@ -40,6 +41,20 @@
 #ifndef __hot
 #define __hot	__attribute__((hot))
 #endif
+
+static inline uint16_t __attribute__((const))
+nicvf_frag_num(uint16_t i)
+{
+#if RTE_BYTE_ORDER == RTE_BIG_ENDIAN
+	return (i & ~3) + 3 - (i & 3);
+#else
+	return i;
+#endif
+}
+
+uint16_t nicvf_recv_pkts(void *rxq, struct rte_mbuf **rx_pkts, uint16_t pkts);
+uint16_t nicvf_recv_pkts_multiseg(void *rx_queue, struct rte_mbuf **rx_pkts,
+				  uint16_t nb_pkts);
 
 uint16_t nicvf_xmit_pkts(void *txq, struct rte_mbuf **tx_pkts, uint16_t pkts);
 uint16_t nicvf_xmit_pkts_multiseg(void *txq, struct rte_mbuf **tx_pkts,

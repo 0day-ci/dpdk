@@ -71,5 +71,33 @@ nicvf_pmd_priv(struct rte_eth_dev *eth_dev)
 	return (struct nicvf *)eth_dev->data->dev_private;
 }
 
+static inline uint64_t
+nicvf_mempool_phy_offset(struct rte_mempool *mp)
+{
+	return (uint64_t)(mp->elt_va_start - mp->elt_pa[0]);
+}
+
+static inline uint16_t
+nicvf_mbuff_meta_length(struct rte_mbuf *mbuf)
+{
+	return (uint16_t)((uintptr_t)mbuf->buf_addr - (uintptr_t)mbuf);
+}
+
+/*
+ * Simple phy2virt functions assuming mbufs are in a single huge page
+ * V = P + offset
+ * P = V - offset
+ */
+static inline uintptr_t
+nicvf_mbuff_phy2virt(phys_addr_t phy, uint64_t mbuf_phys_off)
+{
+	return (uintptr_t)(phy + mbuf_phys_off);
+}
+
+static inline uintptr_t
+nicvf_mbuff_virt2phy(uintptr_t virt, uint64_t mbuf_phys_off)
+{
+	return (phys_addr_t)(virt - mbuf_phys_off);
+}
 
 #endif /* __THUNDERX_NICVF_ETHDEV_H__  */
