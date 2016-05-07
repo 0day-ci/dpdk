@@ -54,6 +54,7 @@ EAL
 Drivers
 ~~~~~~~
 
+* **Added new poll-mode driver for ThunderX nicvf inbuit NIC device.**
 
 Libraries
 ~~~~~~~~~

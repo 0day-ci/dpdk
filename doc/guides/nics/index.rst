@@ -49,6 +49,7 @@ Network Interface Controller Drivers
     mlx5
     nfp
     szedata2
+    thunderx
     virtio
     vhost
     vmxnet3
