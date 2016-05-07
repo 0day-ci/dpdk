@@ -332,6 +332,12 @@ M: Rasesh Mody <rasesh.mody@qlogic.com>
 F: drivers/net/bnx2x/
 F: doc/guides/nics/bnx2x.rst
 
+Thunderx nicvf
+M: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+M: Maciej Czekaj <maciej.czekaj@caviumnetworks.com>
+F: drivers/net/thunderx/
+F: doc/guides/nics/thunderx.rst
+
 RedHat virtio
 M: Huawei Xie <huawei.xie@intel.com>
 M: Yuanhan Liu <yuanhan.liu@linux.intel.com>
