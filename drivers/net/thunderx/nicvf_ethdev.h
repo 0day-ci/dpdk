@@ -60,6 +60,9 @@
 #define DEFAULT_TX_FREE_THRESH          224
 #define DEFAULT_TX_FREE_MPOOL_THRESH    16
 
+#define MAX_RX_FREE_THRESH              1024
+#define MAX_TX_FREE_THRESH              1024
+
 static inline struct nicvf*
 nicvf_pmd_priv(struct rte_eth_dev *eth_dev)
 {
