@@ -29,6 +29,11 @@
 #   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 #   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#### Linaro toolchain usages arm64 instread of aarch64 in kernel
+ifeq ($(ARCH), aarch64)
+ARCH = arm64
+endif
+
 ##### if sourced from kernel Kbuild system
 ifneq ($(KERNELRELEASE),)
 override EXTRA_CFLAGS = $(MODULE_CFLAGS) $(EXTRA_KERNEL_CFLAGS)
