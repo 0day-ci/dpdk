@@ -83,6 +83,8 @@ enum {
 	OPT_VMWARE_TSC_MAP_NUM,
 #define OPT_XEN_DOM0          "xen-dom0"
 	OPT_XEN_DOM0_NUM,
+#define OPT_HUGE_TRYBEST      "huge-trybest"
+	OPT_HUGE_TRYBEST_NUM,
 	OPT_LONG_MAX_NUM
 };
 

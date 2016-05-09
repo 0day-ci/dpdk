@@ -95,6 +95,7 @@ eal_long_options[] = {
 	{OPT_VFIO_INTR,         1, NULL, OPT_VFIO_INTR_NUM        },
 	{OPT_VMWARE_TSC_MAP,    0, NULL, OPT_VMWARE_TSC_MAP_NUM   },
 	{OPT_XEN_DOM0,          0, NULL, OPT_XEN_DOM0_NUM         },
+	{OPT_HUGE_TRYBEST,      0, NULL, OPT_HUGE_TRYBEST_NUM     },
 	{0,                     0, NULL, 0                        }
 };
 
@@ -898,6 +899,9 @@ eal_parse_common_option(int opt, const char *optarg,
 				OPT_LCORES "\n");
 			return -1;
 		}
+		break;
+	case OPT_HUGE_TRYBEST_NUM:
+		internal_config.huge_trybest = 1;
 		break;
 
 	/* don't know what to do, leave this to caller */
