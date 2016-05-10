@@ -191,7 +191,7 @@ extern unsigned int enic_cleanup_wq(struct enic *enic, struct vnic_wq *wq);
 extern void enic_send_pkt(struct enic *enic, struct vnic_wq *wq,
 			  struct rte_mbuf *tx_pkt, unsigned short len,
 			  uint8_t sop, uint8_t eop, uint8_t cq_entry,
-			  uint16_t ol_flags, uint16_t vlan_tag);
+			  uint64_t ol_flags, uint16_t vlan_tag);
 
 extern void enic_post_wq_index(struct vnic_wq *wq);
 extern int enic_probe(struct enic *enic);

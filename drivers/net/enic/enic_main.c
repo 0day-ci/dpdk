@@ -180,7 +180,7 @@ void enic_post_wq_index(struct vnic_wq *wq)
 void enic_send_pkt(struct enic *enic, struct vnic_wq *wq,
 		   struct rte_mbuf *tx_pkt, unsigned short len,
 		   uint8_t sop, uint8_t eop, uint8_t cq_entry,
-		   uint16_t ol_flags, uint16_t vlan_tag)
+		   uint64_t ol_flags, uint16_t vlan_tag)
 {
 	struct wq_enet_desc *desc = vnic_wq_next_desc(wq);
 	uint16_t mss = 0;
