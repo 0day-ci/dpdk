@@ -749,7 +749,6 @@ rte_sched_port_free(struct rte_sched_port *port)
 			rte_pktmbuf_free(mbufs[i]);
 	}
 
-	rte_bitmap_free(port->bmp);
 	rte_free(port);
 }
 
