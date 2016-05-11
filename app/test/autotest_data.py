@@ -109,7 +109,7 @@ parallel_test_group_list = [
 },
 {
 	"Prefix":	"group_2",
-	"Memory" :	"128",
+	"Memory" :	"16",
 	"Tests" :
 	[
 		{
@@ -164,7 +164,7 @@ parallel_test_group_list = [
 },
 {
 	"Prefix":	"group_3",
-	"Memory" :	per_sockets(1024),
+	"Memory" :	per_sockets(390),
 	"Tests" :
 	[
 		{
@@ -287,7 +287,7 @@ parallel_test_group_list = [
 },
 {
 	"Prefix":	"group_6",
-	"Memory" :	per_sockets(620),
+	"Memory" :	per_sockets(128),
 	"Tests" :
 	[
 		{
@@ -324,7 +324,7 @@ parallel_test_group_list = [
 },
 {
 	"Prefix" :	"group_7",
-	"Memory" :	"400",
+	"Memory" :	"64",
 	"Tests" :
 	[
 		{
@@ -412,7 +412,7 @@ non_parallel_test_group_list = [
 },
 {
 	"Prefix" :      "power",
-	"Memory" :      per_sockets(512),
+	"Memory" :      "16",
 	"Tests" :
 	[
 		{
@@ -425,7 +425,7 @@ non_parallel_test_group_list = [
 },
 {
 	"Prefix" :      "power_acpi_cpufreq",
-	"Memory" :      per_sockets(512),
+	"Memory" :      "16",
 	"Tests" :
 	[
 		{
@@ -438,7 +438,7 @@ non_parallel_test_group_list = [
 },
 {
 	"Prefix" :      "power_kvm_vm",
-	"Memory" :      "512",
+	"Memory" :      "16",
 	"Tests" :
 	[
 		{
