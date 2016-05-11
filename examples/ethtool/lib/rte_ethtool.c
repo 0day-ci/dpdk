@@ -91,7 +91,7 @@ rte_ethtool_get_regs_len(uint8_t port_id)
 
 	count_regs = rte_eth_dev_get_reg_length(port_id);
 	if (count_regs > 0)
-		return count_regs * sizeof(uint32_t);
+		return count_regs * sizeof(uint64_t);
 	return count_regs;
 }
 
