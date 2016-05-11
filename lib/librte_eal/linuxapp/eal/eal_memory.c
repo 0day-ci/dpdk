@@ -1051,7 +1051,7 @@ int
 rte_eal_hugepage_init(void)
 {
 	struct rte_mem_config *mcfg;
-	struct hugepage_file *hugepage, *tmp_hp = NULL;
+	struct hugepage_file *hugepage = NULL, *tmp_hp = NULL;
 	struct hugepage_info used_hp[MAX_HUGEPAGE_SIZES];
 
 	uint64_t memory[RTE_MAX_NUMA_NODES];
@@ -1374,6 +1374,8 @@ rte_eal_hugepage_init(void)
 
 fail:
 	free(tmp_hp);
+	if (hugepage != NULL)
+		munmap(hugepage, nr_hugefiles * sizeof(struct hugepage_file));
 	return -1;
 }
 
