@@ -658,8 +658,6 @@ eal_parse_args(int argc, char **argv)
 		goto out;
 	}
 
-	if (optind >= 0)
-		argv[optind-1] = prgname;
 	ret = optind-1;
 
 out:
