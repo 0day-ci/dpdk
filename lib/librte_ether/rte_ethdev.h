@@ -1675,6 +1675,7 @@ struct rte_eth_dev_data {
 	enum rte_kernel_driver kdrv;    /**< Kernel driver passthrough */
 	int numa_node;  /**< NUMA node connection */
 	const char *drv_name;   /**< Driver name */
+	uint64_t dma_mask; /** device supported address space range */
 };
 
 /** Device supports hotplug detach */

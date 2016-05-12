@@ -280,9 +280,16 @@ rte_eth_dev_init(struct rte_pci_driver *pci_drv,
 
 	/* Invoke PMD device initialization function */
 	diag = (*eth_drv->eth_dev_init)(eth_dev);
+	if (diag)
+		goto err;
+
+	if (eth_dev->data->dma_mask)
+		diag = rte_eal_hugepage_check_address_mask(eth_dev->data->dma_mask);
+
 	if (diag == 0)
 		return 0;
 
+err:
 	RTE_PMD_DEBUG_TRACE("driver %s: eth_dev_init(vendor_id=0x%u device_id=0x%x) failed\n",
 			pci_drv->name,
 			(unsigned) pci_dev->id.vendor_id,
