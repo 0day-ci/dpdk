@@ -1037,6 +1037,33 @@ calc_num_pages_per_socket(uint64_t * memory,
 }
 
 /*
+ * Some devices have addressing limitations. A PMD will indirectly call this
+ * function raising an error if any hugepage is out of address range supported.
+ * As hugepages are ordered by physical address, there is nothing to do as
+ * any other hugepage available will be out of range as well.
+ */
+int
+rte_eal_hugepage_check_address_mask(uint64_t dma_mask)
+{
+	const struct rte_mem_config *mcfg = rte_eal_get_configuration()->mem_config;
+	phys_addr_t physaddr;
+	int i =0;
+
+	while (i < RTE_MAX_MEMSEG && mcfg->memseg[i].len > 0) {
+		physaddr = mcfg->memseg[i].phys_addr + mcfg->memseg[i].len;
+		RTE_LOG(DEBUG, EAL, "Checking page with address %"PRIx64" and device"
+				" mask 0x%"PRIx64"\n", physaddr, dma_mask);
+		if (physaddr & ~dma_mask) {
+			RTE_LOG(ERR, EAL, "Allocated hugepages are out of device address"
+					" range.");
+			return -1;
+		}
+		i++;
+	}
+	return 0;
+}
+
+/*
  * Prepare physical memory mapping: fill configuration structure with
  * these infos, return 0 on success.
  *  1. map N huge pages in separate files in hugetlbfs

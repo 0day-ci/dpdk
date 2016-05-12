@@ -256,6 +256,12 @@ rte_mem_phy2mch(uint32_t memseg_id __rte_unused, const phys_addr_t phy_addr)
 }
 #endif
 
+/**
+ * Check hugepages are within the supported
+ * device address space range.
+ */
+int rte_eal_hugepage_check_address_mask(uint64_t dma_mask);
+
 #ifdef __cplusplus
 }
 #endif
