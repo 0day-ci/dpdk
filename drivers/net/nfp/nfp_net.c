@@ -115,6 +115,14 @@ enum nfp_qcp_ptr {
 	NFP_QCP_WRITE_PTR
 };
 
+#ifndef DMA_64BIT_MASK
+#define DMA_64BIT_MASK  0xffffffffffffffffULL
+#endif
+
+#ifndef DMA_BIT_MASK
+#define DMA_BIT_MASK(n) (((n) == 64) ? DMA_64BIT_MASK : ((1ULL<<(n))-1))
+#endif
+
 /*
  * nfp_qcp_ptr_add - Add the value to the selected pointer of a queue
  * @q: Base address for queue structure
@@ -2440,6 +2448,9 @@ nfp_net_init(struct rte_eth_dev *eth_dev)
 
 	/* Recording current stats counters values */
 	nfp_net_stats_reset(eth_dev);
+
+	/* Setting dma_mask */
+	eth_dev->data->dma_mask = DMA_BIT_MASK(40);
 
 	return 0;
 }
