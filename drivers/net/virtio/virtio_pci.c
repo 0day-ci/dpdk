@@ -55,18 +55,62 @@
  */
 #define VIRTIO_PCI_CONFIG(hw) (((hw)->use_msix) ? 24 : 20)
 
+/*
+ * Since we are in legacy mode:
+ * http://ozlabs.org/~rusty/virtio-spec/virtio-0.9.5.pdf
+ *
+ * "Note that this is possible because while the virtio header is PCI (i.e.
+ * little) endian, the device-specific region is encoded in the native endian of
+ * the guest (where such distinction is applicable)."
+ *
+ * For powerpc which supports both, qemu supposes that cpu is big endian and
+ * enforces this for the virtio-net stuff.
+ */
+
 static void
 legacy_read_dev_config(struct virtio_hw *hw, size_t offset,
 		       void *dst, int length)
 {
 	rte_eal_pci_ioport_read(&hw->io, dst, length,
 				VIRTIO_PCI_CONFIG(hw) + offset);
+#ifdef RTE_ARCH_PPC_64
+	switch (length) {
+	case 4:
+		*(uint32_t *)dst = rte_be_to_cpu_32(*(uint32_t *)dst);
+		break;
+	case 2:
+		*(uint16_t *)dst = rte_be_to_cpu_16(*(uint16_t *)dst);
+		break;
+	default:
+		break;
+	}
+#endif
 }
 
 static void
 legacy_write_dev_config(struct virtio_hw *hw, size_t offset,
 			const void *src, int length)
 {
+#ifdef RTE_ARCH_PPC_64
+	union {
+		uint32_t u32;
+		uint16_t u16;
+	} tmp;
+	switch (length) {
+	case 4:
+		tmp.u32 = *(const uint32_t *)src;
+		tmp.u32 = rte_cpu_to_be_32(tmp.u32);
+		src = &tmp.u32;
+		break;
+	case 2:
+		tmp.u16 = *(const uint16_t *)src;
+		tmp.u16 = rte_cpu_to_be_16(tmp.u16);
+		src = &tmp.u16;
+		break;
+	default:
+		break;
+	}
+#endif
 	rte_eal_pci_ioport_write(&hw->io, src, length,
 				 VIRTIO_PCI_CONFIG(hw) + offset);
 }
