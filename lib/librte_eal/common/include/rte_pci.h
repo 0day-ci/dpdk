@@ -105,7 +105,8 @@ extern struct pci_device_list pci_device_list; /**< Global list of PCI devices. 
 /** Nb. of values in PCI resource format. */
 #define PCI_RESOURCE_FMT_NVAL 3
 
-/** IO resource type: memory address space */
+/** IO resource type: */
+#define IORESOURCE_IO         0x00000100
 #define IORESOURCE_MEM        0x00000200
 
 /**
@@ -518,6 +519,7 @@ int rte_eal_pci_write_config(const struct rte_pci_device *device,
 struct rte_pci_ioport {
 	struct rte_pci_device *dev;
 	uint64_t base;
+	uint64_t len; /* only filled for memory mapped ports */
 };
 
 /**
