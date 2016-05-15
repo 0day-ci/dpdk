@@ -1468,9 +1468,11 @@ static inline void rte_pktmbuf_attach(struct rte_mbuf *mi, struct rte_mbuf *m)
  */
 static inline void rte_pktmbuf_detach(struct rte_mbuf *m)
 {
+	struct rte_mbuf *md = rte_mbuf_from_indirect(m);
 	struct rte_mempool *mp = m->pool;
 	uint32_t mbuf_size, buf_len, priv_size;
 
+	rte_mbuf_refcnt_update(md, -1);
 	priv_size = rte_pktmbuf_priv_size(mp);
 	mbuf_size = sizeof(struct rte_mbuf) + priv_size;
 	buf_len = rte_pktmbuf_data_room_size(mp);
@@ -1498,7 +1500,7 @@ __rte_pktmbuf_prefree_seg(struct rte_mbuf *m)
 		if (RTE_MBUF_INDIRECT(m)) {
 			struct rte_mbuf *md = rte_mbuf_from_indirect(m);
 			rte_pktmbuf_detach(m);
-			if (rte_mbuf_refcnt_update(md, -1) == 0)
+			if (rte_mbuf_refcnt_read(md) == 0)
 				__rte_mbuf_raw_free(md);
 		}
 		return m;
