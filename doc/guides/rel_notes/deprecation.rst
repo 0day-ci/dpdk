@@ -78,3 +78,7 @@ Deprecation Notices
 * ABI will change for rte_port_source_params struct. The member file_name
   data type will be changed from char * to const char *. This change targets
   release 16.11.
+
+* ABI will change for rte_port_sink_params struct. The member file_name
+  data type will be changed from char * to const char *. This change targets
+  release 16.11.
