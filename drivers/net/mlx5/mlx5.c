@@ -672,4 +672,4 @@ static struct rte_driver rte_mlx5_driver = {
 	.init = rte_mlx5_pmd_init,
 };
 
-PMD_REGISTER_DRIVER(rte_mlx5_driver)
+PMD_REGISTER_DRIVER_PDEV(rte_mlx5_driveri, mlx5_pci_id_map, mlx5)

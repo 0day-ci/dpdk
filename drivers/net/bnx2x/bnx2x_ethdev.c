@@ -550,5 +550,5 @@ static struct rte_driver rte_bnx2xvf_driver = {
 	.init = rte_bnx2xvf_pmd_init,
 };
 
-PMD_REGISTER_DRIVER(rte_bnx2x_driver);
-PMD_REGISTER_DRIVER(rte_bnx2xvf_driver);
+PMD_REGISTER_DRIVER_PDEV(rte_bnx2x_driver, pci_id_bnx2x_map, bnx2x);
+PMD_REGISTER_DRIVER_PDEV(rte_bnx2xvf_driver, pci_id_bnx2xvf_map, bnx2xvf);

@@ -1090,4 +1090,4 @@ static struct rte_driver pmd_pcap_drv = {
 	.uninit = rte_pmd_pcap_devuninit,
 };
 
-PMD_REGISTER_DRIVER(pmd_pcap_drv);
+PMD_REGISTER_DRIVER_VDEV(pmd_pcap_drv, pcap);

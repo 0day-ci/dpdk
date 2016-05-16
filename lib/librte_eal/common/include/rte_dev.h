@@ -48,7 +48,7 @@ extern "C" {
 
 #include <stdio.h>
 #include <sys/queue.h>
-
+#include <rte_pci.h>
 #include <rte_log.h>
 
 __attribute__((format(printf, 2, 0)))
@@ -178,12 +178,27 @@ int rte_eal_vdev_init(const char *name, const char *args);
  */
 int rte_eal_vdev_uninit(const char *name);
 
+#define DRIVER_EXPORT_NAME_ARRAY(n, idx) n##idx[] __attribute__((used))
+
+#define DRIVER_EXPORT_PDEV(d, n, idx) static const char DRIVER_EXPORT_NAME_ARRAY(this_pmd_driver, idx) = RTE_STR(d);\
+static const char DRIVER_EXPORT_NAME_ARRAY(this_pmd_name, idx) = RTE_STR(n)
+
+#define DRIVER_EXPORT_VDEV(d, idx) static const char DRIVER_EXPORT_NAME_ARRAY(this_pmd_name, idx) = RTE_STR(d)
+
 #define PMD_REGISTER_DRIVER(d)\
 void devinitfn_ ##d(void);\
 void __attribute__((constructor, used)) devinitfn_ ##d(void)\
 {\
-	rte_eal_driver_register(&d);\
-}
+        rte_eal_driver_register(&d);\
+}\
+
+#define PMD_REGISTER_DRIVER_PDEV(d, t, n)\
+PMD_REGISTER_DRIVER(d) \
+DRIVER_EXPORT_PDEV(t, n, __COUNTER__)
+
+#define PMD_REGISTER_DRIVER_VDEV(d, n)\
+PMD_REGISTER_DRIVER(d) \
+DRIVER_EXPORT_VDEV(n, __COUNTER__)
 
 #ifdef __cplusplus
 }

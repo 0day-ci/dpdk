@@ -1563,7 +1563,7 @@ static struct rte_driver rte_i40evf_driver = {
 	.init = rte_i40evf_pmd_init,
 };
 
-PMD_REGISTER_DRIVER(rte_i40evf_driver);
+PMD_REGISTER_DRIVER_PDEV(rte_i40evf_driver, pci_id_i40evf_map, i40evf);
 
 static int
 i40evf_dev_configure(struct rte_eth_dev *dev)

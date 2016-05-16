@@ -275,4 +275,4 @@ static struct rte_driver cryptodev_null_pmd_drv = {
 	.uninit = cryptodev_null_uninit
 };
 
-PMD_REGISTER_DRIVER(cryptodev_null_pmd_drv);
+PMD_REGISTER_DRIVER_VDEV(cryptodev_null_pmd_drv, cryptodev_null_pmd);

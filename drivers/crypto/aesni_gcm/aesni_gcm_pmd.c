@@ -521,4 +521,4 @@ static struct rte_driver aesni_gcm_pmd_drv = {
 	.uninit = aesni_gcm_uninit
 };
 
-PMD_REGISTER_DRIVER(aesni_gcm_pmd_drv);
+PMD_REGISTER_DRIVER_VDEV(aesni_gcm_pmd_drv, aesni_gcm);

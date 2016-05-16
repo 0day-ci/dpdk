@@ -878,4 +878,4 @@ static struct rte_driver pmd_af_packet_drv = {
 	.uninit = rte_pmd_af_packet_devuninit,
 };
 
-PMD_REGISTER_DRIVER(pmd_af_packet_drv);
+PMD_REGISTER_DRIVER_VDEV(pmd_af_packet_drv, eth_af_packet);

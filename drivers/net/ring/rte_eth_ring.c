@@ -630,4 +630,4 @@ static struct rte_driver pmd_ring_drv = {
 	.uninit = rte_pmd_ring_devuninit,
 };
 
-PMD_REGISTER_DRIVER(pmd_ring_drv);
+PMD_REGISTER_DRIVER_VDEV(pmd_ring_drv, eth_ring);

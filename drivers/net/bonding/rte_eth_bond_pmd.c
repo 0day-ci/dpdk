@@ -2511,4 +2511,4 @@ static struct rte_driver bond_drv = {
 	.uninit = bond_uninit,
 };
 
-PMD_REGISTER_DRIVER(bond_drv);
+PMD_REGISTER_DRIVER_VDEV(bond_drv, bonding);

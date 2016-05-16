@@ -1777,4 +1777,4 @@ struct rte_driver em_pmd_drv = {
 	.init = rte_em_pmd_init,
 };
 
-PMD_REGISTER_DRIVER(em_pmd_drv);
+PMD_REGISTER_DRIVER_PDEV(em_pmd_drv, pci_id_em_map, em);

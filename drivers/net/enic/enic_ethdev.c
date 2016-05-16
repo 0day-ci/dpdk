@@ -684,4 +684,4 @@ static struct rte_driver rte_enic_driver = {
 	.init = rte_enic_pmd_init,
 };
 
-PMD_REGISTER_DRIVER(rte_enic_driver);
+PMD_REGISTER_DRIVER_PDEV(rte_enic_driver, pci_id_enic_map, enic);

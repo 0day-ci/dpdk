@@ -548,4 +548,4 @@ static struct rte_driver cryptodev_snow3g_pmd_drv = {
 	.uninit = cryptodev_snow3g_uninit
 };
 
-PMD_REGISTER_DRIVER(cryptodev_snow3g_pmd_drv);
+PMD_REGISTER_DRIVER_VDEV(cryptodev_snow3g_pmd_drv, snow3g);

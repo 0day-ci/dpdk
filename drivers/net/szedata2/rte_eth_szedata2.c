@@ -1601,4 +1601,4 @@ static struct rte_driver rte_szedata2_driver = {
 	.uninit = rte_szedata2_uninit,
 };
 
-PMD_REGISTER_DRIVER(rte_szedata2_driver);
+PMD_REGISTER_DRIVER_PDEV(rte_szedata2_driver, rte_szedata2_pci_id_table ,rte_szedata2_pmd);

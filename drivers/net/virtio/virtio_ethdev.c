@@ -1459,4 +1459,4 @@ static struct rte_driver rte_virtio_driver = {
 	.init = rte_virtio_pmd_init,
 };
 
-PMD_REGISTER_DRIVER(rte_virtio_driver);
+PMD_REGISTER_DRIVER_PDEV(rte_virtio_driver, pci_id_virtio_map, virtio_net);

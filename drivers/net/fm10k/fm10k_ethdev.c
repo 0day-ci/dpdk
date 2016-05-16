@@ -3055,4 +3055,4 @@ static struct rte_driver rte_fm10k_driver = {
 	.init = rte_pmd_fm10k_init,
 };
 
-PMD_REGISTER_DRIVER(rte_fm10k_driver);
+PMD_REGISTER_DRIVER_PDEV(rte_fm10k_driver, pci_id_fm10k_map, fm10k);

@@ -1450,4 +1450,4 @@ struct rte_driver ena_pmd_drv = {
 	.init = rte_ena_pmd_init,
 };
 
-PMD_REGISTER_DRIVER(ena_pmd_drv);
+PMD_REGISTER_DRIVER_PDEV(ena_pmd_drv, pci_id_ena_map, ena);

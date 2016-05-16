@@ -689,4 +689,4 @@ static struct rte_driver pmd_null_drv = {
 	.uninit = rte_pmd_null_devuninit,
 };
 
-PMD_REGISTER_DRIVER(pmd_null_drv);
+PMD_REGISTER_DRIVER_VDEV(pmd_null_drv, eth_null);

@@ -4973,5 +4973,5 @@ eth_igb_configure_msix_intr(struct rte_eth_dev *dev)
 	E1000_WRITE_FLUSH(hw);
 }
 
-PMD_REGISTER_DRIVER(pmd_igb_drv);
-PMD_REGISTER_DRIVER(pmd_igbvf_drv);
+PMD_REGISTER_DRIVER_PDEV(pmd_igb_drv, pci_id_igb_map, igb);
+PMD_REGISTER_DRIVER_PDEV(pmd_igbvf_drv, pci_id_igbvf_map, igbvf);
