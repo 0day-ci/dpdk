@@ -638,6 +638,76 @@ exit_unlock:
 	return NULL;
 }
 
+#ifndef RTE_LIBRTE_XEN_DOM0
+/* stub if DOM0 support not configured */
+int
+rte_dom0_mempool_free(struct rte_mempool *mp __rte_unused)
+{
+	rte_errno = EINVAL;
+	return -1;
+}
+#endif
+
+int
+rte_mempool_free(struct rte_mempool *mp)
+{
+	if (rte_xen_dom0_supported())
+		return rte_dom0_mempool_free(mp);
+	else
+		return rte_mempool_xmem_free(mp);
+}
+
+
+/* Free the memory pool */
+int
+rte_mempool_xmem_free(struct rte_mempool *mp)
+{
+	char mz_name[RTE_MEMZONE_NAMESIZE];
+	struct rte_mempool_list *mempool_list;
+	struct rte_tailq_entry *te = NULL;
+	const struct rte_memzone *mz;
+	unsigned count;
+
+	if (!mp) {
+		return 0;
+	}
+
+	count = rte_mempool_free_count(mp);
+	if (count != 0) {
+		/* All elements must be returned to the pool before free */
+		return count;
+	}
+
+	rte_rwlock_write_lock(RTE_EAL_MEMPOOL_RWLOCK);
+
+	/* Free the ring associated with this mempool */
+	if (mp->ring) {
+		rte_ring_free(mp->ring);
+	}
+
+	/* Remove the entry from the mempool list and free it. */
+	rte_rwlock_write_lock(RTE_EAL_TAILQ_RWLOCK);
+	mempool_list = RTE_TAILQ_CAST(rte_mempool_tailq.head, rte_mempool_list);
+	TAILQ_FOREACH(te, mempool_list, next) {
+		if ((struct rte_mempool *)te->data == mp) {
+			TAILQ_REMOVE(mempool_list, te, next);
+			rte_free(te);
+			break;
+		}
+	}
+	rte_rwlock_write_unlock(RTE_EAL_TAILQ_RWLOCK);
+
+	snprintf(mz_name, sizeof(mz_name), RTE_MEMPOOL_MZ_FORMAT, mp->name);
+	mz = rte_memzone_lookup(mz_name);
+	if (mz) {
+		rte_memzone_free(mz);
+	}
+
+	rte_rwlock_write_unlock(RTE_EAL_MEMPOOL_RWLOCK);
+
+	return 0;
+}
+
 /* Return the number of entries in the mempool */
 unsigned
 rte_mempool_count(const struct rte_mempool *mp)

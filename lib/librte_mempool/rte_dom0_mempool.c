@@ -131,3 +131,25 @@ rte_dom0_mempool_create(const char *name, unsigned elt_num, unsigned elt_size,
 
 	return mp;
 }
+
+/* free the mempool supporting Dom0 */
+int
+rte_dom0_mempool_free(struct rte_mempool *mp)
+{
+	const struct rte_memzone *mz;
+	char mz_name[RTE_MEMZONE_NAMESIZE];
+	int rc;
+
+	rc = rte_mempool_xmem_free(mp);
+	if (rc) {
+		return rc;
+	}
+
+	snprintf(mz_name, sizeof(mz_name), RTE_MEMPOOL_OBJ_NAME, mp->name);
+	mz = rte_memzone_lookup(mz_name);
+	if (mz) {
+		rte_memzone_free(mz);
+	}
+
+	return 0;
+}

@@ -728,6 +728,47 @@ rte_dom0_mempool_create(const char *name, unsigned n, unsigned elt_size,
 		rte_mempool_obj_ctor_t *obj_init, void *obj_init_arg,
 		int socket_id, unsigned flags);
 
+/**
+ * Free the memory pool created by rte_mempool_create
+ *
+ * All elements must be placed back in the pool prior to calling this function.
+ *
+ * @param mp
+ *   A pointer to the mempool structure.
+ * @return
+ *   0 on success. -1 on error  with rte_errno set appropriately.
+ *     Possible rte_errno values include:
+ *    - EINVAL - Invalid input value.
+ */
+int rte_mempool_free(struct rte_mempool *mp);
+
+/**
+ * Free the memory pool created by rte_mempool_xmem_create.
+ *
+ * All elements must be placed back in the pool prior to calling this function.
+ *
+ * @param mp
+ *   A pointer to the mempool structure.
+ * @return
+ *   0 on success. -1 on error  with rte_errno set appropriately.
+ *     Possible rte_errno values include:
+ *    - EINVAL - Invalid input value.
+ */
+int rte_mempool_xmem_free(struct rte_mempool *mp);
+
+/**
+ * Free the memory pool created by rte_dom0_mempool_create.
+ *
+ * All elements must be placed back in the pool prior to calling this function.
+ *
+ * @param mp
+ *   A pointer to the mempool structure.
+ * @return
+ *   0 on success. -1 on error  with rte_errno set appropriately.
+ *     Possible rte_errno values include:
+ *    - EINVAL - Invalid input value.
+ */
+int rte_dom0_mempool_free(struct rte_mempool *mp);
 
 /**
  * Dump the status of the mempool to the console.
