@@ -944,11 +944,6 @@ rte_eth_dev_configure(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 	 */
 	(*dev->dev_ops->dev_infos_get)(dev, &dev_info);
 
-	if (nb_rx_q == 0 && nb_tx_q == 0) {
-		RTE_PMD_DEBUG_TRACE("ethdev port_id=%d both rx and tx queue cannot be 0\n", port_id);
-		return -EINVAL;
-	}
-
 	if (nb_rx_q > dev_info.max_rx_queues) {
 		RTE_PMD_DEBUG_TRACE("ethdev port_id=%d nb_rx_queues=%d > %d\n",
 				port_id, nb_rx_q, dev_info.max_rx_queues);
