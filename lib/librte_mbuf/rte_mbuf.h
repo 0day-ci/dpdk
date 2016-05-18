@@ -733,10 +733,8 @@ struct rte_mbuf {
 	void *buf_addr;           /**< Virtual address of segment buffer. */
 	phys_addr_t buf_physaddr; /**< Physical address of segment buffer. */
 
-	uint16_t buf_len;         /**< Length of segment buffer. */
-
 	/* next 6 bytes are initialised on RX descriptor rearm */
-	MARKER8 rearm_data;
+	MARKER64 rearm_data;
 	uint16_t data_off;
 
 	/**
@@ -753,6 +751,7 @@ struct rte_mbuf {
 	};
 	uint8_t nb_segs;          /**< Number of segments. */
 	uint8_t port;             /**< Input port. */
+	uint16_t pad;             /**< 2B pad for naturally aligned ol_flags */
 
 	uint64_t ol_flags;        /**< Offload features. */
 
@@ -806,6 +805,7 @@ struct rte_mbuf {
 
 	uint16_t vlan_tci_outer;  /**< Outer VLAN Tag Control Identifier (CPU order) */
 
+	uint16_t buf_len;         /**< Length of segment buffer. */
 	/* second cache line - fields only used in slow path or on TX */
 	MARKER cacheline1 __rte_cache_min_aligned;
 
