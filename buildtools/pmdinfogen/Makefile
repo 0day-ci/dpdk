@@ -29,17 +29,20 @@
 #   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 #   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#
-# Head Makefile for compiling rte SDK
-#
-
-RTE_SDK := $(CURDIR)
-export RTE_SDK
+include $(RTE_SDK)/mk/rte.vars.mk
 
 #
-# directory list
+# library name
 #
+APP = pmdinfogen
 
-ROOTDIRS-y := buildtools lib drivers app
+#
+# all sources are stored in SRCS-y
+#
+SRCS-y += pmdinfogen.c
 
-include $(RTE_SDK)/mk/rte.sdkroot.mk
+#CFLAGS += $(WERROR_FLAGS) -g
+CFLAGS += -g
+
+include $(RTE_SDK)/mk/rte.buildtools.mk
+
