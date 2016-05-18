@@ -80,7 +80,8 @@ C_TO_O_STR = $(subst ','\'',$(C_TO_O)) #'# fix syntax highlight
 C_TO_O_DISP = $(if $(V),"$(C_TO_O_STR)","  HOSTCC $(@)")
 else
 C_TO_O = $(CC) -Wp,-MD,$(call obj2dep,$(@)).tmp $(CFLAGS) \
-	$(CFLAGS_$(@)) $(EXTRA_CFLAGS) -o $@ -c $<
+	 $(CFLAGS_$(@)) $(EXTRA_CFLAGS) -o $@ -c $<
+
 C_TO_O_STR = $(subst ','\'',$(C_TO_O)) #'# fix syntax highlight
 C_TO_O_DISP = $(if $(V),"$(C_TO_O_STR)","  CC $(@)")
 endif
@@ -88,9 +89,25 @@ C_TO_O_CMD = 'cmd_$@ = $(C_TO_O_STR)'
 C_TO_O_DO = @set -e; \
 	echo $(C_TO_O_DISP); \
 	$(C_TO_O) && \
+	sh -c "grep -q \"PMD_REGISTER_DRIVER(.*)\" $<; \
+	if [ \$$? -eq 0 ]; \
+	then \
+		echo MODGEN $@; \
+		OBJF=`readlink -f $@`; \
+		${RTE_OUTPUT}/buildtools/pmdinfogen \$$OBJF \$$OBJF.mod.c; \
+		if [ \$$? -eq 0 ]; \
+		then \
+			echo MODBUILD $@; \
+			$(CC) -c -o \$$OBJF.mod.o \$$OBJF.mod.c; \
+			$(CROSS)ld -r -o \$$OBJF.o \$$OBJF.mod.o \$$OBJF; \
+			mv -f \$$OBJF.o \$$OBJF; \
+		fi; \
+	fi; \
+	true" && \
 	echo $(C_TO_O_CMD) > $(call obj2cmd,$(@)) && \
 	sed 's,'$@':,dep_'$@' =,' $(call obj2dep,$(@)).tmp > $(call obj2dep,$(@)) && \
 	rm -f $(call obj2dep,$(@)).tmp
+
 
 # return an empty string if string are equal
 compare = $(strip $(subst $(1),,$(2)) $(subst $(2),,$(1)))
