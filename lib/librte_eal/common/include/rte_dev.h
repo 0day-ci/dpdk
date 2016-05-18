@@ -48,7 +48,7 @@ extern "C" {
 
 #include <stdio.h>
 #include <sys/queue.h>
-
+#include <rte_pci.h>
 #include <rte_log.h>
 
 __attribute__((format(printf, 2, 0)))
@@ -178,12 +178,24 @@ int rte_eal_vdev_init(const char *name, const char *args);
  */
 int rte_eal_vdev_uninit(const char *name);
 
-#define PMD_REGISTER_DRIVER(d)\
+#define DRIVER_EXPORT_NAME_ARRAY(n, idx) n##idx[] __attribute__((used))
+
+#define DRIVER_EXPORT_NAME(d, idx) \
+static const char DRIVER_EXPORT_NAME_ARRAY(this_pmd_name, idx) = RTE_STR(d);\
+ 
+#define PMD_REGISTER_DRIVER(d, n)\
 void devinitfn_ ##d(void);\
 void __attribute__((constructor, used)) devinitfn_ ##d(void)\
 {\
-	rte_eal_driver_register(&d);\
-}
+        rte_eal_driver_register(&d);\
+}\
+DRIVER_EXPORT_NAME(n, __COUNTER__)
+
+#define DRIVER_REGISTER_PCI_TABLE(n, t) \
+static const char n##_pci_tbl_export[] __attribute__((used)) = RTE_STR(t)
+
+#define DRIVER_REGISTER_PARAM_STRING(n, s) \
+static const char n##_param_string_export[] __attribute__((used)) = s
 
 #ifdef __cplusplus
 }
