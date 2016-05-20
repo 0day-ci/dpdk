@@ -147,10 +147,10 @@ copy_mbuf_to_desc(struct virtio_net *dev, struct vhost_virtqueue *vq,
 	struct virtio_net_hdr_mrg_rxbuf virtio_hdr = {{0, 0, 0, 0, 0, 0}, 0};
 
 	desc = &vq->desc[desc_idx];
-	if (unlikely(desc->len < vq->vhost_hlen))
+	desc_addr = gpa_to_vva(dev, desc->addr);
+	if (unlikely(desc->len < vq->vhost_hlen || !desc_addr))
 		return -1;
 
-	desc_addr = gpa_to_vva(dev, desc->addr);
 	rte_prefetch0((void *)(uintptr_t)desc_addr);
 
 	virtio_enqueue_offload(m, &virtio_hdr.hdr);
@@ -184,6 +184,9 @@ copy_mbuf_to_desc(struct virtio_net *dev, struct vhost_virtqueue *vq,
 
 			desc = &vq->desc[desc->next];
 			desc_addr   = gpa_to_vva(dev, desc->addr);
+			if (unlikely(!desc_addr))
+				return -1;
+
 			desc_offset = 0;
 			desc_avail  = desc->len;
 		}
@@ -344,7 +347,8 @@ fill_vec_buf(struct vhost_virtqueue *vq, uint32_t avail_idx,
 	uint32_t len    = *allocated;
 
 	while (1) {
-		if (unlikely(vec_id >= BUF_VECTOR_MAX || idx >= vq->size))
+		if (unlikely(vec_id >= BUF_VECTOR_MAX || idx >= vq->size
+			|| !vq->desc[idx].addr))
 			return -1;
 
 		len += vq->desc[idx].len;
@@ -747,10 +751,10 @@ copy_desc_to_mbuf(struct virtio_net *dev, struct vhost_virtqueue *vq,
 	uint32_t nr_desc = 1;
 
 	desc = &vq->desc[desc_idx];
-	if (unlikely(desc->len < vq->vhost_hlen))
+	desc_addr = gpa_to_vva(dev, desc->addr);
+	if (unlikely(desc->len < vq->vhost_hlen || !desc_addr))
 		return -1;
 
-	desc_addr = gpa_to_vva(dev, desc->addr);
 	rte_prefetch0((void *)(uintptr_t)desc_addr);
 
 	/* Retrieve virtio net header */
@@ -769,6 +773,9 @@ copy_desc_to_mbuf(struct virtio_net *dev, struct vhost_virtqueue *vq,
 			desc = &vq->desc[desc->next];
 
 			desc_addr = gpa_to_vva(dev, desc->addr);
+			if (unlikely(!desc_addr))
+				return -1;
+
 			rte_prefetch0((void *)(uintptr_t)desc_addr);
 
 			desc_offset = 0;
