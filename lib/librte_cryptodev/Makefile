@@ -53,6 +53,7 @@ SYMLINK-y-include += rte_cryptodev_pmd.h
 EXPORT_MAP := rte_cryptodev_version.map
 
 # library dependencies
+LDLIBS += -lrte_eal -lrte_mempool -lrte_ring -lrte_mbuf -lrte_kvargs
 DEPDIRS-y += lib/librte_eal
 DEPDIRS-y += lib/librte_mempool
 DEPDIRS-y += lib/librte_ring

@@ -70,6 +70,7 @@ SYMLINK-$(CONFIG_RTE_LIBRTE_PORT)-include += rte_port_sched.h
 SYMLINK-$(CONFIG_RTE_LIBRTE_PORT)-include += rte_port_source_sink.h
 
 # this lib depends upon:
+LDLIBS += -lrte_eal -lrte_mbuf -lrte_mempool -lethdev -lrte_ip_frag
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PORT) := lib/librte_eal
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PORT) += lib/librte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PORT) += lib/librte_mempool

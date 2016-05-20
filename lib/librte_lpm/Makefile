@@ -54,6 +54,7 @@ SYMLINK-$(CONFIG_RTE_LIBRTE_LPM)-include += rte_lpm_sse.h
 endif
 
 # this lib needs eal
+LDLIBS += -lrte_eal
 DEPDIRS-$(CONFIG_RTE_LIBRTE_LPM) += lib/librte_eal
 
 include $(RTE_SDK)/mk/rte.lib.mk

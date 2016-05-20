@@ -63,6 +63,7 @@ endif
 SYMLINK-$(CONFIG_RTE_LIBRTE_VHOST)-include += rte_virtio_net.h
 
 # dependencies
+LDLIBS += -lrte_eal -lethdev -lrte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_VHOST) += lib/librte_eal
 DEPDIRS-$(CONFIG_RTE_LIBRTE_VHOST) += lib/librte_ether
 DEPDIRS-$(CONFIG_RTE_LIBRTE_VHOST) += lib/librte_mbuf

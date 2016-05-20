@@ -48,6 +48,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_REORDER) := rte_reorder.c
 SYMLINK-$(CONFIG_RTE_LIBRTE_REORDER)-include := rte_reorder.h
 
 # this lib depends upon:
+LDLIBS += -lrte_eal -lrte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_REORDER) += lib/librte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_REORDER) += lib/librte_eal
 

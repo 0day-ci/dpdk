@@ -72,14 +72,17 @@ SYMLINK-$(CONFIG_RTE_LIBRTE_TABLE)-include += rte_table_array.h
 SYMLINK-$(CONFIG_RTE_LIBRTE_TABLE)-include += rte_table_stub.h
 
 # this lib depends upon:
+LDLIBS += -lrte_eal -lrte_mbuf -lrte_mempool -lrte_port -lrte_lpm
 DEPDIRS-$(CONFIG_RTE_LIBRTE_TABLE) := lib/librte_eal
 DEPDIRS-$(CONFIG_RTE_LIBRTE_TABLE) += lib/librte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_TABLE) += lib/librte_mempool
 DEPDIRS-$(CONFIG_RTE_LIBRTE_TABLE) += lib/librte_port
 DEPDIRS-$(CONFIG_RTE_LIBRTE_TABLE) += lib/librte_lpm
 ifeq ($(CONFIG_RTE_LIBRTE_ACL),y)
+LDLIBS += -lrte_acl
 DEPDIRS-$(CONFIG_RTE_LIBRTE_TABLE) += lib/librte_acl
 endif
+LDLIBS += -lrte_hash
 DEPDIRS-$(CONFIG_RTE_LIBRTE_TABLE) += lib/librte_hash
 
 include $(RTE_SDK)/mk/rte.lib.mk

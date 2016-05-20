@@ -54,6 +54,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_METER) := rte_meter.c
 SYMLINK-$(CONFIG_RTE_LIBRTE_METER)-include := rte_meter.h
 
 # this lib depends upon:
+LDLIBS += -lrte_eal
 DEPDIRS-$(CONFIG_RTE_LIBRTE_METER) += lib/librte_eal
 
 include $(RTE_SDK)/mk/rte.lib.mk

@@ -47,6 +47,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_KNI) := rte_kni.c
 SYMLINK-$(CONFIG_RTE_LIBRTE_KNI)-include := rte_kni.h
 
 # this lib needs eal
+LDLIBS += -lrte_eal -lrte_mbuf -lethdev
 DEPDIRS-$(CONFIG_RTE_LIBRTE_KNI) += lib/librte_eal lib/librte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_KNI) += lib/librte_ether
 

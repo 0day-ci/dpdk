@@ -59,6 +59,7 @@ SYMLINK-$(CONFIG_RTE_LIBRTE_SCHED)-include := rte_sched.h rte_bitmap.h rte_sched
 SYMLINK-$(CONFIG_RTE_LIBRTE_SCHED)-include += rte_reciprocal.h
 
 # this lib depends upon:
+LDLIBS += -lrte_eal -lrte_mbuf -lrte_mempool -lrte_timer
 DEPDIRS-$(CONFIG_RTE_LIBRTE_SCHED) += lib/librte_mempool lib/librte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_SCHED) += lib/librte_net lib/librte_timer
 

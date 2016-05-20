@@ -54,6 +54,7 @@ SYMLINK-$(CONFIG_RTE_LIBRTE_IP_FRAG)-include += rte_ip_frag.h
 
 
 # this library depends on rte_ether
+LDLIBS += -lrte_mempool -lethdev
 DEPDIRS-$(CONFIG_RTE_LIBRTE_IP_FRAG) += lib/librte_mempool lib/librte_ether
 
 include $(RTE_SDK)/mk/rte.lib.mk

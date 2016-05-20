@@ -47,6 +47,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_MBUF) := rte_mbuf.c
 SYMLINK-$(CONFIG_RTE_LIBRTE_MBUF)-include := rte_mbuf.h
 
 # this lib needs eal
+LDLIBS += -lrte_eal -lrte_mempool
 DEPDIRS-$(CONFIG_RTE_LIBRTE_MBUF) += lib/librte_eal lib/librte_mempool
 
 include $(RTE_SDK)/mk/rte.lib.mk
