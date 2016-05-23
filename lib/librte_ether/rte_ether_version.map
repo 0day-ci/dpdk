@@ -137,4 +137,5 @@ DPDK_16.07 {
 	global:
 
 	rte_eth_add_first_rx_callback;
+	rte_eth_dev_info_get;
 } DPDK_16.04;
