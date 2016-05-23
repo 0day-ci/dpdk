@@ -437,6 +437,9 @@ Pdump
 M: Reshma Pattan <reshma.pattan@intel.com>
 F: lib/librte_pdump/
 F: app/pdump/
+F: doc/guides/prog_guide/pdump_library.rst
+F: doc/guides/sample_app_ug/pdump.rst
+
 
 Hierarchical scheduler
 M: Cristian Dumitrescu <cristian.dumitrescu@intel.com>

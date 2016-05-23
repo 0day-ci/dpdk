@@ -47,6 +47,10 @@ New Features
   * Dropped specific Xen Dom0 code.
   * Dropped specific anonymous mempool code in testpmd.
 
+* **Added packet capture framework.**
+
+  * The new library ``librte_pdump`` is added to provide packet capture APIs.
+  * The new ``app/pdump`` tool is added to capture packets on DPDK.
 
 Resolved Issues
 ---------------
@@ -116,6 +120,11 @@ API Changes
   ibadcrc, ibadlen, imcasts, fdirmatch, fdirmiss,
   tx_pause_xon, rx_pause_xon, tx_pause_xoff, rx_pause_xoff.
 
+* Function ``rte_eth_dev_get_port_by_name`` changed to public API.
+
+* Function ``rte_eth_dev_info_get`` updated to return new fields ``nb_rx_queues`` and ``nb_tx_queues``
+  in ``rte_eth_dev_info`` object.
+
 
 ABI Changes
 -----------
@@ -127,6 +136,8 @@ ABI Changes
 * The ``rte_port_source_params`` structure has new fields to support PCAP file.
   It was already in release 16.04 with ``RTE_NEXT_ABI`` flag.
 
+* The ``rte_eth_dev_info`` structure has new fields ``nb_rx_queues`` and ``nb_tx_queues``
+  to support number of queues configured by software.
 
 Shared Library Versions
 -----------------------
