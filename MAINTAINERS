@@ -433,6 +433,10 @@ F: app/test/test_reorder*
 F: examples/packet_ordering/
 F: doc/guides/sample_app_ug/packet_ordering.rst
 
+Pdump
+M: Reshma Pattan <reshma.pattan@intel.com>
+F: lib/librte_pdump/
+
 Hierarchical scheduler
 M: Cristian Dumitrescu <cristian.dumitrescu@intel.com>
 F: lib/librte_sched/
