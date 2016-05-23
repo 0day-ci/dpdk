@@ -132,3 +132,9 @@ DPDK_16.04 {
 	rte_eth_tx_buffer_set_err_callback;
 
 } DPDK_2.2;
+
+DPDK_16.07 {
+	global:
+
+	rte_eth_add_first_rx_callback;
+} DPDK_16.04;
