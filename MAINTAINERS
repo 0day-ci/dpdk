@@ -436,6 +436,7 @@ F: doc/guides/sample_app_ug/packet_ordering.rst
 Pdump
 M: Reshma Pattan <reshma.pattan@intel.com>
 F: lib/librte_pdump/
+F: app/pdump/
 
 Hierarchical scheduler
 M: Cristian Dumitrescu <cristian.dumitrescu@intel.com>
