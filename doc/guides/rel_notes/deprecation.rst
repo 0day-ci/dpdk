@@ -57,3 +57,9 @@ Deprecation Notices
   a handle, like the way kernel exposes an fd to user for locating a
   specific file, and to keep all major structures internally, so that
   we are likely to be free from ABI violations in future.
+
+* A librte_ether public structure ``rte_eth_dev_info`` will be changed in 16.07.
+  The proposed change will add new parameters ``nb_rx_queues``, ``nb_tx_queues``
+  to the structure. These are the number of queues configured by software.
+  Modification to definition of ``rte_eth_dev_info_get()`` will be done
+  to update new parameters to ``rte_eth_dev_info`` object.
