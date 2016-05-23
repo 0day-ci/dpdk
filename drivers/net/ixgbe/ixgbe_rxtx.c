@@ -1221,16 +1221,23 @@ ixgbe_rxd_pkt_info_to_pkt_flags(uint16_t pkt_info)
 }
 
 static inline uint64_t
-rx_desc_status_to_pkt_flags(uint32_t rx_status)
+rx_desc_status_to_pkt_flags(uint32_t rx_status, uint8_t vlan_strip)
 {
 	uint64_t pkt_flags;
+	uint64_t vlan_flags;
+
+	/* if vlan is stripped, set the proper flag */
+	if (vlan_strip)
+		vlan_flags = PKT_RX_VLAN_PKT | PKT_RX_VLAN_STRIPPED;
+	else
+		vlan_flags = PKT_RX_VLAN_PKT;
 
 	/*
 	 * Check if VLAN present only.
 	 * Do not check whether L3/L4 rx checksum done by NIC or not,
 	 * That can be found from rte_eth_rxmode.hw_ip_checksum flag
 	 */
-	pkt_flags = (rx_status & IXGBE_RXD_STAT_VP) ?  PKT_RX_VLAN_PKT : 0;
+	pkt_flags = (rx_status & IXGBE_RXD_STAT_VP) ?  vlan_flags : 0;
 
 #ifdef RTE_LIBRTE_IEEE1588
 	if (rx_status & IXGBE_RXD_STAT_TMST)
@@ -1287,6 +1294,7 @@ ixgbe_rx_scan_hw_ring(struct ixgbe_rx_queue *rxq)
 	uint32_t pkt_info[LOOK_AHEAD];
 	int i, j, nb_rx = 0;
 	uint32_t status;
+	uint8_t vlan_strip = rxq->vlan_strip;
 
 	/* get references to current descriptor and S/W ring entry */
 	rxdp = &rxq->rx_ring[rxq->rx_tail];
@@ -1328,7 +1336,8 @@ ixgbe_rx_scan_hw_ring(struct ixgbe_rx_queue *rxq)
 			mb->vlan_tci = rte_le_to_cpu_16(rxdp[j].wb.upper.vlan);
 
 			/* convert descriptor fields to rte mbuf flags */
-			pkt_flags = rx_desc_status_to_pkt_flags(s[j]);
+			pkt_flags = rx_desc_status_to_pkt_flags(s[j],
+				vlan_strip);
 			pkt_flags |= rx_desc_error_to_pkt_flags(s[j]);
 			pkt_flags |= ixgbe_rxd_pkt_info_to_pkt_flags
 					((uint16_t)pkt_info[j]);
@@ -1544,6 +1553,7 @@ ixgbe_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
 	uint16_t nb_rx;
 	uint16_t nb_hold;
 	uint64_t pkt_flags;
+	uint8_t vlan_strip;
 
 	nb_rx = 0;
 	nb_hold = 0;
@@ -1551,6 +1561,7 @@ ixgbe_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
 	rx_id = rxq->rx_tail;
 	rx_ring = rxq->rx_ring;
 	sw_ring = rxq->sw_ring;
+	vlan_strip = rxq->vlan_strip;
 	while (nb_rx < nb_pkts) {
 		/*
 		 * The order of operations here is important as the DD status
@@ -1660,7 +1671,7 @@ ixgbe_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
 		/* Only valid if PKT_RX_VLAN_PKT set in pkt_flags */
 		rxm->vlan_tci = rte_le_to_cpu_16(rxd.wb.upper.vlan);
 
-		pkt_flags = rx_desc_status_to_pkt_flags(staterr);
+		pkt_flags = rx_desc_status_to_pkt_flags(staterr, vlan_strip);
 		pkt_flags = pkt_flags | rx_desc_error_to_pkt_flags(staterr);
 		pkt_flags = pkt_flags |
 			ixgbe_rxd_pkt_info_to_pkt_flags((uint16_t)pkt_info);
@@ -1753,7 +1764,7 @@ ixgbe_fill_cluster_head_buf(
 	 */
 	head->vlan_tci = rte_le_to_cpu_16(desc->wb.upper.vlan);
 	pkt_info = rte_le_to_cpu_32(desc->wb.lower.lo_dword.data);
-	pkt_flags = rx_desc_status_to_pkt_flags(staterr);
+	pkt_flags = rx_desc_status_to_pkt_flags(staterr, rxq->vlan_strip);
 	pkt_flags |= rx_desc_error_to_pkt_flags(staterr);
 	pkt_flags |= ixgbe_rxd_pkt_info_to_pkt_flags((uint16_t)pkt_info);
 	head->ol_flags = pkt_flags;
