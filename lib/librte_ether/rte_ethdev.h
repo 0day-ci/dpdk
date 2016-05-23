@@ -4283,6 +4283,21 @@ rte_eth_dev_l2_tunnel_offload_set(uint8_t port_id,
 				  uint32_t mask,
 				  uint8_t en);
 
+/**
+* Get the port id from pci adrress or device name
+* Ex: 0000:2:00.0 or vdev name eth_pcap0
+*
+* @param name
+*  pci address or name of the device
+* @param port_id
+*   pointer to port identifier of the device
+* @return
+*   - (0) if successful.
+*   - (-ENODEV) on failure.
+*/
+int
+rte_eth_dev_get_port_by_name(const char *name, uint8_t *port_id);
+
 #ifdef __cplusplus
 }
 #endif
