@@ -288,12 +288,15 @@ i40e_fdir_teardown(struct i40e_pf *pf)
 {
 	struct i40e_hw *hw = I40E_PF_TO_HW(pf);
 	struct i40e_vsi *vsi;
+	int err = I40E_SUCCESS;
 
 	vsi = pf->fdir.fdir_vsi;
 	if (!vsi)
 		return;
 	i40e_switch_tx_queue(hw, vsi->base_queue, FALSE);
-	i40e_switch_rx_queue(hw, vsi->base_queue, FALSE);
+	err = i40e_switch_rx_queue(hw, vsi->base_queue, FALSE);
+	if (err)
+		PMD_DRV_LOG(WARNING, "Failed to do FDIR RX switch off.");
 	i40e_dev_rx_queue_release(pf->fdir.rxq);
 	pf->fdir.rxq = NULL;
 	i40e_dev_tx_queue_release(pf->fdir.txq);
