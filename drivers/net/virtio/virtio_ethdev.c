@@ -204,7 +204,8 @@ virtio_send_command(struct virtqueue *vq, struct virtio_pmd_ctrl *ctrl,
 		usleep(100);
 	}
 
-	while (vq->vq_used_cons_idx != vq->vq_ring.used->idx) {
+	while (vq->vq_used_cons_idx !=
+	       *((volatile uint16_t *)(&vq->vq_ring.used->idx))) {
 		uint32_t idx, desc_idx, used_idx;
 		struct vring_used_elem *uep;
 
