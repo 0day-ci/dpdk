@@ -47,7 +47,7 @@ endif
 endif
 endif
 
-ifneq (,$(filter gcc gcc48,$(CC)))
+ifneq (,$(filter %gcc %gcc48,$(CC)))
 CFLAGS_BASE_DRIVER += -Wno-unused-but-set-variable
 CFLAGS_BASE_DRIVER += -Wno-missing-declarations
 CFLAGS_BASE_DRIVER += -Wno-maybe-uninitialized
