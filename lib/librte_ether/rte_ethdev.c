@@ -3211,6 +3211,18 @@ rte_eth_dev_get_reg_length(uint8_t port_id)
 }
 
 int
+rte_eth_dev_get_reg_width(uint8_t port_id)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->get_reg_width, -ENOTSUP);
+	return (*dev->dev_ops->get_reg_width)(dev);
+}
+
+int
 rte_eth_dev_get_reg_info(uint8_t port_id, struct rte_dev_reg_info *info)
 {
 	struct rte_eth_dev *dev;

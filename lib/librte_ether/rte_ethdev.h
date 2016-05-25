@@ -1292,6 +1292,9 @@ typedef int (*eth_timesync_write_time)(struct rte_eth_dev *dev,
 typedef int (*eth_get_reg_length_t)(struct rte_eth_dev *dev);
 /**< @internal Retrieve device register count  */
 
+typedef int (*eth_get_reg_width_t)(struct rte_eth_dev *dev);
+/**< @internal Retrieve device register byte number */
+
 typedef int (*eth_get_reg_t)(struct rte_eth_dev *dev,
 				struct rte_dev_reg_info *info);
 /**< @internal Retrieve registers  */
@@ -1455,6 +1458,8 @@ struct eth_dev_ops {
 
 	eth_get_reg_length_t get_reg_length;
 	/**< Get # of registers */
+	eth_get_reg_width_t get_reg_width;
+	/**< Get # of bytes in register */
 	eth_get_reg_t get_reg;
 	/**< Get registers */
 	eth_get_eeprom_length_t get_eeprom_length;
@@ -3970,6 +3975,19 @@ int rte_eth_tx_queue_info_get(uint8_t port_id, uint16_t queue_id,
  *   - others depends on the specific operations implementation.
  */
 int rte_eth_dev_get_reg_length(uint8_t port_id);
+
+/*
+ * Retrieve the number of bytes in register for a specific device
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @return
+ *   - (>=0) number of registers if successful.
+ *   - (-ENOTSUP) if hardware doesn't support.
+ *   - (-ENODEV) if *port_id* invalid.
+ *   - others depends on the specific operations implementation.
+ */
+int rte_eth_dev_get_reg_width(uint8_t port_id);
 
 /**
  * Retrieve device registers and register attributes
