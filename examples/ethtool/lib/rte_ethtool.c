@@ -87,10 +87,14 @@ int
 rte_ethtool_get_regs_len(uint8_t port_id)
 {
 	int count_regs;
+	int reg_width;
 
 	count_regs = rte_eth_dev_get_reg_length(port_id);
+	reg_width = rte_eth_dev_get_reg_width(port_id);
+	if (reg_width < 0)
+		reg_width = sizeof(uint32_t);
 	if (count_regs > 0)
-		return count_regs * sizeof(uint32_t);
+		return count_regs * reg_width;
 	return count_regs;
 }
 
