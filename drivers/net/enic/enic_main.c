@@ -467,14 +467,16 @@ int enic_alloc_intr_resources(struct enic *enic)
 
 void enic_free_rq(void *rxq)
 {
-	struct vnic_rq *rq = (struct vnic_rq *)rxq;
-	struct enic *enic = vnic_dev_priv(rq->vdev);
+	if (rxq != NULL) {
+		struct vnic_rq *rq = (struct vnic_rq *)rxq;
+		struct enic *enic = vnic_dev_priv(rq->vdev);
 
-	enic_rxmbuf_queue_release(enic, rq);
-	rte_free(rq->mbuf_ring);
-	rq->mbuf_ring = NULL;
-	vnic_rq_free(rq);
-	vnic_cq_free(&enic->cq[rq->index]);
+		enic_rxmbuf_queue_release(enic, rq);
+		rte_free(rq->mbuf_ring);
+		rq->mbuf_ring = NULL;
+		vnic_rq_free(rq);
+		vnic_cq_free(&enic->cq[rq->index]);
+	}
 }
 
 void enic_start_wq(struct enic *enic, uint16_t queue_idx)
@@ -841,16 +843,22 @@ int enic_set_vnic_res(struct enic *enic)
 {
 	struct rte_eth_dev *eth_dev = enic->rte_dev;
 
-	if ((enic->rq_count < eth_dev->data->nb_rx_queues) ||
-		(enic->wq_count < eth_dev->data->nb_tx_queues)) {
-		dev_err(dev, "Not enough resources configured, aborting\n");
+	if (enic->rq_count < eth_dev->data->nb_rx_queues) {
+		dev_err(dev, "Not enough Receive queues. Requested:%u, Configured:%u\n",
+			eth_dev->data->nb_rx_queues, enic->rq_count);
+		return -1;
+	}
+	if (enic->wq_count < eth_dev->data->nb_tx_queues) {
+		dev_err(dev, "Not enough Transmit queues. Requested:%u, Configured:%u\n",
+			eth_dev->data->nb_tx_queues, enic->wq_count);
 		return -1;
 	}
 
 	enic->rq_count = eth_dev->data->nb_rx_queues;
 	enic->wq_count = eth_dev->data->nb_tx_queues;
 	if (enic->cq_count < (enic->rq_count + enic->wq_count)) {
-		dev_err(dev, "Not enough resources configured, aborting\n");
+		dev_err(dev, "Not enough Completion queues. Required:%u, Configured:%u\n",
+			enic->rq_count + enic->wq_count, enic->cq_count);
 		return -1;
 	}
 
