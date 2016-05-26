@@ -116,6 +116,9 @@ API Changes
   ibadcrc, ibadlen, imcasts, fdirmatch, fdirmiss,
   tx_pause_xon, rx_pause_xon, tx_pause_xoff, rx_pause_xoff.
 
+* The comments of ``ETH_VLAN_TYPE_INNER`` and ``ETH_VLAN_TYPE_OUTER`` in
+  ``rte_vlan_type`` are changed.
+
 
 ABI Changes
 -----------
