@@ -146,7 +146,6 @@ bond_ethdev_rx_burst_8023ad(void *queue, struct rte_mbuf **bufs,
 
 	const uint16_t ether_type_slow_be = rte_be_to_cpu_16(ETHER_TYPE_SLOW);
 	uint16_t num_rx_total = 0;	/* Total number of received packets */
-	uint8_t slaves[RTE_MAX_ETHPORTS];
 	uint8_t slave_count;
 
 	uint8_t collecting;  /* current slave collecting status */
@@ -159,15 +158,16 @@ bond_ethdev_rx_burst_8023ad(void *queue, struct rte_mbuf **bufs,
 		return num_rx_total;
 
 	slave_count = internals->active_slave_count;
-	memcpy(slaves, internals->active_slaves,
-			sizeof(internals->active_slaves[0]) * slave_count);
 
 	for (i = 0; i < slave_count && num_rx_total < nb_pkts; i++) {
 		j = num_rx_total;
-		collecting = ACTOR_STATE(&mode_8023ad_ports[slaves[i]], COLLECTING);
+		collecting = ACTOR_STATE(
+				&mode_8023ad_ports[internals->active_slaves[i]],
+				COLLECTING);
 
 		/* Read packets from this slave */
-		num_rx_total += rte_eth_rx_burst(slaves[i], bd_rx_q->queue_id,
+		num_rx_total += rte_eth_rx_burst(internals->active_slaves[i],
+				bd_rx_q->queue_id,
 				&bufs[num_rx_total], nb_pkts - num_rx_total);
 
 		for (k = j; k < 2 && k < num_rx_total; k++)
@@ -188,7 +188,9 @@ bond_ethdev_rx_burst_8023ad(void *queue, struct rte_mbuf **bufs,
 					!is_same_ether_addr(&bond_mac, &hdr->d_addr)))) {
 
 				if (hdr->ether_type == ether_type_slow_be) {
-					bond_mode_8023ad_handle_slow_pkt(internals, slaves[i],
+					bond_mode_8023ad_handle_slow_pkt(
+						internals,
+						internals->active_slaves[i],
 						bufs[j]);
 				} else
 					rte_pktmbuf_free(bufs[j]);
@@ -409,8 +411,6 @@ bond_ethdev_tx_burst_round_robin(void *queue, struct rte_mbuf **bufs,
 	uint16_t slave_nb_pkts[RTE_MAX_ETHPORTS] = { 0 };
 
 	uint8_t num_of_slaves;
-	uint8_t slaves[RTE_MAX_ETHPORTS];
-
 	uint16_t num_tx_total = 0, num_tx_slave;
 
 	static int slave_idx = 0;
@@ -422,12 +422,7 @@ bond_ethdev_tx_burst_round_robin(void *queue, struct rte_mbuf **bufs,
 	if (rte_spinlock_trylock(&bd_tx_q->lock) == 0)
 		return num_tx_total;
 
-	/* Copy slave list to protect against slave up/down changes during tx
-	 * bursting */
 	num_of_slaves = internals->active_slave_count;
-	memcpy(slaves, internals->active_slaves,
-			sizeof(internals->active_slaves[0]) * num_of_slaves);
-
 	if (num_of_slaves < 1) {
 		rte_spinlock_unlock(&bd_tx_q->lock);
 		return num_tx_total;
@@ -446,7 +441,9 @@ bond_ethdev_tx_burst_round_robin(void *queue, struct rte_mbuf **bufs,
 	/* Send packet burst on each slave device */
 	for (i = 0; i < num_of_slaves; i++) {
 		if (slave_nb_pkts[i] > 0) {
-			num_tx_slave = rte_eth_tx_burst(slaves[i], bd_tx_q->queue_id,
+			num_tx_slave = rte_eth_tx_burst(
+					internals->active_slaves[i],
+					bd_tx_q->queue_id,
 					slave_bufs[i], slave_nb_pkts[i]);
 
 			/* if tx burst fails move packets to end of bufs */
@@ -721,7 +718,6 @@ bond_ethdev_tx_burst_tlb(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	uint8_t i, j;
 
 	uint8_t num_of_slaves;
-	uint8_t slaves[RTE_MAX_ETHPORTS];
 
 	struct ether_hdr *ether_hdr;
 	struct ether_addr primary_slave_addr;
@@ -736,9 +732,6 @@ bond_ethdev_tx_burst_tlb(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 		return num_tx_total;
 	}
 
-	memcpy(slaves, internals->tlb_slaves_order,
-				sizeof(internals->tlb_slaves_order[0]) * num_of_slaves);
-
 	ether_addr_copy(primary_port->data->mac_addrs, &primary_slave_addr);
 
 	if (nb_pkts > 3) {
@@ -747,7 +740,8 @@ bond_ethdev_tx_burst_tlb(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	}
 
 	for (i = 0; i < num_of_slaves; i++) {
-		rte_eth_macaddr_get(slaves[i], &active_slave_addr);
+		rte_eth_macaddr_get(internals->tlb_slaves_order[i],
+					&active_slave_addr);
 		for (j = num_tx_total; j < nb_pkts; j++) {
 			if (j + 3 < nb_pkts)
 				rte_prefetch0(rte_pktmbuf_mtod(bufs[j+3], void*));
@@ -760,8 +754,11 @@ bond_ethdev_tx_burst_tlb(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 #endif
 		}
 
-		num_tx_total += rte_eth_tx_burst(slaves[i], bd_tx_q->queue_id,
-				bufs + num_tx_total, nb_pkts - num_tx_total);
+		num_tx_total += rte_eth_tx_burst(
+				internals->tlb_slaves_order[i],
+				bd_tx_q->queue_id,
+				bufs + num_tx_total,
+				nb_pkts - num_tx_total);
 
 		if (num_tx_total == nb_pkts)
 			break;
@@ -937,7 +934,6 @@ bond_ethdev_tx_burst_balance(void *queue, struct rte_mbuf **bufs,
 	struct bond_tx_queue *bd_tx_q;
 
 	uint8_t num_of_slaves;
-	uint8_t slaves[RTE_MAX_ETHPORTS];
 
 	uint16_t num_tx_total = 0, num_tx_slave = 0, tx_fail_total = 0;
 
@@ -952,12 +948,7 @@ bond_ethdev_tx_burst_balance(void *queue, struct rte_mbuf **bufs,
 	if (rte_spinlock_trylock(&bd_tx_q->lock) == 0)
 		return num_tx_total;
 
-	/* Copy slave list to protect against slave up/down changes during tx
-	 * bursting */
 	num_of_slaves = internals->active_slave_count;
-	memcpy(slaves, internals->active_slaves,
-			sizeof(internals->active_slaves[0]) * num_of_slaves);
-
 	if (num_of_slaves < 1) {
 		rte_spinlock_unlock(&bd_tx_q->lock);
 		return num_tx_total;
@@ -975,7 +966,9 @@ bond_ethdev_tx_burst_balance(void *queue, struct rte_mbuf **bufs,
 	/* Send packet burst on each slave device */
 	for (i = 0; i < num_of_slaves; i++) {
 		if (slave_nb_pkts[i] > 0) {
-			num_tx_slave = rte_eth_tx_burst(slaves[i], bd_tx_q->queue_id,
+			num_tx_slave = rte_eth_tx_burst(
+					internals->active_slaves[i],
+					bd_tx_q->queue_id,
 					slave_bufs[i], slave_nb_pkts[i]);
 
 			/* if tx burst fails move packets to end of bufs */
@@ -1003,7 +996,6 @@ bond_ethdev_tx_burst_8023ad(void *queue, struct rte_mbuf **bufs,
 	struct bond_tx_queue *bd_tx_q;
 
 	uint8_t num_of_slaves;
-	uint8_t slaves[RTE_MAX_ETHPORTS];
 	 /* positions in slaves, not ID */
 	uint8_t distributing_offsets[RTE_MAX_ETHPORTS];
 	uint8_t distributing_count;
@@ -1027,15 +1019,11 @@ bond_ethdev_tx_burst_8023ad(void *queue, struct rte_mbuf **bufs,
 	if (rte_spinlock_trylock(&bd_tx_q->lock) == 0)
 		return num_tx_total;
 
-	/* Copy slave list to protect against slave up/down changes during tx
-	 * bursting */
 	num_of_slaves = internals->active_slave_count;
 	if (num_of_slaves < 1) {
 		rte_spinlock_unlock(&bd_tx_q->lock);
 		return num_tx_total;
 	}
-
-	memcpy(slaves, internals->active_slaves, sizeof(slaves[0]) * num_of_slaves);
 
 	distributing_count = 0;
 	for (i = 0; i < num_of_slaves; i++) {
@@ -1073,7 +1061,9 @@ bond_ethdev_tx_burst_8023ad(void *queue, struct rte_mbuf **bufs,
 		if (slave_nb_pkts[i] == 0)
 			continue;
 
-		num_tx_slave = rte_eth_tx_burst(slaves[i], bd_tx_q->queue_id,
+		num_tx_slave = rte_eth_tx_burst(
+				internals->active_slaves[i],
+				bd_tx_q->queue_id,
 				slave_bufs[i], slave_nb_pkts[i]);
 
 		/* If tx burst fails drop slow packets */
@@ -1102,8 +1092,6 @@ bond_ethdev_tx_burst_broadcast(void *queue, struct rte_mbuf **bufs,
 	struct bond_tx_queue *bd_tx_q;
 
 	uint8_t tx_failed_flag = 0, num_of_slaves;
-	uint8_t slaves[RTE_MAX_ETHPORTS];
-
 	uint16_t max_nb_of_tx_pkts = 0;
 
 	int slave_tx_total[RTE_MAX_ETHPORTS];
@@ -1115,12 +1103,7 @@ bond_ethdev_tx_burst_broadcast(void *queue, struct rte_mbuf **bufs,
 	if (rte_spinlock_trylock(&bd_tx_q->lock) == 0)
 		return 0;
 
-	/* Copy slave list to protect against slave up/down changes during tx
-	 * bursting */
 	num_of_slaves = internals->active_slave_count;
-	memcpy(slaves, internals->active_slaves,
-			sizeof(internals->active_slaves[0]) * num_of_slaves);
-
 	if (num_of_slaves < 1) {
 		rte_spinlock_unlock(&bd_tx_q->lock);
 		return 0;
@@ -1132,8 +1115,10 @@ bond_ethdev_tx_burst_broadcast(void *queue, struct rte_mbuf **bufs,
 
 	/* Transmit burst on each active slave */
 	for (i = 0; i < num_of_slaves; i++) {
-		slave_tx_total[i] = rte_eth_tx_burst(slaves[i], bd_tx_q->queue_id,
-					bufs, nb_pkts);
+		slave_tx_total[i] = rte_eth_tx_burst(
+				internals->active_slaves[i],
+				bd_tx_q->queue_id,
+				bufs, nb_pkts);
 
 		if (unlikely(slave_tx_total[i] < nb_pkts))
 			tx_failed_flag = 1;
