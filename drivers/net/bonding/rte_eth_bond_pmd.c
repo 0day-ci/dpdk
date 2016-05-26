@@ -1651,6 +1651,7 @@ bond_ethdev_stop(struct rte_eth_dev *eth_dev)
 	struct bond_dev_private *internals = eth_dev->data->dev_private;
 	uint8_t i;
 
+	rte_spinlock_lock(&internals->lock);
 	if (internals->mode == BONDING_MODE_8023AD) {
 		struct port *port;
 		void *pkt = NULL;
@@ -1672,7 +1673,7 @@ bond_ethdev_stop(struct rte_eth_dev *eth_dev)
 	}
 
 	if (internals->mode == BONDING_MODE_TLB ||
-			internals->mode == BONDING_MODE_ALB) {
+		internals->mode == BONDING_MODE_ALB) {
 		bond_tlb_disable(internals);
 		for (i = 0; i < internals->active_slave_count; i++)
 			tlb_last_obytets[internals->active_slaves[i]] = 0;
@@ -1685,6 +1686,7 @@ bond_ethdev_stop(struct rte_eth_dev *eth_dev)
 
 	eth_dev->data->dev_link.link_status = ETH_LINK_DOWN;
 	eth_dev->data->dev_started = 0;
+	rte_spinlock_unlock(&internals->lock);
 }
 
 void
