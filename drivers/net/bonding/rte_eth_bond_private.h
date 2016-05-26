@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -76,6 +76,7 @@ struct bond_rx_queue {
 	/**< Copy of RX configuration structure for queue */
 	struct rte_mempool *mb_pool;
 	/**< Reference to mbuf pool to use for RX queue */
+	rte_spinlock_t lock;
 };
 
 struct bond_tx_queue {
@@ -87,6 +88,7 @@ struct bond_tx_queue {
 	/**< Number of TX descriptors available for the queue */
 	struct rte_eth_txconf tx_conf;
 	/**< Copy of TX configuration structure for queue */
+	rte_spinlock_t lock;
 };
 
 /** Bonded slave devices structure */

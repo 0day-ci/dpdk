@@ -1676,6 +1676,8 @@ bond_ethdev_rx_queue_setup(struct rte_eth_dev *dev, uint16_t rx_queue_id,
 	if (bd_rx_q == NULL)
 		return -1;
 
+	rte_spinlock_init(&bd_rx_q->lock);
+
 	bd_rx_q->queue_id = rx_queue_id;
 	bd_rx_q->dev_private = dev->data->dev_private;
 
@@ -1700,6 +1702,8 @@ bond_ethdev_tx_queue_setup(struct rte_eth_dev *dev, uint16_t tx_queue_id,
 
 	if (bd_tx_q == NULL)
 		return -1;
+
+	rte_spinlock_init(&bd_tx_q->lock);
 
 	bd_tx_q->queue_id = tx_queue_id;
 	bd_tx_q->dev_private = dev->data->dev_private;
