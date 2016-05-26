@@ -437,8 +437,10 @@ rte_eth_bond_slave_add(uint8_t bonded_port_id, uint8_t slave_port_id)
 {
 	struct rte_eth_dev *bonded_eth_dev;
 	struct bond_dev_private *internals;
-
+	struct bond_tx_queue *bd_tx_q;
+	struct bond_rx_queue *bd_rx_q;
 	int retval;
+	uint16_t i;
 
 	/* Verify that port id's are valid bonded and slave ports */
 	if (valid_bonded_port_id(bonded_port_id) != 0)
@@ -448,11 +450,30 @@ rte_eth_bond_slave_add(uint8_t bonded_port_id, uint8_t slave_port_id)
 	internals = bonded_eth_dev->data->dev_private;
 
 	rte_spinlock_lock(&internals->lock);
+	if (bonded_eth_dev->data->dev_started) {
+		for (i = 0; i < bonded_eth_dev->data->nb_rx_queues; i++) {
+			bd_rx_q = bonded_eth_dev->data->rx_queues[i];
+			rte_spinlock_lock(&bd_rx_q->lock);
+		}
+		for (i = 0; i < bonded_eth_dev->data->nb_rx_queues; i++) {
+			bd_tx_q = bonded_eth_dev->data->tx_queues[i];
+			rte_spinlock_lock(&bd_tx_q->lock);
+		}
+	}
 
 	retval = __eth_bond_slave_add_lock_free(bonded_port_id, slave_port_id);
 
+	if (bonded_eth_dev->data->dev_started) {
+		for (i = 0; i < bonded_eth_dev->data->nb_rx_queues; i++) {
+			bd_rx_q = bonded_eth_dev->data->rx_queues[i];
+			rte_spinlock_unlock(&bd_rx_q->lock);
+		}
+		for (i = 0; i < bonded_eth_dev->data->nb_rx_queues; i++) {
+			bd_tx_q = bonded_eth_dev->data->tx_queues[i];
+			rte_spinlock_unlock(&bd_tx_q->lock);
+		}
+	}
 	rte_spinlock_unlock(&internals->lock);
-
 	return retval;
 }
 
@@ -541,7 +562,10 @@ rte_eth_bond_slave_remove(uint8_t bonded_port_id, uint8_t slave_port_id)
 {
 	struct rte_eth_dev *bonded_eth_dev;
 	struct bond_dev_private *internals;
+	struct bond_tx_queue *bd_tx_q;
+	struct bond_rx_queue *bd_rx_q;
 	int retval;
+	uint16_t i;
 
 	if (valid_bonded_port_id(bonded_port_id) != 0)
 		return -1;
@@ -550,11 +574,33 @@ rte_eth_bond_slave_remove(uint8_t bonded_port_id, uint8_t slave_port_id)
 	internals = bonded_eth_dev->data->dev_private;
 
 	rte_spinlock_lock(&internals->lock);
+	if (bonded_eth_dev->data->dev_started) {
+		for (i = 0; i < bonded_eth_dev->data->nb_rx_queues; i++) {
+			bd_rx_q = bonded_eth_dev->data->rx_queues[i];
+			rte_spinlock_lock(&bd_rx_q->lock);
+		}
+
+		for (i = 0; i < bonded_eth_dev->data->nb_tx_queues; i++) {
+			bd_tx_q = bonded_eth_dev->data->tx_queues[i];
+			rte_spinlock_lock(&bd_tx_q->lock);
+		}
+	}
 
 	retval = __eth_bond_slave_remove_lock_free(bonded_port_id, slave_port_id);
 
-	rte_spinlock_unlock(&internals->lock);
+	if (bonded_eth_dev->data->dev_started) {
+		for (i = 0; i < bonded_eth_dev->data->nb_tx_queues; i++) {
+			bd_tx_q = bonded_eth_dev->data->tx_queues[i];
+			rte_spinlock_unlock(&bd_tx_q->lock);
+		}
 
+		for (i = 0; i < bonded_eth_dev->data->nb_rx_queues; i++) {
+			bd_rx_q = bonded_eth_dev->data->rx_queues[i];
+			rte_spinlock_unlock(&bd_rx_q->lock);
+		}
+		rte_spinlock_unlock(&internals->lock);
+	}
+	rte_spinlock_unlock(&internals->lock);
 	return retval;
 }
 
