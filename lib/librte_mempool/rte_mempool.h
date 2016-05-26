@@ -73,6 +73,7 @@
 #include <rte_memory.h>
 #include <rte_branch_prediction.h>
 #include <rte_ring.h>
+#include <rte_memcpy.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -739,7 +740,6 @@ __mempool_put_bulk(struct rte_mempool *mp, void * const *obj_table,
 		    unsigned n, int is_mp)
 {
 	struct rte_mempool_cache *cache;
-	uint32_t index;
 	void **cache_objs;
 	unsigned lcore_id = rte_lcore_id();
 	uint32_t cache_size = mp->cache_size;
@@ -768,8 +768,7 @@ __mempool_put_bulk(struct rte_mempool *mp, void * const *obj_table,
 	 */
 
 	/* Add elements back into the cache */
-	for (index = 0; index < n; ++index, obj_table++)
-		cache_objs[index] = *obj_table;
+	rte_memcpy(&cache_objs[0], obj_table, sizeof(void *) * n);
 
 	cache->len += n;
 
