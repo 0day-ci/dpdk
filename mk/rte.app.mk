@@ -57,7 +57,6 @@ _LDLIBS-y += -L$(RTE_SDK_BIN)/lib
 # Order is important: from higher level to lower level
 #
 
-_LDLIBS-y += --whole-archive
 _LDLIBS-y += --start-group
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_DISTRIBUTOR)    += -lrte_distributor
@@ -129,6 +128,8 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_XENVIRT)    += -lrte_pmd_xenvirt
 ifeq ($(CONFIG_RTE_BUILD_SHARED_LIB),n)
 # plugins (link only if static libraries)
 
+_LDLIBS-y += --whole-archive
+
 _LDLIBS-$(CONFIG_RTE_LIBRTE_VMXNET3_PMD)    += -lrte_pmd_vmxnet3_uio
 _LDLIBS-$(CONFIG_RTE_LIBRTE_VIRTIO_PMD)     += -lrte_pmd_virtio
 _LDLIBS-$(CONFIG_RTE_LIBRTE_BNX2X_PMD)      += -lrte_pmd_bnx2x
@@ -174,11 +175,12 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_VHOST)      += -lrte_pmd_vhost
 
 endif # $(CONFIG_RTE_LIBRTE_VHOST)
 
+_LDLIBS-y += --no-whole-archive
+
 endif # ! $(CONFIG_RTE_BUILD_SHARED_LIB)
 
 _LDLIBS-y += $(EXECENV_LDLIBS)
 _LDLIBS-y += --end-group
-_LDLIBS-y += --no-whole-archive
 
 LDLIBS += $(_LDLIBS-y) $(CPU_LDLIBS) $(EXTRA_LDLIBS)
 
