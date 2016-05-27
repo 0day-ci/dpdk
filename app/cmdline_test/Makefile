@@ -46,6 +46,7 @@ SRCS-y += commands.c
 
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
+LDFLAGS += -no-as-needed
 
 # this application needs libraries first
 DEPDIRS-y += lib drivers

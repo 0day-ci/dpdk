@@ -58,6 +58,7 @@ _LDLIBS-y += -L$(RTE_SDK_BIN)/lib
 #
 
 _LDLIBS-y += --whole-archive
+_LDLIBS-y += --start-group
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_DISTRIBUTOR)    += -lrte_distributor
 _LDLIBS-$(CONFIG_RTE_LIBRTE_REORDER)        += -lrte_reorder
@@ -110,8 +111,6 @@ else ifeq ($(CONFIG_RTE_LIBRTE_PMD_AESNI_GCM),y)
 _LDLIBS-y                                   += -lcrypto
 endif
 endif # !CONFIG_RTE_BUILD_SHARED_LIBS
-
-_LDLIBS-y += --start-group
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_KVARGS)         += -lrte_kvargs
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MBUF)           += -lrte_mbuf
