@@ -209,6 +209,15 @@ struct app_pipeline_params default_pipeline_params = {
 	.n_args = 0,
 };
 
+struct app_kni_params default_kni_params = {
+	.parsed = 0,
+	.socket_id = 0,
+	.core_id = 0,
+	.hyper_th_id = 0,
+	.mempool_id = 0,
+	.burst = 32,
+};
+
 static const char app_usage[] =
 	"Usage: %s [-f CONFIG_FILE] [-s SCRIPT_FILE] [-p PORT_MASK] "
 	"[-l LOG_LEVEL] [--preproc PREPROCESSOR] [--preproc-args ARGS]\n"
@@ -1169,6 +1178,9 @@ parse_pipeline_pktq_in(struct app_params *app,
 		} else if (validate_name(name, "SOURCE", 1) == 0) {
 			type = APP_PKTQ_IN_SOURCE;
 			id = APP_PARAM_ADD(app->source_params, name);
+		} else if (validate_name(name, "KNI", 1) == 0) {
+			type = APP_PKTQ_IN_KNI;
+			id = APP_PARAM_ADD(app->kni_params, name);
 		} else
 			return -EINVAL;
 
@@ -1240,6 +1252,9 @@ parse_pipeline_pktq_out(struct app_params *app,
 		} else if (validate_name(name, "SINK", 1) == 0) {
 			type = APP_PKTQ_OUT_SINK;
 			id = APP_PARAM_ADD(app->sink_params, name);
+		} else if (validate_name(name, "KNI", 1) == 0) {
+			type = APP_PKTQ_OUT_KNI;
+			id = APP_PARAM_ADD(app->kni_params, name);
 		} else
 			return -EINVAL;
 
@@ -2459,6 +2474,75 @@ parse_msgq(struct app_params *app,
 	free(entries);
 }
 
+static void
+parse_kni(struct app_params *app,
+		   const char *section_name,
+		   struct rte_cfgfile *cfg)
+{
+	struct app_kni_params *param;
+	struct rte_cfgfile_entry *entries;
+	int n_entries, i;
+	ssize_t param_idx;
+
+	n_entries = rte_cfgfile_section_num_entries(cfg, section_name);
+	PARSE_ERROR_SECTION_NO_ENTRIES((n_entries > 0), section_name);
+
+	entries = malloc(n_entries * sizeof(struct rte_cfgfile_entry));
+	PARSE_ERROR_MALLOC(entries != NULL);
+
+	rte_cfgfile_section_entries(cfg, section_name, entries, n_entries);
+
+	param_idx = APP_PARAM_ADD(app->kni_params, section_name);
+	PARSER_PARAM_ADD_CHECK(param_idx, app->kni_params, section_name);
+
+	param = &app->kni_params[param_idx];
+
+	for (i = 0; i < n_entries; i++) {
+		struct rte_cfgfile_entry *ent = &entries[i];
+
+		if (strcmp(ent->name, "core") == 0) {
+			int status = parse_pipeline_core(
+					&param->socket_id, &param->core_id,
+					&param->hyper_th_id, ent->value);
+
+			PARSE_ERROR((status == 0), section_name,
+						ent->name);
+			continue;
+		}
+
+		if (strcmp(ent->name, "mempool") == 0) {
+			int status = validate_name(ent->value,
+									   "MEMPOOL", 1);
+			ssize_t idx;
+
+			PARSE_ERROR((status == 0), section_name,
+						ent->name);
+			idx = APP_PARAM_ADD(app->mempool_params,
+								ent->value);
+			PARSER_PARAM_ADD_CHECK(idx, app->mempool_params,
+								   section_name);
+			param->mempool_id = idx;
+			continue;
+		}
+
+		if (strcmp(ent->name, "burst") == 0) {
+			int status = parser_read_uint32(&param->burst,
+											ent->value);
+
+			PARSE_ERROR((status == 0), section_name,
+						ent->name);
+			continue;
+		}
+
+		/* unrecognized */
+		PARSE_ERROR_INVALID(0, section_name, ent->name);
+	}
+
+	param->parsed = 1;
+
+	free(entries);
+}
+
 typedef void (*config_section_load)(struct app_params *p,
 	const char *section_name,
 	struct rte_cfgfile *cfg);
@@ -2483,6 +2567,7 @@ static const struct config_section cfg_file_scheme[] = {
 	{"MSGQ-REQ-PIPELINE", 1, parse_msgq_req_pipeline},
 	{"MSGQ-RSP-PIPELINE", 1, parse_msgq_rsp_pipeline},
 	{"MSGQ", 1, parse_msgq},
+	{"KNI", 1, parse_kni},
 };
 
 static void
@@ -2619,6 +2704,7 @@ app_config_parse(struct app_params *app, const char *file_name)
 	APP_PARAM_COUNT(app->sink_params, app->n_pktq_sink);
 	APP_PARAM_COUNT(app->msgq_params, app->n_msgq);
 	APP_PARAM_COUNT(app->pipeline_params, app->n_pipelines);
+	APP_PARAM_COUNT(app->kni_params, app->n_kni);
 
 #ifdef RTE_PORT_PCAP
 	for (i = 0; i < (int)app->n_pktq_source; i++) {
@@ -3025,6 +3111,9 @@ save_pipeline_params(struct app_params *app, FILE *f)
 				case APP_PKTQ_IN_SOURCE:
 					name = app->source_params[pp->id].name;
 					break;
+				case APP_PKTQ_IN_KNI:
+					name = app->kni_params[pp->id].name;
+					break;
 				default:
 					APP_CHECK(0, "System error "
 						"occurred while saving "
@@ -3058,6 +3147,9 @@ save_pipeline_params(struct app_params *app, FILE *f)
 					break;
 				case APP_PKTQ_OUT_SINK:
 					name = app->sink_params[pp->id].name;
+					break;
+				case APP_PKTQ_OUT_KNI:
+					name = app->kni_params[pp->id].name;
 					break;
 				default:
 					APP_CHECK(0, "System error "
@@ -3114,6 +3206,37 @@ save_pipeline_params(struct app_params *app, FILE *f)
 	}
 }
 
+static void
+save_kni_params(struct app_params *app, FILE *f)
+{
+	struct app_kni_params *p;
+	size_t i, count;
+
+	count = RTE_DIM(app->kni_params);
+	for (i = 0; i < count; i++) {
+		p = &app->kni_params[i];
+		if (!APP_PARAM_VALID(p))
+			continue;
+
+		/* section name */
+		fprintf(f, "[%s]\n", p->name);
+
+		/* core */
+		fprintf(f, "core = s%" PRIu32 "c%" PRIu32 "%s\n",
+				p->socket_id,
+				p->core_id,
+				(p->hyper_th_id) ? "h" : "");
+
+		/* mempool */
+		fprintf(f, "%s = %" PRIu32 "\n", "mempool_id", p->mempool_id);
+
+		/* burst */
+		fprintf(f, "%s = %" PRIu32 "\n", "burst", p->burst);
+
+		fputc('\n', f);
+	}
+}
+
 void
 app_config_save(struct app_params *app, const char *file_name)
 {
@@ -3144,6 +3267,7 @@ app_config_save(struct app_params *app, const char *file_name)
 	save_source_params(app, file);
 	save_sink_params(app, file);
 	save_msgq_params(app, file);
+	save_kni_params(app, file);
 
 	fclose(file);
 	free(name);
@@ -3205,6 +3329,11 @@ app_config_init(struct app_params *app)
 		memcpy(&app->pipeline_params[i],
 			&default_pipeline_params,
 			sizeof(default_pipeline_params));
+
+	for (i = 0; i < RTE_DIM(app->kni_params); i++)
+		memcpy(&app->kni_params[i],
+			&default_kni_params,
+			sizeof(default_kni_params));
 
 	return 0;
 }

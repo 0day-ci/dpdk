@@ -89,6 +89,24 @@ app_init_core_mask(struct app_params *app)
 		mask |= 1LLU << lcore_id;
 	}
 
+	for (i = 0; i < app->n_kni; i++) {
+		struct app_kni_params *p = &app->kni_params[i];
+		int lcore_id;
+
+		lcore_id = cpu_core_map_get_lcore_id(app->core_map,
+			p->socket_id,
+			p->core_id,
+			p->hyper_th_id);
+
+		if (lcore_id < 0)
+			rte_panic("Cannot create CPU core mask\n");
+
+		if (mask & 1LLU << lcore_id)
+			rte_panic("KNI interface must use a dedicated lcore\n");
+
+		mask |= 1LLU << lcore_id;
+	}
+
 	app->core_mask = mask;
 	APP_LOG(app, HIGH, "CPU core mask = 0x%016" PRIx64, app->core_mask);
 }
@@ -1236,6 +1254,11 @@ static void app_pipeline_params_get(struct app_params *app,
 					n_bytes_per_pkt;
 			}
 			break;
+		case APP_PKTQ_IN_KNI:
+			out->type = PIPELINE_PORT_IN_KNI;
+			out->params.kni.kni = app->kni[in->id];
+			out->burst_size = app->kni_params[in->id].burst;
+			break;
 		default:
 			break;
 		}
@@ -1374,6 +1397,11 @@ static void app_pipeline_params_get(struct app_params *app,
 				out->params.sink.max_n_pkts = 0;
 			}
 			break;
+		case APP_PKTQ_OUT_KNI:
+			out->type = PIPELINE_PORT_OUT_KNI;
+			out->params.kni.kni = app->kni[in->id];
+			out->params.kni.tx_burst_sz = app->kni_params[in->id].burst;
+			break;
 		default:
 			break;
 		}
@@ -1393,6 +1421,47 @@ static void app_pipeline_params_get(struct app_params *app,
 	for (i = 0; i < p_in->n_args; i++) {
 		p_out->args_name[i] = p_in->args_name[i];
 		p_out->args_value[i] = p_in->args_value[i];
+	}
+}
+
+static void
+app_init_kni(struct app_params *app) {
+	uint32_t i;
+	struct rte_kni_conf conf;
+
+	rte_kni_init((unsigned int)app->n_kni);
+
+	for (i = 0; i < app->n_kni; i++) {
+		struct app_kni_params *p_kni = &app->kni_params[i];
+		uint32_t port_id;
+
+		sscanf(p_kni->name, "KNI%" PRIu32, &port_id);
+
+		memset(&conf, 0, sizeof(conf));
+		snprintf(conf.name, RTE_KNI_NAMESIZE,
+				 "vEth%u", port_id);
+		conf.core_id = p_kni->core_id;
+		conf.force_bind = 1;
+
+		conf.group_id = (uint16_t) port_id;
+		conf.mbuf_size = app->mempool_params[p_kni->mempool_id].buffer_size;
+
+		struct rte_kni_ops ops;
+		struct rte_eth_dev_info dev_info;
+
+		memset(&dev_info, 0, sizeof(dev_info));
+		rte_eth_dev_info_get(app->link_params[port_id].pmd_id, &dev_info);
+		conf.addr = dev_info.pci_dev->addr;
+		conf.id = dev_info.pci_dev->id;
+
+		memset(&ops, 0, sizeof(ops));
+		ops.port_id = app->link_params[port_id].pmd_id;
+		ops.change_mtu = kni_change_mtu;
+		ops.config_network_if = kni_config_network_interface;
+
+		app->kni[i] = rte_kni_alloc(app->mempool[p_kni->mempool_id], &conf, &ops);
+		if (!app->kni[i])
+			rte_panic("Fail to create kni for port: %d\n", port_id);
 	}
 }
 
@@ -1531,6 +1600,7 @@ int app_init(struct app_params *app)
 	app_init_swq(app);
 	app_init_tm(app);
 	app_init_msgq(app);
+	app_init_kni(app);
 
 	app_pipeline_common_cmd_push(app);
 	app_pipeline_thread_cmd_push(app);

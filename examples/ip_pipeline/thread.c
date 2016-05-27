@@ -239,6 +239,14 @@ app_thread(void *arg)
 	uint32_t core_id = rte_lcore_id(), i, j;
 	struct app_thread_data *t = &app->thread_data[core_id];
 
+	for (i = 0; i < app->n_kni; i++) {
+		if (core_id == (uint32_t)cpu_core_map_get_lcore_id(app->core_map,
+			app->kni_params[i].socket_id,
+			app->kni_params[i].core_id,
+			app->kni_params[i].hyper_th_id))
+			return 0;
+	}
+
 	for (i = 0; ; i++) {
 		uint32_t n_regular = RTE_MIN(t->n_regular, RTE_DIM(t->regular));
 		uint32_t n_custom = RTE_MIN(t->n_custom, RTE_DIM(t->custom));

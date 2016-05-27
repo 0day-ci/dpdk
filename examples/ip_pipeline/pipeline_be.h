@@ -40,6 +40,7 @@
 #include <rte_port_ras.h>
 #include <rte_port_sched.h>
 #include <rte_port_source_sink.h>
+#include <rte_port_kni.h>
 #include <rte_pipeline.h>
 
 enum pipeline_port_in_type {
@@ -50,6 +51,7 @@ enum pipeline_port_in_type {
 	PIPELINE_PORT_IN_RING_READER_IPV6_FRAG,
 	PIPELINE_PORT_IN_SCHED_READER,
 	PIPELINE_PORT_IN_SOURCE,
+	PIPELINE_PORT_IN_KNI,
 };
 
 struct pipeline_port_in_params {
@@ -62,6 +64,7 @@ struct pipeline_port_in_params {
 		struct rte_port_ring_reader_ipv6_frag_params ring_ipv6_frag;
 		struct rte_port_sched_reader_params sched;
 		struct rte_port_source_params source;
+		struct rte_port_kni_reader_params kni;
 	} params;
 	uint32_t burst_size;
 };
@@ -84,6 +87,8 @@ pipeline_port_in_params_convert(struct pipeline_port_in_params  *p)
 		return (void *) &p->params.sched;
 	case PIPELINE_PORT_IN_SOURCE:
 		return (void *) &p->params.source;
+	case PIPELINE_PORT_IN_KNI:
+		return (void *) &p->params.kni;
 	default:
 		return NULL;
 	}
@@ -107,6 +112,8 @@ pipeline_port_in_params_get_ops(struct pipeline_port_in_params  *p)
 		return &rte_port_sched_reader_ops;
 	case PIPELINE_PORT_IN_SOURCE:
 		return &rte_port_source_ops;
+	case PIPELINE_PORT_IN_KNI:
+		return &rte_port_kni_reader_ops;
 	default:
 		return NULL;
 	}
@@ -123,6 +130,7 @@ enum pipeline_port_out_type {
 	PIPELINE_PORT_OUT_RING_WRITER_IPV6_RAS,
 	PIPELINE_PORT_OUT_SCHED_WRITER,
 	PIPELINE_PORT_OUT_SINK,
+	PIPELINE_PORT_OUT_KNI,
 };
 
 struct pipeline_port_out_params {
@@ -138,6 +146,7 @@ struct pipeline_port_out_params {
 		struct rte_port_ring_writer_ipv6_ras_params ring_ipv6_ras;
 		struct rte_port_sched_writer_params sched;
 		struct rte_port_sink_params sink;
+		struct rte_port_kni_writer_params kni;
 	} params;
 };
 
@@ -165,6 +174,8 @@ pipeline_port_out_params_convert(struct pipeline_port_out_params  *p)
 		return (void *) &p->params.sched;
 	case PIPELINE_PORT_OUT_SINK:
 		return (void *) &p->params.sink;
+	case PIPELINE_PORT_OUT_KNI:
+		return (void *) &p->params.kni;
 	default:
 		return NULL;
 	}
@@ -194,6 +205,8 @@ pipeline_port_out_params_get_ops(struct pipeline_port_out_params  *p)
 		return &rte_port_sched_writer_ops;
 	case PIPELINE_PORT_OUT_SINK:
 		return &rte_port_sink_ops;
+	case PIPELINE_PORT_OUT_KNI:
+		return &rte_port_kni_writer_ops;
 	default:
 		return NULL;
 	}
