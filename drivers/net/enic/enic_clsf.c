@@ -213,6 +213,12 @@ int enic_fdir_add_fltr(struct enic *enic, struct rte_eth_fdir_filter *params)
 	}
 
 	pos = rte_hash_add_key(enic->fdir.hash, params);
+	if (pos < 0 || pos >= ENICPMD_FDIR_MAX) {
+		dev_err(enic, "Add hash key failed\n");
+		enic->fdir.stats.f_add++;
+		return -EINVAL;
+	}
+
 	enic->fdir.nodes[pos] = key;
 	return 0;
 }
