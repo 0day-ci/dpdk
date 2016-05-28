@@ -426,6 +426,39 @@ check_pipelines(struct app_params *app)
 	}
 }
 
+static void
+check_kni(struct app_params *app) {
+	uint32_t i;
+	uint32_t port_id;
+
+	for (i = 0; i < app->n_kni; i++) {
+		struct app_kni_params *p = &app->kni_params[i];
+		uint32_t n_readers = app_kni_get_readers(app, p);
+		uint32_t n_writers = app_kni_get_writers(app, p);
+
+		APP_CHECK((n_readers != 0),
+				  "%s has no reader\n", p->name);
+
+		if (n_readers > 1)
+			APP_LOG(app, LOW,
+					"%s has more than one reader", p->name);
+
+		APP_CHECK((n_writers != 0),
+				  "%s has no writer\n", p->name);
+
+		if (n_writers > 1)
+			APP_LOG(app, LOW,
+					"%s has more than one writer", p->name);
+
+		APP_CHECK(sscanf(p->name, "KNI%" PRIu32, &port_id) == 1,
+				  "%s's port id is invalid\n", p->name);
+
+		APP_CHECK(port_id < app->n_links,
+				  "kni %s is not associated with a valid link\n",
+				  p->name);
+	}
+}
+
 int
 app_config_check(struct app_params *app)
 {
@@ -439,6 +472,7 @@ app_config_check(struct app_params *app)
 	check_sinks(app);
 	check_msgqs(app);
 	check_pipelines(app);
+	check_kni(app);
 
 	return 0;
 }

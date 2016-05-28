@@ -43,9 +43,10 @@ include $(RTE_SDK)/mk/rte.vars.mk
 # binary name
 APP = ip_pipeline
 
+VPATH += $(SRCDIR)/kni
 VPATH += $(SRCDIR)/pipeline
 
-INC += $(wildcard *.h) $(wildcard pipeline/*.h)
+INC += $(wildcard *.h) $(wildcard pipeline/*.h) $(wildcard kni/*.h)
 
 # all source are stored in SRCS-y
 SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) := main.c
@@ -56,6 +57,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) += init.c
 SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) += thread.c
 SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) += thread_fe.c
 SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) += cpu_core_map.c
+SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) += kni.c
 
 SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) += pipeline_common_be.c
 SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) += pipeline_common_fe.c
@@ -72,7 +74,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) += pipeline_flow_actions.c
 SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) += pipeline_routing_be.c
 SRCS-$(CONFIG_RTE_LIBRTE_PIPELINE) += pipeline_routing.c
 
-CFLAGS += -I$(SRCDIR) -I$(SRCDIR)/pipeline
+CFLAGS += -I$(SRCDIR) -I$(SRCDIR)/pipeline -I$(SRCDIR)/kni
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS) -Wno-error=unused-function -Wno-error=unused-variable
 
