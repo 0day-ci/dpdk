@@ -1,7 +1,7 @@
 /*
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -243,11 +243,13 @@ nic_stats_clear(uint8_t port_id)
 static void
 nic_xstats_display(uint8_t port_id)
 {
+	struct rte_eth_xstats_name *ptr_names;
 	struct rte_eth_xstats *xstats;
 	int len, ret, i;
+	int idx_name;
 	static const char *nic_stats_border = "########################";
 
-	len = rte_eth_xstats_get(port_id, NULL, 0);
+	len = rte_eth_xstats_count(port_id);
 	if (len < 0) {
 		printf("Cannot get xstats count\n");
 		return;
@@ -255,6 +257,18 @@ nic_xstats_display(uint8_t port_id)
 	xstats = malloc(sizeof(xstats[0]) * len);
 	if (xstats == NULL) {
 		printf("Cannot allocate memory for xstats\n");
+		return;
+	}
+
+	ptr_names = malloc(sizeof(struct rte_eth_xstats_name) * len);
+	if (ptr_names == NULL) {
+		printf("Cannot allocate memory for xstat names\n");
+		free(xstats);
+		return;
+	}
+	if (len != rte_eth_xstats_names(
+			port_id, ptr_names, len)) {
+		printf("Cannot get xstat names\n");
 		return;
 	}
 
@@ -270,11 +284,17 @@ nic_xstats_display(uint8_t port_id)
 	}
 
 	for (i = 0; i < len; i++)
-		printf("%s: %"PRIu64"\n", xstats[i].name, xstats[i].value);
+		for (idx_name = 0; idx_name < len; idx_name++)
+			if (ptr_names[idx_name].id == xstats[i].id) {
+				printf("%s: %lu\n", ptr_names[idx_name].name,
+					xstats[i].value);
+				break;
+			}
 
 	printf("%s############################\n",
 			   nic_stats_border);
 	free(xstats);
+	free(ptr_names);
 }
 
 static void
