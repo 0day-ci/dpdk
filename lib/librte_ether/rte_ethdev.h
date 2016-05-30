@@ -915,8 +915,21 @@ struct rte_eth_txq_info {
  * structure.
  */
 struct rte_eth_xstats {
+	/* FIXME: Remove name[] once remaining drivers converted */
 	char name[RTE_ETH_XSTATS_NAME_SIZE];
+	uint64_t id;
 	uint64_t value;
+};
+
+/**
+ * A name-key lookup element for extended statistics.
+ *
+ * This structure is used to map between names and ID numbers
+ * for extended ethernet statistics.
+ */
+struct rte_eth_xstats_name {
+	char name[RTE_ETH_XSTATS_NAME_SIZE];
+	uint64_t id;
 };
 
 #define ETH_DCB_NUM_TCS    8
@@ -1053,6 +1066,10 @@ typedef int (*eth_xstats_get_t)(struct rte_eth_dev *dev,
 
 typedef void (*eth_xstats_reset_t)(struct rte_eth_dev *dev);
 /**< @internal Reset extended stats of an Ethernet device. */
+
+typedef int (*eth_xstats_names_t)(struct rte_eth_dev *dev,
+	struct rte_eth_xstats_name *ptr_names, unsigned limit);
+/**< @internal Get names of extended stats of an Ethernet device. */
 
 typedef int (*eth_queue_stats_mapping_set_t)(struct rte_eth_dev *dev,
 					     uint16_t queue_id,
@@ -1401,6 +1418,8 @@ struct eth_dev_ops {
 	eth_stats_reset_t          stats_reset;   /**< Reset generic device statistics. */
 	eth_xstats_get_t           xstats_get;    /**< Get extended device statistics. */
 	eth_xstats_reset_t         xstats_reset;  /**< Reset extended device statistics. */
+	eth_xstats_names_t         xstats_names;
+	/**< Get names of extended statistics. */
 	eth_queue_stats_mapping_set_t queue_stats_mapping_set;
 	/**< Configure per queue stat counter mapping. */
 	eth_dev_infos_get_t        dev_infos_get; /**< Get device info. */
@@ -2251,6 +2270,31 @@ int rte_eth_stats_get(uint8_t port_id, struct rte_eth_stats *stats);
  *   The port identifier of the Ethernet device.
  */
 void rte_eth_stats_reset(uint8_t port_id);
+
+/**
+ * Retrieve names of extended statistics of an Ethernet device.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param ptr_names
+ *  Block of memory to insert names into. Must be at least limit in size.
+ * @param limit
+ *  Capacity of ptr_strings (number of names).
+ * @return
+ *  If successful, number of statistics; negative on error.
+ */
+int rte_eth_xstats_names(uint8_t port_id, struct rte_eth_xstats_name *ptr_names,
+	unsigned limit);
+
+/**
+ * Retrieve number of extended statistics of an Ethernet device.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @return
+ *  If successful, number of statistics; negative on error.
+ */
+int rte_eth_xstats_count(uint8_t port_id);
 
 /**
  * Retrieve extended statistics of an Ethernet device.
