@@ -1741,7 +1741,6 @@ eth_igb_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstats *xstats,
 
 	/* Extended stats */
 	for (i = 0; i < IGB_NB_XSTATS; i++) {
-		xstats[i].name[0] = '\0';
 		xstats[i].id = i;
 		xstats[i].value = *(uint64_t *)(((char *)hw_stats) +
 			rte_igb_stats_strings[i].offset);
@@ -1824,7 +1823,6 @@ eth_igbvf_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstats *xstats,
 		return 0;
 
 	for (i = 0; i < IGBVF_NB_XSTATS; i++) {
-		xstats[i].name[0] = '\0';
 		xstats[i].id = i;
 		xstats[i].value = *(uint64_t *)(((char *)hw_stats) +
 			rte_igbvf_stats_strings[i].offset);

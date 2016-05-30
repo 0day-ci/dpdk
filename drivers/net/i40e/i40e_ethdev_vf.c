@@ -1022,7 +1022,6 @@ static int i40evf_dev_xstats_get(struct rte_eth_dev *dev,
 
 	/* loop over xstats array and values from pstats */
 	for (i = 0; i < I40EVF_NB_XSTATS; i++) {
-		xstats[i].name[0] = '\0';
 		xstats[i].id = i;
 		xstats[i].value = *(uint64_t *)(((char *)pstats) +
 			rte_i40evf_stats_strings[i].offset);

@@ -1627,7 +1627,6 @@ rte_eth_xstats_get(uint8_t port_id, struct rte_eth_xstats *xstats,
 		stats_ptr = RTE_PTR_ADD(&eth_stats,
 					rte_stats_strings[i].offset);
 		val = *stats_ptr;
-		xstats[count].name[0] = '\0';
 		xstats[count].id = count + xcount;
 		xstats[count++].value = val;
 	}
@@ -1639,7 +1638,6 @@ rte_eth_xstats_get(uint8_t port_id, struct rte_eth_xstats *xstats,
 					rte_rxq_stats_strings[i].offset +
 					q * sizeof(uint64_t));
 			val = *stats_ptr;
-			xstats[count].name[0] = '\0';
 			xstats[count].id = count + xcount;
 			xstats[count++].value = val;
 		}
@@ -1652,7 +1650,6 @@ rte_eth_xstats_get(uint8_t port_id, struct rte_eth_xstats *xstats,
 					rte_txq_stats_strings[i].offset +
 					q * sizeof(uint64_t));
 			val = *stats_ptr;
-			xstats[count].name[0] = '\0';
 			xstats[count].id = count + xcount;
 			xstats[count++].value = val;
 		}

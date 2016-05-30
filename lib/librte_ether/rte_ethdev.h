@@ -915,8 +915,6 @@ struct rte_eth_txq_info {
  * structure.
  */
 struct rte_eth_xstats {
-	/* FIXME: Remove name[] once remaining drivers converted */
-	char name[RTE_ETH_XSTATS_NAME_SIZE];
 	uint64_t id;
 	uint64_t value;
 };

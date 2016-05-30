@@ -2284,7 +2284,6 @@ i40e_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstats *xstats,
 
 	/* Get stats from i40e_eth_stats struct */
 	for (i = 0; i < I40E_NB_ETH_XSTATS; i++) {
-		xstats[count].name[0] = '\0';
 		xstats[count].id = count;
 		xstats[count].value = *(uint64_t *)(((char *)&hw_stats->eth) +
 			rte_i40e_stats_strings[i].offset);
@@ -2293,7 +2292,6 @@ i40e_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstats *xstats,
 
 	/* Get individiual stats from i40e_hw_port struct */
 	for (i = 0; i < I40E_NB_HW_PORT_XSTATS; i++) {
-		xstats[count].name[0] = '\0';
 		xstats[count].id = count;
 		xstats[count].value = *(uint64_t *)(((char *)hw_stats) +
 			rte_i40e_hw_port_strings[i].offset);
@@ -2302,7 +2300,6 @@ i40e_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstats *xstats,
 
 	for (i = 0; i < I40E_NB_RXQ_PRIO_XSTATS; i++) {
 		for (prio = 0; prio < 8; prio++) {
-			xstats[count].name[0] = '\0';
 			xstats[count].id = count;
 			xstats[count].value =
 				*(uint64_t *)(((char *)hw_stats) +
@@ -2314,7 +2311,6 @@ i40e_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstats *xstats,
 
 	for (i = 0; i < I40E_NB_TXQ_PRIO_XSTATS; i++) {
 		for (prio = 0; prio < 8; prio++) {
-			xstats[count].name[0] = '\0';
 			xstats[count].id = count;
 			xstats[count].value =
 				*(uint64_t *)(((char *)hw_stats) +
