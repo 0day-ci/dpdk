@@ -67,6 +67,7 @@
 #include <inttypes.h>
 #include <sys/queue.h>
 
+#include <rte_spinlock.h>
 #include <rte_log.h>
 #include <rte_debug.h>
 #include <rte_lcore.h>
@@ -204,9 +205,13 @@ struct rte_mempool_memhdr {
 struct rte_mempool {
 	char name[RTE_MEMPOOL_NAMESIZE]; /**< Name of mempool. */
 	struct rte_ring *ring;           /**< Ring to store objects. */
+	union {
+		void *pool;              /**< Ring or pool to store objects */
+		uint64_t *pool_id;       /**< External mempool identifier */
+	};
 	const struct rte_memzone *mz;    /**< Memzone where pool is allocated */
 	int flags;                       /**< Flags of the mempool. */
-	int socket_id;                   /**< Socket id passed at mempool creation. */
+	int socket_id;                   /**< Socket id passed at create */
 	uint32_t size;                   /**< Max size of the mempool. */
 	uint32_t cache_size;             /**< Size of per-lcore local cache. */
 	uint32_t cache_flushthresh;
@@ -217,6 +222,14 @@ struct rte_mempool {
 	uint32_t trailer_size;           /**< Size of trailer (after elt). */
 
 	unsigned private_data_size;      /**< Size of private data. */
+	/**
+	 * Index into rte_mempool_handler_table array of mempool handler ops
+	 * structs, which contain callback function pointers.
+	 * We're using an index here rather than pointers to the callbacks
+	 * to facilitate any secondary processes that may want to use
+	 * this mempool.
+	 */
+	int32_t handler_idx;
 
 	struct rte_mempool_cache *local_cache; /**< Per-lcore local cache */
 
@@ -324,6 +337,199 @@ void rte_mempool_check_cookies(const struct rte_mempool *mp,
 #else
 #define __mempool_check_cookies(mp, obj_table_const, n, free) do {} while(0)
 #endif /* RTE_LIBRTE_MEMPOOL_DEBUG */
+
+#define RTE_MEMPOOL_HANDLER_NAMESIZE 32 /**< Max length of handler name. */
+
+/**
+ * typedef for allocating the external pool.
+ * The handler's alloc function does whatever it needs to do to grab memory
+ * for this handler, and sets the *pool opaque pointer in the rte_mempool
+ * struct. In the default handler, *pool points to a ring,in other handlers,
+ * it will mostlikely point to a different type of data structure.
+ * It will be transparent to the application programmer.
+ */
+typedef void *(*rte_mempool_alloc_t)(struct rte_mempool *mp);
+
+/** Free the external pool opaque data (that pointed to by *pool) */
+typedef void (*rte_mempool_free_t)(void *p);
+
+/**
+ * Put an object in the external pool.
+ * The *p pointer is the opaque data for a given mempool handler (ring,
+ * array, linked list, etc)
+ */
+typedef int (*rte_mempool_put_t)(void *p, void * const *obj_table, unsigned n);
+
+/** Get an object from the external pool. */
+typedef int (*rte_mempool_get_t)(void *p, void **obj_table, unsigned n);
+
+/** Return the number of available objects in the external pool. */
+typedef unsigned (*rte_mempool_get_count)(void *p);
+
+/** Structure defining a mempool handler. */
+struct rte_mempool_ops {
+	char name[RTE_MEMPOOL_HANDLER_NAMESIZE]; /**< Name of mempool handler */
+	rte_mempool_alloc_t alloc;       /**< Allocate the external pool. */
+	rte_mempool_free_t free;         /**< Free the external pool. */
+	rte_mempool_put_t put;           /**< Put an object. */
+	rte_mempool_get_t get;           /**< Get an object. */
+	rte_mempool_get_count get_count; /**< Get the number of available objs. */
+} __rte_cache_aligned;
+
+#define RTE_MEMPOOL_MAX_HANDLER_IDX 16  /**< Max registered handlers */
+
+/**
+ * Structure storing the table of registered handlers, each of which contain
+ * the function pointers for the mempool handler functions.
+ * Each process has it's own storage for this handler struct aray so that
+ * the mempools can be shared across primary and secondary processes.
+ * The indices used to access the array are valid across processes, whereas
+ * any function pointers stored directly in the mempool struct would not be.
+ * This results in us simply having "handler_idx" in the mempool struct.
+ */
+struct rte_mempool_handler_table {
+	rte_spinlock_t sl;     /**< Spinlock for add/delete. */
+	uint32_t num_handlers; /**< Number of handlers in the table. */
+	/**
+	 * Storage for all possible handlers.
+	 */
+	struct rte_mempool_ops handler_ops[RTE_MEMPOOL_MAX_HANDLER_IDX];
+} __rte_cache_aligned;
+
+/** Array of registered handlers */
+extern struct rte_mempool_handler_table rte_mempool_handler_table;
+
+/**
+ * @internal Get the mempool handler from its index.
+ *
+ * @param handler_idx
+ *   The index of the handler in the handler table. It must be a valid
+ *   index: (0 <= idx < num_handlers).
+ * @return
+ *   The pointer to the handler in the table.
+ */
+static inline struct rte_mempool_ops *
+rte_mempool_handler_get(int handler_idx)
+{
+	return &rte_mempool_handler_table.handler_ops[handler_idx];
+}
+
+/**
+ * @internal wrapper for external mempool manager alloc callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @return
+ *   The opaque pointer to the external pool.
+ */
+void *
+rte_mempool_ops_alloc(struct rte_mempool *mp);
+
+/**
+ * @internal wrapper for external mempool manager get callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @param obj_table
+ *   Pointer to a table of void * pointers (objects).
+ * @param n
+ *   Number of objects to get.
+ * @return
+ *   - 0: Success; got n objects.
+ *   - <0: Error; code of handler get function.
+ */
+static inline int
+rte_mempool_ops_dequeue_bulk(struct rte_mempool *mp,
+		void **obj_table, unsigned n)
+{
+	struct rte_mempool_ops *handler;
+
+	handler = rte_mempool_handler_get(mp->handler_idx);
+	return handler->get(mp->pool, obj_table, n);
+}
+
+/**
+ * @internal wrapper for external mempool manager put callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @param obj_table
+ *   Pointer to a table of void * pointers (objects).
+ * @param n
+ *   Number of objects to put.
+ * @return
+ *   - 0: Success; n objects supplied.
+ *   - <0: Error; code of handler put function.
+ */
+static inline int
+rte_mempool_ops_enqueue_bulk(struct rte_mempool *mp, void * const *obj_table,
+		unsigned n)
+{
+	struct rte_mempool_ops *handler;
+
+	handler = rte_mempool_handler_get(mp->handler_idx);
+	return handler->put(mp->pool, obj_table, n);
+}
+
+/**
+ * @internal wrapper for external mempool manager get_count callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @return
+ *   The number of available objects in the external pool.
+ */
+unsigned
+rte_mempool_ops_get_count(const struct rte_mempool *mp);
+
+/**
+ * @internal wrapper for external mempool manager free callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ */
+void
+rte_mempool_ops_free(struct rte_mempool *mp);
+
+/**
+ * Set the handler of a mempool
+ *
+ * This can only be done on a mempool that is not populated, i.e. just after
+ * a call to rte_mempool_create_empty().
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @param name
+ *   Name of the handler.
+ * @return
+ *   - 0: Sucess; the new handler is configured.
+ *   - EINVAL - Invalid handler name provided
+ *   - EEXIST - mempool already has a handler assigned
+ */
+int
+rte_mempool_set_handler(struct rte_mempool *mp, const char *name);
+
+/**
+ * Register an external pool handler.
+ *
+ * @param h
+ *   Pointer to the external pool handler
+ * @return
+ *   - >=0: Sucess; return the index of the handler in the table.
+ *   - EINVAL - missing callbacks while registering handler
+ *   - ENOSPC - the maximum number of handlers has been reached
+ */
+int rte_mempool_handler_register(const struct rte_mempool_ops *h);
+
+/**
+ * Macro to statically register an external pool handler.
+ */
+#define MEMPOOL_REGISTER_HANDLER(h)					\
+	void mp_hdlr_init_##h(void);					\
+	void __attribute__((constructor, used)) mp_hdlr_init_##h(void)	\
+	{								\
+		rte_mempool_handler_register(&h);			\
+	}
 
 /**
  * An object callback function for mempool.
@@ -774,7 +980,7 @@ __mempool_put_bulk(struct rte_mempool *mp, void * const *obj_table,
 	cache->len += n;
 
 	if (cache->len >= flushthresh) {
-		rte_ring_mp_enqueue_bulk(mp->ring, &cache->objs[cache_size],
+		rte_mempool_ops_enqueue_bulk(mp, &cache->objs[cache_size],
 				cache->len - cache_size);
 		cache->len = cache_size;
 	}
@@ -785,19 +991,10 @@ ring_enqueue:
 
 	/* push remaining objects in ring */
 #ifdef RTE_LIBRTE_MEMPOOL_DEBUG
-	if (is_mp) {
-		if (rte_ring_mp_enqueue_bulk(mp->ring, obj_table, n) < 0)
-			rte_panic("cannot put objects in mempool\n");
-	}
-	else {
-		if (rte_ring_sp_enqueue_bulk(mp->ring, obj_table, n) < 0)
-			rte_panic("cannot put objects in mempool\n");
-	}
+	if (rte_mempool_ops_enqueue_bulk(mp, obj_table, n) < 0)
+		rte_panic("cannot put objects in mempool\n");
 #else
-	if (is_mp)
-		rte_ring_mp_enqueue_bulk(mp->ring, obj_table, n);
-	else
-		rte_ring_sp_enqueue_bulk(mp->ring, obj_table, n);
+	rte_mempool_ops_enqueue_bulk(mp, obj_table, n);
 #endif
 }
 
@@ -922,7 +1119,7 @@ rte_mempool_put(struct rte_mempool *mp, void *obj)
  */
 static inline int __attribute__((always_inline))
 __mempool_get_bulk(struct rte_mempool *mp, void **obj_table,
-		   unsigned n, int is_mc)
+		   unsigned n, __rte_unused int is_mc)
 {
 	int ret;
 	struct rte_mempool_cache *cache;
@@ -945,7 +1142,8 @@ __mempool_get_bulk(struct rte_mempool *mp, void **obj_table,
 		uint32_t req = n + (cache_size - cache->len);
 
 		/* How many do we require i.e. number to fill the cache + the request */
-		ret = rte_ring_mc_dequeue_bulk(mp->ring, &cache->objs[cache->len], req);
+		ret = rte_mempool_ops_dequeue_bulk(mp,
+			&cache->objs[cache->len], req);
 		if (unlikely(ret < 0)) {
 			/*
 			 * In the offchance that we are buffer constrained,
@@ -972,10 +1170,7 @@ __mempool_get_bulk(struct rte_mempool *mp, void **obj_table,
 ring_dequeue:
 
 	/* get remaining objects from ring */
-	if (is_mc)
-		ret = rte_ring_mc_dequeue_bulk(mp->ring, obj_table, n);
-	else
-		ret = rte_ring_sc_dequeue_bulk(mp->ring, obj_table, n);
+	ret = rte_mempool_ops_dequeue_bulk(mp, obj_table, n);
 
 	if (ret < 0)
 		__MEMPOOL_STAT_ADD(mp, get_fail, n);
