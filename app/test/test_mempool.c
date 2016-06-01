@@ -83,6 +83,97 @@
 static rte_atomic32_t synchro;
 
 /*
+ * Simple example of custom mempool structure. Holds pointers to all the
+ * elements which are simply malloc'd in this example.
+ */
+struct custom_mempool {
+	rte_spinlock_t lock;
+	unsigned count;
+	unsigned size;
+	void *elts[];
+};
+
+/*
+ * Loop through all the element pointers and allocate a chunk of memory, then
+ * insert that memory into the ring.
+ */
+static void *
+custom_mempool_alloc(struct rte_mempool *mp)
+{
+	struct custom_mempool *cm;
+
+	cm = rte_zmalloc("custom_mempool",
+		sizeof(struct custom_mempool) + mp->size * sizeof(void *), 0);
+	if (cm == NULL)
+		return NULL;
+
+	rte_spinlock_init(&cm->lock);
+	cm->count = 0;
+	cm->size = mp->size;
+	return cm;
+}
+
+static void
+custom_mempool_free(void *p)
+{
+	rte_free(p);
+}
+
+static int
+custom_mempool_put(void *p, void * const *obj_table, unsigned n)
+{
+	struct custom_mempool *cm = (struct custom_mempool *)p;
+	int ret = 0;
+
+	rte_spinlock_lock(&cm->lock);
+	if (cm->count + n > cm->size) {
+		ret = -ENOBUFS;
+	} else {
+		memcpy(&cm->elts[cm->count], obj_table, sizeof(void *) * n);
+		cm->count += n;
+	}
+	rte_spinlock_unlock(&cm->lock);
+	return ret;
+}
+
+
+static int
+custom_mempool_get(void *p, void **obj_table, unsigned n)
+{
+	struct custom_mempool *cm = (struct custom_mempool *)p;
+	int ret = 0;
+
+	rte_spinlock_lock(&cm->lock);
+	if (n > cm->count) {
+		ret = -ENOENT;
+	} else {
+		cm->count -= n;
+		memcpy(obj_table, &cm->elts[cm->count], sizeof(void *) * n);
+	}
+	rte_spinlock_unlock(&cm->lock);
+	return ret;
+}
+
+static unsigned
+custom_mempool_get_count(void *p)
+{
+	struct custom_mempool *cm = (struct custom_mempool *)p;
+
+	return cm->count;
+}
+
+static struct rte_mempool_ops mempool_handler_custom = {
+	.name = "custom_handler",
+	.alloc = custom_mempool_alloc,
+	.free = custom_mempool_free,
+	.put = custom_mempool_put,
+	.get = custom_mempool_get,
+	.get_count = custom_mempool_get_count,
+};
+
+MEMPOOL_REGISTER_HANDLER(mempool_handler_custom);
+
+/*
  * save the object number in the first 4 bytes of object data. All
  * other bytes are set to 0.
  */
@@ -477,6 +568,7 @@ test_mempool(void)
 {
 	struct rte_mempool *mp_cache = NULL;
 	struct rte_mempool *mp_nocache = NULL;
+	struct rte_mempool *mp_ext = NULL;
 
 	rte_atomic32_init(&synchro);
 
@@ -504,6 +596,27 @@ test_mempool(void)
 		printf("cannot allocate mp_cache mempool\n");
 		goto err;
 	}
+
+	/* create a mempool with an external handler */
+	mp_ext = rte_mempool_create_empty("test_ext",
+		MEMPOOL_SIZE,
+		MEMPOOL_ELT_SIZE,
+		RTE_MEMPOOL_CACHE_MAX_SIZE, 0,
+		SOCKET_ID_ANY, 0);
+
+	if (mp_ext == NULL) {
+		printf("cannot allocate mp_ext mempool\n");
+		goto err;
+	}
+	if (rte_mempool_set_handler(mp_ext, "custom_handler") < 0) {
+		printf("cannot set custom handler\n");
+		goto err;
+	}
+	if (rte_mempool_populate_default(mp_ext) < 0) {
+		printf("cannot populate mp_ext mempool\n");
+		goto err;
+	}
+	rte_mempool_obj_iter(mp_ext, my_obj_init, NULL);
 
 	/* retrieve the mempool from its name */
 	if (rte_mempool_lookup("test_nocache") != mp_nocache) {
@@ -545,6 +658,7 @@ test_mempool(void)
 err:
 	rte_mempool_free(mp_nocache);
 	rte_mempool_free(mp_cache);
+	rte_mempool_free(mp_ext);
 	return -1;
 }
 
