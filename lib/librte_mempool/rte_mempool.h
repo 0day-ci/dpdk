@@ -410,6 +410,8 @@ extern struct rte_mempool_handler_table rte_mempool_handler_table;
 static inline struct rte_mempool_ops *
 rte_mempool_handler_get(int handler_idx)
 {
+	RTE_VERIFY(handler_idx < RTE_MEMPOOL_MAX_HANDLER_IDX);
+
 	return &rte_mempool_handler_table.handler_ops[handler_idx];
 }
 
