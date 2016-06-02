@@ -67,6 +67,7 @@
 #include <inttypes.h>
 #include <sys/queue.h>
 
+#include <rte_spinlock.h>
 #include <rte_log.h>
 #include <rte_debug.h>
 #include <rte_lcore.h>
@@ -204,9 +205,13 @@ struct rte_mempool_memhdr {
 struct rte_mempool {
 	char name[RTE_MEMPOOL_NAMESIZE]; /**< Name of mempool. */
 	struct rte_ring *ring;           /**< Ring to store objects. */
+	union {
+		void *pool_data;         /**< Ring or pool to store objects */
+		uint64_t pool_id;        /**< External mempool identifier */
+	};
 	const struct rte_memzone *mz;    /**< Memzone where pool is allocated */
 	int flags;                       /**< Flags of the mempool. */
-	int socket_id;                   /**< Socket id passed at mempool creation. */
+	int socket_id;                   /**< Socket id passed at create */
 	uint32_t size;                   /**< Max size of the mempool. */
 	uint32_t cache_size;             /**< Size of per-lcore local cache. */
 	uint32_t cache_flushthresh;
@@ -217,6 +222,14 @@ struct rte_mempool {
 	uint32_t trailer_size;           /**< Size of trailer (after elt). */
 
 	unsigned private_data_size;      /**< Size of private data. */
+	/**
+	 * Index into rte_mempool_ops_table array of mempool ops
+	 * structs, which contain callback function pointers.
+	 * We're using an index here rather than pointers to the callbacks
+	 * to facilitate any secondary processes that may want to use
+	 * this mempool.
+	 */
+	int32_t ops_index;
 
 	struct rte_mempool_cache *local_cache; /**< Per-lcore local cache */
 
@@ -324,6 +337,204 @@ void rte_mempool_check_cookies(const struct rte_mempool *mp,
 #else
 #define __mempool_check_cookies(mp, obj_table_const, n, free) do {} while(0)
 #endif /* RTE_LIBRTE_MEMPOOL_DEBUG */
+
+#define RTE_MEMPOOL_OPS_NAMESIZE 32 /**< Max length of ops struct name. */
+
+/**
+ * prototype for implementation specific data provisioning function
+ * The function should provide the implementation specific memory for
+ * for use by the other mempool ops functions in a given mempool ops struct.
+ * E.g. the default ops provides an instance of the rte_ring for this purpose.
+ * it will mostlikely point to a different type of data structure, and
+ * will be transparent to the application programmer.
+ * The function should also not touch the given *mp instance.
+ */
+typedef void *(*rte_mempool_alloc_t)(const struct rte_mempool *mp);
+
+/** Free the opaque private data pointed to by mp->pool_data pointer */
+typedef void (*rte_mempool_free_t)(void *p);
+
+/**
+ * Put an object in the external pool.
+ * The *p pointer is the opaque data for a given mempool manager (ring,
+ * array, linked list, etc)
+ */
+typedef int (*rte_mempool_put_t)(void *p,
+		void * const *obj_table, unsigned int n);
+
+/** Get an object from the external pool. */
+typedef int (*rte_mempool_get_t)(void *p,
+		void **obj_table, unsigned int n);
+
+/** Return the number of available objects in the external pool. */
+typedef unsigned (*rte_mempool_get_count)(void *p);
+
+/** Structure defining mempool operations structure */
+struct rte_mempool_ops {
+	char name[RTE_MEMPOOL_OPS_NAMESIZE]; /**< Name of mempool ops struct */
+	rte_mempool_alloc_t alloc;       /**< Allocate private data */
+	rte_mempool_free_t free;         /**< Free the external pool. */
+	rte_mempool_put_t put;           /**< Put an object. */
+	rte_mempool_get_t get;           /**< Get an object. */
+	rte_mempool_get_count get_count; /**< Get the number of available objs. */
+} __rte_cache_aligned;
+
+#define RTE_MEMPOOL_MAX_OPS_IDX 16  /**< Max registered ops structs */
+
+/**
+ * Structure storing the table of registered ops structs, each of which contain
+ * the function pointers for the mempool ops functions.
+ * Each process has it's own storage for this ops struct aray so that
+ * the mempools can be shared across primary and secondary processes.
+ * The indices used to access the array are valid across processes, whereas
+ * any function pointers stored directly in the mempool struct would not be.
+ * This results in us simply having "ops_index" in the mempool struct.
+ */
+struct rte_mempool_ops_table {
+	rte_spinlock_t sl;     /**< Spinlock for add/delete. */
+	uint32_t num_ops;      /**< Number of used ops structs in the table. */
+	/**
+	 * Storage for all possible ops structs.
+	 */
+	struct rte_mempool_ops ops[RTE_MEMPOOL_MAX_OPS_IDX];
+} __rte_cache_aligned;
+
+/** Array of registered ops structs */
+extern struct rte_mempool_ops_table rte_mempool_ops_table;
+
+/**
+ * @internal Get the mempool ops struct from its index.
+ *
+ * @param ops_index
+ *   The index of the ops struct in the ops struct table. It must be a valid
+ *   index: (0 <= idx < num_ops).
+ * @return
+ *   The pointer to the ops struct in the table.
+ */
+static inline struct rte_mempool_ops *
+rte_mempool_ops_get(int ops_index)
+{
+	return &rte_mempool_ops_table.ops[ops_index];
+}
+
+/**
+ * @internal wrapper for external mempool manager alloc callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @return
+ *   The opaque pointer to the external pool.
+ */
+void *
+rte_mempool_ops_alloc(const struct rte_mempool *mp);
+
+/**
+ * @internal wrapper for external mempool manager get callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @param obj_table
+ *   Pointer to a table of void * pointers (objects).
+ * @param n
+ *   Number of objects to get.
+ * @return
+ *   - 0: Success; got n objects.
+ *   - <0: Error; code of get function.
+ */
+static inline int
+rte_mempool_ops_dequeue_bulk(struct rte_mempool *mp,
+		void **obj_table, unsigned n)
+{
+	struct rte_mempool_ops *ops;
+
+	ops = rte_mempool_ops_get(mp->ops_index);
+	return ops->get(mp->pool_data, obj_table, n);
+}
+
+/**
+ * @internal wrapper for external mempool manager put callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @param obj_table
+ *   Pointer to a table of void * pointers (objects).
+ * @param n
+ *   Number of objects to put.
+ * @return
+ *   - 0: Success; n objects supplied.
+ *   - <0: Error; code of put function.
+ */
+static inline int
+rte_mempool_ops_enqueue_bulk(struct rte_mempool *mp, void * const *obj_table,
+		unsigned n)
+{
+	struct rte_mempool_ops *ops;
+
+	ops = rte_mempool_ops_get(mp->ops_index);
+	return ops->put(mp->pool_data, obj_table, n);
+}
+
+/**
+ * @internal wrapper for external mempool manager get_count callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @return
+ *   The number of available objects in the external pool.
+ */
+unsigned
+rte_mempool_ops_get_count(const struct rte_mempool *mp);
+
+/**
+ * @internal wrapper for external mempool manager free callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ */
+void
+rte_mempool_ops_free(struct rte_mempool *mp);
+
+/**
+ * Set the ops of a mempool
+ *
+ * This can only be done on a mempool that is not populated, i.e. just after
+ * a call to rte_mempool_create_empty().
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @param name
+ *   Name of the ops structure to use for this mempool.
+ * @return
+ *   - 0: Sucess; the mempool is now using the requested ops functions
+ *   - -EINVAL - Invalid ops struct name provided
+ *   - -EEXIST - mempool already has an ops struct assigned
+ */
+int
+rte_mempool_set_ops_byname(struct rte_mempool *mp, const char *name);
+
+/**
+ * Register mempool operations
+ *
+ * @param h
+ *   Pointer to and ops structure to register
+ * @return
+ *   - >=0: Sucess; return the index of the ops struct in the table.
+ *   - -EINVAL - some missing callbacks while registering ops struct
+ *   - -ENOSPC - the maximum number of ops structs has been reached
+ */
+int rte_mempool_ops_register(const struct rte_mempool_ops *h);
+
+/**
+ * Macro to statically register the ops of an external mempool manager
+ * Note that the rte_mempool_ops_register fails silently here when
+ * more then RTE_MEMPOOL_MAX_OPS_IDX is registered.
+ */
+#define MEMPOOL_REGISTER_OPS(h)					\
+	void mp_hdlr_init_##h(void);					\
+	void __attribute__((constructor, used)) mp_hdlr_init_##h(void)	\
+	{								\
+		rte_mempool_ops_register(&h);			\
+	}
 
 /**
  * An object callback function for mempool.
@@ -774,7 +985,7 @@ __mempool_put_bulk(struct rte_mempool *mp, void * const *obj_table,
 	cache->len += n;
 
 	if (cache->len >= flushthresh) {
-		rte_ring_mp_enqueue_bulk(mp->ring, &cache->objs[cache_size],
+		rte_mempool_ops_enqueue_bulk(mp, &cache->objs[cache_size],
 				cache->len - cache_size);
 		cache->len = cache_size;
 	}
@@ -785,19 +996,10 @@ ring_enqueue:
 
 	/* push remaining objects in ring */
 #ifdef RTE_LIBRTE_MEMPOOL_DEBUG
-	if (is_mp) {
-		if (rte_ring_mp_enqueue_bulk(mp->ring, obj_table, n) < 0)
-			rte_panic("cannot put objects in mempool\n");
-	}
-	else {
-		if (rte_ring_sp_enqueue_bulk(mp->ring, obj_table, n) < 0)
-			rte_panic("cannot put objects in mempool\n");
-	}
+	if (rte_mempool_ops_enqueue_bulk(mp, obj_table, n) < 0)
+		rte_panic("cannot put objects in mempool\n");
 #else
-	if (is_mp)
-		rte_ring_mp_enqueue_bulk(mp->ring, obj_table, n);
-	else
-		rte_ring_sp_enqueue_bulk(mp->ring, obj_table, n);
+	rte_mempool_ops_enqueue_bulk(mp, obj_table, n);
 #endif
 }
 
@@ -922,7 +1124,7 @@ rte_mempool_put(struct rte_mempool *mp, void *obj)
  */
 static inline int __attribute__((always_inline))
 __mempool_get_bulk(struct rte_mempool *mp, void **obj_table,
-		   unsigned n, int is_mc)
+		   unsigned int n, int is_mc)
 {
 	int ret;
 	struct rte_mempool_cache *cache;
@@ -945,7 +1147,8 @@ __mempool_get_bulk(struct rte_mempool *mp, void **obj_table,
 		uint32_t req = n + (cache_size - cache->len);
 
 		/* How many do we require i.e. number to fill the cache + the request */
-		ret = rte_ring_mc_dequeue_bulk(mp->ring, &cache->objs[cache->len], req);
+		ret = rte_mempool_ops_dequeue_bulk(mp,
+			&cache->objs[cache->len], req);
 		if (unlikely(ret < 0)) {
 			/*
 			 * In the offchance that we are buffer constrained,
@@ -972,10 +1175,7 @@ __mempool_get_bulk(struct rte_mempool *mp, void **obj_table,
 ring_dequeue:
 
 	/* get remaining objects from ring */
-	if (is_mc)
-		ret = rte_ring_mc_dequeue_bulk(mp->ring, obj_table, n);
-	else
-		ret = rte_ring_sc_dequeue_bulk(mp->ring, obj_table, n);
+	ret = rte_mempool_ops_dequeue_bulk(mp, obj_table, n);
 
 	if (ret < 0)
 		__MEMPOOL_STAT_ADD(mp, get_fail, n);
