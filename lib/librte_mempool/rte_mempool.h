@@ -204,7 +204,6 @@ struct rte_mempool_memhdr {
  */
 struct rte_mempool {
 	char name[RTE_MEMPOOL_NAMESIZE]; /**< Name of mempool. */
-	struct rte_ring *ring;           /**< Ring to store objects. */
 	union {
 		void *pool_data;         /**< Ring or pool to store objects */
 		uint64_t pool_id;        /**< External mempool identifier */
