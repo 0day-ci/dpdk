@@ -413,6 +413,8 @@ extern struct rte_mempool_ops_table rte_mempool_ops_table;
 static inline struct rte_mempool_ops *
 rte_mempool_ops_get(int ops_index)
 {
+	RTE_VERIFY(ops_index < RTE_MEMPOOL_MAX_OPS_IDX);
+
 	return &rte_mempool_ops_table.ops[ops_index];
 }
 
