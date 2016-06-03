@@ -86,6 +86,14 @@
 #define E1000_INCVALUE_82576         (16 << IGB_82576_TSYNC_SHIFT)
 #define E1000_TSAUXC_DISABLE_SYSTIME 0x80000000
 
+/* CTRL_EXT bit mask*/
+#define E1000_CTRL_EXT_EXT_VLAN      (1 << 26)
+
+/* VLAN Ether Type bit mask */
+#define E1000_VET_VET_EXT            0xFFFF0000
+
+#define E1000_VET_VET_EXT_SHIFT      16
+
 static int  eth_igb_configure(struct rte_eth_dev *dev);
 static int  eth_igb_start(struct rte_eth_dev *dev);
 static void eth_igb_stop(struct rte_eth_dev *dev);
@@ -2237,13 +2245,37 @@ eth_igb_vlan_tpid_set(struct rte_eth_dev *dev,
 {
 	struct e1000_hw *hw =
 		E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
-	uint32_t reg = ETHER_TYPE_VLAN;
+	uint32_t reg;
+	uint32_t qinq;
 	int ret = 0;
+
+	qinq = E1000_READ_REG(hw, E1000_CTRL_EXT);
+	qinq &= E1000_CTRL_EXT_EXT_VLAN;
 
 	switch (vlan_type) {
 	case ETH_VLAN_TYPE_INNER:
-		reg |= (tpid << 16);
-		E1000_WRITE_REG(hw, E1000_VET, reg);
+		if (qinq) {
+			ret = -ENOTSUP;
+			PMD_DRV_LOG(WARNING,
+				    "Inner vlan ether type is read-only\n");
+		} else {
+			ret = -ENOTSUP;
+			PMD_DRV_LOG(ERR, "Inner type is not supported"
+				    " by single vlan\n");
+		}
+		break;
+	case ETH_VLAN_TYPE_OUTER:
+		if (qinq) {
+			reg = E1000_READ_REG(hw, E1000_VET);
+			reg = (reg & (~E1000_VET_VET_EXT)) |
+				((uint32_t)tpid << E1000_VET_VET_EXT_SHIFT);
+			E1000_WRITE_REG(hw, E1000_VET, reg);
+		} else {
+			ret = -ENOTSUP;
+			PMD_DRV_LOG(WARNING,
+				    "Single vlan ether type is read-only\n");
+		}
+
 		break;
 	default:
 		ret = -EINVAL;
