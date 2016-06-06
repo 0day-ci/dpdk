@@ -41,6 +41,7 @@
 #include "bnxt_hwrm.h"
 #include "bnxt_ring.h"
 #include "bnxt_rxq.h"
+#include "bnxt_rxr.h"
 #include "bnxt_vnic.h"
 #include "hsi_struct_def_dpdk.h"
 
@@ -217,7 +218,20 @@ err_out:
 
 static void bnxt_rx_queue_release_mbufs(struct bnxt_rx_queue *rxq __rte_unused)
 {
-	/* TODO: Requires interaction with TX ring */
+	struct bnxt_sw_rx_bd *sw_ring;
+	uint16_t i;
+
+	if (rxq) {
+		sw_ring = rxq->rx_ring->rx_buf_ring;
+		if (sw_ring) {
+			for (i = 0; i < rxq->nb_rx_desc; i++) {
+				if (sw_ring[i].mbuf) {
+					rte_pktmbuf_free_seg(sw_ring[i].mbuf);
+					sw_ring[i].mbuf = NULL;
+				}
+			}
+		}
+	}
 }
 
 void bnxt_free_rx_mbufs(struct bnxt *bp)
@@ -238,7 +252,13 @@ void bnxt_rx_queue_release_op(void *rx_queue)
 	if (rxq) {
 		bnxt_rx_queue_release_mbufs(rxq);
 
-		/* TODO: Free ring and stats here */
+		/* Free RX ring hardware descriptors */
+		bnxt_free_ring(rxq->rx_ring->rx_ring_struct);
+
+		/* Free RX completion ring hardware descriptors */
+		bnxt_free_ring(rxq->cp_ring->cp_ring_struct);
+
+		bnxt_free_rxq_stats(rxq);
 
 		rte_free(rxq);
 	}
@@ -275,7 +295,7 @@ int bnxt_rx_queue_setup_op(struct rte_eth_dev *eth_dev,
 	rxq->nb_rx_desc = nb_desc;
 	rxq->rx_free_thresh = rx_conf->rx_free_thresh;
 
-	/* TODO: Initialize ring structure */
+	bnxt_init_rx_ring_struct(rxq);
 
 	rxq->queue_id = queue_idx;
 	rxq->port_id = eth_dev->data->port_id;
@@ -283,7 +303,13 @@ int bnxt_rx_queue_setup_op(struct rte_eth_dev *eth_dev,
 				0 : ETHER_CRC_LEN);
 
 	eth_dev->data->rx_queues[queue_idx] = rxq;
-	/* TODO: Allocate RX ring hardware descriptors */
+	/* Allocate RX ring hardware descriptors */
+	if (bnxt_alloc_rings(bp, queue_idx, NULL, rxq->rx_ring, rxq->cp_ring,
+			"bnxt_rx_ring")) {
+		RTE_LOG(ERR, PMD, "ring_dma_zone_reserve for rx_ring failed!");
+		bnxt_rx_queue_release_op(rxq);
+		return -ENOMEM;
+	}
 
 	return 0;
 }
