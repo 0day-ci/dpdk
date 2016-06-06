@@ -206,6 +206,49 @@ int bnxt_hwrm_clear_filter(struct bnxt *bp,
 	return 0;
 }
 
+int bnxt_hwrm_set_filter(struct bnxt *bp,
+			 struct bnxt_vnic_info *vnic,
+			 struct bnxt_filter_info *filter)
+{
+	int rc = 0;
+	struct hwrm_cfa_l2_filter_alloc_input req = {.req_type = 0 };
+	struct hwrm_cfa_l2_filter_alloc_output *resp = bp->hwrm_cmd_resp_addr;
+	uint32_t enables = 0;
+
+	HWRM_PREP(req, CFA_L2_FILTER_ALLOC, -1, resp);
+
+	req.flags = rte_cpu_to_le_32(filter->flags);
+
+	enables = filter->enables |
+	      HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_DST_ID;
+	req.dst_id = rte_cpu_to_le_16(vnic->fw_vnic_id);
+
+	if (enables &
+	    HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_L2_ADDR)
+		memcpy(req.l2_addr, filter->l2_addr,
+		       ETHER_ADDR_LEN);
+	if (enables &
+	    HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_L2_ADDR_MASK)
+		memcpy(req.l2_addr_mask, filter->l2_addr_mask,
+		       ETHER_ADDR_LEN);
+	if (enables &
+	    HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_L2_OVLAN)
+		req.l2_ovlan = filter->l2_ovlan;
+	if (enables &
+	    HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_L2_OVLAN_MASK)
+		req.l2_ovlan_mask = filter->l2_ovlan_mask;
+
+	req.enables = rte_cpu_to_le_32(enables);
+
+	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
+
+	HWRM_CHECK_RESULT;
+
+	filter->fw_l2_filter_id = rte_le_to_cpu_64(resp->l2_filter_id);
+
+	return rc;
+}
+
 int bnxt_hwrm_exec_fwd_resp(struct bnxt *bp, void *fwd_cmd)
 {
 	int rc;
@@ -1014,6 +1057,32 @@ int bnxt_alloc_hwrm_resources(struct bnxt *bp)
 	rte_spinlock_init(&bp->hwrm_lock);
 
 	return 0;
+}
+
+int bnxt_clear_hwrm_vnic_filters(struct bnxt *bp, struct bnxt_vnic_info *vnic)
+{
+	struct bnxt_filter_info *filter;
+	int rc = 0;
+
+	STAILQ_FOREACH(filter, &vnic->filter, next) {
+		rc = bnxt_hwrm_clear_filter(bp, filter);
+		if (rc)
+			break;
+	}
+	return rc;
+}
+
+int bnxt_set_hwrm_vnic_filters(struct bnxt *bp, struct bnxt_vnic_info *vnic)
+{
+	struct bnxt_filter_info *filter;
+	int rc = 0;
+
+	STAILQ_FOREACH(filter, &vnic->filter, next) {
+		rc = bnxt_hwrm_set_filter(bp, vnic, filter);
+		if (rc)
+			break;
+	}
+	return rc;
 }
 
 static uint16_t bnxt_parse_eth_link_duplex(uint32_t conf_link_speed)
