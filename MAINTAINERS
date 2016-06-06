@@ -650,3 +650,7 @@ F: examples/tep_termination/
 F: examples/vmdq/
 F: examples/vmdq_dcb/
 F: doc/guides/sample_app_ug/vmdq_dcb_forwarding.rst
+
+M: Wenzhuo Lu <wenzhuo.lu@intel.com>
+F: examples/link_reset/
+F: doc/guides/sample_app_ug/link_reset.rst
