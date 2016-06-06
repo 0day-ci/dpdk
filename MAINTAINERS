@@ -400,6 +400,11 @@ M: Declan Doherty <declan.doherty@intel.com>
 F: drivers/crypto/null/
 F: doc/guides/cryptodevs/null.rst
 
+Broadcom BNXT PMD
+M: Stephen Hurd <stephen.hurd@broadcom.com>
+F: drivers/net/bnxt/
+F: doc/guides/nics/bnxt.rst
+
 
 Packet processing
 -----------------
