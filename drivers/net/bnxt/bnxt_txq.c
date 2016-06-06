@@ -49,9 +49,6 @@ void bnxt_free_txq_stats(struct bnxt_tx_queue *txq)
 {
 	struct bnxt_cp_ring_info *cpr = txq->cp_ring;
 
-	/* 'Unreserve' rte_memzone */
-	/* N/A */
-
 	if (cpr->hw_stats)
 		cpr->hw_stats = NULL;
 }
@@ -109,10 +106,12 @@ int bnxt_tx_queue_setup_op(struct rte_eth_dev *eth_dev,
 {
 	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
 	struct bnxt_tx_queue *txq;
+	int rc = 0;
 
 	if (!nb_desc || nb_desc > MAX_TX_DESC_CNT) {
 		RTE_LOG(ERR, PMD, "nb_desc %d is invalid", nb_desc);
-		return -EINVAL;
+		rc = -EINVAL;
+		goto out;
 	}
 
 	if (eth_dev->data->tx_queues) {
@@ -124,33 +123,40 @@ int bnxt_tx_queue_setup_op(struct rte_eth_dev *eth_dev,
 	}
 	txq = rte_zmalloc_socket("bnxt_tx_queue", sizeof(struct bnxt_tx_queue),
 				 RTE_CACHE_LINE_SIZE, socket_id);
-	if (txq == NULL) {
+	if (!txq) {
 		RTE_LOG(ERR, PMD, "bnxt_tx_queue allocation failed!");
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto out;
 	}
 	txq->bp = bp;
 	txq->nb_tx_desc = nb_desc;
 	txq->tx_free_thresh = tx_conf->tx_free_thresh;
 
-	bnxt_init_tx_ring_struct(txq);
+	rc = bnxt_init_tx_ring_struct(txq, socket_id);
+	if (rc)
+		goto out;
 
 	txq->queue_id = queue_idx;
 	txq->port_id = eth_dev->data->port_id;
 
 	/* Allocate TX ring hardware descriptors */
 	if (bnxt_alloc_rings(bp, queue_idx, txq->tx_ring, NULL, txq->cp_ring,
-			"bnxt_tx_ring")) {
+			"txr")) {
 		RTE_LOG(ERR, PMD, "ring_dma_zone_reserve for tx_ring failed!");
 		bnxt_tx_queue_release_op(txq);
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto out;
 	}
 
 	if (bnxt_init_one_tx_ring(txq)) {
 		RTE_LOG(ERR, PMD, "bnxt_init_one_tx_ring failed!");
 		bnxt_tx_queue_release_op(txq);
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto out;
 	}
 
 	eth_dev->data->tx_queues[queue_idx] = txq;
-	return 0;
+
+out:
+	return rc;
 }
