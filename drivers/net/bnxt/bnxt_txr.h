@@ -53,7 +53,7 @@ struct bnxt_tx_ring_info {
 #define BNXT_DEV_STATE_CLOSING	0x1
 	uint32_t		dev_state;
 
-	struct bnxt_ring_struct	*tx_ring_struct;
+	struct bnxt_ring	*tx_ring_struct;
 };
 
 struct bnxt_sw_tx_bd {

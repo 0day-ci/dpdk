@@ -273,7 +273,7 @@ int bnxt_init_rx_ring_struct(struct bnxt_rx_queue *rxq, unsigned int socket_id)
 	struct bnxt *bp = rxq->bp;
 	struct bnxt_cp_ring_info *cpr;
 	struct bnxt_rx_ring_info *rxr;
-	struct bnxt_ring_struct *ring;
+	struct bnxt_ring *ring;
 
 	rxq->rx_buf_use_size = bp->eth_dev->data->mtu +
 			       ETHER_HDR_LEN + ETHER_CRC_LEN +
@@ -288,7 +288,7 @@ int bnxt_init_rx_ring_struct(struct bnxt_rx_queue *rxq, unsigned int socket_id)
 	rxq->rx_ring = rxr;
 
 	ring = rte_zmalloc_socket("bnxt_rx_ring_struct",
-				   sizeof(struct bnxt_ring_struct),
+				   sizeof(struct bnxt_ring),
 				   RTE_CACHE_LINE_SIZE, socket_id);
 	if (ring == NULL)
 		return -ENOMEM;
@@ -308,7 +308,7 @@ int bnxt_init_rx_ring_struct(struct bnxt_rx_queue *rxq, unsigned int socket_id)
 	rxq->cp_ring = cpr;
 
 	ring = rte_zmalloc_socket("bnxt_rx_ring_struct",
-				   sizeof(struct bnxt_ring_struct),
+				   sizeof(struct bnxt_ring),
 				   RTE_CACHE_LINE_SIZE, socket_id);
 	if (ring == NULL)
 		return -ENOMEM;
@@ -323,7 +323,7 @@ int bnxt_init_rx_ring_struct(struct bnxt_rx_queue *rxq, unsigned int socket_id)
 	return 0;
 }
 
-static void bnxt_init_rxbds(struct bnxt_ring_struct *ring, uint32_t type,
+static void bnxt_init_rxbds(struct bnxt_ring *ring, uint32_t type,
 			    uint16_t len)
 {
 	uint32_t j;
@@ -341,7 +341,7 @@ static void bnxt_init_rxbds(struct bnxt_ring_struct *ring, uint32_t type,
 int bnxt_init_one_rx_ring(struct bnxt_rx_queue *rxq)
 {
 	struct bnxt_rx_ring_info *rxr;
-	struct bnxt_ring_struct *ring;
+	struct bnxt_ring *ring;
 	uint32_t prod, type;
 	unsigned int i;
 

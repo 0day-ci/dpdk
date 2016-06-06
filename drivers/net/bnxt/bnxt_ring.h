@@ -66,7 +66,7 @@
 
 #define INVALID_HW_RING_ID      ((uint16_t)-1)
 
-struct bnxt_ring_struct {
+struct bnxt_ring {
 	void			*bd;
 	phys_addr_t		bd_dma;
 	uint32_t		ring_size;
@@ -91,7 +91,7 @@ struct bnxt;
 struct bnxt_tx_ring_info;
 struct bnxt_rx_ring_info;
 struct bnxt_cp_ring_info;
-void bnxt_free_ring(struct bnxt_ring_struct *ring);
+void bnxt_free_ring(struct bnxt_ring *ring);
 void bnxt_init_ring_grps(struct bnxt *bp);
 int bnxt_alloc_rings(struct bnxt *bp, uint16_t qidx,
 			    struct bnxt_tx_ring_info *tx_ring_info,

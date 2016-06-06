@@ -48,7 +48,7 @@
  * Generic ring handling
  */
 
-void bnxt_free_ring(struct bnxt_ring_struct *ring)
+void bnxt_free_ring(struct bnxt_ring *ring)
 {
 	if (ring->vmem_size && *ring->vmem) {
 		memset((char *)*ring->vmem, 0, ring->vmem_size);
@@ -77,7 +77,7 @@ void bnxt_init_ring_grps(struct bnxt *bp)
  *
  * Order in the allocation is:
  * stats - Always non-zero length
- * cp vmem - Always zero-length, supported for the bnxt_ring_struct abstraction
+ * cp vmem - Always zero-length, supported for the bnxt_ring abstraction
  * tx vmem - Only non-zero length if tx_ring_info is not NULL
  * rx vmem - Only non-zero length if rx_ring_info is not NULL
  * cp bd ring - Always non-zero length
@@ -90,9 +90,9 @@ int bnxt_alloc_rings(struct bnxt *bp, uint16_t qidx,
 			    struct bnxt_cp_ring_info *cp_ring_info,
 			    const char *suffix)
 {
-	struct bnxt_ring_struct *cp_ring = cp_ring_info->cp_ring_struct;
-	struct bnxt_ring_struct *rx_ring;
-	struct bnxt_ring_struct *tx_ring;
+	struct bnxt_ring *cp_ring = cp_ring_info->cp_ring_struct;
+	struct bnxt_ring *rx_ring;
+	struct bnxt_ring *tx_ring;
 	struct rte_pci_device *pdev = bp->pdev;
 	const struct rte_memzone *mz = NULL;
 	char mz_name[RTE_MEMZONE_NAMESIZE];
@@ -214,7 +214,7 @@ int bnxt_alloc_hwrm_rings(struct bnxt *bp)
 	/* Default completion ring */
 	{
 		struct bnxt_cp_ring_info *cpr = bp->def_cp_ring;
-		struct bnxt_ring_struct *cp_ring = cpr->cp_ring_struct;
+		struct bnxt_ring *cp_ring = cpr->cp_ring_struct;
 
 		rc = bnxt_hwrm_ring_alloc(bp, cp_ring,
 					  HWRM_RING_ALLOC_INPUT_RING_TYPE_CMPL,
@@ -230,9 +230,9 @@ int bnxt_alloc_hwrm_rings(struct bnxt *bp)
 	for (i = 0; i < bp->rx_cp_nr_rings; i++) {
 		struct bnxt_rx_queue *rxq = bp->rx_queues[i];
 		struct bnxt_cp_ring_info *cpr = rxq->cp_ring;
-		struct bnxt_ring_struct *cp_ring = cpr->cp_ring_struct;
+		struct bnxt_ring *cp_ring = cpr->cp_ring_struct;
 		struct bnxt_rx_ring_info *rxr = rxq->rx_ring;
-		struct bnxt_ring_struct *ring = rxr->rx_ring_struct;
+		struct bnxt_ring *ring = rxr->rx_ring_struct;
 		unsigned int idx = i + 1;
 
 		/* Rx cmpl */
@@ -270,9 +270,9 @@ int bnxt_alloc_hwrm_rings(struct bnxt *bp)
 	for (i = 0; i < bp->tx_cp_nr_rings; i++) {
 		struct bnxt_tx_queue *txq = bp->tx_queues[i];
 		struct bnxt_cp_ring_info *cpr = txq->cp_ring;
-		struct bnxt_ring_struct *cp_ring = cpr->cp_ring_struct;
+		struct bnxt_ring *cp_ring = cpr->cp_ring_struct;
 		struct bnxt_tx_ring_info *txr = txq->tx_ring;
-		struct bnxt_ring_struct *ring = txr->tx_ring_struct;
+		struct bnxt_ring *ring = txr->tx_ring_struct;
 		unsigned int idx = 1 + bp->rx_cp_nr_rings + i;
 
 		/* Tx cmpl */

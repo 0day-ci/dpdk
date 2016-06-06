@@ -587,7 +587,7 @@ int bnxt_hwrm_queue_qportcfg(struct bnxt *bp)
 }
 
 int bnxt_hwrm_ring_alloc(struct bnxt *bp,
-			 struct bnxt_ring_struct *ring,
+			 struct bnxt_ring *ring,
 			 uint32_t ring_type, uint32_t map_index,
 			 uint32_t stats_ctx_id)
 {
@@ -660,7 +660,7 @@ int bnxt_hwrm_ring_alloc(struct bnxt *bp,
 }
 
 int bnxt_hwrm_ring_free(struct bnxt *bp,
-			struct bnxt_ring_struct *ring, uint32_t ring_type)
+			struct bnxt_ring *ring, uint32_t ring_type)
 {
 	int rc;
 	struct hwrm_ring_free_input req = {.req_type = 0 };
@@ -1058,7 +1058,7 @@ int bnxt_free_all_hwrm_ring_grps(struct bnxt *bp)
 static void bnxt_free_cp_ring(struct bnxt *bp,
 			      struct bnxt_cp_ring_info *cpr, unsigned int idx)
 {
-	struct bnxt_ring_struct *cp_ring = cpr->cp_ring_struct;
+	struct bnxt_ring *cp_ring = cpr->cp_ring_struct;
 
 	bnxt_hwrm_ring_free(bp, cp_ring,
 			HWRM_RING_FREE_INPUT_RING_TYPE_CMPL);
@@ -1077,7 +1077,7 @@ int bnxt_free_all_hwrm_rings(struct bnxt *bp)
 	for (i = 0; i < bp->tx_cp_nr_rings; i++) {
 		struct bnxt_tx_queue *txq = bp->tx_queues[i];
 		struct bnxt_tx_ring_info *txr = txq->tx_ring;
-		struct bnxt_ring_struct *ring = txr->tx_ring_struct;
+		struct bnxt_ring *ring = txr->tx_ring_struct;
 		struct bnxt_cp_ring_info *cpr = txq->cp_ring;
 		unsigned int idx = bp->rx_cp_nr_rings + i + 1;
 
@@ -1101,7 +1101,7 @@ int bnxt_free_all_hwrm_rings(struct bnxt *bp)
 	for (i = 0; i < bp->rx_cp_nr_rings; i++) {
 		struct bnxt_rx_queue *rxq = bp->rx_queues[i];
 		struct bnxt_rx_ring_info *rxr = rxq->rx_ring;
-		struct bnxt_ring_struct *ring = rxr->rx_ring_struct;
+		struct bnxt_ring *ring = rxr->rx_ring_struct;
 		struct bnxt_cp_ring_info *cpr = rxq->cp_ring;
 		unsigned int idx = i + 1;
 

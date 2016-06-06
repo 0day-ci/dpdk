@@ -57,7 +57,7 @@
 		(*(uint32_t *)((cpr)->cp_doorbell) = (DB_CP_FLAGS |	\
 				RING_CMP(cpr->cp_ring_struct, raw_cons)))
 
-struct bnxt_ring_struct;
+struct bnxt_ring;
 struct bnxt_cp_ring_info {
 	uint32_t		cp_raw_cons;
 	void			*cp_doorbell;
@@ -70,7 +70,7 @@ struct bnxt_cp_ring_info {
 	phys_addr_t		hw_stats_map;
 	uint32_t		hw_stats_ctx_id;
 
-	struct bnxt_ring_struct	*cp_ring_struct;
+	struct bnxt_ring	*cp_ring_struct;
 };
 
 #define RX_CMP_L2_ERRORS						\

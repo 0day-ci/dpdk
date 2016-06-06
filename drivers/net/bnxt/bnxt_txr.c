@@ -74,7 +74,7 @@ void bnxt_free_tx_rings(struct bnxt *bp)
 int bnxt_init_one_tx_ring(struct bnxt_tx_queue *txq)
 {
 	struct bnxt_tx_ring_info *txr = txq->tx_ring;
-	struct bnxt_ring_struct *ring = txr->tx_ring_struct;
+	struct bnxt_ring *ring = txr->tx_ring_struct;
 
 	txq->tx_wake_thresh = ring->ring_size / 2;
 	ring->fw_ring_id = INVALID_HW_RING_ID;
@@ -86,7 +86,7 @@ int bnxt_init_tx_ring_struct(struct bnxt_tx_queue *txq, unsigned int socket_id)
 {
 	struct bnxt_cp_ring_info *cpr;
 	struct bnxt_tx_ring_info *txr;
-	struct bnxt_ring_struct *ring;
+	struct bnxt_ring *ring;
 
 	txr = rte_zmalloc_socket("bnxt_tx_ring",
 				 sizeof(struct bnxt_tx_ring_info),
@@ -96,7 +96,7 @@ int bnxt_init_tx_ring_struct(struct bnxt_tx_queue *txq, unsigned int socket_id)
 	txq->tx_ring = txr;
 
 	ring = rte_zmalloc_socket("bnxt_tx_ring_struct",
-				  sizeof(struct bnxt_ring_struct),
+				  sizeof(struct bnxt_ring),
 				  RTE_CACHE_LINE_SIZE, socket_id);
 	if (ring == NULL)
 		return -ENOMEM;
@@ -116,7 +116,7 @@ int bnxt_init_tx_ring_struct(struct bnxt_tx_queue *txq, unsigned int socket_id)
 	txq->cp_ring = cpr;
 
 	ring = rte_zmalloc_socket("bnxt_tx_ring_struct",
-				  sizeof(struct bnxt_ring_struct),
+				  sizeof(struct bnxt_ring),
 				  RTE_CACHE_LINE_SIZE, socket_id);
 	if (ring == NULL)
 		return -ENOMEM;

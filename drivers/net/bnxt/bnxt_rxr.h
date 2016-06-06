@@ -50,7 +50,7 @@ struct bnxt_rx_ring_info {
 
 	phys_addr_t		rx_desc_mapping;
 
-	struct bnxt_ring_struct	*rx_ring_struct;
+	struct bnxt_ring	*rx_ring_struct;
 };
 
 uint16_t bnxt_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,

@@ -62,11 +62,11 @@ int bnxt_hwrm_func_driver_unregister(struct bnxt *bp, uint32_t flags);
 int bnxt_hwrm_queue_qportcfg(struct bnxt *bp);
 
 int bnxt_hwrm_ring_alloc(struct bnxt *bp,
-			 struct bnxt_ring_struct *ring,
+			 struct bnxt_ring *ring,
 			 uint32_t ring_type, uint32_t map_index,
 			 uint32_t stats_ctx_id);
 int bnxt_hwrm_ring_free(struct bnxt *bp,
-			struct bnxt_ring_struct *ring, uint32_t ring_type);
+			struct bnxt_ring *ring, uint32_t ring_type);
 int bnxt_hwrm_ring_grp_alloc(struct bnxt *bp, unsigned int idx);
 int bnxt_hwrm_ring_grp_free(struct bnxt *bp, unsigned int idx);
 

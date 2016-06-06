@@ -133,7 +133,7 @@ void bnxt_free_def_cp_ring(struct bnxt *bp)
 int bnxt_init_def_ring_struct(struct bnxt *bp, unsigned int socket_id)
 {
 	struct bnxt_cp_ring_info *cpr;
-	struct bnxt_ring_struct *ring;
+	struct bnxt_ring *ring;
 
 	cpr = rte_zmalloc_socket("bnxt_cp_ring",
 				 sizeof(struct bnxt_cp_ring_info),
@@ -143,7 +143,7 @@ int bnxt_init_def_ring_struct(struct bnxt *bp, unsigned int socket_id)
 	bp->def_cp_ring = cpr;
 
 	ring = rte_zmalloc_socket("bnxt_cp_ring_struct",
-				  sizeof(struct bnxt_ring_struct),
+				  sizeof(struct bnxt_ring),
 				  RTE_CACHE_LINE_SIZE, socket_id);
 	if (ring == NULL)
 		return -ENOMEM;
