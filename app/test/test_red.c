@@ -1747,6 +1747,16 @@ struct tests func_tests[] = {
 	{ &ovfl_test1_config, ovfl_test1 },
 };
 
+struct tests func_tests_quick[] = {
+	{ &func_test1_config, func_test1 },
+	{ &func_test2_config, func_test2 },
+	{ &func_test3_config, func_test3 },
+	/* no test 4 as it takes a lot of time */
+	{ &func_test5_config, func_test5 },
+	{ &func_test6_config, func_test6 },
+	{ &ovfl_test1_config, ovfl_test1 },
+};
+
 struct tests perf_tests[] = {
 	{ &perf1_test1_config, perf1_test },
 	{ &perf1_test2_config, perf1_test },
@@ -1850,27 +1860,60 @@ test_invalid_parameters(void)
 	return 0;
 }
 
+static void
+show_stats(const uint32_t num_tests, const uint32_t num_pass)
+{
+	if (num_pass == num_tests)
+		printf("[total: %u, pass: %u]\n", num_tests, num_pass);
+	else
+		printf("[total: %u, pass: %u, fail: %u]\n", num_tests, num_pass,
+		       num_tests - num_pass);
+}
+
+static int
+tell_the_result(const uint32_t num_tests, const uint32_t num_pass)
+{
+	return (num_pass == num_tests) ? 0 : 1;
+}
+
 static int
 test_red(void)
 {
 	uint32_t num_tests = 0;
 	uint32_t num_pass = 0;
-	int ret = 0;
+
+	if (test_invalid_parameters() < 0)
+		return -1;
+	run_tests(func_tests_quick, RTE_DIM(func_tests_quick),
+		  &num_tests, &num_pass);
+	show_stats(num_tests, num_pass);
+	return tell_the_result(num_tests, num_pass);
+}
+
+static int
+test_red_perf(void)
+{
+	uint32_t num_tests = 0;
+	uint32_t num_pass = 0;
+
+	run_tests(perf_tests, RTE_DIM(perf_tests), &num_tests, &num_pass);
+	show_stats(num_tests, num_pass);
+	return tell_the_result(num_tests, num_pass);
+}
+
+static int
+test_red_all(void)
+{
+	uint32_t num_tests = 0;
+	uint32_t num_pass = 0;
 
 	if (test_invalid_parameters() < 0)
 		return -1;
 
 	run_tests(func_tests, RTE_DIM(func_tests), &num_tests, &num_pass);
 	run_tests(perf_tests, RTE_DIM(perf_tests), &num_tests, &num_pass);
-
-	if (num_pass == num_tests) {
-		printf("[total: %u, pass: %u]\n", num_tests, num_pass);
-		ret = 0;
-	} else {
-		printf("[total: %u, pass: %u, fail: %u]\n", num_tests, num_pass, num_tests - num_pass);
-		ret = -1;
-	}
-	return ret;
+	show_stats(num_tests, num_pass);
+	return tell_the_result(num_tests, num_pass);
 }
 
 static struct test_command red_cmd = {
@@ -1878,3 +1921,15 @@ static struct test_command red_cmd = {
 	.callback = test_red,
 };
 REGISTER_TEST_COMMAND(red_cmd);
+
+static struct test_command red_cmd_perf = {
+	.command = "red_perf",
+	.callback = test_red_perf,
+};
+REGISTER_TEST_COMMAND(red_cmd_perf);
+
+static struct test_command red_cmd_all = {
+	.command = "red_all",
+	.callback = test_red_all,
+};
+REGISTER_TEST_COMMAND(red_cmd_all);
