@@ -416,8 +416,8 @@ inbound_sa_lookup(struct sa_ctx *sa_ctx, struct rte_mbuf *pkts[],
 	uint32_t *src, spi;
 
 	for (i = 0; i < nb_pkts; i++) {
-		spi = rte_pktmbuf_mtod_offset(pkts[i], struct esp_hdr *,
-				sizeof(struct ip))->spi;
+		spi = rte_be_to_cpu_32(rte_pktmbuf_mtod_offset(pkts[i],
+				struct esp_hdr *, sizeof(struct ip))->spi);
 
 		if (spi == INVALID_SPI)
 			continue;
