@@ -55,16 +55,17 @@
 static inline void
 random_iv_u64(uint64_t *buf, uint16_t n)
 {
-	unsigned left = n & 0x7;
-	unsigned i;
+	int res = 0;
+	FILE *fp;
 
-	RTE_ASSERT((n & 0x3) == 0);
+	fp = fopen("/dev/urandom", "r");
+	if (fp != NULL) {
+		res = fread(buf, 8, n, fp);
+		fclose(fp);
+	}
 
-	for (i = 0; i < (n >> 3); i++)
-		buf[i] = rte_rand();
-
-	if (left)
-		*((uint32_t *)&buf[i]) = (uint32_t)lrand48();
+	RTE_ASSERT(res != n);
+	RTE_LOG(DEBUG, IPSEC_ESP, "random_iv_u64 result %d\n", res);
 }
 
 /* IPv4 Tunnel */
