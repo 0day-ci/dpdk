@@ -1108,7 +1108,6 @@ static inline struct rte_mbuf *rte_mbuf_raw_alloc(struct rte_mempool *mp)
 	if (rte_mempool_get(mp, &mb) < 0)
 		return NULL;
 	m = (struct rte_mbuf *)mb;
-	RTE_ASSERT(rte_mbuf_refcnt_read(m) == 0);
 	rte_mbuf_refcnt_set(m, 1);
 	__rte_mbuf_sanity_check(m, 0);
 
@@ -1133,7 +1132,6 @@ __rte_mbuf_raw_alloc(struct rte_mempool *mp)
 static inline void __attribute__((always_inline))
 __rte_mbuf_raw_free(struct rte_mbuf *m)
 {
-	RTE_ASSERT(rte_mbuf_refcnt_read(m) == 0);
 	rte_mempool_put(m->pool, m);
 }
 
