@@ -470,6 +470,9 @@ void enic_free_rq(void *rxq)
 	struct vnic_rq *rq = (struct vnic_rq *)rxq;
 	struct enic *enic = vnic_dev_priv(rq->vdev);
 
+	if (rxq == NULL)
+		return;
+
 	enic_rxmbuf_queue_release(enic, rq);
 	rte_free(rq->mbuf_ring);
 	rq->mbuf_ring = NULL;
