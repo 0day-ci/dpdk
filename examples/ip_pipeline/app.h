@@ -667,7 +667,7 @@ app_swq_get_reader(struct app_params *app,
 	struct app_pktq_swq_params *swq,
 	uint32_t *pktq_in_id)
 {
-	struct app_pipeline_params *reader;
+	struct app_pipeline_params *reader = NULL;
 	uint32_t pos = swq - app->swq_params;
 	uint32_t n_pipelines = RTE_MIN(app->n_pipelines,
 		RTE_DIM(app->pipeline_params));
@@ -727,7 +727,7 @@ app_tm_get_reader(struct app_params *app,
 	struct app_pktq_tm_params *tm,
 	uint32_t *pktq_in_id)
 {
-	struct app_pipeline_params *reader;
+	struct app_pipeline_params *reader = NULL;
 	uint32_t pos = tm - app->tm_params;
 	uint32_t n_pipelines = RTE_MIN(app->n_pipelines,
 		RTE_DIM(app->pipeline_params));
