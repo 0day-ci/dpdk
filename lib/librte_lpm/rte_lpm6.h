@@ -55,7 +55,7 @@ struct rte_lpm6;
 
 /** LPM configuration structure. */
 struct rte_lpm6_config {
-	uint32_t max_rules;      /**< Max number of rules. */
+	uint32_t max_rules;      /**< This field is currently unused. */
 	uint32_t number_tbl8s;   /**< Number of tbl8s to allocate. */
 	int flags;               /**< This field is currently unused. */
 };
@@ -123,8 +123,13 @@ rte_lpm6_free(struct rte_lpm6 *lpm);
  */
 int
 rte_lpm6_add(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
+		uint16_t next_hop);
+int
+rte_lpm6_add_v20(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
 		uint8_t next_hop);
-
+int
+rte_lpm6_add_v1607(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
+		uint16_t next_hop);
 /**
  * Check if a rule is present in the LPM table,
  * and provide its next hop if it is.
@@ -142,7 +147,13 @@ rte_lpm6_add(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
  */
 int
 rte_lpm6_is_rule_present(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
+uint16_t *next_hop);
+int
+rte_lpm6_is_rule_present_v20(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
 uint8_t *next_hop);
+int
+rte_lpm6_is_rule_present_v1607(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
+uint16_t *next_hop);
 
 /**
  * Delete a rule from the LPM table.
@@ -199,7 +210,11 @@ rte_lpm6_delete_all(struct rte_lpm6 *lpm);
  *   -EINVAL for incorrect arguments, -ENOENT on lookup miss, 0 on lookup hit
  */
 int
-rte_lpm6_lookup(const struct rte_lpm6 *lpm, uint8_t *ip, uint8_t *next_hop);
+rte_lpm6_lookup(const struct rte_lpm6 *lpm, uint8_t *ip, uint16_t *next_hop);
+int
+rte_lpm6_lookup_v20(const struct rte_lpm6 *lpm, uint8_t *ip, uint8_t *next_hop);
+int
+rte_lpm6_lookup_v1607(const struct rte_lpm6 *lpm, uint8_t *ip, uint16_t *next_hop);
 
 /**
  * Lookup multiple IP addresses in an LPM table.
@@ -220,7 +235,33 @@ rte_lpm6_lookup(const struct rte_lpm6 *lpm, uint8_t *ip, uint8_t *next_hop);
 int
 rte_lpm6_lookup_bulk_func(const struct rte_lpm6 *lpm,
 		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
-		int16_t * next_hops, unsigned n);
+		int32_t *next_hops, unsigned n);
+int
+rte_lpm6_lookup_bulk_func_v20(const struct rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+		int16_t *next_hops, unsigned n);
+int
+rte_lpm6_lookup_bulk_func_v1607(const struct rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+		int32_t *next_hops, unsigned n);
+/**
+ * Return the number of entries in the Tbl8 array
+ *
+ * @param lpm
+ *   LPM object handle
+ */
+unsigned
+rte_lpm6_tbl8_count(const struct rte_lpm6 *lpm);
+
+
+/**
+ * Return the number of free entries in the Tbl8 array
+ *
+ * @param lpm
+ *   LPM object handle
+ */
+unsigned
+rte_lpm6_tbl8_free_count(const struct rte_lpm6 *lpm);
 
 #ifdef __cplusplus
 }

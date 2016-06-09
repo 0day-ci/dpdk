@@ -52,6 +52,8 @@
 #include <rte_errno.h>
 #include <rte_rwlock.h>
 #include <rte_spinlock.h>
+#include <rte_compat.h>
+#include <tree.h>
 
 #include "rte_lpm6.h"
 
@@ -97,26 +99,45 @@ struct rte_lpm6_tbl_entry {
 /** Rules tbl entry structure. */
 struct rte_lpm6_rule {
 	uint8_t ip[RTE_LPM6_IPV6_ADDR_SIZE]; /**< Rule IP address. */
-	uint8_t next_hop; /**< Rule next hop. */
+	uint16_t next_hop; /**< Rule next hop. */
 	uint8_t depth; /**< Rule depth. */
+	RB_ENTRY(rte_lpm6_rule) link;
 };
 
 /** LPM6 structure. */
 struct rte_lpm6 {
 	/* LPM metadata. */
 	char name[RTE_LPM6_NAMESIZE];    /**< Name of the lpm. */
-	uint32_t max_rules;              /**< Max number of rules. */
-	uint32_t used_rules;             /**< Used rules so far. */
 	uint32_t number_tbl8s;           /**< Number of tbl8s to allocate. */
-	uint32_t next_tbl8;              /**< Next tbl8 to be used. */
+
+	/* LPM rules. */
+	RB_HEAD(rte_lpm6_rules_tree, rte_lpm6_rule) rules[RTE_LPM6_MAX_DEPTH + 1];
 
 	/* LPM Tables. */
-	struct rte_lpm6_rule *rules_tbl; /**< LPM rules. */
 	struct rte_lpm6_tbl_entry tbl24[RTE_LPM6_TBL24_NUM_ENTRIES]
 			__rte_cache_aligned; /**< LPM tbl24 table. */
 	struct rte_lpm6_tbl_entry tbl8[0]
 			__rte_cache_aligned; /**< LPM tbl8 table. */
 };
+
+/* Comparison function for red-black tree nodes.
+   "If the first argument is smaller than the second, the function
+	returns a value smaller than zero.	If they are equal, the function
+	returns zero.  Otherwise, it should return a value greater than zero."
+*/
+static inline int rules_cmp(const struct rte_lpm6_rule *r1,
+				const struct rte_lpm6_rule *r2)
+{
+	return memcmp(r1->ip, r2->ip, RTE_LPM6_IPV6_ADDR_SIZE);
+}
+
+/* Satisfy old style attribute in tree.h header */
+#ifndef __unused
+#define __unused __attribute__ ((unused))
+#endif
+
+/* Generate internal functions and make them static. */
+RB_GENERATE_STATIC(rte_lpm6_rules_tree, rte_lpm6_rule, link, rules_cmp)
 
 /*
  * Takes an array of uint8_t (IPv6 address) and masks it using the depth.
@@ -126,8 +147,8 @@ struct rte_lpm6 {
 static inline void
 mask_ip(uint8_t *ip, uint8_t depth)
 {
-        int16_t part_depth, mask;
-        int i;
+		int16_t part_depth, mask;
+		int i;
 
 		part_depth = depth;
 
@@ -152,7 +173,8 @@ rte_lpm6_create(const char *name, int socket_id,
 	char mem_name[RTE_LPM6_NAMESIZE];
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_tailq_entry *te;
-	uint64_t mem_size, rules_size;
+	uint64_t mem_size;
+	unsigned int depth;
 	struct rte_lpm6_list *lpm_list;
 
 	lpm_list = RTE_TAILQ_CAST(rte_lpm6_tailq.head, rte_lpm6_list);
@@ -161,7 +183,6 @@ rte_lpm6_create(const char *name, int socket_id,
 
 	/* Check user arguments. */
 	if ((name == NULL) || (socket_id < -1) || (config == NULL) ||
-			(config->max_rules == 0) ||
 			config->number_tbl8s > RTE_LPM6_TBL8_MAX_NUM_GROUPS) {
 		rte_errno = EINVAL;
 		return NULL;
@@ -172,7 +193,6 @@ rte_lpm6_create(const char *name, int socket_id,
 	/* Determine the amount of memory to allocate. */
 	mem_size = sizeof(*lpm) + (sizeof(lpm->tbl8[0]) *
 			RTE_LPM6_TBL8_GROUP_NUM_ENTRIES * config->number_tbl8s);
-	rules_size = sizeof(struct rte_lpm6_rule) * config->max_rules;
 
 	rte_rwlock_write_lock(RTE_EAL_TAILQ_RWLOCK);
 
@@ -205,21 +225,13 @@ rte_lpm6_create(const char *name, int socket_id,
 		goto exit;
 	}
 
-	lpm->rules_tbl = (struct rte_lpm6_rule *)rte_zmalloc_socket(NULL,
-			(size_t)rules_size, RTE_CACHE_LINE_SIZE, socket_id);
-
-	if (lpm->rules_tbl == NULL) {
-		RTE_LOG(ERR, LPM, "LPM rules_tbl allocation failed\n");
-		rte_free(lpm);
-		lpm = NULL;
-		rte_free(te);
-		goto exit;
-	}
-
 	/* Save user arguments. */
-	lpm->max_rules = config->max_rules;
 	lpm->number_tbl8s = config->number_tbl8s;
 	snprintf(lpm->name, sizeof(lpm->name), "%s", name);
+
+	/* Vyatta change to use red-black tree */
+	for (depth = 0; depth <= RTE_LPM6_MAX_DEPTH; ++depth)
+		RB_INIT(&lpm->rules[depth]);
 
 	te->data = (void *) lpm;
 
@@ -286,8 +298,8 @@ rte_lpm6_free(struct rte_lpm6 *lpm)
 		TAILQ_REMOVE(lpm_list, te, next);
 
 	rte_rwlock_write_unlock(RTE_EAL_TAILQ_RWLOCK);
+	rte_lpm6_delete_all(lpm);
 
-	rte_free(lpm->rules_tbl);
 	rte_free(lpm);
 	rte_free(te);
 }
@@ -296,41 +308,85 @@ rte_lpm6_free(struct rte_lpm6 *lpm)
  * Checks if a rule already exists in the rules table and updates
  * the nexthop if so. Otherwise it adds a new rule if enough space is available.
  */
-static inline int32_t
-rule_add(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t next_hop, uint8_t depth)
+static struct rte_lpm6_rule *
+rule_add(struct rte_lpm6 *lpm, uint8_t *ip, uint16_t next_hop, uint8_t depth)
 {
-	uint32_t rule_index;
+	struct rte_lpm6_rules_tree *head = &lpm->rules[depth];
+	struct rte_lpm6_rule *r, *old;
 
-	/* Scan through rule list to see if rule already exists. */
-	for (rule_index = 0; rule_index < lpm->used_rules; rule_index++) {
+	/*
+	 * NB: uses regular malloc to avoid chewing up precious
+	 *  memory pool space for rules.
+	 */
+	r = malloc(sizeof(*r));
+	if (!r)
+		return NULL;
 
-		/* If rule already exists update its next_hop and return. */
-		if ((memcmp (lpm->rules_tbl[rule_index].ip, ip,
-				RTE_LPM6_IPV6_ADDR_SIZE) == 0) &&
-				lpm->rules_tbl[rule_index].depth == depth) {
-			lpm->rules_tbl[rule_index].next_hop = next_hop;
+	rte_memcpy(r->ip, ip, RTE_LPM6_IPV6_ADDR_SIZE);
+	r->next_hop = next_hop;
+	r->depth = depth;
 
-			return rule_index;
+	old = RB_INSERT(rte_lpm6_rules_tree, head, r);
+	if (!old)
+		return r;
+
+	/* collision with existing rule */
+	free(r);
+
+	return old;
+}
+
+/*
+ * Find, clean and allocate a tbl8.
+ */
+static inline int32_t
+tbl8_alloc(struct rte_lpm6 *lpm)
+{
+	uint32_t tbl8_gindex; /* tbl8 group index. */
+	struct rte_lpm6_tbl_entry *tbl8_entry;
+	struct rte_lpm6_tbl_entry *tbl8 = lpm->tbl8;
+
+	/* Scan through tbl8 to find a free (i.e. INVALID) tbl8 group. */
+	for (tbl8_gindex = 0; tbl8_gindex < lpm->number_tbl8s;
+			tbl8_gindex++) {
+		tbl8_entry = &tbl8[tbl8_gindex * RTE_LPM6_TBL8_GROUP_NUM_ENTRIES];
+		/* If a free tbl8 group is found clean it and set as VALID. */
+		if (!tbl8_entry->valid_group) {
+			memset(&tbl8_entry[0], 0,
+					RTE_LPM6_TBL8_GROUP_NUM_ENTRIES *
+					sizeof(tbl8_entry[0]));
+
+			tbl8_entry->valid_group = VALID;
+
+			/* Return group index for allocated tbl8 group. */
+			return tbl8_gindex;
 		}
 	}
 
-	/*
-	 * If rule does not exist check if there is space to add a new rule to
-	 * this rule group. If there is no space return error.
-	 */
-	if (lpm->used_rules == lpm->max_rules) {
-		return -ENOSPC;
+	/* If there are no tbl8 groups free then return error. */
+	return -ENOSPC;
+}
+
+static inline void
+tbl8_free(struct rte_lpm6_tbl_entry *tbl8, uint32_t tbl8_group_start)
+{
+	/* Set tbl8 group invalid*/
+	memset(&tbl8[tbl8_group_start], 0, RTE_LPM6_TBL8_GROUP_NUM_ENTRIES *
+		sizeof(tbl8[0]));
+}
+
+static int
+tbl8_is_free(struct rte_lpm6_tbl_entry *tbl8, uint32_t tbl8_group_start)
+{
+	uint32_t i, tbl8_group_end;
+		tbl8_group_end = tbl8_group_start +
+			RTE_LPM6_TBL8_GROUP_NUM_ENTRIES;
+
+	for (i = tbl8_group_start; i < tbl8_group_end; i++) {
+		if (tbl8[i].valid)
+			return 0;
 	}
-
-	/* If there is space for the new rule add it. */
-	rte_memcpy(lpm->rules_tbl[rule_index].ip, ip, RTE_LPM6_IPV6_ADDR_SIZE);
-	lpm->rules_tbl[rule_index].next_hop = next_hop;
-	lpm->rules_tbl[rule_index].depth = depth;
-
-	/* Increment the used rules counter for this rule group. */
-	lpm->used_rules++;
-
-	return rule_index;
+	return 1;
 }
 
 /*
@@ -340,7 +396,7 @@ rule_add(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t next_hop, uint8_t depth)
  */
 static void
 expand_rule(struct rte_lpm6 *lpm, uint32_t tbl8_gindex, uint8_t depth,
-		uint8_t next_hop)
+		uint16_t next_hop)
 {
 	uint32_t tbl8_group_end, tbl8_gindex_next, j;
 
@@ -353,6 +409,8 @@ expand_rule(struct rte_lpm6 *lpm, uint32_t tbl8_gindex, uint8_t depth,
 		.next_hop = next_hop,
 		.ext_entry = 0,
 	};
+
+	rte_compiler_barrier();
 
 	for (j = tbl8_gindex; j < tbl8_group_end; j++) {
 		if (!lpm->tbl8[j].valid || (lpm->tbl8[j].ext_entry == 0
@@ -377,7 +435,7 @@ expand_rule(struct rte_lpm6 *lpm, uint32_t tbl8_gindex, uint8_t depth,
 static inline int
 add_step(struct rte_lpm6 *lpm, struct rte_lpm6_tbl_entry *tbl,
 		struct rte_lpm6_tbl_entry **tbl_next, uint8_t *ip, uint8_t bytes,
-		uint8_t first_byte, uint8_t depth, uint8_t next_hop)
+		uint8_t first_byte, uint8_t depth, uint16_t next_hop)
 {
 	uint32_t tbl_index, tbl_range, tbl8_group_start, tbl8_group_end, i;
 	int32_t tbl8_gindex;
@@ -404,19 +462,21 @@ add_step(struct rte_lpm6 *lpm, struct rte_lpm6_tbl_entry *tbl,
 	 * expand the rule across the relevant positions in the table.
 	 */
 	if (depth <= bits_covered) {
+		struct rte_lpm6_tbl_entry new_tbl_entry = {
+			.next_hop = next_hop,
+			.depth = depth,
+			.valid = VALID,
+			.valid_group = VALID,
+			.ext_entry = 0,
+		};
+
+		rte_compiler_barrier();
+
 		tbl_range = 1 << (bits_covered - depth);
 
 		for (i = tbl_index; i < (tbl_index + tbl_range); i++) {
 			if (!tbl[i].valid || (tbl[i].ext_entry == 0 &&
 					tbl[i].depth <= depth)) {
-
-				struct rte_lpm6_tbl_entry new_tbl_entry = {
-					.next_hop = next_hop,
-					.depth = depth,
-					.valid = VALID,
-					.valid_group = VALID,
-					.ext_entry = 0,
-				};
 
 				tbl[i] = new_tbl_entry;
 
@@ -441,10 +501,10 @@ add_step(struct rte_lpm6 *lpm, struct rte_lpm6_tbl_entry *tbl,
 	else {
 		/* If it's invalid a new tbl8 is needed */
 		if (!tbl[tbl_index].valid) {
-			if (lpm->next_tbl8 < lpm->number_tbl8s)
-				tbl8_gindex = (lpm->next_tbl8)++;
-			else
+			tbl8_gindex = tbl8_alloc(lpm);
+			if (tbl8_gindex < 0) {
 				return -ENOSPC;
+			}
 
 			struct rte_lpm6_tbl_entry new_tbl_entry = {
 				.lpm6_tbl8_gindex = tbl8_gindex,
@@ -454,6 +514,8 @@ add_step(struct rte_lpm6 *lpm, struct rte_lpm6_tbl_entry *tbl,
 				.ext_entry = 1,
 			};
 
+			rte_compiler_barrier();
+
 			tbl[tbl_index] = new_tbl_entry;
 		}
 		/*
@@ -461,12 +523,10 @@ add_step(struct rte_lpm6 *lpm, struct rte_lpm6_tbl_entry *tbl,
 		 * here needs to be moved to the next table.
 		 */
 		else if (tbl[tbl_index].ext_entry == 0) {
-			/* Search for free tbl8 group. */
-			if (lpm->next_tbl8 < lpm->number_tbl8s)
-				tbl8_gindex = (lpm->next_tbl8)++;
-			else
+			tbl8_gindex = tbl8_alloc(lpm);
+			if (tbl8_gindex < 0) {
 				return -ENOSPC;
-
+			}
 			tbl8_group_start = tbl8_gindex *
 					RTE_LPM6_TBL8_GROUP_NUM_ENTRIES;
 			tbl8_group_end = tbl8_group_start +
@@ -493,6 +553,8 @@ add_step(struct rte_lpm6 *lpm, struct rte_lpm6_tbl_entry *tbl,
 				.ext_entry = 1,
 			};
 
+			rte_compiler_barrier();
+
 			tbl[tbl_index] = new_tbl_entry;
 		}
 
@@ -503,19 +565,26 @@ add_step(struct rte_lpm6 *lpm, struct rte_lpm6_tbl_entry *tbl,
 	return 1;
 }
 
+int
+rte_lpm6_add_v20(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
+		uint8_t next_hop)
+{
+	return rte_lpm6_add_v1607(lpm, ip, depth, next_hop);
+}
+VERSION_SYMBOL(rte_lpm6_add, _v20, 2.0);
+
 /*
  * Add a route
  */
 int
-rte_lpm6_add(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
-		uint8_t next_hop)
+rte_lpm6_add_v1607(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
+		uint16_t next_hop)
 {
 	struct rte_lpm6_tbl_entry *tbl;
 	struct rte_lpm6_tbl_entry *tbl_next;
-	int32_t rule_index;
-	int status;
+	struct rte_lpm6_rule *rule;
+	int status, i;
 	uint8_t masked_ip[RTE_LPM6_IPV6_ADDR_SIZE];
-	int i;
 
 	/* Check user arguments. */
 	if ((lpm == NULL) || (depth < 1) || (depth > RTE_LPM6_MAX_DEPTH))
@@ -526,14 +595,14 @@ rte_lpm6_add(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
 	mask_ip(masked_ip, depth);
 
 	/* Add the rule to the rule table. */
-	rule_index = rule_add(lpm, masked_ip, next_hop, depth);
+	rule = rule_add(lpm, masked_ip, next_hop, depth);
 
 	/* If there is no space available for new rule return error. */
-	if (rule_index < 0) {
-		return rule_index;
+	if (rule == NULL) {
+		return -EINVAL;
 	}
 
-	/* Inspect the first three bytes through tbl24 on the first step. */
+	/* inspect the first three bytes through tbl24 on the first step. */
 	tbl = lpm->tbl24;
 	status = add_step (lpm, tbl, &tbl_next, masked_ip, ADD_FIRST_BYTE, 1,
 			depth, next_hop);
@@ -544,7 +613,7 @@ rte_lpm6_add(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
 	}
 
 	/*
-	 * Inspect one by one the rest of the bytes until
+	 * inspect one by one the rest of the bytes until
 	 * the process is completed.
 	 */
 	for (i = ADD_FIRST_BYTE; i < RTE_LPM6_IPV6_ADDR_SIZE && status == 1; i++) {
@@ -560,6 +629,9 @@ rte_lpm6_add(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
 
 	return status;
 }
+BIND_DEFAULT_SYMBOL(rte_lpm6_add, _v1607, 16.07);
+MAP_STATIC_SYMBOL(int rte_lpm6_add(struct rte_lpm6 *lpm, uint8_t *ip,
+		uint8_t depth, uint16_t next_hop), rte_lpm6_add_v1607);
 
 /*
  * Takes a pointer to a table entry and inspect one level.
@@ -569,7 +641,7 @@ rte_lpm6_add(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
 static inline int
 lookup_step(const struct rte_lpm6 *lpm, const struct rte_lpm6_tbl_entry *tbl,
 		const struct rte_lpm6_tbl_entry **tbl_next, uint8_t *ip,
-		uint8_t first_byte, uint8_t *next_hop)
+		uint8_t first_byte, uint16_t *next_hop)
 {
 	uint32_t tbl8_index, tbl_entry;
 
@@ -589,16 +661,22 @@ lookup_step(const struct rte_lpm6 *lpm, const struct rte_lpm6_tbl_entry *tbl,
 		return 1;
 	} else {
 		/* If not extended then we can have a match. */
-		*next_hop = (uint8_t)tbl_entry;
+		*next_hop = (uint16_t)tbl_entry;
 		return (tbl_entry & RTE_LPM6_LOOKUP_SUCCESS) ? 0 : -ENOENT;
 	}
 }
 
+int
+rte_lpm6_lookup_v20(const struct rte_lpm6 *lpm, uint8_t *ip, uint8_t *next_hop)
+{
+	return rte_lpm6_lookup_v1607(lpm, ip, (uint16_t*)next_hop);
+}
+VERSION_SYMBOL(rte_lpm6_lookup, _v20, 2.0);
 /*
  * Looks up an IP
  */
 int
-rte_lpm6_lookup(const struct rte_lpm6 *lpm, uint8_t *ip, uint8_t *next_hop)
+rte_lpm6_lookup_v1607(const struct rte_lpm6 *lpm, uint8_t *ip, uint16_t *next_hop)
 {
 	const struct rte_lpm6_tbl_entry *tbl;
 	const struct rte_lpm6_tbl_entry *tbl_next = NULL;
@@ -625,20 +703,33 @@ rte_lpm6_lookup(const struct rte_lpm6 *lpm, uint8_t *ip, uint8_t *next_hop)
 
 	return status;
 }
+BIND_DEFAULT_SYMBOL(rte_lpm6_lookup, _v1607, 16.07);
+MAP_STATIC_SYMBOL(int rte_lpm6_lookup(const struct rte_lpm6 *lpm, uint8_t *ip,
+		uint16_t *next_hop), rte_lpm6_lookup_v1607);
+
+int
+rte_lpm6_lookup_bulk_func_v20(const struct rte_lpm6 *lpm,
+		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+		int16_t *next_hops, unsigned n)
+{
+	return rte_lpm6_lookup_bulk_func_v1607(lpm, ips, (int32_t*)next_hops, n);
+}
+VERSION_SYMBOL(rte_lpm6_lookup_bulk_func, _v20, 2.0);
 
 /*
  * Looks up a group of IP addresses
  */
 int
-rte_lpm6_lookup_bulk_func(const struct rte_lpm6 *lpm,
+rte_lpm6_lookup_bulk_func_v1607(const struct rte_lpm6 *lpm,
 		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
-		int16_t * next_hops, unsigned n)
+		int32_t *next_hops, unsigned n)
 {
 	unsigned i;
 	const struct rte_lpm6_tbl_entry *tbl;
 	const struct rte_lpm6_tbl_entry *tbl_next = NULL;
 	uint32_t tbl24_index;
-	uint8_t first_byte, next_hop;
+	uint8_t first_byte;
+	uint16_t next_hop;
 	int status;
 
 	/* DEBUG: Check user input arguments. */
@@ -669,40 +760,64 @@ rte_lpm6_lookup_bulk_func(const struct rte_lpm6 *lpm,
 
 	return 0;
 }
+BIND_DEFAULT_SYMBOL(rte_lpm6_lookup_bulk_func, _v1607, 16.07);
+MAP_STATIC_SYMBOL(int rte_lpm6_lookup_bulk_func(const struct rte_lpm6 *lpm, uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE],
+		int32_t *next_hops, unsigned n), rte_lpm6_lookup_bulk_func_v1607);
 
 /*
  * Finds a rule in rule table.
- * NOTE: Valid range for depth parameter is 1 .. 128 inclusive.
+ * NOTE: Valid range for depth parameter is 0 .. 128 inclusive.
  */
-static inline int32_t
+static struct rte_lpm6_rule *
 rule_find(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth)
 {
-	uint32_t rule_index;
 
-	/* Scan used rules at given depth to find rule. */
-	for (rule_index = 0; rule_index < lpm->used_rules; rule_index++) {
-		/* If rule is found return the rule index. */
-		if ((memcmp (lpm->rules_tbl[rule_index].ip, ip,
-				RTE_LPM6_IPV6_ADDR_SIZE) == 0) &&
-				lpm->rules_tbl[rule_index].depth == depth) {
+	struct rte_lpm6_rules_tree *head = &lpm->rules[depth];
+	struct rte_lpm6_rule k;
 
-			return rule_index;
+	rte_memcpy(k.ip, ip, RTE_LPM6_IPV6_ADDR_SIZE);
+
+	return RB_FIND(rte_lpm6_rules_tree, head, &k);
+}
+
+static struct rte_lpm6_rule *
+find_previous_rule(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
+			uint8_t *sub_rule_depth)
+{
+	struct rte_lpm6_rule *rule;
+	uint8_t ip_masked[RTE_LPM6_IPV6_ADDR_SIZE];
+	int prev_depth;
+
+	/* Copy the IP and mask it to avoid modifying user's input data. */
+	rte_memcpy(ip_masked, ip, RTE_LPM6_IPV6_ADDR_SIZE);
+	for (prev_depth = depth; prev_depth >= 0; prev_depth--) {
+		mask_ip(ip_masked, prev_depth);
+		rule = rule_find(lpm, ip_masked, prev_depth);
+		if (rule) {
+			*sub_rule_depth = prev_depth;
+			return rule;
 		}
 	}
 
-	/* If rule is not found return -ENOENT. */
-	return -ENOENT;
+	return NULL;
 }
 
+int
+rte_lpm6_is_rule_present_v20(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
+uint8_t *next_hop)
+{
+	return rte_lpm6_is_rule_present_v1607(lpm, ip, depth, (uint16_t*)next_hop);
+}
+VERSION_SYMBOL(rte_lpm6_is_rule_present, _v20, 2.0);
 /*
  * Look for a rule in the high-level rules table
  */
 int
-rte_lpm6_is_rule_present(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
-uint8_t *next_hop)
+rte_lpm6_is_rule_present_v1607(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth,
+uint16_t *next_hop)
 {
 	uint8_t ip_masked[RTE_LPM6_IPV6_ADDR_SIZE];
-	int32_t rule_index;
+	struct rte_lpm6_rule *rule;
 
 	/* Check user arguments. */
 	if ((lpm == NULL) || next_hop == NULL || ip == NULL ||
@@ -710,34 +825,175 @@ uint8_t *next_hop)
 		return -EINVAL;
 
 	/* Copy the IP and mask it to avoid modifying user's input data. */
-	memcpy(ip_masked, ip, RTE_LPM6_IPV6_ADDR_SIZE);
+	rte_memcpy(ip_masked, ip, RTE_LPM6_IPV6_ADDR_SIZE);
 	mask_ip(ip_masked, depth);
 
 	/* Look for the rule using rule_find. */
-	rule_index = rule_find(lpm, ip_masked, depth);
+	rule = rule_find(lpm, ip, depth);
 
-	if (rule_index >= 0) {
-		*next_hop = lpm->rules_tbl[rule_index].next_hop;
+	if (rule != NULL) {
+		*next_hop = rule->next_hop;
 		return 1;
 	}
 
 	/* If rule is not found return 0. */
 	return 0;
 }
+BIND_DEFAULT_SYMBOL(rte_lpm6_is_rule_present, _v1607, 16.07);
+MAP_STATIC_SYMBOL(int rte_lpm6_is_rule_present(struct rte_lpm6 *lpm, uint8_t *ip,
+		uint8_t depth, uint16_t *next_hop), rte_lpm6_is_rule_present_v1607);
 
 /*
  * Delete a rule from the rule table.
- * NOTE: Valid range for depth parameter is 1 .. 128 inclusive.
+ * NOTE: Valid range for depth parameter is 0 .. 128 inclusive.
  */
 static inline void
-rule_delete(struct rte_lpm6 *lpm, int32_t rule_index)
+rule_delete(struct rte_lpm6 *lpm, struct rte_lpm6_rule *r, uint8_t depth)
 {
-	/*
-	 * Overwrite redundant rule with last rule in group and decrement rule
-	 * counter.
-	 */
-	lpm->rules_tbl[rule_index] = lpm->rules_tbl[lpm->used_rules-1];
-	lpm->used_rules--;
+	struct rte_lpm6_rules_tree *head = &lpm->rules[depth];
+
+	RB_REMOVE(rte_lpm6_rules_tree, head, r);
+
+	free(r);
+}
+
+/*
+ * Function that run through the data structure when and clean entries
+ * that where expanded by expand_rule().
+ */
+static void
+delete_expand_step(struct rte_lpm6 *lpm, uint32_t tbl8_gindex, uint8_t depth,
+		uint16_t next_hop)
+{
+	uint32_t tbl8_group_end, tbl8_gindex_next, j;
+
+	tbl8_group_end = tbl8_gindex + RTE_LPM6_TBL8_GROUP_NUM_ENTRIES;
+
+	struct rte_lpm6_tbl_entry empty_tbl8_entry = {
+		.valid = INVALID,
+		.valid_group = INVALID,
+		.depth = 0,
+		.next_hop = 0,
+		.ext_entry = 0,
+	};
+
+	rte_compiler_barrier();
+
+	for (j = tbl8_gindex; j < tbl8_group_end; j++) {
+		if (lpm->tbl8[j].valid && lpm->tbl8[j].ext_entry == 0
+				&& lpm->tbl8[j].depth == depth && lpm->tbl8[j].next_hop == next_hop) {
+
+			lpm->tbl8[j] = empty_tbl8_entry;
+
+		} else if (lpm->tbl8[j].ext_entry == 1) {
+
+			tbl8_gindex_next = lpm->tbl8[j].lpm6_tbl8_gindex
+					* RTE_LPM6_TBL8_GROUP_NUM_ENTRIES;
+			delete_expand_step(lpm, tbl8_gindex_next, depth, next_hop);
+		}
+	}
+
+}
+/*
+ * Partially delete a route from the data structure (tbl24+tbl8s).
+ * It may be called and partially added routes (after an unsuccesful add_step).
+ */
+static void
+delete_step(struct rte_lpm6 *lpm, struct rte_lpm6_tbl_entry *tbl,
+		uint8_t *ip, uint32_t tbl_group_start, struct rte_lpm6_rule *sub_rule, uint8_t depth, uint8_t bits_covered, uint16_t next_hop)
+{
+	uint32_t i, tbl_index = tbl_group_start + ip[bits_covered / 8 - 1];
+	struct rte_lpm6_tbl_entry empty_tbl8_entry = {
+		.valid = INVALID,
+		.valid_group = INVALID,
+		.depth = 0,
+		.next_hop = 0,
+		.ext_entry = 0,
+	};
+
+	rte_compiler_barrier();
+
+	/* recurse until we are at the last tbl8 that should have been deleted for this rule without an expand */
+	if (depth > bits_covered) {
+		uint32_t tbl_group_next;
+
+		/* check if we have a partially added rule */
+		if (tbl[tbl_index].ext_entry == 1) {
+			/* calculate the next tbl_index */
+			tbl_group_next = tbl[tbl_index].lpm6_tbl8_gindex * RTE_LPM6_TBL8_GROUP_NUM_ENTRIES;
+			delete_step(lpm, lpm->tbl8, ip, tbl_group_next, sub_rule, depth, bits_covered + 8, next_hop);
+		}
+	} else {
+		uint32_t tbl_range;
+
+		/* last iteration, we may need to remove what we have done through the expand */
+		tbl_range = 1 << (bits_covered - depth);
+		for (i = tbl_index; i < (tbl_index + tbl_range); i++) {
+			if (tbl[i].ext_entry == 1) {
+				uint32_t tbl8_gindex = tbl[i].lpm6_tbl8_gindex *
+						RTE_LPM6_TBL8_GROUP_NUM_ENTRIES;
+				delete_expand_step(lpm, tbl8_gindex, depth, next_hop);
+			} else {
+				/* do a normal cleaning */
+				if (tbl[i].depth == depth) {
+					if (sub_rule) {
+						tbl[i].depth = sub_rule->depth;
+						tbl[i].next_hop = sub_rule->next_hop;
+					} else {
+						tbl[i] = empty_tbl8_entry;
+					}
+				}
+			}
+		}
+		return;
+	}
+
+	/* check if we can recycle the current tbl_entry because we have cleaned all its childs  */
+	if (tbl[tbl_index].ext_entry) {
+		if (tbl8_is_free(lpm->tbl8, tbl[tbl_index].lpm6_tbl8_gindex * RTE_LPM6_TBL8_GROUP_NUM_ENTRIES)) {
+			tbl[tbl_index] = empty_tbl8_entry;
+		}
+	}
+
+	/* we are recursing on the tbl24 so we don't need to check those cases */
+	if (bits_covered == 24) {
+		return;
+	}
+
+	/* try to clean our current tbl group from tbl_group_start to tbl_group_end */
+	for (i = tbl_group_start; i < tbl_group_start + RTE_LPM6_TBL8_GROUP_NUM_ENTRIES; i++) {
+		if (tbl[i].valid == 1) {
+			break;
+		}
+	}
+	if (i == tbl_group_start + RTE_LPM6_TBL8_GROUP_NUM_ENTRIES) {
+		/* we can free a whole group */
+		tbl8_free(lpm->tbl8, tbl_group_start);
+	}
+}
+
+/*
+ * Find rule to replace the just deleted. If there is no rule to
+ * replace the rule_to_delete we return NULL and invalidate the table
+ * entries associated with this rule.
+ */
+static void
+rule_replace(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth, uint16_t next_hop)
+{
+	uint8_t ip_masked[RTE_LPM6_IPV6_ADDR_SIZE];
+	struct rte_lpm6_rule *sub_rule;
+	uint8_t sub_depth = 0;
+	uint32_t tbl_index;
+
+	/* Copy the IP and mask it to avoid modifying user's input data. */
+	rte_memcpy(ip_masked, ip, RTE_LPM6_IPV6_ADDR_SIZE);
+	mask_ip(ip_masked, depth);
+
+	sub_rule = find_previous_rule(lpm, ip_masked, depth, &sub_depth);
+
+	tbl_index = (ip_masked[0] << BYTES2_SIZE) | (ip_masked[1] << BYTE_SIZE);
+
+	delete_step(lpm, lpm->tbl24, ip_masked, tbl_index, sub_rule, depth, 24, next_hop);
 }
 
 /*
@@ -746,9 +1002,9 @@ rule_delete(struct rte_lpm6 *lpm, int32_t rule_index)
 int
 rte_lpm6_delete(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth)
 {
-	int32_t rule_to_delete_index;
+	struct rte_lpm6_rule *rule;
 	uint8_t ip_masked[RTE_LPM6_IPV6_ADDR_SIZE];
-	unsigned i;
+	uint16_t next_hop;
 
 	/*
 	 * Check input arguments.
@@ -758,42 +1014,29 @@ rte_lpm6_delete(struct rte_lpm6 *lpm, uint8_t *ip, uint8_t depth)
 	}
 
 	/* Copy the IP and mask it to avoid modifying user's input data. */
-	memcpy(ip_masked, ip, RTE_LPM6_IPV6_ADDR_SIZE);
+	rte_memcpy(ip_masked, ip, RTE_LPM6_IPV6_ADDR_SIZE);
 	mask_ip(ip_masked, depth);
 
 	/*
 	 * Find the index of the input rule, that needs to be deleted, in the
 	 * rule table.
 	 */
-	rule_to_delete_index = rule_find(lpm, ip_masked, depth);
+	rule = rule_find(lpm, ip_masked, depth);
 
 	/*
 	 * Check if rule_to_delete_index was found. If no rule was found the
 	 * function rule_find returns -ENOENT.
 	 */
-	if (rule_to_delete_index < 0)
-		return rule_to_delete_index;
+	if (rule == NULL)
+		return -EINVAL;
+
+	next_hop = rule->next_hop;
 
 	/* Delete the rule from the rule table. */
-	rule_delete(lpm, rule_to_delete_index);
+	rule_delete(lpm, rule, depth);
 
-	/*
-	 * Set all the table entries to 0 (ie delete every rule
-	 * from the data structure.
-	 */
-	lpm->next_tbl8 = 0;
-	memset(lpm->tbl24, 0, sizeof(lpm->tbl24));
-	memset(lpm->tbl8, 0, sizeof(lpm->tbl8[0])
-			* RTE_LPM6_TBL8_GROUP_NUM_ENTRIES * lpm->number_tbl8s);
-
-	/*
-	 * Add every rule again (except for the one that was removed from
-	 * the rules table).
-	 */
-	for (i = 0; i < lpm->used_rules; i++) {
-		rte_lpm6_add(lpm, lpm->rules_tbl[i].ip, lpm->rules_tbl[i].depth,
-				lpm->rules_tbl[i].next_hop);
-	}
+	/* Replace with next level up rule */
+	rule_replace(lpm, ip_masked, depth, next_hop);
 
 	return 0;
 }
@@ -805,9 +1048,10 @@ int
 rte_lpm6_delete_bulk_func(struct rte_lpm6 *lpm,
 		uint8_t ips[][RTE_LPM6_IPV6_ADDR_SIZE], uint8_t *depths, unsigned n)
 {
-	int32_t rule_to_delete_index;
+	struct rte_lpm6_rule *rule;
 	uint8_t ip_masked[RTE_LPM6_IPV6_ADDR_SIZE];
 	unsigned i;
+	uint16_t next_hop;
 
 	/*
 	 * Check input arguments.
@@ -825,39 +1069,27 @@ rte_lpm6_delete_bulk_func(struct rte_lpm6 *lpm,
 		 * Find the index of the input rule, that needs to be deleted, in the
 		 * rule table.
 		 */
-		rule_to_delete_index = rule_find(lpm, ip_masked, depths[i]);
+		rule = rule_find(lpm, ip_masked, depths[i]);
 
 		/*
 		 * Check if rule_to_delete_index was found. If no rule was found the
 		 * function rule_find returns -ENOENT.
 		 */
-		if (rule_to_delete_index < 0)
+		if (rule == NULL)
 			continue;
 
+		next_hop = rule->next_hop;
+
 		/* Delete the rule from the rule table. */
-		rule_delete(lpm, rule_to_delete_index);
-	}
+		rule_delete(lpm, rule, depths[i]);
 
-	/*
-	 * Set all the table entries to 0 (ie delete every rule
-	 * from the data structure.
-	 */
-	lpm->next_tbl8 = 0;
-	memset(lpm->tbl24, 0, sizeof(lpm->tbl24));
-	memset(lpm->tbl8, 0, sizeof(lpm->tbl8[0])
-			* RTE_LPM6_TBL8_GROUP_NUM_ENTRIES * lpm->number_tbl8s);
-
-	/*
-	 * Add every rule again (except for the ones that were removed from
-	 * the rules table).
-	 */
-	for (i = 0; i < lpm->used_rules; i++) {
-		rte_lpm6_add(lpm, lpm->rules_tbl[i].ip, lpm->rules_tbl[i].depth,
-				lpm->rules_tbl[i].next_hop);
+		/* Replace with next level up rule */
+		rule_replace(lpm, ip_masked, depths[i], next_hop);
 	}
 
 	return 0;
 }
+
 
 /*
  * Delete all rules from the LPM table.
@@ -865,11 +1097,17 @@ rte_lpm6_delete_bulk_func(struct rte_lpm6 *lpm,
 void
 rte_lpm6_delete_all(struct rte_lpm6 *lpm)
 {
-	/* Zero used rules counter. */
-	lpm->used_rules = 0;
+	uint8_t depth;
 
-	/* Zero next tbl8 index. */
-	lpm->next_tbl8 = 0;
+	/* Delete all rules form the rules table. */
+	for (depth = 0; depth < RTE_LPM6_MAX_DEPTH; ++depth) {
+		struct rte_lpm6_rules_tree *head = &lpm->rules[depth];
+		struct rte_lpm6_rule *r, *n;
+
+		RB_FOREACH_SAFE(r, rte_lpm6_rules_tree, head, n) {
+			rule_delete(lpm, r, depth);
+		}
+	}
 
 	/* Zero tbl24. */
 	memset(lpm->tbl24, 0, sizeof(lpm->tbl24));
@@ -877,7 +1115,25 @@ rte_lpm6_delete_all(struct rte_lpm6 *lpm)
 	/* Zero tbl8. */
 	memset(lpm->tbl8, 0, sizeof(lpm->tbl8[0]) *
 			RTE_LPM6_TBL8_GROUP_NUM_ENTRIES * lpm->number_tbl8s);
+}
 
-	/* Delete all rules form the rules table. */
-	memset(lpm->rules_tbl, 0, sizeof(struct rte_lpm6_rule) * lpm->max_rules);
+/* Count usage of tbl8 */
+unsigned
+rte_lpm6_tbl8_count(const struct rte_lpm6 *lpm)
+{
+	unsigned i, count = 0;
+
+	for (i = 0; i < lpm->number_tbl8s ; i++) {
+		const struct rte_lpm6_tbl_entry *tbl8_entry
+			= lpm->tbl8 + i * RTE_LPM6_TBL8_GROUP_NUM_ENTRIES;
+		if (tbl8_entry->valid_group)
+			++count;
+	}
+	return count;
+}
+
+unsigned
+rte_lpm6_tbl8_free_count(const struct rte_lpm6 *lpm)
+{
+	return lpm->number_tbl8s - rte_lpm6_tbl8_count(lpm);
 }
