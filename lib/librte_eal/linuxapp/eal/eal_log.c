@@ -60,9 +60,6 @@ console_log_write(__attribute__((unused)) void *c, const char *buf, size_t size)
 	ssize_t ret;
 	uint32_t loglevel;
 
-	/* add this log in history */
-	rte_log_add_in_history(buf, size);
-
 	/* write on stdout */
 	ret = fwrite(buf, 1, size, stdout);
 	fflush(stdout);
