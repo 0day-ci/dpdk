@@ -129,7 +129,6 @@ rte_table_lpm_ipv6_create(void *params, int socket_id, uint32_t entry_size)
 	}
 
 	/* LPM low-level table creation */
-	lpm6_config.max_rules = p->n_rules;
 	lpm6_config.number_tbl8s = p->number_tbl8s;
 	lpm6_config.flags = 0;
 	lpm->lpm = rte_lpm6_create(p->name, socket_id, &lpm6_config);
@@ -213,7 +212,7 @@ rte_table_lpm_ipv6_entry_add(
 		(struct rte_table_lpm_ipv6_key *) key;
 	uint32_t nht_pos, nht_pos0_valid;
 	int status;
-	uint8_t nht_pos0;
+	uint16_t nht_pos0;
 
 	/* Check input parameters */
 	if (lpm == NULL) {
@@ -280,7 +279,7 @@ rte_table_lpm_ipv6_entry_delete(
 	struct rte_table_lpm_ipv6 *lpm = (struct rte_table_lpm_ipv6 *) table;
 	struct rte_table_lpm_ipv6_key *ip_prefix =
 		(struct rte_table_lpm_ipv6_key *) key;
-	uint8_t nht_pos;
+	uint16_t nht_pos;
 	int status;
 
 	/* Check input parameters */
@@ -356,7 +355,7 @@ rte_table_lpm_ipv6_lookup(
 			uint8_t *ip = RTE_MBUF_METADATA_UINT8_PTR(pkt,
 				lpm->offset);
 			int status;
-			uint8_t nht_pos;
+			uint16_t nht_pos;
 
 			status = rte_lpm6_lookup(lpm->lpm, ip, &nht_pos);
 			if (status == 0) {

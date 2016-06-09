@@ -114,7 +114,6 @@ rte_lpm6_test tests6[] = {
 
 #define NUM_LPM6_TESTS                (sizeof(tests6)/sizeof(tests6[0]))
 #define MAX_DEPTH                                                    128
-#define MAX_RULES                                                1000000
 #define NUMBER_TBL8S                                           (1 << 16)
 #define MAX_NUM_TBL8S                                          (1 << 21)
 #define PASS 0
@@ -153,7 +152,6 @@ test0(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -161,14 +159,7 @@ test0(void)
 	lpm = rte_lpm6_create(NULL, SOCKET_ID_ANY, &config);
 	TEST_LPM_ASSERT(lpm == NULL);
 
-	/* rte_lpm6_create: max_rules = 0 */
-	/* Note: __func__ inserts the function name, in this case "test0". */
-	config.max_rules = 0;
-	lpm = rte_lpm6_create(__func__, SOCKET_ID_ANY, &config);
-	TEST_LPM_ASSERT(lpm == NULL);
-
 	/* socket_id < -1 is invalid */
-	config.max_rules = MAX_RULES;
 	lpm = rte_lpm6_create(__func__, -2, &config);
 	TEST_LPM_ASSERT(lpm == NULL);
 
@@ -195,7 +186,6 @@ test1(void)
 	struct rte_lpm6 *lpm1 = NULL, *lpm2 = NULL, *lpm3 = NULL;
 	struct rte_lpm6_config config;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -233,7 +223,6 @@ test2(void)
 
 	/* rte_lpm6_free: Free NULL */
 	for (i = 0; i < 20; i++) {
-		config.max_rules = MAX_RULES - i;
 		lpm = rte_lpm6_create(__func__, SOCKET_ID_ANY, &config);
 		TEST_LPM_ASSERT(lpm != NULL);
 
@@ -256,7 +245,6 @@ test3(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -278,10 +266,10 @@ test4(void)
 	struct rte_lpm6_config config;
 
 	uint8_t ip[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint8_t depth = 24, next_hop = 100;
+	uint8_t depth = 24;
+	uint16_t next_hop = 100;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -319,7 +307,6 @@ test5(void)
 	uint8_t depth = 24;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -354,10 +341,9 @@ test6(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 	uint8_t ip[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint8_t next_hop_return = 0;
+	uint16_t next_hop_return = 0;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -392,10 +378,9 @@ test7(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 	uint8_t ip[10][16];
-	int16_t next_hop_return[10];
+	int32_t next_hop_return[10];
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -433,7 +418,6 @@ test8(void)
 	uint8_t depth[10];
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -469,11 +453,11 @@ test9(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 	uint8_t ip[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint8_t depth = 16, next_hop_add = 100, next_hop_return = 0;
+	uint8_t depth = 16;
+	uint16_t next_hop_add = 100, next_hop_return = 0;
 	int32_t status = 0;
 	uint8_t i;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -517,14 +501,13 @@ test10(void)
 	int32_t status = 0;
 	int i;
 
-	config.max_rules = 127;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
 	lpm = rte_lpm6_create(__func__, SOCKET_ID_ANY, &config);
 	TEST_LPM_ASSERT(lpm != NULL);
 
-	for (i = 1; i < 128; i++) {
+	for (i = 1; i <= 128; i++) {
 		depth = (uint8_t)i;
 		status = rte_lpm6_add(lpm, ip, depth, next_hop_add);
 		TEST_LPM_ASSERT(status == 0);
@@ -532,9 +515,9 @@ test10(void)
 
 	depth = 128;
 	status = rte_lpm6_add(lpm, ip, depth, next_hop_add);
-	TEST_LPM_ASSERT(status == -ENOSPC);
+	TEST_LPM_ASSERT(status == 0);
 
-	depth = 127;
+	depth = 128;
 	status = rte_lpm6_delete(lpm, ip, depth);
 	TEST_LPM_ASSERT(status == 0);
 
@@ -560,43 +543,69 @@ test11(void)
 	uint8_t depth, next_hop_add = 100;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = 16;
 	config.flags = 0;
 
 	lpm = rte_lpm6_create(__func__, SOCKET_ID_ANY, &config);
 	TEST_LPM_ASSERT(lpm != NULL);
 
+	//use 13 tlb8
 	depth = 128;
 	status = rte_lpm6_add(lpm, ip, depth, next_hop_add);
 	TEST_LPM_ASSERT(status == 0);
 
+	status = rte_lpm6_tbl8_count(lpm);
+	TEST_LPM_ASSERT(status == 13);
+
+	//14
 	ip[0] = 1;
 	depth = 25;
 	status = rte_lpm6_add(lpm, ip, depth, next_hop_add);
 	TEST_LPM_ASSERT(status == 0);
 
+	status = rte_lpm6_tbl8_count(lpm);
+	TEST_LPM_ASSERT(status == 14);
+
 	status = rte_lpm6_delete(lpm, ip, depth);
 	TEST_LPM_ASSERT(status == 0);
 
+	status = rte_lpm6_tbl8_count(lpm);
+	TEST_LPM_ASSERT(status == 13);
+
+	//15
 	depth = 33;
 	status = rte_lpm6_add(lpm, ip, depth, next_hop_add);
 	TEST_LPM_ASSERT(status == 0);
 
+	status = rte_lpm6_tbl8_count(lpm);
+	TEST_LPM_ASSERT(status == 15);
+
 	status = rte_lpm6_delete(lpm, ip, depth);
 	TEST_LPM_ASSERT(status == 0);
 
+	status = rte_lpm6_tbl8_count(lpm);
+	TEST_LPM_ASSERT(status == 13);
+
+	//16
 	depth = 41;
 	status = rte_lpm6_add(lpm, ip, depth, next_hop_add);
 	TEST_LPM_ASSERT(status == 0);
 
+	status = rte_lpm6_tbl8_count(lpm);
+	TEST_LPM_ASSERT(status == 16);
+
 	status = rte_lpm6_delete(lpm, ip, depth);
 	TEST_LPM_ASSERT(status == 0);
 
+	status = rte_lpm6_tbl8_count(lpm);
+	TEST_LPM_ASSERT(status == 13);
+
+	//17
 	depth = 49;
 	status = rte_lpm6_add(lpm, ip, depth, next_hop_add);
 	TEST_LPM_ASSERT(status == -ENOSPC);
 
+	//16
 	depth = 41;
 	status = rte_lpm6_add(lpm, ip, depth, next_hop_add);
 	TEST_LPM_ASSERT(status == 0);
@@ -620,7 +629,6 @@ test12(void)
 	uint8_t depth, next_hop_add = 100;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = 16;
 	config.flags = 0;
 
@@ -658,7 +666,6 @@ test13(void)
 	uint8_t depth, next_hop_add = 100;
 	int32_t status = 0;
 
-	config.max_rules = 2;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -675,9 +682,9 @@ test13(void)
 
 	depth = 3;
 	status = rte_lpm6_add(lpm, ip, depth, next_hop_add);
-	TEST_LPM_ASSERT(status == -ENOSPC);
+	TEST_LPM_ASSERT(status == 0);
 
-	depth = 2;
+	depth = 3;
 	status = rte_lpm6_delete(lpm, ip, depth);
 	TEST_LPM_ASSERT(status == 0);
 
@@ -706,7 +713,6 @@ test14(void)
 	int32_t status = 0;
 	int i;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = 256;
 	config.flags = 0;
 
@@ -748,10 +754,10 @@ test15(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 	uint8_t ip[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint8_t depth = 24, next_hop_add = 100, next_hop_return = 0;
+	uint8_t depth = 24;
+	uint16_t next_hop_add = 100, next_hop_return = 0;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -784,10 +790,10 @@ test16(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 	uint8_t ip[] = {12,12,1,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint8_t depth = 128, next_hop_add = 100, next_hop_return = 0;
+	uint8_t depth = 128;
+	uint16_t next_hop_add = 100, next_hop_return = 0;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -828,10 +834,10 @@ test17(void)
 	uint8_t ip1[] = {127,255,255,255,255,255,255,255,255,
 			255,255,255,255,255,255,255};
 	uint8_t ip2[] = {128,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	uint8_t depth, next_hop_add, next_hop_return;
+	uint8_t depth;
+	uint16_t next_hop_add, next_hop_return;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -893,11 +899,11 @@ test18(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 	uint8_t ip[16], ip_1[16], ip_2[16];
-	uint8_t depth, depth_1, depth_2, next_hop_add, next_hop_add_1,
+	uint8_t depth, depth_1, depth_2;
+	uint16_t next_hop_add, next_hop_add_1,
 		next_hop_add_2, next_hop_return;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -1055,10 +1061,10 @@ test19(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 	uint8_t ip[16];
-	uint8_t depth, next_hop_add, next_hop_return;
+	uint8_t depth;
+	uint16_t next_hop_add, next_hop_return;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -1253,10 +1259,10 @@ test20(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 	uint8_t ip[16];
-	uint8_t depth, next_hop_add, next_hop_return;
+	uint8_t depth;
+	uint16_t next_hop_add, next_hop_return;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -1320,11 +1326,11 @@ test21(void)
 	struct rte_lpm6 *lpm = NULL;
 	struct rte_lpm6_config config;
 	uint8_t ip_batch[4][16];
-	uint8_t depth, next_hop_add;
-	int16_t next_hop_return[4];
+	uint8_t depth;
+	uint16_t next_hop_add;
+	int32_t next_hop_return[4];
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -1379,10 +1385,9 @@ test22(void)
 	struct rte_lpm6_config config;
 	uint8_t ip_batch[5][16];
 	uint8_t depth[5], next_hop_add;
-	int16_t next_hop_return[5];
+	int32_t next_hop_return[5];
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -1495,10 +1500,10 @@ test23(void)
 	struct rte_lpm6_config config;
 	uint32_t i;
 	uint8_t ip[16];
-	uint8_t depth, next_hop_add, next_hop_return;
+	uint8_t depth;
+	uint16_t next_hop_add, next_hop_return;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -1542,7 +1547,6 @@ test24(void)
 	struct rte_lpm6 *lpm = NULL, *result = NULL;
 	struct rte_lpm6_config config;
 
-	config.max_rules = 256 * 32;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -1579,10 +1583,10 @@ test25(void)
 	struct rte_lpm6_config config;
 	uint8_t ip[16];
 	uint32_t i;
-	uint8_t depth, next_hop_add, next_hop_return, next_hop_expected;
+	uint8_t depth;
+	uint16_t next_hop_add, next_hop_return, next_hop_expected;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -1629,13 +1633,12 @@ test26(void)
 	uint8_t d_ip_10_32 = 32;
 	uint8_t	d_ip_10_24 = 24;
 	uint8_t	d_ip_20_25 = 25;
-	uint8_t next_hop_ip_10_32 = 100;
-	uint8_t	next_hop_ip_10_24 = 105;
-	uint8_t	next_hop_ip_20_25 = 111;
-	uint8_t next_hop_return = 0;
+	uint16_t next_hop_ip_10_32 = 100;
+	uint16_t next_hop_ip_10_24 = 105;
+	uint16_t next_hop_ip_20_25 = 111;
+	uint16_t next_hop_return = 0;
 	int32_t status = 0;
 
-	config.max_rules = MAX_RULES;
 	config.number_tbl8s = NUMBER_TBL8S;
 	config.flags = 0;
 
@@ -1647,7 +1650,7 @@ test26(void)
 		return -1;
 
 	status = rte_lpm6_lookup(lpm, ip_10_32, &next_hop_return);
-	uint8_t test_hop_10_32 = next_hop_return;
+	uint16_t test_hop_10_32 = next_hop_return;
 	TEST_LPM_ASSERT(status == 0);
 	TEST_LPM_ASSERT(next_hop_return == next_hop_ip_10_32);
 
@@ -1656,7 +1659,7 @@ test26(void)
 			return -1;
 
 	status = rte_lpm6_lookup(lpm, ip_10_24, &next_hop_return);
-	uint8_t test_hop_10_24 = next_hop_return;
+	uint16_t test_hop_10_24 = next_hop_return;
 	TEST_LPM_ASSERT(status == 0);
 	TEST_LPM_ASSERT(next_hop_return == next_hop_ip_10_24);
 
@@ -1665,7 +1668,7 @@ test26(void)
 		return -1;
 
 	status = rte_lpm6_lookup(lpm, ip_20_25, &next_hop_return);
-	uint8_t test_hop_20_25 = next_hop_return;
+	uint16_t test_hop_20_25 = next_hop_return;
 	TEST_LPM_ASSERT(status == 0);
 	TEST_LPM_ASSERT(next_hop_return == next_hop_ip_20_25);
 
@@ -1704,11 +1707,11 @@ test27(void)
 		struct rte_lpm6 *lpm = NULL;
 		struct rte_lpm6_config config;
 		uint8_t ip[] = {128,128,128,128,128,128,128,128,128,128,128,128,128,128,0,0};
-		uint8_t depth = 128, next_hop_add = 100, next_hop_return;
+		uint8_t depth = 128;
+		uint16_t next_hop_add = 100, next_hop_return;
 		int32_t status = 0;
 		int i, j;
 
-		config.max_rules = MAX_RULES;
 		config.number_tbl8s = NUMBER_TBL8S;
 		config.flags = 0;
 
