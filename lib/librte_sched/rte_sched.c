@@ -1869,7 +1869,7 @@ grinder_next_pipe(struct rte_sched_port *port, uint32_t pos)
 
 	/* Install new pipe in the grinder */
 	grinder->pindex = pipe_qindex >> 4;
-	grinder->subport = port->subport + (grinder->pindex / port->n_pipes_per_subport);
+	grinder->subport = port->subport + (grinder->pindex / port->n_subports_per_port);
 	grinder->pipe = port->pipe + grinder->pindex;
 	grinder->pipe_params = NULL; /* to be set after the pipe structure is prefetched */
 	grinder->productive = 0;
