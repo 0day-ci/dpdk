@@ -48,6 +48,7 @@ CFLAGS += -O3
 CFLAGS += -std=gnu99 -Wall -Wextra
 CFLAGS += -g
 CFLAGS += -I.
+CFLAGS += -D_DEFAULT_SOURCE
 CFLAGS += -D_XOPEN_SOURCE=600
 CFLAGS += $(WERROR_FLAGS)
 LDLIBS += -libverbs
