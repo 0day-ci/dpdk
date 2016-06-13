@@ -205,49 +205,6 @@ copy_mbuf_to_desc(struct virtio_net *dev, struct vhost_virtqueue *vq,
 	return 0;
 }
 
-/*
- * As many data cores may want to access available buffers
- * they need to be reserved.
- */
-static inline uint32_t
-reserve_avail_buf(struct vhost_virtqueue *vq, uint32_t count,
-		  uint16_t *start, uint16_t *end)
-{
-	uint16_t res_start_idx;
-	uint16_t res_end_idx;
-	uint16_t avail_idx;
-	uint16_t free_entries;
-	int success;
-
-	count = RTE_MIN(count, (uint32_t)MAX_PKT_BURST);
-
-again:
-	res_start_idx = vq->last_used_idx_res;
-	avail_idx = *((volatile uint16_t *)&vq->avail->idx);
-
-	free_entries = avail_idx - res_start_idx;
-	count = RTE_MIN(count, free_entries);
-	if (count == 0)
-		return 0;
-
-	res_end_idx = res_start_idx + count;
-
-	/*
-	 * update vq->last_used_idx_res atomically; try again if failed.
-	 *
-	 * TODO: Allow to disable cmpset if no concurrency in application.
-	 */
-	success = rte_atomic16_cmpset(&vq->last_used_idx_res,
-				      res_start_idx, res_end_idx);
-	if (unlikely(!success))
-		goto again;
-
-	*start = res_start_idx;
-	*end   = res_end_idx;
-
-	return count;
-}
-
 /**
  * This function adds buffers to the virtio devices RX virtqueue. Buffers can
  * be received from the physical port or from another virtio device. A packet
@@ -260,7 +217,7 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 	      struct rte_mbuf **pkts, uint32_t count)
 {
 	struct vhost_virtqueue *vq;
-	uint16_t res_start_idx, res_end_idx;
+	uint16_t avail_idx, free_entries, res_start_idx;
 	uint16_t desc_indexes[MAX_PKT_BURST];
 	uint32_t i;
 
@@ -276,13 +233,19 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 	if (unlikely(vq->enabled == 0))
 		return 0;
 
-	count = reserve_avail_buf(vq, count, &res_start_idx, &res_end_idx);
+
+	count = RTE_MIN(count, (uint32_t)MAX_PKT_BURST);
+	avail_idx = *((volatile uint16_t *)&vq->avail->idx);
+	res_start_idx = vq->last_used_idx;
+	free_entries = avail_idx - res_start_idx;
+	count = RTE_MIN(count, free_entries);
+
 	if (count == 0)
 		return 0;
 
 	LOG_DEBUG(VHOST_DATA,
 		"(%"PRIu64") res_start_idx %d| res_end_idx Index %d\n",
-		dev->device_fh, res_start_idx, res_end_idx);
+		dev->device_fh, res_start_idx, res_start_idx + count);
 
 	/* Retrieve all of the desc indexes first to avoid caching issues. */
 	rte_prefetch0(&vq->avail->ring[res_start_idx & (vq->size - 1)]);
@@ -315,12 +278,8 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 
 	rte_smp_wmb();
 
-	/* Wait until it's our turn to add our buffer to the used ring. */
-	while (unlikely(vq->last_used_idx != res_start_idx))
-		rte_pause();
-
 	*(volatile uint16_t *)&vq->used->idx += count;
-	vq->last_used_idx = res_end_idx;
+	vq->last_used_idx += count;
 	vhost_log_used_vring(dev, vq,
 		offsetof(struct vring_used, idx),
 		sizeof(vq->used->idx));
@@ -366,29 +325,20 @@ fill_vec_buf(struct vhost_virtqueue *vq, uint32_t avail_idx,
 }
 
 /*
- * As many data cores may want to access available buffers concurrently,
- * they need to be reserved.
- *
  * Returns -1 on fail, 0 on success
  */
 static inline int
 reserve_avail_buf_mergeable(struct vhost_virtqueue *vq, uint32_t size,
-			    uint16_t *start, uint16_t *end)
+			    uint16_t *end)
 {
-	uint16_t res_start_idx;
 	uint16_t res_cur_idx;
 	uint16_t avail_idx;
-	uint32_t allocated;
-	uint32_t vec_idx;
-	uint16_t tries;
+	uint32_t allocated = 0;
+	uint32_t vec_idx = 0;
+	uint16_t tries = 0;
 
-again:
-	res_start_idx = vq->last_used_idx_res;
-	res_cur_idx  = res_start_idx;
+	res_cur_idx  = vq->last_used_idx;
 
-	allocated = 0;
-	vec_idx   = 0;
-	tries     = 0;
 	while (1) {
 		avail_idx = *((volatile uint16_t *)&vq->avail->idx);
 		if (unlikely(res_cur_idx == avail_idx))
@@ -413,26 +363,17 @@ again:
 			return -1;
 	}
 
-	/*
-	 * update vq->last_used_idx_res atomically.
-	 * retry again if failed.
-	 */
-	if (rte_atomic16_cmpset(&vq->last_used_idx_res,
-				res_start_idx, res_cur_idx) == 0)
-		goto again;
-
-	*start = res_start_idx;
 	*end   = res_cur_idx;
 	return 0;
 }
 
 static inline uint32_t __attribute__((always_inline))
 copy_mbuf_to_desc_mergeable(struct virtio_net *dev, struct vhost_virtqueue *vq,
-			    uint16_t res_start_idx, uint16_t res_end_idx,
-			    struct rte_mbuf *m)
+			    uint16_t res_end_idx, struct rte_mbuf *m)
 {
 	struct virtio_net_hdr_mrg_rxbuf virtio_hdr = {{0, 0, 0, 0, 0, 0}, 0};
 	uint32_t vec_idx = 0;
+	uint16_t res_start_idx = vq->last_used_idx;
 	uint16_t cur_idx = res_start_idx;
 	uint64_t desc_addr;
 	uint32_t mbuf_offset, mbuf_avail;
@@ -531,7 +472,7 @@ virtio_dev_merge_rx(struct virtio_net *dev, uint16_t queue_id,
 {
 	struct vhost_virtqueue *vq;
 	uint32_t pkt_idx = 0, nr_used = 0;
-	uint16_t start, end;
+	uint16_t end;
 
 	LOG_DEBUG(VHOST_DATA, "(%"PRIu64") virtio_dev_merge_rx()\n",
 		dev->device_fh);
@@ -554,23 +495,16 @@ virtio_dev_merge_rx(struct virtio_net *dev, uint16_t queue_id,
 		uint32_t pkt_len = pkts[pkt_idx]->pkt_len + vq->vhost_hlen;
 
 		if (unlikely(reserve_avail_buf_mergeable(vq, pkt_len,
-							 &start, &end) < 0)) {
+							 &end) < 0)) {
 			LOG_DEBUG(VHOST_DATA,
 				"(%" PRIu64 ") Failed to get enough desc from vring\n",
 				dev->device_fh);
 			break;
 		}
 
-		nr_used = copy_mbuf_to_desc_mergeable(dev, vq, start, end,
+		nr_used = copy_mbuf_to_desc_mergeable(dev, vq, end,
 						      pkts[pkt_idx]);
 		rte_smp_wmb();
-
-		/*
-		 * Wait until it's our turn to add our buffer
-		 * to the used ring.
-		 */
-		while (unlikely(vq->last_used_idx != start))
-			rte_pause();
 
 		*(volatile uint16_t *)&vq->used->idx += nr_used;
 		vhost_log_used_vring(dev, vq, offsetof(struct vring_used, idx),

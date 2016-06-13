@@ -131,6 +131,9 @@ API Changes
    * Add a short 1-2 sentence description of the API change. Use fixed width
      quotes for ``rte_function_names`` or ``rte_struct_names``. Use the past tense.
 
+* The function ``rte_vhost_enqueue_burst`` no longer supports concurrent enqueuing
+  packets to the same queue.
+
 * The following counters are removed from ``rte_eth_stats`` structure:
   ibadcrc, ibadlen, imcasts, fdirmatch, fdirmiss,
   tx_pause_xon, rx_pause_xon, tx_pause_xoff, rx_pause_xoff.

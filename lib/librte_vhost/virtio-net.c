@@ -601,7 +601,6 @@ vhost_set_vring_base(struct vhost_device_ctx ctx,
 
 	/* State->index refers to the queue index. The txq is 1, rxq is 0. */
 	dev->virtqueue[state->index]->last_used_idx = state->num;
-	dev->virtqueue[state->index]->last_used_idx_res = state->num;
 
 	return 0;
 }

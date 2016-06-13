@@ -88,7 +88,6 @@ struct vhost_virtqueue {
 	uint32_t		backend;		/**< Backend value to determine if device should started/stopped. */
 	uint16_t		vhost_hlen;		/**< Vhost header length (varies depending on RX merge buffers. */
 	volatile uint16_t	last_used_idx;		/**< Last index used on the available ring */
-	volatile uint16_t	last_used_idx_res;	/**< Used for multiple devices reserving buffers. */
 #define VIRTIO_INVALID_EVENTFD		(-1)
 #define VIRTIO_UNINITIALIZED_EVENTFD	(-2)
 	int			callfd;			/**< Used to notify the guest (trigger interrupt). */
@@ -192,7 +191,7 @@ rte_vring_available_entries(struct virtio_net *dev, uint16_t queue_id)
 	if (!vq->enabled)
 		return 0;
 
-	return *(volatile uint16_t *)&vq->avail->idx - vq->last_used_idx_res;
+	return *(volatile uint16_t *)&vq->avail->idx - vq->last_used_idx;
 }
 
 /**
