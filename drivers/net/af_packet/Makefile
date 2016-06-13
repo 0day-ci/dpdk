@@ -54,5 +54,6 @@ SRCS-$(CONFIG_RTE_LIBRTE_PMD_AF_PACKET) += rte_eth_af_packet.c
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_AF_PACKET) += lib/librte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_AF_PACKET) += lib/librte_ether
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_AF_PACKET) += lib/librte_kvargs
+DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_AF_PACKET) += lib/librte_eal
 
 include $(RTE_SDK)/mk/rte.lib.mk

@@ -61,5 +61,6 @@ SYMLINK-$(CONFIG_RTE_LIBRTE_SCHED)-include += rte_reciprocal.h
 # this lib depends upon:
 DEPDIRS-$(CONFIG_RTE_LIBRTE_SCHED) += lib/librte_mempool lib/librte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_SCHED) += lib/librte_net lib/librte_timer
+DEPDIRS-$(CONFIG_RTE_LIBRTE_SCHED) += lib/librte_eal
 
 include $(RTE_SDK)/mk/rte.lib.mk

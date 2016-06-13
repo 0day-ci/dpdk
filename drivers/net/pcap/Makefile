@@ -59,5 +59,6 @@ SYMLINK-y-include +=
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_PCAP) += lib/librte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_PCAP) += lib/librte_ether
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_PCAP) += lib/librte_kvargs
+DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_PCAP) += lib/librte_eal
 
 include $(RTE_SDK)/mk/rte.lib.mk

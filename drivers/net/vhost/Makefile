@@ -36,6 +36,8 @@ include $(RTE_SDK)/mk/rte.vars.mk
 #
 LIB = librte_pmd_vhost.a
 
+LDLIBS += -lpthread
+
 CFLAGS += -O3
 CFLAGS += $(WERROR_FLAGS)
 
@@ -58,5 +60,6 @@ DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_VHOST) += lib/librte_mbuf
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_VHOST) += lib/librte_ether
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_VHOST) += lib/librte_kvargs
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_VHOST) += lib/librte_vhost
+DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_VHOST) += lib/librte_eal
 
 include $(RTE_SDK)/mk/rte.lib.mk
