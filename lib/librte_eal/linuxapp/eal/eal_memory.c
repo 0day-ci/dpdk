@@ -1075,6 +1075,15 @@ rte_eal_hugepage_init(void)
 	if (internal_config.no_hugetlbfs) {
 		addr = mmap(NULL, internal_config.memory, PROT_READ | PROT_WRITE,
 			MAP_LOCKED | MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+		/* retry without MAP_LOCKED */
+		if (addr == MAP_FAILED && errno == EAGAIN) {
+			addr = mmap(NULL, internal_config.memory,
+				PROT_READ | PROT_WRITE,
+				MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+			if (addr != MAP_FAILED)
+				RTE_LOG(NOTICE, EAL,
+					"Cannot lock memory: don't use physical devices\n");
+		}
 		if (addr == MAP_FAILED) {
 			RTE_LOG(ERR, EAL, "%s: mmap() failed: %s\n", __func__,
 					strerror(errno));
