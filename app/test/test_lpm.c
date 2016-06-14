@@ -34,12 +34,25 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <rte_lpm.h>
+#include <rte_ip.h>
+#include <rte_malloc.h>
 
 #include "test.h"
-#include "test_lpm_routes.h"
+#include "resource.h"
+
 #include "test_xmmt_ops.h"
+
+REGISTER_LINKED_RESOURCE(test_lpm_data)
+
+struct route_rule {
+	uint32_t ip;
+	uint8_t depth;
+};
+static struct route_rule *large_route_table;
+static unsigned int num_route_entries;
 
 #define TEST_LPM_ASSERT(cond) do {                                            \
 	if (!(cond)) {                                                        \
@@ -1217,6 +1230,62 @@ test17(void)
 	return PASS;
 }
 
+static int
+load_large_route_table(void)
+{
+	const struct resource *r;
+	const char *lpm_data;
+
+	r = resource_find("test_lpm_data");
+	TEST_ASSERT_NOT_NULL(r, "No large lpm table data found");
+
+	/* the routing table size is going to be less than the size of the
+	 * resource, since text extries are more verbose. Allocate this as
+	 * the max size, and shrink the allocation later
+	 */
+	large_route_table = rte_malloc(NULL, resource_size(r), 0);
+	if (large_route_table == NULL)
+		return -1;
+
+	/* parse the lpm table. All entries are of format:
+	 *  {IP-as-decimal-unsigned, depth}
+	 * For example:
+	 *  {1234567U, 24},
+	 * We use the "U" and "}" characters as format check characters,
+	 * after parsing each number.
+	 */
+	for (lpm_data = r->begin; lpm_data < r->end; lpm_data++) {
+		if (*lpm_data == '{') {
+			char *endptr;
+
+			lpm_data++;
+			large_route_table[num_route_entries].ip = \
+				strtoul(lpm_data, &endptr, 0);
+			if (*endptr != 'U') {
+				if (num_route_entries > 0)
+					printf("Failed parse of %.*s\n", 12, lpm_data);
+				continue;
+			}
+
+			lpm_data = endptr + 2; /* skip U and , */
+			large_route_table[num_route_entries].depth = \
+				strtoul(lpm_data, &endptr, 0);
+			if (*endptr != '}') {
+				if (num_route_entries > 0)
+					printf("Failed parse of %.*s\n",5, lpm_data);
+				continue;
+			}
+
+			num_route_entries++;
+		}
+	}
+
+	large_route_table = rte_realloc(large_route_table,
+		sizeof(large_route_table[0]) * num_route_entries, 0);
+	printf("Read %u route entries\n", num_route_entries);
+	return 0;
+}
+
 /*
  * Do all unit tests.
  */
@@ -1226,6 +1295,8 @@ test_lpm(void)
 {
 	unsigned i;
 	int status, global_status = 0;
+
+	TEST_ASSERT_SUCCESS(load_large_route_table(), "Error loading lpm table");
 
 	for (i = 0; i < NUM_LPM_TESTS; i++) {
 		status = tests[i]();
