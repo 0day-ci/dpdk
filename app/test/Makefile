@@ -71,9 +71,6 @@ SRCS-y += test.c
 SRCS-y += resource.c
 SRCS-y += test_resource.c
 $(eval $(call linked_resource,test_resource_c,resource.c))
-$(eval $(call linked_tar_resource,test_resource_tar,test_resource.c))
-SRCS-y += test_pci.c
-$(eval $(call linked_tar_resource,test_pci_sysfs,test_pci_sysfs))
 SRCS-y += test_prefetch.c
 SRCS-y += test_byteorder.c
 SRCS-y += test_per_lcore.c
@@ -87,6 +84,13 @@ SRCS-y += test_memzone.c
 SRCS-y += test_ring.c
 SRCS-y += test_ring_perf.c
 SRCS-y += test_pmd_perf.c
+
+ifeq ($(CONFIG_RTE_APP_TEST_RESOURCE_TAR),y)
+$(eval $(call linked_tar_resource,test_resource_tar,test_resource.c))
+SRCS-y += test_pci.c
+$(eval $(call linked_tar_resource,test_pci_sysfs,test_pci_sysfs))
+LDLIBS += -larchive
+endif
 
 ifeq ($(CONFIG_RTE_LIBRTE_TABLE),y)
 SRCS-y += test_table.c
@@ -194,7 +198,6 @@ CFLAGS += $(WERROR_FLAGS)
 CFLAGS += -D_GNU_SOURCE
 
 LDLIBS += -lm
-LDLIBS += -larchive
 
 # Disable VTA for memcpy test
 ifeq ($(CONFIG_RTE_TOOLCHAIN_GCC),y)
