@@ -1417,7 +1417,7 @@ rte_eal_hugepage_attach(void)
 	if (internal_config.xen_dom0_support) {
 #ifdef RTE_LIBRTE_XEN_DOM0
 		if (rte_xen_dom0_memory_attach() < 0) {
-			RTE_LOG(ERR, EAL,"Failed to attach memory setments of primay "
+			RTE_LOG(ERR, EAL, "Failed to attach memory segments of primary "
 					"process\n");
 			return -1;
 		}
@@ -1481,7 +1481,7 @@ rte_eal_hugepage_attach(void)
 
 	size = getFileSize(fd_hugepage);
 	hp = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd_hugepage, 0);
-	if (hp == NULL) {
+	if (hp == MAP_FAILED) {
 		RTE_LOG(ERR, EAL, "Could not mmap %s\n", eal_hugepage_info_path());
 		goto error;
 	}
@@ -1551,6 +1551,13 @@ rte_eal_hugepage_attach(void)
 	return 0;
 
 error:
+	s = 0;
+	while (s < RTE_MAX_MEMSEG && mcfg->memseg[s].len > 0) {
+		munmap(mcfg->memseg[s].addr, mcfg->memseg[s].len);
+		s++;
+	}
+	if (hp != NULL && hp != MAP_FAILED)
+		munmap((void *)(uintptr_t)hp, size);
 	if (fd_zero >= 0)
 		close(fd_zero);
 	if (fd_hugepage >= 0)
