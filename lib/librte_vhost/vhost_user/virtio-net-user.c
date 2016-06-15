@@ -277,6 +277,9 @@ user_set_vring_kick(struct vhost_device_ctx ctx, struct VhostUserMsg *pmsg)
 	struct vhost_vring_file file;
 	struct virtio_net *dev = get_device(ctx);
 
+	if (!dev)
+		return;
+
 	file.index = pmsg->payload.u64 & VHOST_USER_VRING_IDX_MASK;
 	if (pmsg->payload.u64 & VHOST_USER_VRING_NOFD_MASK)
 		file.fd = VIRTIO_INVALID_EVENTFD;
@@ -300,8 +303,9 @@ user_get_vring_base(struct vhost_device_ctx ctx,
 {
 	struct virtio_net *dev = get_device(ctx);
 
-	if (dev == NULL)
+	if (!dev)
 		return -1;
+
 	/* We have to stop the queue (virtio) if it is running. */
 	if (dev->flags & VIRTIO_DEV_RUNNING)
 		notify_ops->destroy_device(dev);
@@ -335,6 +339,9 @@ user_set_vring_enable(struct vhost_device_ctx ctx,
 	struct virtio_net *dev = get_device(ctx);
 	int enable = (int)state->num;
 
+	if (!dev)
+		return -1;
+
 	RTE_LOG(INFO, VHOST_CONFIG,
 		"set queue enable: %d to qp idx: %d\n",
 		enable, state->index);
@@ -355,7 +362,7 @@ user_set_protocol_features(struct vhost_device_ctx ctx,
 	struct virtio_net *dev;
 
 	dev = get_device(ctx);
-	if (dev == NULL || protocol_features & ~VHOST_USER_PROTOCOL_FEATURES)
+	if (!dev || protocol_features & ~VHOST_USER_PROTOCOL_FEATURES)
 		return;
 
 	dev->protocol_features = protocol_features;
