@@ -332,8 +332,12 @@ int
 user_set_vring_enable(struct vhost_device_ctx ctx,
 		      struct vhost_vring_state *state)
 {
-	struct virtio_net *dev = get_device(ctx);
+	struct virtio_net *dev;
 	int enable = (int)state->num;
+
+	dev = get_device(ctx);
+	if (dev == NULL)
+		return -1;
 
 	RTE_LOG(INFO, VHOST_CONFIG,
 		"set queue enable: %d to qp idx: %d\n",
