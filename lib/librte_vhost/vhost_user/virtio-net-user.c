@@ -397,6 +397,7 @@ user_set_log_base(struct vhost_device_ctx ctx,
 	 * fail when offset is not page size aligned.
 	 */
 	addr = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	close(fd);
 	if (addr == MAP_FAILED) {
 		RTE_LOG(ERR, VHOST_CONFIG, "mmap log base failed!\n");
 		return -1;
