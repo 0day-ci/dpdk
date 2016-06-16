@@ -1485,11 +1485,15 @@ static struct eth_driver rte_ixgbe_pmd = {
 		.id_table = pci_id_ixgbe_map,
 		.drv_flags = RTE_PCI_DRV_NEED_MAPPING | RTE_PCI_DRV_INTR_LSC |
 			RTE_PCI_DRV_DETACHABLE,
+		.devinit = rte_eth_dev_pci_probe,
+		.devuninit = rte_eth_dev_pci_remove,
 	},
 	.eth_dev_init = eth_ixgbe_dev_init,
 	.eth_dev_uninit = eth_ixgbe_dev_uninit,
 	.dev_private_size = sizeof(struct ixgbe_adapter),
 };
+
+RTE_EAL_PCI_REGISTER(ixgbe, rte_ixgbe_pmd.pci_drv);
 
 /*
  * virtual function driver struct
@@ -1499,39 +1503,15 @@ static struct eth_driver rte_ixgbevf_pmd = {
 		.name = "rte_ixgbevf_pmd",
 		.id_table = pci_id_ixgbevf_map,
 		.drv_flags = RTE_PCI_DRV_NEED_MAPPING | RTE_PCI_DRV_DETACHABLE,
+		.devinit = rte_eth_dev_pci_probe,
+		.devuninit = rte_eth_dev_pci_remove,
 	},
 	.eth_dev_init = eth_ixgbevf_dev_init,
 	.eth_dev_uninit = eth_ixgbevf_dev_uninit,
 	.dev_private_size = sizeof(struct ixgbe_adapter),
 };
 
-/*
- * Driver initialization routine.
- * Invoked once at EAL init time.
- * Register itself as the [Poll Mode] Driver of PCI IXGBE devices.
- */
-static int
-rte_ixgbe_pmd_init(const char *name __rte_unused, const char *params __rte_unused)
-{
-	PMD_INIT_FUNC_TRACE();
-
-	rte_eth_driver_register(&rte_ixgbe_pmd);
-	return 0;
-}
-
-/*
- * VF Driver initialization routine.
- * Invoked one at EAL init time.
- * Register itself as the [Virtual Poll Mode] Driver of PCI niantic devices.
- */
-static int
-rte_ixgbevf_pmd_init(const char *name __rte_unused, const char *param __rte_unused)
-{
-	PMD_INIT_FUNC_TRACE();
-
-	rte_eth_driver_register(&rte_ixgbevf_pmd);
-	return 0;
-}
+RTE_EAL_PCI_REGISTER(ixgbevf, rte_ixgbevf_pmd.pci_drv);
 
 static int
 ixgbe_vlan_filter_set(struct rte_eth_dev *dev, uint16_t vlan_id, int on)
@@ -7164,16 +7144,3 @@ ixgbevf_dev_allmulticast_disable(struct rte_eth_dev *dev)
 
 	ixgbevf_update_xcast_mode(hw, IXGBEVF_XCAST_MODE_NONE);
 }
-
-static struct rte_driver rte_ixgbe_driver = {
-	.type = PMD_PDEV,
-	.init = rte_ixgbe_pmd_init,
-};
-
-static struct rte_driver rte_ixgbevf_driver = {
-	.type = PMD_PDEV,
-	.init = rte_ixgbevf_pmd_init,
-};
-
-PMD_REGISTER_DRIVER(rte_ixgbe_driver);
-PMD_REGISTER_DRIVER(rte_ixgbevf_driver);

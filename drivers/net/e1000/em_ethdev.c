@@ -368,18 +368,15 @@ static struct eth_driver rte_em_pmd = {
 		.id_table = pci_id_em_map,
 		.drv_flags = RTE_PCI_DRV_NEED_MAPPING | RTE_PCI_DRV_INTR_LSC |
 			RTE_PCI_DRV_DETACHABLE,
+		.devinit = rte_eth_dev_pci_probe,
+		.devuninit = rte_eth_dev_pci_remove,
 	},
 	.eth_dev_init = eth_em_dev_init,
 	.eth_dev_uninit = eth_em_dev_uninit,
 	.dev_private_size = sizeof(struct e1000_adapter),
 };
 
-static int
-rte_em_pmd_init(const char *name __rte_unused, const char *params __rte_unused)
-{
-	rte_eth_driver_register(&rte_em_pmd);
-	return 0;
-}
+RTE_EAL_PCI_REGISTER(em, rte_em_pmd.pci_drv);
 
 static int
 em_hw_init(struct e1000_hw *hw)
@@ -1771,10 +1768,3 @@ eth_em_set_mc_addr_list(struct rte_eth_dev *dev,
 	e1000_update_mc_addr_list(hw, (u8 *)mc_addr_set, nb_mc_addr);
 	return 0;
 }
-
-struct rte_driver em_pmd_drv = {
-	.type = PMD_PDEV,
-	.init = rte_em_pmd_init,
-};
-
-PMD_REGISTER_DRIVER(em_pmd_drv);
