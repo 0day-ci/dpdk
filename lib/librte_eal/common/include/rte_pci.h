@@ -107,6 +107,9 @@ const char *pci_get_sysfs_path(void);
 /** Nb. of values in PCI resource format. */
 #define PCI_RESOURCE_FMT_NVAL 3
 
+/** Default sysfs path for PCI device search. */
+#define SYSFS_PCI_DEVICES "/sys/bus/pci/devices"
+
 /**
  * A structure describing a PCI resource.
  */

@@ -87,8 +87,6 @@ struct pci_driver_list pci_driver_list =
 struct pci_device_list pci_device_list =
 	TAILQ_HEAD_INITIALIZER(pci_device_list);
 
-#define SYSFS_PCI_DEVICES "/sys/bus/pci/devices"
-
 const char *pci_get_sysfs_path(void)
 {
 	const char *path = NULL;
