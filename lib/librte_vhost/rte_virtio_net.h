@@ -143,7 +143,8 @@ struct virtio_net {
 	uint64_t		log_base;	/**< Where dirty pages are logged */
 	struct ether_addr	mac;		/**< MAC address */
 	rte_atomic16_t		broadcast_rarp;	/**< A flag to tell if we need broadcast rarp packet */
-	uint64_t		reserved[61];	/**< Reserve some spaces for future extension. */
+	uint64_t		log_addr;	/**< Where log mapped. */
+	uint64_t		reserved[60];	/**< Reserve some spaces for future extension. */
 	struct vhost_virtqueue	*virtqueue[VHOST_MAX_QUEUE_PAIRS * 2];	/**< Contains all virtqueue information. */
 } __rte_cache_aligned;
 
