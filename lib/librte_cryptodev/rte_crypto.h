@@ -328,6 +328,21 @@ rte_crypto_op_free(struct rte_crypto_op *op)
 }
 
 /**
+ * free crypto operation structure
+ * If operation has been allocate from a rte_mempool, then the operation will
+ * be returned to the mempool.
+ *
+ * @param	op	symmetric crypto operation
+ */
+static inline void
+rte_crypto_op_bulk_free(struct rte_mempool *mpool, struct rte_crypto_op **ops,
+		uint16_t nb_ops)
+{
+	if (ops != NULL)
+		rte_mempool_put_bulk(mpool, (void * const *)ops, nb_ops);
+}
+
+/**
  * Allocate a symmetric crypto operation in the private data of an mbuf.
  *
  * @param	m	mbuf which is associated with the crypto operation, the
