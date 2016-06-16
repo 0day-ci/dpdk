@@ -144,6 +144,12 @@ pipeline_run(void *pipeline)
 		rte_exit(0, "Bye!\n");
 	}
 
+#ifdef RTE_LIBRTE_KNI
+	/* Handle KNI requests from Linux kernel */
+	for (uint32_t i = 0; i < app->n_pktq_kni; i++)
+		rte_kni_handle_request(app->kni[i]);
+#endif /* RTE_LIBRTE_KNI */
+
 	return 0;
 }
 

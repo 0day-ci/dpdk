@@ -1281,10 +1281,21 @@ void app_pipeline_params_get(struct app_params *app,
 			break;
 		}
 		case APP_PKTQ_IN_TM:
+		{
 			out->type = PIPELINE_PORT_IN_SCHED_READER;
 			out->params.sched.sched = app->tm[in->id];
 			out->burst_size = app->tm_params[in->id].burst_read;
 			break;
+		}
+#ifdef RTE_LIBRTE_KNI
+		case APP_PKTQ_IN_KNI:
+		{
+			out->type = PIPELINE_PORT_IN_KNI_READER;
+			out->params.kni.kni = app->kni[in->id];
+			out->burst_size = app->kni_params[in->id].burst_read;
+			break;
+		}
+#endif /* RTE_LIBRTE_KNI */
 		case APP_PKTQ_IN_SOURCE:
 		{
 			uint32_t mempool_id =
@@ -1409,7 +1420,8 @@ void app_pipeline_params_get(struct app_params *app,
 			}
 			break;
 		}
-		case APP_PKTQ_OUT_TM: {
+		case APP_PKTQ_OUT_TM:
+		{
 			struct rte_port_sched_writer_params *params =
 				&out->params.sched;
 
@@ -1419,6 +1431,16 @@ void app_pipeline_params_get(struct app_params *app,
 				app->tm_params[in->id].burst_write;
 			break;
 		}
+#ifdef RTE_LIBRTE_KNI
+		case APP_PKTQ_OUT_KNI:
+		{
+			out->type = PIPELINE_PORT_OUT_KNI_WRITER;
+			out->params.kni.kni = app->kni[in->id];
+			out->params.kni.tx_burst_sz =
+				app->kni_params[in->id].burst_write;
+			break;
+		}
+#endif /* RTE_LIBRTE_KNI */
 		case APP_PKTQ_OUT_SINK:
 		{
 			out->type = PIPELINE_PORT_OUT_SINK;
@@ -1450,6 +1472,113 @@ void app_pipeline_params_get(struct app_params *app,
 		p_out->args_name[i] = p_in->args_name[i];
 		p_out->args_value[i] = p_in->args_value[i];
 	}
+}
+
+#ifdef RTE_LIBRTE_KNI
+static int
+kni_config_network_interface(uint8_t port_id, uint8_t if_up) {
+	int ret = 0;
+
+	if (port_id >= rte_eth_dev_count())
+		return -EINVAL;
+
+	if (if_up) {
+		rte_eth_dev_stop(port_id);
+		ret = rte_eth_dev_start(port_id);
+	} else
+		rte_eth_dev_stop(port_id);
+
+	return ret;
+}
+
+static int
+kni_change_mtu(uint8_t port_id, unsigned new_mtu) {
+	int ret;
+
+	if (port_id >= rte_eth_dev_count())
+		return -EINVAL;
+
+	if (new_mtu > ETHER_MAX_LEN)
+		return -EINVAL;
+
+	/* Stop specific port */
+	rte_eth_dev_stop(port_id);
+
+	/* Set new MTU */
+	ret = rte_eth_dev_set_mtu(port_id, new_mtu);
+	if (ret < 0)
+		return ret;
+
+	/* Restart specific port */
+	ret = rte_eth_dev_start(port_id);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+#endif /* RTE_LIBRTE_KNI */
+
+static void
+app_init_kni(struct app_params *app) {
+	if (app->n_pktq_kni == 0)
+		return;
+#ifndef RTE_LIBRTE_KNI
+	else
+		rte_panic("Can not init KNI without librte_kni support.\n");
+#else
+	rte_kni_init(app->n_pktq_kni);
+
+	for (uint32_t i = 0; i < app->n_pktq_kni; i++) {
+		struct app_pktq_kni_params *p_kni = &app->kni_params[i];
+		struct app_link_params *p_link;
+		struct rte_eth_dev_info dev_info;
+		struct app_mempool_params *mempool_params;
+		struct rte_mempool *mempool;
+		struct rte_kni_conf conf;
+		struct rte_kni_ops ops;
+
+		/* LINK */
+		p_link = app_get_link_for_kni(app, p_kni);
+		memset(&dev_info, 0, sizeof(dev_info));
+		rte_eth_dev_info_get(p_link->pmd_id, &dev_info);
+
+		/* MEMPOOL */
+		mempool_params = &app->mempool_params[p_kni->mempool_id];
+		mempool = app->mempool[p_kni->mempool_id];
+
+		/* KNI */
+		memset(&conf, 0, sizeof(conf));
+		snprintf(conf.name, RTE_KNI_NAMESIZE, "%s", p_kni->name);
+		conf.force_bind = p_kni->force_bind;
+		if (conf.force_bind) {
+			int lcore_id;
+
+			lcore_id = cpu_core_map_get_lcore_id(app->core_map,
+				p_kni->socket_id,
+				p_kni->core_id,
+				p_kni->hyper_th_id);
+
+			if (lcore_id < 0)
+				rte_panic("%s invalid CPU core\n", p_kni->name);
+
+			conf.core_id = (uint32_t) lcore_id;
+		}
+		conf.group_id = p_link->pmd_id;
+		conf.mbuf_size = mempool_params->buffer_size;
+		conf.addr = dev_info.pci_dev->addr;
+		conf.id = dev_info.pci_dev->id;
+
+		memset(&ops, 0, sizeof(ops));
+		ops.port_id = (uint8_t) p_link->pmd_id;
+		ops.change_mtu = kni_change_mtu;
+		ops.config_network_if = kni_config_network_interface;
+
+		APP_LOG(app, HIGH, "Initializing %s ...", p_kni->name);
+		app->kni[i] = rte_kni_alloc(mempool, &conf, &ops);
+		if (!app->kni[i])
+			rte_panic("%s init error\n", p_kni->name);
+	}
+#endif /* RTE_LIBRTE_KNI */
 }
 
 static void
@@ -1607,6 +1736,7 @@ int app_init(struct app_params *app)
 	app_init_link(app);
 	app_init_swq(app);
 	app_init_tm(app);
+	app_init_kni(app);
 	app_init_msgq(app);
 
 	app_pipeline_common_cmd_push(app);
