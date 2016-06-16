@@ -4254,6 +4254,19 @@ rte_eth_dev_l2_tunnel_offload_set(uint8_t port_id,
 				  uint32_t mask,
 				  uint8_t en);
 
+/**
+ * Wrapper for use by pci drivers as a .devinit function to attach to a ethdev
+ * interface.
+ */
+int rte_eth_dev_pci_probe(struct rte_pci_driver *pci_drv,
+			  struct rte_pci_device *pci_dev);
+
+/**
+ * Wrapper for use by pci drivers as a .devuninit function to detach a ethdev
+ * interface.
+ */
+int rte_eth_dev_pci_remove(struct rte_pci_device *pci_dev);
+
 #ifdef __cplusplus
 }
 #endif
