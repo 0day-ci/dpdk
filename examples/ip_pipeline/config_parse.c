@@ -1816,7 +1816,7 @@ parse_tm(struct app_params *app,
 	param = &app->tm_params[param_idx];
 	PARSE_CHECK_DUPLICATE_SECTION(param);
 
-	APP_PARAM_ADD_LINK_FOR_TXQ(app, section_name);
+	APP_PARAM_ADD_LINK_FOR_TM(app, section_name);
 
 	for (i = 0; i < n_entries; i++) {
 		struct rte_cfgfile_entry *ent = &entries[i];
