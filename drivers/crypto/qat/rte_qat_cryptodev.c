@@ -72,7 +72,8 @@ static struct rte_pci_id pci_id_qat_map[] = {
 			.vendor_id = 0x8086,
 			.device_id = 0x0443,
 			.subsystem_vendor_id = PCI_ANY_ID,
-			.subsystem_device_id = PCI_ANY_ID
+			.subsystem_device_id = PCI_ANY_ID,
+			.class_id  = 0xB4000
 		},
 		{.device_id = 0},
 };
