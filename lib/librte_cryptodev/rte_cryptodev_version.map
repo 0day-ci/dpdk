@@ -32,3 +32,11 @@ DPDK_16.04 {
 
 	local: *;
 };
+
+DPDK_16.07 {
+	global:
+
+	rte_cryptodev_pci_probe;
+	rte_cryptodev_pci_remove;
+
+} DPDK_16.04;

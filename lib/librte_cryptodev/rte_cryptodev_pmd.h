@@ -534,6 +534,18 @@ rte_cryptodev_pmd_driver_register(struct rte_cryptodev_driver *crypto_drv,
 void rte_cryptodev_pmd_callback_process(struct rte_cryptodev *dev,
 				enum rte_cryptodev_event_type event);
 
+/**
+ * Wrapper for use by pci drivers as a .devinit function to attach to a crypto
+ * interface.
+ */
+int rte_cryptodev_pci_probe(struct rte_pci_driver *pci_drv,
+			    struct rte_pci_device *pci_dev);
+
+/**
+ * Wrapper for use by pci drivers as a .devuninit function to detach a crypto
+ * interface.
+ */
+int rte_cryptodev_pci_remove(struct rte_pci_device *pci_dev);
 
 #ifdef __cplusplus
 }
