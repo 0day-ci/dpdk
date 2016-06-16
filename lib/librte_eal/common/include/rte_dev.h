@@ -178,6 +178,31 @@ int rte_eal_vdev_init(const char *name, const char *args);
  */
 int rte_eal_vdev_uninit(const char *name);
 
+/**
+ * Attach a resource to a registered driver.
+ *
+ * @param name
+ *   The resource name, that refers to a pci resource or some private
+ *   way of designating a resource for vdev drivers. Based on this
+ *   resource name, eal will identify a driver capable of handling
+ *   this resource and pass this resource to the driver probing
+ *   function.
+ * @param devargs
+ *   Device arguments to be passed to the driver.
+ * @return
+ *   0 on success, negative on error.
+ */
+int rte_eal_dev_attach(const char *name, const char *devargs);
+
+/**
+ * Detach a resource from its driver.
+ *
+ * @param name
+ *   Same description as for rte_eal_dev_attach().
+ *   Here, eal will call the driver detaching function.
+ */
+int rte_eal_dev_detach(const char *name);
+
 #define PMD_REGISTER_DRIVER(d)\
 RTE_INIT(devinitfn_ ##d);\
 static void devinitfn_ ##d(void)\

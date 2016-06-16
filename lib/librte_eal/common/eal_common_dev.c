@@ -150,3 +150,42 @@ rte_eal_vdev_uninit(const char *name)
 	RTE_LOG(ERR, EAL, "no driver found for %s\n", name);
 	return -EINVAL;
 }
+
+int rte_eal_dev_attach(const char *name, const char *devargs)
+{
+	struct rte_pci_addr addr;
+	int ret = -1;
+
+	if (eal_parse_pci_DomBDF(name, &addr) == 0) {
+		if (rte_eal_pci_probe_one(&addr) < 0)
+			goto err;
+
+	} else {
+		if (rte_eal_vdev_init(name, devargs))
+			goto err;
+	}
+
+	return 0;
+
+err:
+	RTE_LOG(ERR, EAL, "Driver, cannot attach the device\n");
+	return ret;
+}
+
+int rte_eal_dev_detach(const char *name)
+{
+	struct rte_pci_addr addr;
+
+	if (eal_parse_pci_DomBDF(name, &addr) == 0) {
+		if (rte_eal_pci_detach(&addr) < 0)
+			goto err;
+	} else {
+		if (rte_eal_vdev_uninit(name))
+			goto err;
+	}
+	return 0;
+
+err:
+	RTE_LOG(ERR, EAL, "Driver, cannot detach the device\n");
+	return -1;
+}

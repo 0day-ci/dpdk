@@ -159,5 +159,7 @@ DPDK_16.07 {
 	global:
 
 	pci_get_sysfs_path;
+	rte_eal_dev_attach;
+	rte_eal_dev_detach;
 
 } DPDK_16.04;
