@@ -147,6 +147,8 @@ struct app_pktq_kni_params {
 	uint32_t mempool_id; /* Position in the app->mempool_params */
 	uint32_t burst_read;
 	uint32_t burst_write;
+	uint32_t dropless;
+	uint64_t n_retries;
 };
 
 #ifndef APP_FILE_NAME_SIZE

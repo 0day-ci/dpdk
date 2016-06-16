@@ -1434,10 +1434,28 @@ void app_pipeline_params_get(struct app_params *app,
 #ifdef RTE_LIBRTE_KNI
 		case APP_PKTQ_OUT_KNI:
 		{
-			out->type = PIPELINE_PORT_OUT_KNI_WRITER;
-			out->params.kni.kni = app->kni[in->id];
-			out->params.kni.tx_burst_sz =
-				app->kni_params[in->id].burst_write;
+			struct app_pktq_kni_params *p_kni =
+				&app->kni_params[in->id];
+
+			if (p_kni->dropless == 0) {
+				struct rte_port_kni_writer_params *params =
+					&out->params.kni;
+
+				out->type = PIPELINE_PORT_OUT_KNI_WRITER;
+				params->kni = app->kni[in->id];
+				params->tx_burst_sz =
+					app->kni_params[in->id].burst_write;
+			} else {
+				struct rte_port_kni_writer_nodrop_params
+					*params = &out->params.kni_nodrop;
+
+				out->type = PIPELINE_PORT_OUT_KNI_WRITER_NODROP;
+				params->kni = app->kni[in->id];
+				params->tx_burst_sz =
+					app->kni_params[in->id].burst_write;
+				params->n_retries =
+					app->kni_params[in->id].n_retries;
+			}
 			break;
 		}
 #endif /* RTE_LIBRTE_KNI */

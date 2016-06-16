@@ -138,6 +138,7 @@ enum pipeline_port_out_type {
 	PIPELINE_PORT_OUT_RING_WRITER_IPV6_RAS,
 	PIPELINE_PORT_OUT_SCHED_WRITER,
 	PIPELINE_PORT_OUT_KNI_WRITER,
+	PIPELINE_PORT_OUT_KNI_WRITER_NODROP,
 	PIPELINE_PORT_OUT_SINK,
 };
 
@@ -155,6 +156,7 @@ struct pipeline_port_out_params {
 		struct rte_port_sched_writer_params sched;
 #ifdef RTE_LIBRTE_KNI
 		struct rte_port_kni_writer_params kni;
+		struct rte_port_kni_writer_nodrop_params kni_nodrop;
 #endif
 		struct rte_port_sink_params sink;
 	} params;
@@ -185,6 +187,8 @@ pipeline_port_out_params_convert(struct pipeline_port_out_params  *p)
 #ifdef RTE_LIBRTE_KNI
 	case PIPELINE_PORT_OUT_KNI_WRITER:
 		return (void *) &p->params.kni;
+	case PIPELINE_PORT_OUT_KNI_WRITER_NODROP:
+		return (void *) &p->params.kni_nodrop;
 #endif
 	case PIPELINE_PORT_OUT_SINK:
 		return (void *) &p->params.sink;
@@ -218,6 +222,8 @@ pipeline_port_out_params_get_ops(struct pipeline_port_out_params  *p)
 #ifdef RTE_LIBRTE_KNI
 	case PIPELINE_PORT_OUT_KNI_WRITER:
 		return &rte_port_kni_writer_ops;
+	case PIPELINE_PORT_OUT_KNI_WRITER_NODROP:
+		return &rte_port_kni_writer_nodrop_ops;
 #endif
 	case PIPELINE_PORT_OUT_SINK:
 		return &rte_port_sink_ops;

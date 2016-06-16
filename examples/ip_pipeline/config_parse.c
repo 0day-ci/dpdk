@@ -199,6 +199,8 @@ struct app_pktq_kni_params default_kni_params = {
 	.mempool_id = 0,
 	.burst_read = 32,
 	.burst_write = 32,
+	.dropless = 0,
+	.n_retries = 0,
 };
 
 struct app_pktq_source_params default_source_params = {
@@ -1927,7 +1929,7 @@ parse_kni(struct app_params *app,
 
 		if (strcmp(ent->name, "mempool") == 0) {
 			int status = validate_name(ent->value,
-									   "MEMPOOL", 1);
+				"MEMPOOL", 1);
 			ssize_t idx;
 
 			PARSE_ERROR((status == 0), section_name,
@@ -1940,7 +1942,7 @@ parse_kni(struct app_params *app,
 
 		if (strcmp(ent->name, "burst_read") == 0) {
 			int status = parser_read_uint32(&param->burst_read,
-											ent->value);
+						ent->value);
 
 			PARSE_ERROR((status == 0), section_name,
 						ent->name);
@@ -1949,7 +1951,25 @@ parse_kni(struct app_params *app,
 
 		if (strcmp(ent->name, "burst_write") == 0) {
 			int status = parser_read_uint32(&param->burst_write,
-											ent->value);
+						ent->value);
+
+			PARSE_ERROR((status == 0), section_name,
+						ent->name);
+			continue;
+		}
+
+		if (strcmp(ent->name, "dropless") == 0) {
+			int status = parser_read_arg_bool(ent->value);
+
+			PARSE_ERROR((status != -EINVAL), section_name,
+						ent->name);
+			param->dropless = status;
+			continue;
+		}
+
+		if (strcmp(ent->name, "n_retries") == 0) {
+			int status = parser_read_uint64(&param->n_retries,
+						ent->value);
 
 			PARSE_ERROR((status == 0), section_name,
 						ent->name);
@@ -2793,6 +2813,11 @@ save_kni_params(struct app_params *app, FILE *f)
 
 		/* burst_write */
 		fprintf(f, "%s = %" PRIu32 "\n", "burst_write", p->burst_write);
+
+		/* dropless */
+		fprintf(f, "%s = %s\n",
+				"dropless",
+				p->dropless ? "yes" : "no");
 
 		fputc('\n', f);
 	}
