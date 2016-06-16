@@ -470,6 +470,13 @@ void rte_eal_pci_dump(FILE *f);
  */
 void rte_eal_pci_register(struct rte_pci_driver *driver);
 
+#define RTE_EAL_PCI_REGISTER(name, d) \
+RTE_INIT(pciinitfn_ ##name); \
+static void pciinitfn_ ##name(void) \
+{ \
+	rte_eal_pci_register(&d); \
+}
+
 /**
  * Unregister a PCI driver.
  *

@@ -179,8 +179,8 @@ int rte_eal_vdev_init(const char *name, const char *args);
 int rte_eal_vdev_uninit(const char *name);
 
 #define PMD_REGISTER_DRIVER(d)\
-void devinitfn_ ##d(void);\
-void __attribute__((constructor, used)) devinitfn_ ##d(void)\
+RTE_INIT(devinitfn_ ##d);\
+static void devinitfn_ ##d(void)\
 {\
 	rte_eal_driver_register(&d);\
 }
