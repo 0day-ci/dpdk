@@ -821,6 +821,9 @@ rte_eal_init(int argc, char **argv)
 	if (eal_plugins_init() < 0)
 		rte_panic("Cannot init plugins\n");
 
+	if (rte_eal_intr_init() < 0)
+		rte_panic("Cannot init interrupt-handling thread\n");
+
 	eal_thread_init_master(rte_config.master_lcore);
 
 	ret = eal_thread_dump_affinity(cpuset, RTE_CPU_AFFINITY_STR_LEN);
@@ -831,9 +834,6 @@ rte_eal_init(int argc, char **argv)
 
 	if (rte_eal_dev_init() < 0)
 		rte_panic("Cannot init pmd devices\n");
-
-	if (rte_eal_intr_init() < 0)
-		rte_panic("Cannot init interrupt-handling thread\n");
 
 	RTE_LCORE_FOREACH_SLAVE(i) {
 
