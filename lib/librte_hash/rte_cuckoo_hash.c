@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -100,7 +100,13 @@ EAL_REGISTER_TAILQ(rte_hash_tailq)
 
 #define KEY_ALIGNMENT			16
 
-#define LCORE_CACHE_SIZE		8
+#define LCORE_CACHE_SIZE		64
+
+#define RTE_HASH_BFS_QUEUE_MAX_LEN  1000
+
+#define RTE_XABORT_CUCKOO_PATH_INVALIDED 0x4
+
+#define RTE_HASH_TSX_MAX_RETRY 10
 
 #if defined(RTE_ARCH_X86) || defined(RTE_ARCH_ARM64)
 /*
@@ -190,6 +196,7 @@ struct rte_hash {
 							memory support */
 	struct lcore_cache *local_free_slots;
 	/**< Local cache per lcore, storing some indexes of the free slots */
+	uint8_t multiwriter_add; /**< Multi-write safe hash add behavior */
 } __rte_cache_aligned;
 
 /* Structure storing both primary and secondary hashes */
@@ -372,7 +379,7 @@ rte_hash_create(const struct rte_hash_parameters *params)
 
 /*
  * If x86 architecture is used, select appropriate compare function,
- * which may use x86 instrinsics, otherwise use memcmp
+ * which may use x86 intrinsics, otherwise use memcmp
  */
 #if defined(RTE_ARCH_X86) || defined(RTE_ARCH_ARM64)
 	/* Select function to compare keys */
@@ -431,7 +438,16 @@ rte_hash_create(const struct rte_hash_parameters *params)
 	h->free_slots = r;
 	h->hw_trans_mem_support = hw_trans_mem_support;
 
-	/* populate the free slots ring. Entry zero is reserved for key misses */
+	/* Turn on multi-writer only with explicit flat from user and TM
+	 * support.
+	 */
+	if (params->extra_flag & RTE_HASH_EXTRA_FLAGS_MULTI_WRITER_ADD
+	    && h->hw_trans_mem_support)
+		h->multiwriter_add = 1;
+	else
+		h->multiwriter_add = 0;
+
+	/* Populate free slots ring. Entry zero is reserved for key misses. */
 	for (i = 1; i < params->entries + 1; i++)
 		rte_ring_sp_enqueue(r, (void *)((uintptr_t) i));
 
@@ -599,6 +615,123 @@ make_space_bucket(const struct rte_hash *h, struct rte_hash_bucket *bkt)
 
 }
 
+struct queue_node {
+	struct rte_hash_bucket *bkt; /* Current bucket on the bfs search */
+
+	struct queue_node *prev;     /* Parent(bucket) in search path */
+	int prev_slot;               /* Parent(slot) in search path */
+};
+
+/* Shift buckets along cuckoo_path and fill the path head with new entry */
+static inline int
+tsx_cuckoo_move_insert(const struct rte_hash *h, struct queue_node *leaf,
+			uint32_t leaf_slot, hash_sig_t sig,
+			hash_sig_t alt_hash, uint32_t new_idx)
+{
+	unsigned try = 0;
+	unsigned status;
+	uint32_t prev_alt_bkt_idx;
+
+	struct queue_node *prev_node, *curr_node = leaf;
+	struct rte_hash_bucket *prev_bkt, *curr_bkt = leaf->bkt;
+	uint32_t prev_slot, curr_slot = leaf_slot;
+
+	while (try < RTE_HASH_TSX_MAX_RETRY) {
+		status = rte_xbegin();
+		if (likely(status == RTE_XBEGIN_STARTED)) {
+			while (likely(curr_node->prev != NULL)) {
+				prev_node = curr_node->prev;
+				prev_bkt = prev_node->bkt;
+				prev_slot = curr_node->prev_slot;
+
+				prev_alt_bkt_idx
+					= prev_bkt->signatures[prev_slot].alt
+					    & h->bucket_bitmask;
+
+				if (unlikely(&h->buckets[prev_alt_bkt_idx]
+					     != curr_bkt)) {
+					rte_xabort(RTE_XABORT_CUCKOO_PATH_INVALIDED);
+				}
+
+				/* Need to swap current/alt sig to allow later Cuckoo insert to
+				 * move elements back to its primary bucket if available
+				 */
+				curr_bkt->signatures[curr_slot].alt =
+				    prev_bkt->signatures[prev_slot].current;
+				curr_bkt->signatures[curr_slot].current =
+				    prev_bkt->signatures[prev_slot].alt;
+				curr_bkt->key_idx[curr_slot]
+				    = prev_bkt->key_idx[prev_slot];
+
+				curr_slot = prev_slot;
+				curr_node = prev_node;
+				curr_bkt = curr_node->bkt;
+			}
+
+			curr_bkt->signatures[curr_slot].current = sig;
+			curr_bkt->signatures[curr_slot].alt = alt_hash;
+			curr_bkt->key_idx[curr_slot] = new_idx;
+
+			rte_xend();
+
+			return 0;
+		}
+
+		/* If we abort we give up this cuckoo path, since most likely it's
+		 * no longer valid as TSX detected data conflict
+		 */
+		try++;
+		rte_pause();
+	}
+
+	return -1;
+}
+
+/*
+ * Make space for new key, using bfs Cuckoo Search and Multi-Writer safe
+ * Cuckoo
+ */
+static inline int
+make_space_insert_bfs_mw(const struct rte_hash *h, struct rte_hash_bucket *bkt,
+			hash_sig_t sig, hash_sig_t alt_hash,
+			uint32_t new_idx)
+{
+	unsigned i;
+	struct queue_node queue[RTE_HASH_BFS_QUEUE_MAX_LEN];
+	struct queue_node *tail, *head;
+	struct rte_hash_bucket *curr_bkt, *alt_bkt;
+
+	tail = queue;
+	head = queue + 1;
+	tail->bkt = bkt;
+	tail->prev = NULL;
+	tail->prev_slot = -1;
+
+	/* Cuckoo bfs Search */
+	while (likely(tail != head && head <
+		            queue + RTE_HASH_BFS_QUEUE_MAX_LEN - 4)) {
+		curr_bkt = tail->bkt;
+		for (i = 0; i < RTE_HASH_BUCKET_ENTRIES; i++) {
+			if (curr_bkt->signatures[i].sig == NULL_SIGNATURE) {
+				if (likely(tsx_cuckoo_move_insert(h, tail, i,
+					         sig, alt_hash, new_idx) == 0))
+					return 0;
+			}
+
+			/* Enqueue new node and keep prev node info */
+			alt_bkt = &(h->buckets[curr_bkt->signatures[i].alt
+						    & h->bucket_bitmask]);
+			head->bkt = alt_bkt;
+			head->prev = tail;
+			head->prev_slot = i;
+			head++;
+		}
+		tail++;
+	}
+
+	return -ENOSPC;
+}
+
 /*
  * Function called to enqueue back an index in the cache/ring,
  * as slot has not being used and it can be used in the
@@ -712,30 +845,78 @@ __rte_hash_add_key_with_hash(const struct rte_hash *h, const void *key,
 	rte_memcpy(new_k->key, key, h->key_len);
 	new_k->pdata = data;
 
-	/* Insert new entry is there is room in the primary bucket */
-	for (i = 0; i < RTE_HASH_BUCKET_ENTRIES; i++) {
-		/* Check if slot is available */
-		if (likely(prim_bkt->signatures[i].sig == NULL_SIGNATURE)) {
-			prim_bkt->signatures[i].current = sig;
-			prim_bkt->signatures[i].alt = alt_hash;
-			prim_bkt->key_idx[i] = new_idx;
+	if (h->multiwriter_add) {
+		unsigned status;
+		unsigned try = 0;
+
+		while (try < RTE_HASH_TSX_MAX_RETRY) {
+			status = rte_xbegin();
+			if (likely(status == RTE_XBEGIN_STARTED)) {
+				/* Insert new entry if there is room in the primary
+				* bucket.
+				*/
+				for (i = 0; i < RTE_HASH_BUCKET_ENTRIES; i++) {
+					/* Check if slot is available */
+					if (likely(prim_bkt->signatures[i].sig == NULL_SIGNATURE)) {
+						prim_bkt->signatures[i].current = sig;
+						prim_bkt->signatures[i].alt = alt_hash;
+						prim_bkt->key_idx[i] = new_idx;
+						break;
+					}
+				}
+				rte_xend();
+
+				if (i != RTE_HASH_BUCKET_ENTRIES)
+					return new_idx - 1;
+
+				break; /* break off try loop if transaction commits */
+			} else {
+				/* If we abort we give up this cuckoo path. */
+				try++;
+				rte_pause();
+			}
+		}
+
+		/* Primary bucket full, need to make space for new entry */
+		ret = make_space_insert_bfs_mw(h, prim_bkt, sig, alt_hash,
+		                               new_idx);
+
+		if (ret >= 0)
+			return new_idx - 1;
+
+		/* Also search secondary bucket to get better occupancy */
+		ret = make_space_insert_bfs_mw(h, sec_bkt, sig, alt_hash,
+		                               new_idx);
+
+		if (ret >= 0)
+			return new_idx - 1;
+	} else {
+		for (i = 0; i < RTE_HASH_BUCKET_ENTRIES; i++) {
+			/* Check if slot is available */
+			if (likely(prim_bkt->signatures[i].sig == NULL_SIGNATURE)) {
+				prim_bkt->signatures[i].current = sig;
+				prim_bkt->signatures[i].alt = alt_hash;
+				prim_bkt->key_idx[i] = new_idx;
+				break;
+			}
+		}
+
+		if (i != RTE_HASH_BUCKET_ENTRIES)
+			return new_idx - 1;
+
+		/* Primary bucket full, need to make space for new entry
+		 * After recursive function.
+		 * Insert the new entry in the position of the pushed entry
+		 * if successful or return error and
+		 * store the new slot back in the ring
+		 */
+		ret = make_space_bucket(h, prim_bkt);
+		if (ret >= 0) {
+			prim_bkt->signatures[ret].current = sig;
+			prim_bkt->signatures[ret].alt = alt_hash;
+			prim_bkt->key_idx[ret] = new_idx;
 			return new_idx - 1;
 		}
-	}
-
-	/* Primary bucket is full, so we need to make space for new entry */
-	ret = make_space_bucket(h, prim_bkt);
-	/*
-	 * After recursive function.
-	 * Insert the new entry in the position of the pushed entry
-	 * if successful or return error and
-	 * store the new slot back in the ring
-	 */
-	if (ret >= 0) {
-		prim_bkt->signatures[ret].current = sig;
-		prim_bkt->signatures[ret].alt = alt_hash;
-		prim_bkt->key_idx[ret] = new_idx;
-		return new_idx - 1;
 	}
 
 	/* Error in addition, store new slot back in the ring and return error */
