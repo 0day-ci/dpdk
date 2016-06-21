@@ -460,8 +460,7 @@ pdump_get_socket_path(char *buffer, int bufsz, enum rte_pdump_socktype type)
 					SOCKET_PATH_HOME, __func__, __LINE__);
 				return -1;
 			}
-		}
-		else
+		} else
 			dir = SOCKET_PATH_VAR_RUN;
 	}
 
@@ -800,13 +799,15 @@ pdump_prepare_client_request(char *device, uint16_t queue,
 	req.flags = flags;
 	req.op =  operation;
 	if ((operation & ENABLE) != 0) {
-		strncpy(req.data.en_v1.device, device, strlen(device));
+		strncpy(req.data.en_v1.device, device,
+			sizeof(req.data.en_v1.device)-1);
 		req.data.en_v1.queue = queue;
 		req.data.en_v1.ring = ring;
 		req.data.en_v1.mp = mp;
 		req.data.en_v1.filter = filter;
 	} else {
-		strncpy(req.data.dis_v1.device, device, strlen(device));
+		strncpy(req.data.dis_v1.device, device,
+			sizeof(req.data.dis_v1.device)-1);
 		req.data.dis_v1.queue = queue;
 		req.data.dis_v1.ring = NULL;
 		req.data.dis_v1.mp = NULL;
