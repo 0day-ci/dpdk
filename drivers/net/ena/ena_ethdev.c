@@ -943,7 +943,10 @@ static int ena_tx_queue_setup(struct rte_eth_dev *dev,
 			      __rte_unused unsigned int socket_id,
 			      __rte_unused const struct rte_eth_txconf *tx_conf)
 {
-	struct ena_com_create_io_ctx ctx = { 0 };
+	struct ena_com_create_io_ctx ctx =
+		/* policy set to _HOST just to satisfy icc compiler */
+		{ ENA_ADMIN_PLACEMENT_POLICY_HOST,
+		  ENA_COM_IO_QUEUE_DIRECTION_TX, 0, 0, 0, 0 };
 	struct ena_ring *txq = NULL;
 	struct ena_adapter *adapter =
 		(struct ena_adapter *)(dev->data->dev_private);
@@ -1036,7 +1039,10 @@ static int ena_rx_queue_setup(struct rte_eth_dev *dev,
 			      __rte_unused const struct rte_eth_rxconf *rx_conf,
 			      struct rte_mempool *mp)
 {
-	struct ena_com_create_io_ctx ctx = { 0 };
+	struct ena_com_create_io_ctx ctx =
+		/* policy set to _HOST just to satisfy icc compiler */
+		{ ENA_ADMIN_PLACEMENT_POLICY_HOST,
+		  ENA_COM_IO_QUEUE_DIRECTION_RX, 0, 0, 0, 0 };
 	struct ena_adapter *adapter =
 		(struct ena_adapter *)(dev->data->dev_private);
 	struct ena_ring *rxq = NULL;
