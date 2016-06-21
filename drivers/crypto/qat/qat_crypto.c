@@ -361,7 +361,8 @@ qat_get_cipher_xform(struct rte_crypto_sym_xform *xform)
 }
 void *
 qat_crypto_sym_configure_session_cipher(struct rte_cryptodev *dev,
-		struct rte_crypto_sym_xform *xform, void *session_private)
+		struct rte_crypto_sym_xform *xform,
+		void *session_private)
 {
 	struct qat_pmd_private *internals = dev->data->dev_private;
 
@@ -443,9 +444,7 @@ qat_crypto_sym_configure_session(struct rte_cryptodev *dev,
 		struct rte_crypto_sym_xform *xform, void *session_private)
 {
 	struct qat_pmd_private *internals = dev->data->dev_private;
-
 	struct qat_session *session = session_private;
-
 	int qat_cmd_id;
 
 	PMD_INIT_FUNC_TRACE();
@@ -459,19 +458,31 @@ qat_crypto_sym_configure_session(struct rte_cryptodev *dev,
 	session->qat_cmd = (enum icp_qat_fw_la_cmd_id)qat_cmd_id;
 	switch (session->qat_cmd) {
 	case ICP_QAT_FW_LA_CMD_CIPHER:
-	session = qat_crypto_sym_configure_session_cipher(dev, xform, session);
+		session = qat_crypto_sym_configure_session_cipher(dev, xform,
+				session);
 		break;
 	case ICP_QAT_FW_LA_CMD_AUTH:
-	session = qat_crypto_sym_configure_session_auth(dev, xform, session);
+		session = qat_crypto_sym_configure_session_auth(dev, xform,
+				session);
 		break;
 	case ICP_QAT_FW_LA_CMD_CIPHER_HASH:
-	session = qat_crypto_sym_configure_session_cipher(dev, xform, session);
-	session = qat_crypto_sym_configure_session_auth(dev, xform, session);
-		break;
+		session = qat_crypto_sym_configure_session_cipher(dev, xform,
+				session);
+		session = qat_crypto_sym_configure_session_auth(dev, xform,
+				session);
+		if (qat_crypto_sym_use_optimized_alg(session))
+			qat_crypto_sym_configure_optimized_session(dev, xform,
+				session);
+	break;
 	case ICP_QAT_FW_LA_CMD_HASH_CIPHER:
-	session = qat_crypto_sym_configure_session_auth(dev, xform, session);
-	session = qat_crypto_sym_configure_session_cipher(dev, xform, session);
-		break;
+		session = qat_crypto_sym_configure_session_auth(dev, xform,
+				session);
+		session = qat_crypto_sym_configure_session_cipher(dev, xform,
+				session);
+		if (qat_crypto_sym_use_optimized_alg(session))
+			qat_crypto_sym_configure_optimized_session(dev, xform,
+				session);
+	break;
 	case ICP_QAT_FW_LA_CMD_TRNG_GET_RANDOM:
 	case ICP_QAT_FW_LA_CMD_TRNG_TEST:
 	case ICP_QAT_FW_LA_CMD_SSL3_KEY_DERIVE:
@@ -489,6 +500,35 @@ qat_crypto_sym_configure_session(struct rte_cryptodev *dev,
 		session->qat_cmd);
 		goto error_out;
 	}
+	return session;
+
+error_out:
+	rte_mempool_put(internals->sess_mp, session);
+	return NULL;
+}
+
+
+struct qat_session *
+qat_crypto_sym_configure_optimized_session(struct rte_cryptodev *dev,
+				struct rte_crypto_sym_xform *xform,
+				struct qat_session *session)
+{
+
+	struct qat_pmd_private *internals = dev->data->dev_private;
+	struct rte_crypto_auth_xform *auth_xform = NULL;
+	struct rte_crypto_cipher_xform *cipher_xform = NULL;
+
+	auth_xform = qat_get_auth_xform(xform);
+	cipher_xform = qat_get_cipher_xform(xform);
+	if ((auth_xform == NULL) || (cipher_xform == NULL))
+		goto error_out;
+
+	if (qat_crypto_create_optimzed_session(session,
+			cipher_xform->key.data,
+			cipher_xform->key.length,
+			auth_xform->key.data,
+			auth_xform->key.length,
+			auth_xform->digest_length) == 0)
 	return session;
 
 error_out:
@@ -551,11 +591,11 @@ qat_crypto_sym_configure_session_auth(struct rte_cryptodev *dev,
 				auth_xform->algo);
 		goto error_out;
 	}
-	cipher_xform = qat_get_cipher_xform(xform);
 
 	if ((session->qat_hash_alg == ICP_QAT_HW_AUTH_ALGO_GALOIS_128) ||
 			(session->qat_hash_alg ==
 				ICP_QAT_HW_AUTH_ALGO_GALOIS_64))  {
+		cipher_xform = qat_get_cipher_xform(xform);
 		if (qat_alg_aead_session_create_content_desc_auth(session,
 				cipher_xform->key.data,
 				cipher_xform->key.length,

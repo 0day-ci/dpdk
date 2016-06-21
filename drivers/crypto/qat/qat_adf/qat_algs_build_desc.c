@@ -444,6 +444,7 @@ int qat_alg_aead_session_create_content_desc_cipher(struct qat_session *cdesc,
 	header->service_cmd_id = cdesc->qat_cmd;
 	ICP_QAT_FW_LA_DIGEST_IN_BUFFER_SET(header->serv_specif_flags,
 					ICP_QAT_FW_LA_NO_DIGEST_IN_BUFFER);
+
 	/* Configure the common header protocol flags */
 	ICP_QAT_FW_LA_PROTO_SET(header->serv_specif_flags, proto);
 	cd_pars->u.s.content_desc_addr = cdesc->cd_paddr;
@@ -748,6 +749,96 @@ int qat_alg_aead_session_create_content_desc_auth(struct qat_session *cdesc,
 	}
 	return 0;
 }
+
+/*
+ * Function which will return if it's possible to use the
+ * optimised content descriptor.
+ */
+int qat_crypto_sym_use_optimized_alg(struct qat_session *session)
+{
+	return ((session->qat_mode == ICP_QAT_HW_CIPHER_CBC_MODE)
+	&& (session->qat_cipher_alg == ICP_QAT_HW_CIPHER_ALGO_AES128)
+	&& (session->qat_hash_alg == ICP_QAT_HW_AUTH_ALGO_SHA1));
+}
+
+/*
+ * Function to create an optimised content descriptor for AES128 SHA1.
+ */
+int qat_crypto_create_optimzed_session(struct qat_session *session,
+				       uint8_t *cipherkey,
+				       uint32_t cipherkeylen,
+				       uint8_t *authkey,
+				       uint32_t authkeylen,
+				       uint32_t digestsize)
+{
+	/* CFG_CIPH_AES128_CBC_ENCRYPT, CFG_AUTH_SHA1_MODE1_NO_NESTED */
+	uint32_t icp_qat_fw_aes128_cbc_sha1_encrypt[] = {0x21120202,
+			0x422E0000, 0x14140000, 0x18031800, 0};
+	/* CFG_CIPH_AES128_CBC_DECRYPT, CFG_AUTH_SHA1_MODE1_NO_NESTED */
+	uint32_t icp_qat_fw_aes128_cbc_sha1_decrypt[] = {0x41150202,
+			0x122E0000, 0x14140000, 0x18031800, 0};
+
+	register struct icp_qat_fw_la_bulk_req *qat_req;
+	uint8_t *cd_ptr = (uint8_t *)&session->cd;
+	uint16_t state2_size;
+	struct icp_qat_fw_auth_cd_ctrl_hdr *hash_cd_ctrl;
+
+	/*
+	 * Setup the template for the request.
+	 */
+	qat_req = &session->fw_req;
+
+	/*
+	 * Setup some hard coded values for the constant config table.
+	 */
+	if (session->qat_dir == ICP_QAT_HW_CIPHER_ENCRYPT) {
+		memcpy(&qat_req->cd_ctrl, icp_qat_fw_aes128_cbc_sha1_encrypt,
+				sizeof(icp_qat_fw_aes128_cbc_sha1_encrypt));
+		qat_req->comn_hdr.serv_specif_flags = 0x2c;
+	} else {
+		memcpy(&qat_req->cd_ctrl, icp_qat_fw_aes128_cbc_sha1_decrypt,
+				sizeof(icp_qat_fw_aes128_cbc_sha1_decrypt));
+		qat_req->comn_hdr.serv_specif_flags = 0x4c;
+	}
+
+	/*
+	 * Cope with a digest size != 0x14
+	 */
+	if (digestsize != 0x14) {
+		hash_cd_ctrl = (struct icp_qat_fw_auth_cd_ctrl_hdr *)
+				&qat_req->cd_ctrl;
+		hash_cd_ctrl->inner_res_sz = digestsize;
+		hash_cd_ctrl->final_sz = digestsize;
+		struct icp_qat_fw_la_auth_req_params *auth_param =
+			(struct icp_qat_fw_la_auth_req_params *)
+			((char *)&qat_req->serv_specif_rqpars +
+			sizeof(struct icp_qat_fw_la_cipher_req_params));
+		auth_param->auth_res_sz = digestsize;
+	}
+
+	/*
+	 * Setup the size of the content descriptor.
+	 */
+
+	qat_req->cd_pars.u.s.content_desc_params_sz = 0x08;
+	qat_req->cd_pars.u.s.content_desc_addr = session->cd_paddr;
+
+	/*
+	 * Setup the content descriptor.
+	 */
+	memcpy(cd_ptr, cipherkey, cipherkeylen);
+	cd_ptr += cipherkeylen;
+
+	if (qat_alg_do_precomputes(session->qat_hash_alg,
+				authkey, authkeylen, cd_ptr,
+				&state2_size)) {
+		PMD_DRV_LOG(ERR, "(SHA) pre-compute failed");
+		return -EFAULT;
+	}
+	return 0;
+}
+
+
 
 static void qat_alg_ablkcipher_init_com(struct icp_qat_fw_la_bulk_req *req,
 					struct icp_qat_hw_cipher_algo_blk *cd,

@@ -127,4 +127,11 @@ void qat_alg_ablkcipher_init_dec(struct qat_alg_ablkcipher_cd *cd,
 int qat_alg_validate_aes_key(int key_len, enum icp_qat_hw_cipher_algo *alg);
 int qat_alg_validate_snow3g_key(int key_len, enum icp_qat_hw_cipher_algo *alg);
 
+int qat_crypto_sym_use_optimized_alg(struct qat_session *session);
+int qat_crypto_create_optimzed_session(struct qat_session *session,
+					uint8_t *cipherkey,
+					uint32_t cipherkeylen,
+					uint8_t *authkey,
+					uint32_t authkeylen,
+					uint32_t digestsize);
 #endif
