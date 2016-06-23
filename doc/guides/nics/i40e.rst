@@ -366,3 +366,143 @@ Delete all flow director rules on a port:
 
    testpmd> flush_flow_director 0
 
+
+Bifurcated driver guide on I40E
+-------------------------------
+
+The bifurcated driver is explained in :ref:`Bifurcated driver guide <bifurcated_driver>`.
+And on Intel® X710/XL710 series Ethernet Controllers, Bifurcated driver can be achieved
+by SR-IOV , cloud filter and L3 VEB switch. So the traffic can be directed to queues by
+cloud filter and L3 VEB switch's matching rule.
+
+*   L3 VEB filter for non-tunnelled packets. It can direct a packet just by the
+    Destination IP address to a queue in a VF.
+
+*   Cloud filters for tunnelled packets have following types.
+
+    *   Inner mac
+
+    *   Inner mac + VNI
+
+    *   Outer mac + Inner mac + VNI
+
+    *   Inner mac + Inner vlan + VNI
+
+    *   Inner mac + Inner vlan
+
+The step procedure is as following:
+
+#.  Boot system without iommu, or with “iommu=pt”.
+
+#.  Build and insert i40e.ko module.
+
+#.  Create Virtual Functions:
+
+    .. code-block:: console
+
+        echo 2 > /sys/bus/pci/devices/0000:01:00.0/sriov_numvfs
+
+#.  Add udp port offload to NIC if using cloud filter:
+
+    .. code-block:: console
+
+        ip li add vxlan0 type vxlan id 42 group 239.1.1.1 local 10.16.43.214 dev <dev_name>
+        ifconfig vxlan0 up
+        ip -d li show vxlan0
+
+    .. note::
+
+        Print “add vxlan port 8472, index 0 success” can be found in system log.
+
+#.  Enable and set flow filters:
+
+    *   L3 VEB filter, route whose dest IP = 192.168.50.108 to VF 0's queue 2.
+
+    .. code-block:: console
+
+        ethtool -N <dev_name> flow-type ip4 dst-ip 192.168.50.108 \
+                user-def 0xffffffff00000000 action 2 loc 8
+
+    *   Inner mac, route whose inner dest mac = 0:0:0:0:9:0 to PF's queue 6.
+
+    .. code-block:: console
+
+        ethtool -N <dev_name> flow-type ether dst 00:00:00:00:00:00 \
+                m ff:ff:ff:ff:ff:ff src 00:00:00:00:09:00 m 00:00:00:00:00:00 \
+                user-def 0xffffffff00000003 action 6 loc 1
+
+    *   Inner mac + VNI, route whose inner dest mac = 0:0:0:0:9:0 and VNI = 8 to PF's queue 4.
+
+    .. code-block:: console
+
+        ethtool -N <dev_name> flow-type ether dst 00:00:00:00:00:00 \
+                m ff:ff:ff:ff:ff:ff src 00:00:00:00:09:00 m 00:00:00:00:00:00 \
+                user-def 0x800000003 action 4 loc 4
+
+    *   Outer mac + Inner mac + VNI, route whose outer mac= 68:05:ca:24:03:8b, inner dest mac
+        = c2:1a:e1:53:bc:57, and VNI = 8 to PF's  queue 2.
+
+    .. code-block:: console
+
+        ethtool -N <dev_name> flow-type ether dst 68:05:ca:24:03:8b \
+                m 00:00:00:00:00:00 src c2:1a:e1:53:bc:57 m 00:00:00:00:00:00 \
+                user-def 0x800000003 action 2 loc 2
+
+    *   Inner mac + Inner vlan + VNI, route whose inner dest mac = 00:00:00:00:20:00,
+        inner vlan = 10, and VNI = 8 to VF 0's queue 1
+
+    .. code-block:: console
+
+        ethtool -N <dev_name> flow-type ether dst 00:00:00:00:01:00 \
+                m ff:ff:ff:ff:ff:ff src 00:00:00:00:20:00 m 00:00:00:00:00:00 \
+                vlan 10 user-def 0x800000000 action 1 loc 5
+
+    *   Inner mac + Inner vlan, route whose inner dest mac = 00:00:00:00:20:00,
+        and inner vlan = 10 to VF 0's queue 1
+
+    .. code-block:: console
+
+        ethtool -N <dev_name> flow-type ether dst 00:00:00:00:01:00 \
+                m ff:ff:ff:ff:ff:ff src 00:00:00:00:20:00 m 00:00:00:00:00:00 \
+                vlan 10 user-def 0xffffffff00000000 action 1 loc 5
+
+    .. note::
+
+        *   If the upper 32 bits of 'user-def' are 0xffffffff, then the filter can
+            be used for programming an L3 VEB filter, otherwise the upper 32 bits
+            of 'user-def' can carry the tenant ID/VNI if specified/required.
+
+        *   Cloud filters can be defined with inner mac, outer mac, inner ip, inner vlan
+            and VNI as part of the cloud tuple. It is always the Destination (not source)
+            mac/ip that these filters, filter on. For all these examples dst and src mac
+            address fields are overloaded dst == outer, src == inner.
+
+        *   Filter will be directing a packet who matching the rule to a vf id
+            specified in the lower 32 bit of user-def to queue specified by 'action'.
+
+        *   If the vf id specified by the lower 32 bit of user-def is greater than
+            or equal to max_vfs, then the filter is for the PF queues.
+
+#.  Compile the DPDK and insert igb_uio or probe vfio-pci kernel modules as normal.
+
+#.  Bind virtual function:
+
+    .. code-block:: console
+
+        modprobe vfio-pci
+        dpdk_nic_bind.py -b vfio-pci 01:10.0
+        dpdk_nic_bind.py -b vfio-pci 01:10.1
+
+#.  run DPDK application on VFs:
+
+    .. code-block:: console
+
+        testpmd -c 0xff -n 4 -- -i -w 01:10.0 -w 01:10.1 --forward-mode=mac
+
+.. note::
+
+    *   The above steps work on the i40e Linux kernel driver v1.5.16.
+
+    *   Ethtool's version used in this example is 3.18. And the mask “ff” means not involved, while “00” or don’t set mask means involved.
+
+    *   For more details of the configuration, can refer to the `cloud filter test plan <http://dpdk.org/browse/tools/dts/tree/test_plans/cloud_filter_test_plan.rst>`_
