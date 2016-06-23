@@ -101,7 +101,13 @@ where,
 *   -P: optional, sets all ports to promiscuous mode so that packets are accepted regardless of the packet's Ethernet MAC destination address.
     Without this option, only packets with the Ethernet MAC destination address set to the Ethernet address of the port are accepted.
 
+*   -E: enable exact match
+
+*   -L: enable longest prefix match
+
 *   --config (port,queue,lcore)[,(port,queue,lcore)]: determines which queues from which ports are mapped to which cores
+
+*   --eth-dest=X,MM:MM:MM:MM:MM:MM: optional, ethernet destination for port X
 
 *   --enable-jumbo: optional, enables jumbo frames
 
@@ -113,7 +119,7 @@ where,
 
 *   --ipv6: optional, set it if running ipv6 packets
 
-*   --parse-ptype: optional, set it if use software way to analyze packet type
+*   --parse-ptype: optional, set it if use software way to analyze packet type. Without this option, HW will check packet type.
 
 For example, consider a dual processor socket platform where cores 0-7 and 16-23 appear on socket 0, while cores 8-15 and 24-31 appear on socket 1.
 Let's say that the programmer wants to use memory from both NUMA nodes, the platform has only two ports, one connected to each NUMA node,
