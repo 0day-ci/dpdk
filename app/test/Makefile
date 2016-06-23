@@ -43,14 +43,14 @@ define linked_resource
 SRCS-y += $(1).res.o
 $(1).res.o: $(2)
 	@  echo '  MKRES $$@'
-	$Q ln -fs $$< resource.tmp
+	$Q [ "$$(<D)" = . ] || ln -fs $$<
 	$Q $(OBJCOPY) -I binary -B $(RTE_OBJCOPY_ARCH) -O $(RTE_OBJCOPY_TARGET) \
 		--rename-section                                         \
 			.data=.rodata,alloc,load,data,contents,readonly  \
-		--redefine-sym _binary_resource_tmp_start=beg_$(1)       \
-		--redefine-sym _binary_resource_tmp_end=end_$(1)         \
-		--redefine-sym _binary_resource_tmp_size=siz_$(1)        \
-		resource.tmp $$@ && rm -f resource.tmp
+		--redefine-sym _binary_$$(subst .,_,$$(<F))_start=beg_$(1) \
+		--redefine-sym _binary_$$(subst .,_,$$(<F))_end=end_$(1)   \
+		--redefine-sym _binary_$$(subst .,_,$$(<F))_size=siz_$(1)  \
+		$$(<F) $$@
 endef
 
 ifeq ($(CONFIG_RTE_APP_TEST_RESOURCE_TAR),y)
