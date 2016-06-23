@@ -224,3 +224,122 @@ be calculated as follows:
   max_read_interval = ~4 mins 48 sec.
 
 In order to ensure valid results, it is recommended to poll every 4 minutes.
+
+.. _bifurcated_driver:
+
+Bifurcated driver guide
+-----------------------
+
+Bifurcated driver is a mechanism which depends the advanced Ethernet device to
+split traffic between Linux user space and kernel space. Because it is hardware
+assisted design, this approach can provide the line rate processing capability.
+Other than KNI, the SW is just required to device configuration, no need to
+take care of the packet movement during the traffic split. This can get more
+performance with less CPU overhead.
+
+The Bifurcated driver take advantage of Ethernet device feature to split the
+incoming data traffic to user space application (Such as DPDK application)
+and/or kernel space program (Linux kernel stack). It can direct some traffic
+(e.g data plane traffic) to DPDK, while direct some other traffic (e.g control
+plane traffic) to the traditional Linux networking stack.
+
+There are a number of technical options to achieve this. A typical example is
+to combine the technology of SR-IOV and packet classification filtering.
+
+SR-IOV is a PCI standard that allows the same physical adapter to split as
+multiple virtual functions. Each virtual function has separated queues with
+physical function. Traffic with a virtual function’s destination MAC address
+from network adapter will be directed to it. In a sense, SR-IOV has the
+capability on queue division.
+
+Packet classification filtering is the hardware capability available on most
+network adapters. Filters can be configured to direct specific flows to a given
+receive queue by hardware. Different NIC may have different filter types to
+direct flow to a Virtual Function or a queue belong to it.
+
+Linux network can receive the specific traffic through kernel driver, while
+DPDK can receive the specific traffic bypassing the Linux kernel by using
+drivers like VFIO or DPDK igb_uio module.
+
+.. _figure_bifurcated_driver_overview:
+
+.. figure:: img/bifurcated_driver_overview.*
+
+   Bifurcated Driver Overview
+
+Use Bifurcated driver on IXGBE in Linux
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+On Intel® 82599 10 Gigabit Ethernet Controller series NICs, Bifurcated driver
+can be achieved by SR-IOV and flow director technologies. So the traffic can
+be directed to queues by flow director capability, typically by matching 5-tuple
+of UDP/TCP packets.
+
+The step procedure is as following:
+
+#.  Boot system without iommu, or with “iommu=pt”.
+
+#.  Create Virtual Functions:
+
+    .. code-block:: console
+
+        echo 2 > /sys/bus/pci/devices/0000:01:00.0/sriov_numvfs
+
+#.  Enable and set flow filters:
+
+    .. code-block:: console
+
+        ethtool -K eth1 ntuple on
+        ethtool -N eth1 flow-type udp4 src-ip 192.0.2.2 dst-ip 198.51.100.2 \
+		        action $queue_index_in_VF0
+        ethtool -N eth1 flow-type udp4 src-ip 198.51.100.2 dst-ip 192.0.2.2 \
+                action $queue_index_in_VF1
+
+    where:
+
+        *   $queue_index_in_PF: [queue index]
+
+        *   $queue_index_in_VFn: Bits 39:32 of the variable defines VF id + 1; lower 32 bits indicates the queue index of VF.
+
+            *   $queue_index_in_VF0 = (0x1 & 0xFF) << 32 + [queue index];
+
+            *   $queue_index_in_VF1 = (0x2 & 0xFF) << 32 + [queue index];
+
+        .. _figure_ixgbe_bifu_queue_idx:
+
+        .. figure:: img/ixgbe_bifu_queue_idx.*
+
+#.  Compile the DPDK and insert igb_uio or probe vfio-pci kernel modules as normal.
+
+#.  Bind virtual function:
+
+    .. code-block:: console
+
+        modprobe vfio-pci
+        dpdk_nic_bind.py -b vfio-pci 01:10.0
+        dpdk_nic_bind.py -b vfio-pci 01:10.1
+
+#.  run DPDK application on VFs:
+
+    .. code-block:: console
+
+        testpmd -c 0xff -n 4 -- -i -w 01:10.0 -w 01:10.1 --forward-mode=mac
+
+In this example, traffic matching the rules will go through VF by matching the
+filter rule. All other traffic which mismatching the rules, will go through
+the default queue or scaling on queues in PF. That is to say UDP packets with
+those IP source and destination addresses will go through the DPDK. All other
+traffic, with different hosts or different protocols, will go through the Linux
+networking stack.
+
+.. note::
+
+    *   The above steps work on the Linux kernel v4.2.
+
+    *   The Bifurcated driver is implemented in Linux kernel and ixgbe kernel driver by following patches:
+
+        *   `ethtool: Add helper routines to pass vf to rx_flow_spec <https://patchwork.ozlabs.org/patch/476511/>`_
+
+        *   `ixgbe: Allow flow director to use entire queue space <https://patchwork.ozlabs.org/patch/476516/>`_
+
+    *   Ethtool's version used in this example is 3.18.
