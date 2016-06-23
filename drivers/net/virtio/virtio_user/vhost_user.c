@@ -254,7 +254,7 @@ vhost_user_sock(int vhostfd, uint64_t req, void *arg)
 
 	PMD_DRV_LOG(INFO, "%s", vhost_msg_strings[req]);
 
-	msg.request = req;
+	msg.request = (enum vhost_user_request)req;
 	msg.flags = VHOST_USER_VERSION;
 	msg.size = 0;
 
