@@ -442,7 +442,7 @@ set_pdump_rxtx_cbs(struct pdump_request *p)
 }
 
 /* get socket path (/var/run if root, $HOME otherwise) */
-static void
+static int
 pdump_get_socket_path(char *buffer, int bufsz, enum rte_pdump_socktype type)
 {
 	char dir[PATH_MAX] = {0};
@@ -455,9 +455,17 @@ pdump_get_socket_path(char *buffer, int bufsz, enum rte_pdump_socktype type)
 	else {
 		if (getuid() != 0) {
 			dir_home = getenv(SOCKET_PATH_HOME);
+			if (!dir_home) {
+				RTE_LOG(ERR, PDUMP,
+					"Failed to get environment variable"
+					" value for %s, %s:%d\n",
+					SOCKET_PATH_HOME, __func__, __LINE__);
+				return -1;
+			}
 			strcat(dir, dir_home);
 		} else
 			strcat(dir, SOCKET_PATH_VAR_RUN);
+
 		strcat(dir, SOCKET_DIR);
 	}
 
@@ -467,6 +475,8 @@ pdump_get_socket_path(char *buffer, int bufsz, enum rte_pdump_socktype type)
 	else
 		snprintf(buffer, bufsz, CLIENT_SOCKET, dir, getpid(),
 				rte_sys_gettid());
+
+	return 0;
 }
 
 static int
@@ -476,8 +486,14 @@ pdump_create_server_socket(void)
 	struct sockaddr_un addr;
 	socklen_t addr_len;
 
-	pdump_get_socket_path(addr.sun_path, sizeof(addr.sun_path),
+	ret = pdump_get_socket_path(addr.sun_path, sizeof(addr.sun_path),
 				RTE_PDUMP_SOCKET_SERVER);
+	if (ret != 0) {
+		RTE_LOG(ERR, PDUMP,
+			"Failed to get server socket path: %s:%d\n",
+			__func__, __LINE__);
+		return -1;
+	}
 	addr.sun_family = AF_UNIX;
 
 	/* remove if file already exists */
@@ -608,8 +624,14 @@ rte_pdump_uninit(void)
 
 	struct sockaddr_un addr;
 
-	pdump_get_socket_path(addr.sun_path, sizeof(addr.sun_path),
+	ret = pdump_get_socket_path(addr.sun_path, sizeof(addr.sun_path),
 				RTE_PDUMP_SOCKET_SERVER);
+	if (ret != 0) {
+		RTE_LOG(ERR, PDUMP,
+			"Failed to get server socket path: %s:%d\n",
+			__func__, __LINE__);
+		return -1;
+	}
 	ret = unlink(addr.sun_path);
 	if (ret != 0) {
 		RTE_LOG(ERR, PDUMP,
@@ -643,8 +665,14 @@ pdump_create_client_socket(struct pdump_request *p)
 		return ret;
 	}
 
-	pdump_get_socket_path(addr.sun_path, sizeof(addr.sun_path),
+	ret = pdump_get_socket_path(addr.sun_path, sizeof(addr.sun_path),
 				RTE_PDUMP_SOCKET_CLIENT);
+	if (ret != 0) {
+		RTE_LOG(ERR, PDUMP,
+			"Failed to get client socket path: %s:%d\n",
+			__func__, __LINE__);
+		return -1;
+	}
 	addr.sun_family = AF_UNIX;
 	addr_len = sizeof(struct sockaddr_un);
 
@@ -660,9 +688,15 @@ pdump_create_client_socket(struct pdump_request *p)
 
 		serv_len = sizeof(struct sockaddr_un);
 		memset(&serv_addr, 0, sizeof(serv_addr));
-		pdump_get_socket_path(serv_addr.sun_path,
+		ret = pdump_get_socket_path(serv_addr.sun_path,
 					sizeof(serv_addr.sun_path),
 					RTE_PDUMP_SOCKET_SERVER);
+		if (ret != 0) {
+			RTE_LOG(ERR, PDUMP,
+				"Failed to get server socket path: %s:%d\n",
+				__func__, __LINE__);
+			break;
+		}
 		serv_addr.sun_family = AF_UNIX;
 
 		n =  sendto(socket_fd, p, sizeof(struct pdump_request), 0,
