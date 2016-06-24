@@ -1,5 +1,5 @@
 ..  BSD LICENSE
-    Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
+    Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -31,48 +31,100 @@
 Vhost Library
 =============
 
-The vhost library implements a user space vhost driver. It supports both vhost-cuse
-(cuse: user space character device) and vhost-user(user space socket server).
-It also creates, manages and destroys vhost devices for corresponding virtio
-devices in the guest. Vhost supported vSwitch could register callbacks to this
-library, which will be called when a vhost device is activated or deactivated
-by guest virtual machine.
+The vhost library implements a user space virtio net server, allowing
+us to manipulate the virtio ring directly. In another word, it allows
+us to fetch/put packets from/to the VM virtio net device. To achieve
+that, we should be able to
+
+* access the guest memory
+
+  For QEMU, this is done by using **-object memory-backend-file,share=on,...**
+  option. Which means QEMU will create a file to serve as the guest RAM.
+  The **share=on** option allows another process to map that file, which
+  means it can access the guest RAM.
+
+* know all the necessary info about the vring, such as where is avail
+  ring stored.
+
+  Vhost defines some messages to tell the backend all the info it needs
+  to know to manipulate the vring.
+
+Currently, there are two ways to pass those messages. That results to we
+have two implementations: vhost-cuse (character devices in user space) and
+vhost-user. Vhost-cuse creates a user space char dev and hook a function
+ioctl, so that all ioctl commands (that represent those messages) sent
+from the frontend (QEMU) will be captured and handled. While vhost-user
+creates a Unix domain socket file, through which those messages are passed.
+
+Note that since DPDK v2.2, we have spent a lot of efforts on enhancing
+vhost-user, such as multiple queue, live migration, reconnect, etc. Thus,
+**you are encouraged to use vhost-user instead of vhost-cuse**.
 
 Vhost API Overview
 ------------------
 
-*   Vhost driver registration
+* ``rte_vhost_driver_register(path, flags)``
 
-      rte_vhost_driver_register registers the vhost driver into the system.
-      For vhost-cuse, character device file will be created under the /dev directory.
-      Character device name is specified as the parameter.
-      For vhost-user, a Unix domain socket server will be created with the parameter as
-      the local socket path.
+  It registers a vhost driver into the system. For vhost-cuse, a /dev/``path``
+  character device file will be created. For vhost-user server mode, a Unix
+  domain socket file ``path`` will be created.
 
-*   Vhost session start
+  We currently support two flags (both are valid for vhost-user only):
 
-      rte_vhost_driver_session_start starts the vhost session loop.
-      Vhost session is an infinite blocking loop.
-      Put the session in a dedicate DPDK thread.
+  - ``RTE_VHOST_USER_CLIENT``
 
-*   Callback register
+    DPDK vhost-user will acts as the client when this flag is given. See more
+    detailed info below.
 
-      Vhost supported vSwitch could call rte_vhost_driver_callback_register to
-      register two callbacks, new_destory and destroy_device.
-      When virtio device is activated or deactivated by guest virtual machine,
-      the callback will be called, then vSwitch could put the device onto data
-      core or remove the device from data core by setting or unsetting
-      VIRTIO_DEV_RUNNING on the device flags.
+  - ``RTE_VHOST_USER_NO_RECONNECT``
 
-*   Read/write packets from/to guest virtual machine
+    When DPDK-vhost user acts as the client, it will keep trying to reconnect
+    to the server (QEMU) until it succeeds. This become handy in two cases:
 
-      rte_vhost_enqueue_burst transmit host packets to guest.
-      rte_vhost_dequeue_burst receives packets from guest.
+    * when QEMU is not started yet.
+    * when QEMU restarts (say guest OS reboots).
 
-*   Feature enable/disable
+    It's enabled by default. However, you can turn it off by setting this flag.
 
-      Now one negotiate-able feature in vhost is merge-able.
-      vSwitch could enable/disable this feature for performance consideration.
+
+* ``rte_vhost_driver_session_start()``
+
+  It starts the vhost session loop, to handle those vhost messages. It's an
+  infinite loop, therefore, you should call it in a dedicate thread.
+
+* ``rte_vhost_driver_callback_register(virtio_net_device_ops)``
+
+  It registers a set of callbacks, to let DPDK applications to take proper
+  actions when some events happen. Currently, we have:
+
+  * ``new_device(int vid)``
+
+    It's invoked when a virtio net device becomes ready. ``vid`` is the virtio
+    net device ID.
+
+  * ``destroy_device(int vid)``
+
+    It's invoked when a virtio net device shuts down (or when the vhost
+    connection is broken).
+
+  * ``vring_state_changed(int vid, uint16_t queue_id, int enable)``
+
+    It's invoked when a specific queue's state is changed, say, enabled or
+    disabled.
+
+* ``rte_vhost_enqueue_burst(vid, queue_id, pkts, count)``
+
+  Transmits (enqueues) packets ``count`` packets from host to guest.
+
+* ``rte_vhost_dequeue_burst(vid, queue_id, mbuf_pool, pkts, count)``
+
+  Receives (dequeues) ``count`` packets from guest, and stored them at ``pkts``.
+
+* ``rte_vhost_feature_disable/rte_vhost_feature_enable(feature_mask)``
+
+  Disable/enable some features. For example, you could use that to disable
+  mergeable and TSO features, which both are enabled by default.
+
 
 Vhost Implementation
 --------------------
@@ -102,15 +154,32 @@ When the release call is released, vhost will destroy the device.
 
 Vhost user implementation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-When vSwitch registers a vhost driver, it will create a Unix domain socket server
-into the system. This server will listen for a connection and process the vhost message from
-QEMU simulator.
+As stated, vhost-user leverages Unix domain socket for passing messages.
+That means DPDK vhost-user implementation has two options:
 
-When there is a new socket connection, it means a new virtio device has been created in
-the guest virtual machine, and the vhost driver will create a vhost device for this virtio device.
+* DPDK vhost-user acts as the server
 
-For messages with a file descriptor, the file descriptor could be directly used in the vhost
-process as it is already installed by Unix domain socket.
+  DPDK will create a Unix domain socket server file, and listen for
+  connections from the frontend.
+
+  Note this is the default mode, and the only mode before DPDK v16.07.
+
+
+* DPDK vhost-user acts as the client
+
+  Unlike the server mode, this mode doesn't not create the socket file;
+  it just tries to connect to the server (who responses to create the
+  file instead).
+
+  When DPDK vhost-user application restarts, DPDK vhost-user will try
+  to connect to the server again. And that's simply how the "reconnect"
+  feature works. Note that you need **QEMU v2.7** (or above) to make it work.
+
+No matter which mode we used, once a connection is established, DPDK
+vhost-user will start receiving and processing vhost messages from QEMU.
+
+For messages with a file descriptor, the file descriptor could be directly
+used in the vhost process as it is already installed by Unix domain socket.
 
  * VHOST_SET_MEM_TABLE
  * VHOST_SET_VRING_KICK
@@ -118,18 +187,20 @@ process as it is already installed by Unix domain socket.
  * VHOST_SET_LOG_FD
  * VHOST_SET_VRING_ERR
 
-For VHOST_SET_MEM_TABLE message, QEMU will send us information for each memory region and its
-file descriptor in the ancillary data of the message. The fd is used to map that region.
+For VHOST_SET_MEM_TABLE message, QEMU will send us information for each
+memory region and its file descriptor in the ancillary data of the message.
+The fd is used to map that region.
 
-There is no VHOST_NET_SET_BACKEND message as in vhost cuse to signal us whether virtio device
-is ready or should be stopped.
-VHOST_SET_VRING_KICK is used as the signal to put the vhost device onto data plane.
-VHOST_GET_VRING_BASE is used as the signal to remove vhost device from data plane.
+There is no VHOST_NET_SET_BACKEND message as in vhost cuse to signal us
+whether virtio device is ready or stopped. Instead, VHOST_SET_VRING_KICK
+is used as the signal to put the vhost device onto data plane, and
+VHOST_GET_VRING_BASE is used as the signal to remove vhost device from
+data plane.
 
 When the socket connection is closed, vhost will destroy the device.
 
 Vhost supported vSwitch reference
 ---------------------------------
 
-For more vhost details and how to support vhost in vSwitch, please refer to vhost example in the
-DPDK Sample Applications Guide.
+For more vhost details and how to support vhost in vSwitch, please refer to
+vhost example in the DPDK Sample Applications Guide.
