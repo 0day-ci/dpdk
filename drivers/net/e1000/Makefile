@@ -48,7 +48,7 @@ ifeq ($(CONFIG_RTE_TOOLCHAIN_ICC),y)
 # CFLAGS for icc
 #
 CFLAGS_BASE_DRIVER = -wd177 -wd181 -wd188 -wd869 -wd2259
-else
+else ifeq ($(CONFIG_RTE_TOOLCHAIN_GCC),y)
 #
 # CFLAGS for gcc
 #
@@ -57,6 +57,9 @@ CFLAGS_BASE_DRIVER += -Wno-unused-variable
 ifeq ($(shell test $(GCC_VERSION) -ge 60 && echo 1), 1)
 CFLAGS_BASE_DRIVER += -Wno-misleading-indentation
 endif
+else
+CFLAGS_BASE_DRIVER = -Wno-uninitialized -Wno-unused-parameter
+CFLAGS_BASE_DRIVER += -Wno-unused-variable
 endif
 
 #
