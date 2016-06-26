@@ -59,6 +59,8 @@ CFLAGS_BASE_DRIVER += -Wno-strict-aliasing -Wno-format-extra-args
 CFLAGS_BASE_DRIVER += -Wno-unused-variable
 CFLAGS_BASE_DRIVER += -Wno-missing-field-initializers
 
+CFLAGS_fm10k_ethdev.o := -Wno-array-bounds
+
 else
 #
 # CFLAGS for gcc

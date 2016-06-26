@@ -60,6 +60,8 @@ CFLAGS_BASE_DRIVER += -Wno-missing-field-initializers
 CFLAGS_BASE_DRIVER += -Wno-pointer-to-int-cast
 CFLAGS_BASE_DRIVER += -Wno-format-nonliteral
 CFLAGS_BASE_DRIVER += -Wno-unused-variable
+
+CFLAGS_i40e_hmc.o += -Wno-tautological-compare
 else
 CFLAGS_BASE_DRIVER  = -Wno-sign-compare
 CFLAGS_BASE_DRIVER += -Wno-unused-value

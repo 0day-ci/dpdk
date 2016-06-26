@@ -43,6 +43,10 @@ EXPORT_MAP := rte_eth_bond_version.map
 
 LIBABIVER := 1
 
+ifeq ($(CONFIG_RTE_TOOLCHAIN_CLANG),y)
+CFLAGS_rte_eth_bond_args.o := -Wno-array-bounds
+endif
+
 #
 # all source are stored in SRCS-y
 #

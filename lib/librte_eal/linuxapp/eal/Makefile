@@ -125,6 +125,14 @@ CFLAGS_eal_common_options.o := -D_GNU_SOURCE
 CFLAGS_eal_common_thread.o := -D_GNU_SOURCE
 CFLAGS_eal_common_lcore.o := -D_GNU_SOURCE
 
+ifeq ($(CONFIG_RTE_TOOLCHAIN_CLANG),y)
+CFLAGS_eal_alarm.o += -Wno-parentheses-equality
+CFLAGS_eal_interrupts.o += -Wno-parentheses-equality
+CFLAGS_eal_common_options.o += -Wno-array-bounds
+CFLAGS_eal_pci.o += -Wno-parentheses-equality
+CFLAGS_eal_pci.o += -Wno-array-bounds
+endif
+
 # workaround for a gcc bug with noreturn attribute
 # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=12603
 ifeq ($(CONFIG_RTE_TOOLCHAIN_GCC),y)

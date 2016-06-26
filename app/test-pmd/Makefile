@@ -59,6 +59,9 @@ SRCS-y += icmpecho.c
 SRCS-$(CONFIG_RTE_LIBRTE_IEEE1588) += ieee1588fwd.c
 
 CFLAGS_cmdline.o := -D_GNU_SOURCE
+ifeq ($(CONFIG_RTE_TOOLCHAIN_CLANG),y)
+CFLAGS_cmdline.o += -Wno-array-bounds
+endif
 
 # this application needs libraries first
 DEPDIRS-y += lib drivers

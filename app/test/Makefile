@@ -211,6 +211,9 @@ ifeq ($(shell test $(GCC_VERSION) -ge 44 && echo 1), 1)
 CFLAGS_test_memcpy.o += -fno-var-tracking-assignments
 CFLAGS_test_memcpy_perf.o += -fno-var-tracking-assignments
 endif
+else ifeq ($(CONFIG_RTE_TOOLCHAIN_CLANG),y)
+CFLAGS_test_errno.o += -Wno-array-bounds
+CFLAGS_test_devargs.o += -Wno-array-bounds
 endif
 
 # this application needs libraries first

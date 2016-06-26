@@ -40,6 +40,12 @@ EXPORT_MAP := rte_cmdline_version.map
 
 LIBABIVER := 2
 
+ifeq ($(CONFIG_RTE_TOOLCHAIN_CLANG),y)
+CFLAGS_cmdline_cirbuf.o:= -Wno-parentheses-equality
+CFLAGS_cmdline_rdline.o:= -Wno-parentheses-equality
+CFLAGS_cmdline_parse_string.o:= -Wno-array-bounds
+endif
+
 # all source are stored in SRCS-y
 SRCS-$(CONFIG_RTE_LIBRTE_CMDLINE) := cmdline.c
 SRCS-$(CONFIG_RTE_LIBRTE_CMDLINE) += cmdline_cirbuf.c
