@@ -132,6 +132,14 @@ New Features
   * A new library ``librte_pdump`` is added to provide packet capture API.
   * A new ``app/pdump`` tool is added to capture packets in DPDK.
 
+* **Added floating VEB support for i40e PF driver.**
+
+  A "floating VEB" is a special Virtual Ethernet Bridge (VEB) which does not
+  have an upload port, but instead is used for switching traffic between
+  virtual functions (VFs) on a port.
+
+  For information on this feature,  please see the "I40E Poll Mode Driver"
+  section of the "Network Interface Controller Drivers" document.
 
 Resolved Issues
 ---------------
