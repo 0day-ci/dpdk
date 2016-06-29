@@ -201,7 +201,7 @@ launch_cores(unsigned cores)
 	       "n_put_bulk=%u n_keep=%u ",
 	       (unsigned) mp->cache_size, cores, n_get_bulk, n_put_bulk, n_keep);
 
-	if (rte_mempool_count(mp) != MEMPOOL_SIZE) {
+	if (rte_mempool_unallocated_count(mp) != MEMPOOL_SIZE) {
 		printf("mempool is not full\n");
 		return -1;
 	}

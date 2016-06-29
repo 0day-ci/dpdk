@@ -34,6 +34,12 @@ Deprecation Notices
   compact API. The ones that remain are backwards compatible and use the
   per-lcore default cache if available. This change targets release 16.07.
 
+* The APIs rte_mempool_count and rte_mempool_free_count are being deprecated
+  on the basis that they are confusing to use - free_count actually returns
+  the number of allocated entries, not the number of free entries as expected.
+  They are being replaced by rte_mempool_unallocated_count and
+  rte_mempool_allocated_count respectively.
+
 * The mbuf flags PKT_RX_VLAN_PKT and PKT_RX_QINQ_PKT are deprecated and
   are respectively replaced by PKT_RX_VLAN_STRIPPED and
   PKT_RX_QINQ_STRIPPED, that are better described. The old flags and
