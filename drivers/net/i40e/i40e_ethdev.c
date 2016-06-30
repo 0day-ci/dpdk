@@ -2960,9 +2960,10 @@ i40e_macaddr_add(struct rte_eth_dev *dev,
 	int ret;
 
 	/* If VMDQ not enabled or configured, return */
-	if (pool != 0 && (!(pf->flags | I40E_FLAG_VMDQ) || !pf->nb_cfg_vmdq_vsi)) {
+	if (pool != 0 && (!(pf->flags & I40E_FLAG_VMDQ) ||
+			  !pf->nb_cfg_vmdq_vsi)) {
 		PMD_DRV_LOG(ERR, "VMDQ not %s, can't set mac to pool %u",
-			pf->flags | I40E_FLAG_VMDQ ? "configured" : "enabled",
+			pf->flags & I40E_FLAG_VMDQ ? "configured" : "enabled",
 			pool);
 		return;
 	}
@@ -3013,7 +3014,7 @@ i40e_macaddr_remove(struct rte_eth_dev *dev, uint32_t index)
 				vsi = pf->main_vsi;
 			else {
 				/* No VMDQ pool enabled or configured */
-				if (!(pf->flags | I40E_FLAG_VMDQ) ||
+				if (!(pf->flags & I40E_FLAG_VMDQ) ||
 					(i > pf->nb_cfg_vmdq_vsi)) {
 					PMD_DRV_LOG(ERR, "No VMDQ pool enabled"
 							"/configured");
