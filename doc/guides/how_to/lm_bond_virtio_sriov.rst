@@ -57,6 +57,9 @@ The switch is configured to broadcast traffic on all the NIC ports.
 Live Migration with SR-IOV VF test setup:
 -----------------------------------------
 
+.. _figure_lm_overview:
+
+.. figure:: img/lm_overview.*
 
 Live Migration steps for VM with Virtio and VF PMD's:
 -----------------------------------------------------
