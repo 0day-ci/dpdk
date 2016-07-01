@@ -180,6 +180,8 @@ New Features
   section of the "Network Interface Controller Drivers" document.
 
 
+* **Virtio NEON support for ARM.**
+
 Resolved Issues
 ---------------
 
