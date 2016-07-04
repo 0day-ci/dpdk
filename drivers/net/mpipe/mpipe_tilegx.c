@@ -1635,8 +1635,8 @@ static struct rte_driver pmd_mpipe_gbe_drv = {
 	.init = rte_pmd_mpipe_devinit,
 };
 
-PMD_REGISTER_DRIVER(pmd_mpipe_xgbe_drv);
-PMD_REGISTER_DRIVER(pmd_mpipe_gbe_drv);
+RTE_REGISTER_DRIVER(mpipe_xgbe, pmd_mpipe_xgbe_drv);
+RTE_REGISTER_DRIVER(mpipe_gbe, pmd_mpipe_gbe_drv);
 
 static void __attribute__((constructor, used))
 mpipe_init_contexts(void)

@@ -766,4 +766,4 @@ static struct rte_driver pmd_xenvirt_drv = {
 	.uninit = rte_pmd_xenvirt_devuninit,
 };
 
-PMD_REGISTER_DRIVER(pmd_xenvirt_drv);
+RTE_REGISTER_DRIVER(xenvirt, pmd_xenvirt_drv);

@@ -48,7 +48,7 @@ extern "C" {
 
 #include <stdio.h>
 #include <sys/queue.h>
-
+#include <rte_pci.h>
 #include <rte_log.h>
 
 __attribute__((format(printf, 2, 0)))
@@ -178,12 +178,30 @@ int rte_eal_vdev_init(const char *name, const char *args);
  */
 int rte_eal_vdev_uninit(const char *name);
 
-#define PMD_REGISTER_DRIVER(d)\
-void devinitfn_ ##d(void);\
-void __attribute__((constructor, used)) devinitfn_ ##d(void)\
+#define _RTE_EXPORT_DRIVER_NAME(name, index) name##index[]
+
+#define RTE_EXPORT_DRIVER_NAME(name, index) \
+static const char _RTE_EXPORT_DRIVER_NAME(rte_pmd_name, index) \
+__attribute__((used)) = RTE_STR(name)
+
+#define RTE_REGISTER_DRIVER(_name, driver)\
+void devinitfn_ ##driver(void);\
+void __attribute__((constructor, used)) devinitfn_ ##driver(void)\
 {\
-	rte_eal_driver_register(&d);\
-}
+	(driver).name = RTE_STR(_name);\
+	rte_eal_driver_register(&driver);\
+} \
+RTE_EXPORT_DRIVER_NAME(_name, __COUNTER__)
+
+#define _RTE_EXPORT_TAG(name, tag) __##name##_##tag
+
+#define RTE_EXPORT_PCI_TABLE(name, table) \
+static const char _RTE_EXPORT_TAG(name, pci_table_export)[] \
+__attribute__((used)) = RTE_STR(table)
+
+#define RTE_EXPORT_PARAM_STRING(name, str) \
+static const char _RTE_EXPORT_TAG(name, param_string_export)[] \
+__attribute__((used)) = str
 
 #ifdef __cplusplus
 }

@@ -1090,4 +1090,6 @@ static struct rte_driver pmd_pcap_drv = {
 	.uninit = rte_pmd_pcap_devuninit,
 };
 
-PMD_REGISTER_DRIVER(pmd_pcap_drv);
+RTE_REGISTER_DRIVER(pcap, pmd_pcap_drv);
+RTE_EXPORT_PARAM_STRING(pcap, "rx_pcap=<string> tx_pcap=<string> "
+"rx_iface=<ifc> tx_iface=<ifc> iface=<ifc>");

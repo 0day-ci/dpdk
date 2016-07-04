@@ -98,7 +98,7 @@ rte_eal_dev_init(void)
 	/*
 	 * Note that the dev_driver_list is populated here
 	 * from calls made to rte_eal_driver_register from constructor functions
-	 * embedded into PMD modules via the PMD_REGISTER_DRIVER macro
+	 * embedded into PMD modules via the RTE_REGISTER_DRIVER macro
 	 */
 
 	/* call the init function for each virtual device */

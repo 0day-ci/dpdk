@@ -134,4 +134,5 @@ static struct rte_driver pmd_qat_drv = {
 	.init = rte_qat_pmd_init,
 };
 
-PMD_REGISTER_DRIVER(pmd_qat_drv);
+RTE_REGISTER_DRIVER(qat, pmd_qat_drv);
+RTE_EXPORT_PCI_TABLE(qat, pci_id_qat_map);

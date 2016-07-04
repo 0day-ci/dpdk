@@ -705,7 +705,8 @@ static struct rte_driver rte_i40e_driver = {
 	.init = rte_i40e_pmd_init,
 };
 
-PMD_REGISTER_DRIVER(rte_i40e_driver);
+RTE_REGISTER_DRIVER(i40e, rte_i40e_driver);
+RTE_EXPORT_PCI_TABLE(i40e, pci_id_i40e_map);
 
 /*
  * Initialize registers for flexible payload, which should be set by NVM.

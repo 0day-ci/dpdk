@@ -1340,5 +1340,7 @@ static struct rte_driver rte_qede_driver = {
 	.init = rte_qedevf_pmd_init
 };
 
-PMD_REGISTER_DRIVER(rte_qede_driver);
-PMD_REGISTER_DRIVER(rte_qedevf_driver);
+RTE_REGISTER_DRIVER(qede, rte_qede_driver);
+RTE_EXPORT_PCI_TABLE(qede, pci_id_qede_map);
+RTE_REGISTER_DRIVER(qedevf, rte_qedevf_driver);
+RTE_EXPORT_PCI_TABLE(qedevf, pci_id_qedevf_map);

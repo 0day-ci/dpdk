@@ -5210,5 +5210,7 @@ eth_igb_configure_msix_intr(struct rte_eth_dev *dev)
 	E1000_WRITE_FLUSH(hw);
 }
 
-PMD_REGISTER_DRIVER(pmd_igb_drv);
-PMD_REGISTER_DRIVER(pmd_igbvf_drv);
+RTE_REGISTER_DRIVER(igb, pmd_igb_drv);
+RTE_EXPORT_PCI_TABLE(igb, pci_id_igb_map);
+RTE_REGISTER_DRIVER(igbvf, pmd_igbvf_drv);
+RTE_EXPORT_PCI_TABLE(igbvf, pci_id_igbvf_map);

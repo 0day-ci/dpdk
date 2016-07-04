@@ -721,4 +721,6 @@ static struct rte_driver cryptodev_aesni_mb_pmd_drv = {
 	.uninit = cryptodev_aesni_mb_uninit
 };
 
-PMD_REGISTER_DRIVER(cryptodev_aesni_mb_pmd_drv);
+RTE_REGISTER_DRIVER(aesni_mb, cryptodev_aesni_mb_pmd_drv);
+RTE_EXPORT_PARAM_STRING(aesni_gcm, "max_nb_queue_pairs=<int> "
+"max_nb_sessions=<int> socket_id=<int>");

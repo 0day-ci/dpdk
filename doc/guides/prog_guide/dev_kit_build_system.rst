@@ -304,6 +304,25 @@ Misc
 
 *   rte.subdir.mk: Build several directories in the development kit framework.
 
+.. _Internally_Generated_Build_Tools:
+
+Internally Generated Build Tools
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These well known symbol names are defined by various macros and used to export
+important information about hardware support and usage for PMD files.  For
+instance the macro:
+
+.. code-block:: c
+
+   RTE_REGISTER_DRIVER(drv, name)
+
+Creates the following symbol:
+
+.. code-block:: c
+
+   static char rte_pmd_name0[] __attribute__((used)) = "<name>";
+
 .. _Useful_Variables_Provided_by_the_Build_System:
 
 Useful Variables Provided by the Build System

@@ -521,4 +521,6 @@ static struct rte_driver aesni_gcm_pmd_drv = {
 	.uninit = aesni_gcm_uninit
 };
 
-PMD_REGISTER_DRIVER(aesni_gcm_pmd_drv);
+RTE_REGISTER_DRIVER(aesni_gcm, aesni_gcm_pmd_drv);
+RTE_EXPORT_PARAM_STRING(aesni_gcm, "max_nb_queue_pairs=<int> "
+"max_nb_sessions=<int> socket_id=<int>");
