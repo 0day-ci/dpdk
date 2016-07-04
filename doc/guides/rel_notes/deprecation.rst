@@ -41,3 +41,8 @@ Deprecation Notices
 * The mempool functions for single/multi producer/consumer are deprecated and
   will be removed in 16.11.
   It is replaced by rte_mempool_generic_get/put functions.
+
+* The rte_eal_vdev_init function will be changed in 16.11 to return
+  the port/device id of the device created, instead of 0, when it has been
+  initialized successfully, so user can use the returned value straight away
+  to call all the device functions that require that parameter.
