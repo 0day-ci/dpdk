@@ -275,8 +275,6 @@ Generate a .a library.
 
 *   rte.extlib.mk: external library
 
-*   rte.hostlib.mk: host library in the development kit framework
-
 Install
 ^^^^^^^
 
