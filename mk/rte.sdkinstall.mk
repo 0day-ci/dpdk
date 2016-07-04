@@ -126,6 +126,8 @@ install-runtime:
 	$(Q)$(call rte_mkdir,      $(DESTDIR)$(sbindir))
 	$(Q)$(call rte_symlink,    $(DESTDIR)$(datadir)/tools/dpdk_nic_bind.py, \
 	                           $(DESTDIR)$(sbindir)/dpdk_nic_bind)
+	$(Q)$(call rte_symlink,    $(DESTDIR)$(datadir)/tools/dpdk-pmdinfo.py, \
+	                           $(DESTDIR)$(bindir)/dpdk-pmdinfo)
 
 install-kmod:
 ifneq ($(wildcard $O/kmod/*),)

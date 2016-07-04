@@ -115,7 +115,7 @@ TAILQ_HEAD_INITIALIZER(solib_list);
 /* Default path of external loadable drivers */
 static const char *default_solib_dir = RTE_EAL_PMD_PATH;
 
-/* Stringified version of default solib path */
+/* Stringified version of default solib path used by dpdk-pmdinfo.py */
 static const char dpdk_solib_path[] __attribute__((used)) =
 "DPDK_PLUGIN_PATH=" RTE_EAL_PMD_PATH;
 

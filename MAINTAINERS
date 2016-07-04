@@ -71,6 +71,7 @@ F: scripts/validate-abi.sh
 Driver information
 M: Neil Horman <nhorman@tuxdriver.com>
 F: buildtools/pmdinfogen/
+F: tools/dpdk-pmdinfo.py
 
 
 Environment Abstraction Layer
