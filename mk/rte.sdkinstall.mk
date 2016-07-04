@@ -141,10 +141,13 @@ install-sdk:
 	$(Q)$(call rte_mkdir,                            $(DESTDIR)$(sdkdir))
 	$(Q)cp -a               $(RTE_SDK)/mk            $(DESTDIR)$(sdkdir)
 	$(Q)cp -a               $(RTE_SDK)/scripts       $(DESTDIR)$(sdkdir)
+	$(Q)cp -a               $O/buildtools            $(DESTDIR)$(sdkdir)
 	$(Q)$(call rte_mkdir,                            $(DESTDIR)$(targetdir))
 	$(Q)cp -a               $O/.config               $(DESTDIR)$(targetdir)
 	$(Q)$(call rte_symlink, $(DESTDIR)$(includedir), $(DESTDIR)$(targetdir)/include)
 	$(Q)$(call rte_symlink, $(DESTDIR)$(libdir),     $(DESTDIR)$(targetdir)/lib)
+	$(Q)$(call rte_symlink, $(DESTDIR)$(sdkdir)/buildtools, \
+	                        $(DESTDIR)$(targetdir)/buildtools)
 
 install-doc:
 ifneq ($(wildcard $O/doc),)

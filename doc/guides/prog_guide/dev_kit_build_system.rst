@@ -70,7 +70,7 @@ Each build directory contains include files, libraries, and applications:
     ...
     ~/DEV/DPDK$ ls i686-native-linuxapp-gcc
 
-    app build hostapp include kmod lib Makefile
+    app build buildtools include kmod lib Makefile
 
 
     ~/DEV/DPDK$ ls i686-native-linuxapp-gcc/app/
@@ -307,6 +307,7 @@ Misc
 Internally Generated Build Tools
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+``dpdk-pmdinfogen`` scans an object (.o) file for various well known symbol names.
 These well known symbol names are defined by various macros and used to export
 important information about hardware support and usage for PMD files.  For
 instance the macro:
@@ -320,6 +321,18 @@ Creates the following symbol:
 .. code-block:: c
 
    static char rte_pmd_name0[] __attribute__((used)) = "<name>";
+
+Which dpdk-pmdinfogen scans for.  Using this information other relevant bits of
+data can be exported from the object file and used to produce a hardware support
+description, that dpdk-pmdinfogen then encodes into a json formatted string in
+the following format:
+
+.. code-block:: C
+
+   static char <name_pmd_string>="PMD_INFO_STRING=\"{'name' : '<name>', ...}\"";
+
+These strings can then be searched for by external tools to determine the
+hardware support of a given library or application.
 
 .. _Useful_Variables_Provided_by_the_Build_System:
 
