@@ -40,8 +40,8 @@ include $(RTE_SDK)/mk/internal/rte.depdirs-pre.mk
 # VPATH contains at least SRCDIR
 VPATH += $(SRCDIR)
 
-_BUILD = $(HOSTAPP)
-_INSTALL = $(INSTALL-FILES-y) $(SYMLINK-FILES-y) $(RTE_OUTPUT)/hostapp/$(HOSTAPP)
+_BUILD = $(RTE_OUTPUT)/$(HOSTAPP_DIR)/$(HOSTAPP)
+_INSTALL = $(INSTALL-FILES-y) $(SYMLINK-FILES-y) $(RTE_OUTPUT)/$(HOSTAPP_DIR)/$(HOSTAPP)
 _CLEAN = doclean
 
 .PHONY: all
@@ -60,7 +60,7 @@ exe2cmd = $(strip $(call dotfile,$(patsubst %,%.cmd,$(1))))
 O_TO_EXE = $(HOSTCC) $(HOST_LDFLAGS) $(LDFLAGS_$(@)) \
 	$(EXTRA_HOST_LDFLAGS) -o $@ $(OBJS-y) $(LDLIBS)
 O_TO_EXE_STR = $(subst ','\'',$(O_TO_EXE)) #'# fix syntax highlight
-O_TO_EXE_DISP = $(if $(V),"$(O_TO_EXE_STR)","  HOSTLD $(@)")
+O_TO_EXE_DISP = $(if $(V),"$(O_TO_EXE_STR)","  HOSTLD $(@F)")
 O_TO_EXE_CMD = "cmd_$@ = $(O_TO_EXE_STR)"
 O_TO_EXE_DO = @set -e; \
 	echo $(O_TO_EXE_DISP); \
@@ -69,15 +69,10 @@ O_TO_EXE_DO = @set -e; \
 
 -include .$(HOSTAPP).cmd
 
-# list of .a files that are linked to this application
-LDLIBS_FILES := $(wildcard \
-	$(addprefix $(RTE_OUTPUT)/lib/, \
-	$(patsubst -l%,lib%.a,$(filter -l%,$(LDLIBS)))))
-
 #
 # Compile executable file if needed
 #
-$(HOSTAPP): $(OBJS-y) $(LDLIBS_FILES) FORCE
+$(RTE_OUTPUT)/$(HOSTAPP_DIR)/$(HOSTAPP): $(OBJS-y) FORCE
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
 	$(if $(D),\
 		@echo -n "$@ -> $< " ; \
@@ -93,14 +88,6 @@ $(HOSTAPP): $(OBJS-y) $(LDLIBS_FILES) FORCE
 		$(O_TO_EXE_DO))
 
 #
-# install app in $(RTE_OUTPUT)/hostapp
-#
-$(RTE_OUTPUT)/hostapp/$(HOSTAPP): $(HOSTAPP)
-	@echo "  INSTALL-HOSTAPP $(HOSTAPP)"
-	@[ -d $(RTE_OUTPUT)/hostapp ] || mkdir -p $(RTE_OUTPUT)/hostapp
-	$(Q)cp -f $(HOSTAPP) $(RTE_OUTPUT)/hostapp
-
-#
 # Clean all generated files
 #
 .PHONY: clean
@@ -109,7 +96,7 @@ clean: _postclean
 
 .PHONY: doclean
 doclean:
-	$(Q)rm -rf $(HOSTAPP) $(OBJS-all) $(DEPS-all) $(DEPSTMP-all) \
+	$(Q)rm -rf $(OBJS-all) $(DEPS-all) $(DEPSTMP-all) \
 	  $(CMDS-all) $(INSTALL-FILES-all) .$(HOSTAPP).cmd
 
 

@@ -264,7 +264,7 @@ These Makefiles generate a binary application.
 
 *   rte.extapp.mk: External application
 
-*   rte.hostapp.mk: Host application in the development kit framework
+*   rte.hostapp.mk: Prerequisite tool to build DPDK
 
 Library
 ^^^^^^^
