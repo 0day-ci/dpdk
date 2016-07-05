@@ -403,6 +403,24 @@ extern "C" {
  */
 #define RTE_PTYPE_INNER_L2_ETHER_VLAN       0x00020000
 /**
+ * QinQ packet type.
+ *
+ * Packet format:
+ * <'ether type'=[0x88A8]>
+ */
+#define RTE_PTYPE_INNER_L2_ETHER_QINQ       0x00030000
+/**
+ * MPLS packet type.
+ *
+ * Packet format:
+ * <'ether type'=[0x8847|0x0x8848]>
+ */
+#define RTE_PTYPE_INNER_L2_ETHER_MPLS       0x00040000
+/**
+ * Mask of layer 2 packet types.
+ * It is used for outer packet for tunneling cases.
+ */
+/**
  * Mask of inner layer 2 packet types.
  */
 #define RTE_PTYPE_INNER_L2_MASK             0x000f0000
@@ -597,7 +615,7 @@ struct rte_mbuf_hdr_lens {
  *   L2: Ether, Vlan, QinQ, Mpls
  *   L3: IPv4, IPv6
  *   L4: TCP, UDP, SCTP
- *   Tunnels: IPv4, IPv6, Gre
+ *   Tunnels: IPv4, IPv6, Gre, Nvgre
  *
  * @param m
  *   The packet mbuf to be parsed.
