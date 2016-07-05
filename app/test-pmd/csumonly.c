@@ -204,7 +204,8 @@ parse_ethernet(struct ether_hdr *eth_hdr, struct testpmd_offload_info *info)
 static void
 parse_vxlan(struct udp_hdr *udp_hdr,
 	    struct testpmd_offload_info *info,
-	    uint32_t pkt_type)
+	    uint32_t pkt_type,
+	    uint64_t *ol_flags)
 {
 	struct ether_hdr *eth_hdr;
 
@@ -215,6 +216,7 @@ parse_vxlan(struct udp_hdr *udp_hdr,
 		RTE_ETH_IS_TUNNEL_PKT(pkt_type) == 0)
 		return;
 
+	*ol_flags |= PKT_TX_TUNNEL_VXLAN;
 	info->is_tunnel = 1;
 	info->outer_ethertype = info->ethertype;
 	info->outer_l2_len = info->l2_len;
@@ -231,7 +233,9 @@ parse_vxlan(struct udp_hdr *udp_hdr,
 
 /* Parse a gre header */
 static void
-parse_gre(struct simple_gre_hdr *gre_hdr, struct testpmd_offload_info *info)
+parse_gre(struct simple_gre_hdr *gre_hdr,
+	  struct testpmd_offload_info *info,
+	  uint64_t *ol_flags)
 {
 	struct ether_hdr *eth_hdr;
 	struct ipv4_hdr *ipv4_hdr;
@@ -241,6 +245,8 @@ parse_gre(struct simple_gre_hdr *gre_hdr, struct testpmd_offload_info *info)
 	/* check which fields are supported */
 	if ((gre_hdr->flags & _htons(~GRE_SUPPORTED_FIELDS)) != 0)
 		return;
+
+	*ol_flags |= PKT_TX_TUNNEL_GRE;
 
 	gre_len += sizeof(struct simple_gre_hdr);
 
@@ -417,7 +423,7 @@ process_inner_cksums(void *l3_hdr, const struct testpmd_offload_info *info,
  * packet */
 static uint64_t
 process_outer_cksums(void *outer_l3_hdr, struct testpmd_offload_info *info,
-	uint16_t testpmd_ol_flags)
+	uint16_t testpmd_ol_flags, uint64_t orig_ol_flags)
 {
 	struct ipv4_hdr *ipv4_hdr = outer_l3_hdr;
 	struct ipv6_hdr *ipv6_hdr = outer_l3_hdr;
@@ -442,6 +448,9 @@ process_outer_cksums(void *outer_l3_hdr, struct testpmd_offload_info *info,
 	 * hardware supporting it today, and no API for it. */
 
 	udp_hdr = (struct udp_hdr *)((char *)outer_l3_hdr + info->outer_l3_len);
+	if ((orig_ol_flags & PKT_TX_TCP_SEG) &&
+	    ((orig_ol_flags & PKT_TX_TUNNEL_MASK) == PKT_TX_TUNNEL_VXLAN))
+		udp_hdr->dgram_cksum = 0;
 	/* do not recalculate udp cksum if it was 0 */
 	if (udp_hdr->dgram_cksum != 0) {
 		udp_hdr->dgram_cksum = 0;
@@ -705,15 +714,18 @@ pkt_burst_checksum_forward(struct fwd_stream *fs)
 			if (info.l4_proto == IPPROTO_UDP) {
 				struct udp_hdr *udp_hdr;
 				udp_hdr = (struct udp_hdr *)((char *)l3_hdr +
-					info.l3_len);
-				parse_vxlan(udp_hdr, &info, m->packet_type);
+					   info.l3_len);
+				parse_vxlan(udp_hdr, &info, m->packet_type,
+					    &ol_flags);
 			} else if (info.l4_proto == IPPROTO_GRE) {
 				struct simple_gre_hdr *gre_hdr;
 				gre_hdr = (struct simple_gre_hdr *)
 					((char *)l3_hdr + info.l3_len);
-				parse_gre(gre_hdr, &info);
+				parse_gre(gre_hdr, &info, &ol_flags);
 			} else if (info.l4_proto == IPPROTO_IPIP) {
 				void *encap_ip_hdr;
+
+				ol_flags |= PKT_TX_TUNNEL_IPIP;
 				encap_ip_hdr = (char *)l3_hdr + info.l3_len;
 				parse_encap_ip(encap_ip_hdr, &info);
 			}
@@ -745,7 +757,7 @@ pkt_burst_checksum_forward(struct fwd_stream *fs)
 		 * processed in hardware. */
 		if (info.is_tunnel == 1) {
 			ol_flags |= process_outer_cksums(outer_l3_hdr, &info,
-				testpmd_ol_flags);
+				testpmd_ol_flags, ol_flags);
 		}
 
 		/* step 4: fill the mbuf meta data (flags and header lengths) */

@@ -129,6 +129,17 @@ extern "C" {
 /* add new TX flags here */
 
 /**
+ * Bits 45:48 used for the tunnel type.
+ * When doing Tx offload like TSO or checksum, the HW needs to configure the
+ * tunnel type into the HW descriptors.
+ */
+#define PKT_TX_TUNNEL_VXLAN   (1ULL << 45)
+#define PKT_TX_TUNNEL_GRE   (2ULL << 45)
+#define PKT_TX_TUNNEL_IPIP    (3ULL << 45)
+/* add new TX TUNNEL type here */
+#define PKT_TX_TUNNEL_MASK    (0xFULL << 45)
+
+/**
  * Second VLAN insertion (QinQ) flag.
  */
 #define PKT_TX_QINQ_PKT    (1ULL << 49)   /**< TX packet with double VLAN inserted. */

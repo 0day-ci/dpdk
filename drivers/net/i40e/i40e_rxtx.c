@@ -786,6 +786,12 @@ i40e_txd_enable_checksum(uint64_t ol_flags,
 			union i40e_tx_offload tx_offload,
 			uint32_t *cd_tunneling)
 {
+	/* Tx pkts tunnel type*/
+	if ((ol_flags & PKT_TX_TUNNEL_MASK) == PKT_TX_TUNNEL_VXLAN)
+		*cd_tunneling |= I40E_TXD_CTX_UDP_TUNNELING;
+	else if ((ol_flags & PKT_TX_TUNNEL_MASK) == PKT_TX_TUNNEL_GRE)
+		*cd_tunneling |= I40E_TXD_CTX_GRE_TUNNELING;
+
 	/* UDP tunneling packet TX checksum offload */
 	if (ol_flags & PKT_TX_OUTER_IP_CKSUM) {
 
@@ -1495,7 +1501,8 @@ i40e_calc_context_desc(uint64_t flags)
 
 /* set i40e TSO context descriptor */
 static inline uint64_t
-i40e_set_tso_ctx(struct rte_mbuf *mbuf, union i40e_tx_offload tx_offload)
+i40e_set_tso_ctx(struct rte_mbuf *mbuf,
+		 union i40e_tx_offload tx_offload)
 {
 	uint64_t ctx_desc = 0;
 	uint32_t cd_cmd, hdr_len, cd_tso_len;
@@ -1522,7 +1529,6 @@ i40e_set_tso_ctx(struct rte_mbuf *mbuf, union i40e_tx_offload tx_offload)
 		 I40E_TXD_CTX_QW1_TSO_LEN_SHIFT) |
 		((uint64_t)mbuf->tso_segsz <<
 		 I40E_TXD_CTX_QW1_MSS_SHIFT);
-
 	return ctx_desc;
 }
 
