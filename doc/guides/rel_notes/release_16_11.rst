@@ -34,6 +34,10 @@ New Features
 
      Refer to the previous release notes for examples.
 
+* **Added function to read packet data.**
+
+  Added a new function ``rte_pktmbuf_read()`` to read the packet data from an
+  mbuf chain, linearizing if required.
 
 Resolved Issues
 ---------------
