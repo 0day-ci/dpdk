@@ -78,6 +78,12 @@ bad=$(echo "$headlines" | grep --color=always \
 	| sed 's,^,\t,')
 [ -z "$bad" ] || printf "Wrong headline label:\n$bad\n"
 
+# check headline label for net/ prefix if needed
+bad=$(echo "$headlines" | grep -E --color=always \
+	-e "^($(ls drivers/net | grep -v Makefile | tr '\n' '|')):" \
+	| sed 's,^,\t,')
+[ -z "$bad" ] || printf "Headline missing 'net/' prefix:\n$bad\n"
+
 # check headline lowercase for first words
 bad=$(echo "$headlines" | grep --color=always \
 	-e '^.*[A-Z].*:' \
