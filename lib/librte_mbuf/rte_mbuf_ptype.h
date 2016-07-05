@@ -150,6 +150,13 @@ extern "C" {
  */
 #define RTE_PTYPE_L2_ETHER_QINQ             0x00000007
 /**
+ * MPLS packet type.
+ *
+ * Packet format:
+ * <'ether type'=[0x8847|0x0x8848]>
+ */
+#define RTE_PTYPE_L2_ETHER_MPLS             0x00000008
+/**
  * Mask of layer 2 packet types.
  * It is used for outer packet for tunneling cases.
  */
@@ -587,7 +594,7 @@ struct rte_mbuf_hdr_lens {
  * (retval & RTE_PTYPE_L2_MASK) != RTE_PTYPE_UNKNOWN.
  *
  * Supported packet types are:
- *   L2: Ether, Vlan, QinQ
+ *   L2: Ether, Vlan, QinQ, Mpls
  *   L3: IPv4, IPv6
  *   L4: TCP, UDP, SCTP
  *

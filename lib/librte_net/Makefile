@@ -34,7 +34,9 @@ include $(RTE_SDK)/mk/rte.vars.mk
 CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR) -O3
 
 # install includes
-SYMLINK-$(CONFIG_RTE_LIBRTE_NET)-include := rte_ip.h rte_tcp.h rte_udp.h rte_sctp.h rte_icmp.h rte_arp.h rte_ether.h
+SYMLINK-$(CONFIG_RTE_LIBRTE_NET)-include := rte_ip.h rte_tcp.h rte_udp.h
+SYMLINK-$(CONFIG_RTE_LIBRTE_NET)-include += rte_sctp.h rte_icmp.h rte_arp.h
+SYMLINK-$(CONFIG_RTE_LIBRTE_NET)-include += rte_ether.h rte_mpls.h
 
 
 include $(RTE_SDK)/mk/rte.install.mk

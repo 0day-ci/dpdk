@@ -333,6 +333,8 @@ struct vxlan_hdr {
 #define ETHER_TYPE_1588 0x88F7 /**< IEEE 802.1AS 1588 Precise Time Protocol. */
 #define ETHER_TYPE_SLOW 0x8809 /**< Slow protocols (LACP and Marker). */
 #define ETHER_TYPE_TEB  0x6558 /**< Transparent Ethernet Bridging. */
+#define ETHER_TYPE_MPLS 0x8847 /**< MPLS ethertype. */
+#define ETHER_TYPE_MPLSM 0x8848 /**< MPLS multicast ethertype. */
 
 #define ETHER_VXLAN_HLEN (sizeof(struct udp_hdr) + sizeof(struct vxlan_hdr))
 /**< VXLAN tunnel header length. */

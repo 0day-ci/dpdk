@@ -41,6 +41,7 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 #include <rte_sctp.h>
+#include <rte_mpls.h>
 
 /* get l3 packet type from ip6 next protocol */
 static uint32_t
@@ -166,6 +167,9 @@ uint32_t rte_pktmbuf_get_ptype(const struct rte_mbuf *m,
 	off = sizeof(*eh);
 	hdr_lens->l2_len = off;
 
+	if (proto == rte_cpu_to_be_16(ETHER_TYPE_IPv4))
+		goto l3; /* fast path if packet is IPv4 */
+
 	if (proto == rte_cpu_to_be_16(ETHER_TYPE_VLAN)) {
 		const struct vlan_hdr *vh;
 		struct vlan_hdr vh_copy;
@@ -189,8 +193,29 @@ uint32_t rte_pktmbuf_get_ptype(const struct rte_mbuf *m,
 		off += 2 * sizeof(*vh);
 		hdr_lens->l2_len += 2 * sizeof(*vh);
 		proto = vh->eth_proto;
+	} else if ((proto == rte_cpu_to_be_16(ETHER_TYPE_MPLS)) ||
+			(proto == rte_cpu_to_be_16(ETHER_TYPE_MPLSM))) {
+		unsigned int i;
+		const struct mpls_hdr *mh;
+		struct mpls_hdr mh_copy;
+
+#define MAX_MPLS_HDR 5
+		for (i = 0; i < MAX_MPLS_HDR; i++) {
+			mh = rte_pktmbuf_read(m, off + (i * sizeof(*mh)),
+				sizeof(*mh), &mh_copy);
+			if (unlikely(mh == NULL))
+				return pkt_type;
+			if (mh->bs)
+				break;
+		}
+		if (i == MAX_MPLS_HDR)
+			return pkt_type;
+		pkt_type = RTE_PTYPE_L2_ETHER_MPLS;
+		hdr_lens->l2_len += (sizeof(*mh) * (i + 1));
+		return pkt_type;
 	}
 
+ l3:
 	if (proto == rte_cpu_to_be_16(ETHER_TYPE_IPv4)) {
 		const struct ipv4_hdr *ip4h;
 		struct ipv4_hdr ip4h_copy;
