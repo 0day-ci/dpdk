@@ -177,6 +177,18 @@ uint32_t rte_pktmbuf_get_ptype(const struct rte_mbuf *m,
 		off += sizeof(*vh);
 		hdr_lens->l2_len += sizeof(*vh);
 		proto = vh->eth_proto;
+	} else if (proto == rte_cpu_to_be_16(ETHER_TYPE_QINQ)) {
+		const struct vlan_hdr *vh;
+		struct vlan_hdr vh_copy;
+
+		pkt_type = RTE_PTYPE_L2_ETHER_QINQ;
+		vh = rte_pktmbuf_read(m, off + sizeof(*vh), sizeof(*vh),
+			&vh_copy);
+		if (unlikely(vh == NULL))
+			return pkt_type;
+		off += 2 * sizeof(*vh);
+		hdr_lens->l2_len += 2 * sizeof(*vh);
+		proto = vh->eth_proto;
 	}
 
 	if (proto == rte_cpu_to_be_16(ETHER_TYPE_IPv4)) {

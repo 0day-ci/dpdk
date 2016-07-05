@@ -143,6 +143,13 @@ extern "C" {
  */
 #define RTE_PTYPE_L2_ETHER_VLAN             0x00000006
 /**
+ * QinQ packet type.
+ *
+ * Packet format:
+ * <'ether type'=[0x88A8]>
+ */
+#define RTE_PTYPE_L2_ETHER_QINQ             0x00000007
+/**
  * Mask of layer 2 packet types.
  * It is used for outer packet for tunneling cases.
  */
@@ -580,7 +587,7 @@ struct rte_mbuf_hdr_lens {
  * (retval & RTE_PTYPE_L2_MASK) != RTE_PTYPE_UNKNOWN.
  *
  * Supported packet types are:
- *   L2: Ether, Vlan
+ *   L2: Ether, Vlan, QinQ
  *   L3: IPv4, IPv6
  *   L4: TCP, UDP, SCTP
  *
