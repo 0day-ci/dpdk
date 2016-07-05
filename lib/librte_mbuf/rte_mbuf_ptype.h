@@ -234,7 +234,7 @@ extern "C" {
  *
  * Packet format:
  * <'ether type'=0x0800
- * | 'version'=4, 'protocol'=6, 'MF'=0>
+ * | 'version'=4, 'protocol'=6, 'MF'=0, 'frag_offset'=0>
  * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'=6>
@@ -246,7 +246,7 @@ extern "C" {
  *
  * Packet format:
  * <'ether type'=0x0800
- * | 'version'=4, 'protocol'=17, 'MF'=0>
+ * | 'version'=4, 'protocol'=17, 'MF'=0, 'frag_offset'=0>
  * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'=17>
@@ -265,6 +265,9 @@ extern "C" {
  * <'ether type'=0x0800
  * | 'version'=4, 'MF'=1>
  * or,
+ * <'ether type'=0x0800
+ * | 'version'=4, 'frag_offset'!=0>
+ * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'=44>
  */
@@ -275,7 +278,7 @@ extern "C" {
  *
  * Packet format:
  * <'ether type'=0x0800
- * | 'version'=4, 'protocol'=132, 'MF'=0>
+ * | 'version'=4, 'protocol'=132, 'MF'=0, 'frag_offset'=0>
  * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'=132>
@@ -287,7 +290,7 @@ extern "C" {
  *
  * Packet format:
  * <'ether type'=0x0800
- * | 'version'=4, 'protocol'=1, 'MF'=0>
+ * | 'version'=4, 'protocol'=1, 'MF'=0, 'frag_offset'=0>
  * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'=1>
@@ -303,7 +306,7 @@ extern "C" {
  *
  * Packet format:
  * <'ether type'=0x0800
- * | 'version'=4, 'protocol'!=[6|17|132|1], 'MF'=0>
+ * | 'version'=4, 'protocol'!=[6|17|132|1], 'MF'=0, 'frag_offset'=0>
  * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'!=[6|17|44|132|1]>
@@ -491,7 +494,7 @@ extern "C" {
  *
  * Packet format (inner only):
  * <'ether type'=0x0800
- * | 'version'=4, 'protocol'=6, 'MF'=0>
+ * | 'version'=4, 'protocol'=6, 'MF'=0, 'frag_offset'=0>
  * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'=6>
@@ -503,7 +506,7 @@ extern "C" {
  *
  * Packet format (inner only):
  * <'ether type'=0x0800
- * | 'version'=4, 'protocol'=17, 'MF'=0>
+ * | 'version'=4, 'protocol'=17, 'MF'=0, 'frag_offset'=0>
  * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'=17>
@@ -517,6 +520,9 @@ extern "C" {
  * <'ether type'=0x0800
  * | 'version'=4, 'MF'=1>
  * or,
+ * <'ether type'=0x0800
+ * | 'version'=4, 'frag_offset'!=0>
+ * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'=44>
  */
@@ -527,7 +533,7 @@ extern "C" {
  *
  * Packet format (inner only):
  * <'ether type'=0x0800
- * | 'version'=4, 'protocol'=132, 'MF'=0>
+ * | 'version'=4, 'protocol'=132, 'MF'=0, 'frag_offset'=0>
  * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'=132>
@@ -539,7 +545,7 @@ extern "C" {
  *
  * Packet format (inner only):
  * <'ether type'=0x0800
- * | 'version'=4, 'protocol'=1, 'MF'=0>
+ * | 'version'=4, 'protocol'=1, 'MF'=0, 'frag_offset'=0>
  * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'=1>
@@ -552,7 +558,7 @@ extern "C" {
  *
  * Packet format (inner only):
  * <'ether type'=0x0800
- * | 'version'=4, 'protocol'!=[6|17|132|1], 'MF'=0>
+ * | 'version'=4, 'protocol'!=[6|17|132|1], 'MF'=0, 'frag_offset'=0>
  * or,
  * <'ether type'=0x86DD
  * | 'version'=6, 'next header'!=[6|17|44|132|1]>
