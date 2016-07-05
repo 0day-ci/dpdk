@@ -597,7 +597,7 @@ struct rte_mbuf_hdr_lens {
  *   L2: Ether, Vlan, QinQ, Mpls
  *   L3: IPv4, IPv6
  *   L4: TCP, UDP, SCTP
- *   Tunnels: IPv4, IPv6
+ *   Tunnels: IPv4, IPv6, Gre
  *
  * @param m
  *   The packet mbuf to be parsed.
