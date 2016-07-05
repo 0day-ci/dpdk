@@ -545,6 +545,49 @@ extern "C" {
 		RTE_PTYPE_INNER_L3_MASK |				\
 		RTE_PTYPE_INNER_L4_MASK))
 
+struct rte_mbuf;
+
+/**
+ * Structure containing header lengths associated to a packet.
+ */
+struct rte_mbuf_hdr_lens {
+	uint8_t l2_len;
+	uint8_t l3_len;
+	uint8_t l4_len;
+	uint8_t tunnel_len;
+	uint8_t inner_l2_len;
+	uint8_t inner_l3_len;
+	uint8_t inner_l4_len;
+};
+
+/**
+ * Parse an Ethernet packet to get its packet type.
+ *
+ * This function parses the network headers in mbuf data and return its
+ * packet type.
+ *
+ * If it is provided by the user, it also fills a rte_mbuf_hdr_lens
+ * structure that contains the lengths of the parsed network
+ * headers. Each length field is valid only if the associated packet
+ * type is set. For instance, hdr_lens->l2_len is valid only if
+ * (retval & RTE_PTYPE_L2_MASK) != RTE_PTYPE_UNKNOWN.
+ *
+ * Supported packet types are:
+ *   L2: Ether
+ *   L3: IPv4, IPv6
+ *   L4: TCP, UDP, SCTP
+ *
+ * @param m
+ *   The packet mbuf to be parsed.
+ * @param hdr_lens
+ *   A pointer to a structure where the header lengths will be returned,
+ *   or NULL.
+ * @return
+ *   The packet type of the packet.
+ */
+uint32_t rte_pktmbuf_get_ptype(const struct rte_mbuf *m,
+	struct rte_mbuf_hdr_lens *hdr_lens);
+
 #ifdef __cplusplus
 }
 #endif

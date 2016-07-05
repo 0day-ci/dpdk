@@ -23,5 +23,6 @@ DPDK_16.11 {
 	global:
 
 	__rte_pktmbuf_read;
+	rte_pktmbuf_get_ptype;
 
 } DPDK_2.1;
