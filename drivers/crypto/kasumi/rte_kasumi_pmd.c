@@ -648,12 +648,11 @@ cryptodev_kasumi_uninit(const char *name)
 }
 
 static struct rte_driver cryptodev_kasumi_pmd_drv = {
-	.name = CRYPTODEV_NAME_KASUMI_PMD,
 	.type = PMD_VDEV,
 	.init = cryptodev_kasumi_init,
 	.uninit = cryptodev_kasumi_uninit
 };
 
-PMD_REGISTER_DRIVER(cryptodev_kasumi_pmd_drv, kasumi);
-DRIVER_REGISTER_PARAM_STRING(kasumi, "max_nb_queue_pairs=<int> "
+PMD_REGISTER_DRIVER(cryptodev_kasumi_pmd_drv, CRYPTODEV_NAME_KASUMI_PMD);
+DRIVER_REGISTER_PARAM_STRING(CRYPTODEV_NAME_KASUMI_PMD, "max_nb_queue_pairs=<int> "
 "max_nb_sessions=<int> socket_id=<int>");
