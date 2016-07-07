@@ -48,190 +48,247 @@
 
 #include "ipsec.h"
 #include "esp.h"
+#include "parser.h"
 
-/* SAs Outbound */
-const struct ipsec_sa sa_out[] = {
-	{
-	.spi = 5,
-	.src.ip4 = IPv4(172, 16, 1, 5),
-	.dst.ip4 = IPv4(172, 16, 2, 5),
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = IP4_TUNNEL
-	},
-	{
-	.spi = 6,
-	.src.ip4 = IPv4(172, 16, 1, 6),
-	.dst.ip4 = IPv4(172, 16, 2, 6),
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = IP4_TUNNEL
-	},
-	{
-	.spi = 10,
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = TRANSPORT
-	},
-	{
-	.spi = 11,
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = TRANSPORT
-	},
-	{
-	.spi = 15,
-	.src.ip4 = IPv4(172, 16, 1, 5),
-	.dst.ip4 = IPv4(172, 16, 2, 5),
-	.cipher_algo = RTE_CRYPTO_CIPHER_NULL,
-	.auth_algo = RTE_CRYPTO_AUTH_NULL,
-	.digest_len = 0,
-	.iv_len = 0,
-	.block_size = 4,
-	.flags = IP4_TUNNEL
-	},
-	{
-	.spi = 16,
-	.src.ip4 = IPv4(172, 16, 1, 6),
-	.dst.ip4 = IPv4(172, 16, 2, 6),
-	.cipher_algo = RTE_CRYPTO_CIPHER_NULL,
-	.auth_algo = RTE_CRYPTO_AUTH_NULL,
-	.digest_len = 0,
-	.iv_len = 0,
-	.block_size = 4,
-	.flags = IP4_TUNNEL
-	},
-	{
-	.spi = 25,
-	.src.ip6_b = { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-		0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x55, 0x55 },
-	.dst.ip6_b = { 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22,
-		0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x55, 0x55 },
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = IP6_TUNNEL
-	},
-	{
-	.spi = 26,
-	.src.ip6_b = { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-		0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x66, 0x66 },
-	.dst.ip6_b = { 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22,
-		0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x66, 0x66 },
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = IP6_TUNNEL
-	},
+struct supported_cipher_algo {
+	const char *keyword;
+	enum rte_crypto_cipher_algorithm algo;
+	uint16_t iv_len;
+	uint16_t block_size;
 };
 
-/* SAs Inbound */
-const struct ipsec_sa sa_in[] = {
-	{
-	.spi = 105,
-	.src.ip4 = IPv4(172, 16, 2, 5),
-	.dst.ip4 = IPv4(172, 16, 1, 5),
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = IP4_TUNNEL
-	},
-	{
-	.spi = 106,
-	.src.ip4 = IPv4(172, 16, 2, 6),
-	.dst.ip4 = IPv4(172, 16, 1, 6),
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = IP4_TUNNEL
-	},
-	{
-	.spi = 110,
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = TRANSPORT
-	},
-	{
-	.spi = 111,
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = TRANSPORT
-	},
-	{
-	.spi = 115,
-	.src.ip4 = IPv4(172, 16, 2, 5),
-	.dst.ip4 = IPv4(172, 16, 1, 5),
-	.cipher_algo = RTE_CRYPTO_CIPHER_NULL,
-	.auth_algo = RTE_CRYPTO_AUTH_NULL,
-	.digest_len = 0,
-	.iv_len = 0,
-	.block_size = 4,
-	.flags = IP4_TUNNEL
-	},
-	{
-	.spi = 116,
-	.src.ip4 = IPv4(172, 16, 2, 6),
-	.dst.ip4 = IPv4(172, 16, 1, 6),
-	.cipher_algo = RTE_CRYPTO_CIPHER_NULL,
-	.auth_algo = RTE_CRYPTO_AUTH_NULL,
-	.digest_len = 0,
-	.iv_len = 0,
-	.block_size = 4,
-	.flags = IP4_TUNNEL
-	},
-	{
-	.spi = 125,
-	.src.ip6_b = { 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22,
-		0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x55, 0x55 },
-	.dst.ip6_b = { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-		0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x55, 0x55 },
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = IP6_TUNNEL
-	},
-	{
-	.spi = 126,
-	.src.ip6_b = { 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22,
-		0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x66, 0x66 },
-	.dst.ip6_b = { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-		0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x66, 0x66 },
-	.cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC,
-	.auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
-	.digest_len = 12,
-	.iv_len = 16,
-	.block_size = 16,
-	.flags = IP6_TUNNEL
-	},
+struct supported_auth_algo {
+	const char *keyword;
+	enum rte_crypto_auth_algorithm algo;
+	uint16_t digest_len;
 };
+
+const struct supported_cipher_algo cipher_algos[] = {
+	{
+		.keyword = "null",
+		.algo = RTE_CRYPTO_CIPHER_NULL,
+		.iv_len = 0,
+		.block_size = 4
+	},
+	{
+		.keyword = "aes-128-cbc",
+		.algo = RTE_CRYPTO_CIPHER_AES_CBC,
+		.iv_len = 16,
+		.block_size = 16
+	}
+};
+
+const struct supported_auth_algo auth_algos[] = {
+	{
+		.keyword = "null",
+		.algo = RTE_CRYPTO_AUTH_NULL,
+		.digest_len = 0,
+	},
+	{
+		.keyword = "sha1-hmac",
+		.algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
+		.digest_len = 12
+	}
+};
+
+static int
+find_match_algo(struct ipsec_sa *rule,
+	const char *cipher_keyword, const char *auth_keyword)
+{
+	size_t i;
+	int ret = -2;
+
+	if (cipher_keyword != NULL) {
+		for (i = 0; i < RTE_DIM(cipher_algos); i++) {
+			const struct supported_cipher_algo *algo =
+				&cipher_algos[i];
+
+			if (strcmp(cipher_keyword, algo->keyword) == 0) {
+				rule->cipher_algo = algo->algo;
+				rule->block_size = algo->block_size;
+				rule->iv_len = algo->iv_len;
+				ret += 1;
+				break;
+			}
+		}
+	}
+
+	if (auth_keyword != NULL) {
+		for (i = 0; i < RTE_DIM(auth_algos); i++) {
+			const struct supported_auth_algo *algo =
+				&auth_algos[i];
+
+			if (strcmp(auth_keyword, algo->keyword) == 0) {
+				rule->auth_algo = algo->algo;
+				rule->digest_len = algo->digest_len;
+				ret += 1;
+				break;
+			}
+		}
+	}
+
+	return ret;
+}
+
+#define MAX_SA_RULE_NUM		1000
+
+struct ipsec_sa sa_out[MAX_SA_RULE_NUM];
+uint32_t nb_sa_out;
+
+struct ipsec_sa sa_in[MAX_SA_RULE_NUM];
+uint32_t nb_sa_in;
+
+void
+parse_sa_tokens(char **tokens, uint32_t n_tokens,
+	struct parse_status *status)
+{
+	struct ipsec_sa *rule = NULL;
+	uint32_t ti; /*token index*/
+	uint32_t *ri /*rule index*/;
+	const char *cipher_str, *auth_str;
+	uint32_t src_p = 0;
+	uint32_t dst_p = 0;
+
+	if (strcmp(tokens[0], "in") == 0) {
+		ri = &nb_sa_in;
+
+		APP_CHECK(*ri <= MAX_SA_RULE_NUM - 1, status,
+			"too many sa rules, abort insertion\n");
+		if (status->status < 0)
+			return;
+
+		rule = &sa_in[*ri];
+	} else {
+		ri = &nb_sa_out;
+
+		APP_CHECK(*ri <= MAX_SA_RULE_NUM - 1, status,
+			"too many sa rules, abort insertion\n");
+		if (status->status < 0)
+			return;
+
+		rule = &sa_out[*ri];
+	}
+
+	/* spi number */
+	APP_CHECK_TOKEN_IS_NUM(tokens, 1, status);
+	if (status->status < 0)
+		return;
+	rule->spi = atoi(tokens[1]);
+
+	cipher_str = tokens[2];
+	auth_str = tokens[3];
+
+	APP_CHECK(find_match_algo(rule, cipher_str, auth_str) == 0,
+		status, "Unrecognized cipher or auth algorithm (%s:%s)",
+		cipher_str, auth_str);
+	if (status->status < 0)
+		return;
+
+	if (strcmp(tokens[4], "ipv4-tunnel") == 0)
+		rule->flags = IP4_TUNNEL;
+	else if (strcmp(tokens[4], "ipv6-tunnel") == 0)
+		rule->flags = IP6_TUNNEL;
+	else if (strcmp(tokens[4], "transport") == 0)
+		rule->flags = TRANSPORT;
+	else {
+		APP_CHECK(0, status, "unrecognized input \"%s\"",
+			tokens[4]);
+		return;
+	}
+
+	for (ti = 5; ti < n_tokens; ti++) {
+		if (strcmp(tokens[ti], "src") == 0) {
+			APP_CHECK_PRESENCE(src_p, tokens[ti], status);
+			if (status->status < 0)
+				return;
+
+			INCREMENT_TOKEN_INDEX(ti, n_tokens, status);
+			if (status->status < 0)
+				return;
+
+			if (rule->flags == IP4_TUNNEL) {
+				struct in_addr ip;
+
+				APP_CHECK(parse_ipv4_addr(tokens[ti],
+					&ip, NULL) == 0, status,
+					"unrecognized input \"%s\", "
+					"expect valid ipv4 addr",
+					tokens[ti]);
+				if (status->status < 0)
+					return;
+				rule->src.ip4 = rte_bswap32(
+					(uint32_t)ip.s_addr);
+			} else if (rule->flags == IP6_TUNNEL) {
+				struct in6_addr ip;
+
+				APP_CHECK(parse_ipv6_addr(tokens[ti], &ip,
+					NULL) == 0, status,
+					"unrecognized input \"%s\", "
+					"expect valid ipv6 addr",
+					tokens[ti]);
+				if (status->status < 0)
+					return;
+				memcpy(rule->src.ip6_b, ip.s6_addr, 16);
+			} else if (rule->flags == TRANSPORT) {
+				APP_CHECK(0, status, "unrecognized input "
+					"\"%s\"", tokens[ti]);
+				return;
+			}
+
+			src_p = 1;
+			continue;
+		}
+
+		if (strcmp(tokens[ti], "dst") == 0) {
+			APP_CHECK_PRESENCE(dst_p, tokens[ti], status);
+			if (status->status < 0)
+				return;
+
+			INCREMENT_TOKEN_INDEX(ti, n_tokens, status);
+			if (status->status < 0)
+				return;
+
+			if (rule->flags == IP4_TUNNEL) {
+				struct in_addr ip;
+
+				APP_CHECK(parse_ipv4_addr(tokens[ti],
+					&ip, NULL) == 0, status,
+					"unrecognized input \"%s\", "
+					"expect valid ipv4 addr",
+					tokens[ti]);
+				if (status->status < 0)
+					return;
+				rule->dst.ip4 = rte_bswap32(
+					(uint32_t)ip.s_addr);
+			} else if (rule->flags == IP6_TUNNEL) {
+				struct in6_addr ip;
+
+				APP_CHECK(parse_ipv6_addr(tokens[ti], &ip,
+					NULL) == 0, status,
+					"unrecognized input \"%s\", "
+					"expect valid ipv6 addr",
+					tokens[ti]);
+				if (status->status < 0)
+					return;
+				memcpy(rule->dst.ip6_b, ip.s6_addr, 16);
+			} else if (rule->flags == TRANSPORT) {
+				APP_CHECK(0, status, "unrecognized "
+					"input \"%s\"",	tokens[ti]);
+				return;
+			}
+
+			dst_p = 1;
+			continue;
+		}
+
+		/* unrecognizeable input */
+		APP_CHECK(0, status, "unrecognized input \"%s\"",
+			tokens[ti]);
+		return;
+	}
+
+	*ri = *ri + 1;
+}
 
 static uint8_t cipher_key[256] = "sixteenbytes key";
 
@@ -386,10 +443,8 @@ sa_in_add_rules(struct sa_ctx *sa_ctx, const struct ipsec_sa entries[],
 }
 
 void
-sa_init(struct socket_ctx *ctx, int32_t socket_id, uint32_t ep)
+sa_init(struct socket_ctx *ctx, int32_t socket_id)
 {
-	const struct ipsec_sa *sa_out_entries, *sa_in_entries;
-	uint32_t nb_out_entries, nb_in_entries;
 	const char *name;
 
 	if (ctx == NULL)
@@ -403,19 +458,8 @@ sa_init(struct socket_ctx *ctx, int32_t socket_id, uint32_t ep)
 		rte_exit(EXIT_FAILURE, "Outbound SA DB for socket %u already "
 				"initialized\n", socket_id);
 
-	if (ep == 0) {
-		sa_out_entries = sa_out;
-		nb_out_entries = RTE_DIM(sa_out);
-		sa_in_entries = sa_in;
-		nb_in_entries = RTE_DIM(sa_in);
-	} else if (ep == 1) {
-		sa_out_entries = sa_in;
-		nb_out_entries = RTE_DIM(sa_in);
-		sa_in_entries = sa_out;
-		nb_in_entries = RTE_DIM(sa_out);
-	} else
-		rte_exit(EXIT_FAILURE, "Invalid EP value %u. "
-				"Only 0 or 1 supported.\n", ep);
+	if (nb_sa_out == 0 && nb_sa_in == 0)
+		RTE_LOG(WARNING, IPSEC, "No SA rule specified\n");
 
 	name = "sa_in";
 	ctx->sa_in = sa_create(name, socket_id);
@@ -429,9 +473,9 @@ sa_init(struct socket_ctx *ctx, int32_t socket_id, uint32_t ep)
 		rte_exit(EXIT_FAILURE, "Error [%d] creating SA context %s "
 				"in socket %d\n", rte_errno, name, socket_id);
 
-	sa_in_add_rules(ctx->sa_in, sa_in_entries, nb_in_entries);
+	sa_in_add_rules(ctx->sa_in, sa_in, nb_sa_in);
 
-	sa_out_add_rules(ctx->sa_out, sa_out_entries, nb_out_entries);
+	sa_out_add_rules(ctx->sa_out, sa_out, nb_sa_out);
 }
 
 int
