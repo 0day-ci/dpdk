@@ -188,6 +188,11 @@ struct rte_pci_device {
 	.subsystem_device_id = PCI_ANY_ID
 #endif
 
+#define DRIVER_REGISTER_PCI_TABLE(name, table) \
+static const char __##name##_pci_tbl_export[] \
+	__attribute__((used)) = \
+	RTE_STR(table)
+
 struct rte_pci_driver;
 
 /**

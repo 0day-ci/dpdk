@@ -48,7 +48,7 @@ extern "C" {
 
 #include <stdio.h>
 #include <sys/queue.h>
-#include <rte_pci.h>
+
 #include <rte_log.h>
 
 __attribute__((format(printf, 2, 0)))
@@ -194,10 +194,6 @@ void __attribute__((constructor, used)) devinitfn_ ##drv(void)\
 DRIVER_EXPORT_NAME(nm, __COUNTER__)
 
 #define DRV_EXP_TAG(name, tag) __##name##_##tag
-
-#define DRIVER_REGISTER_PCI_TABLE(name, table) \
-static const char DRV_EXP_TAG(name, pci_tbl_export)[] __attribute__((used)) = \
-RTE_STR(table)
 
 #define DRIVER_REGISTER_PARAM_STRING(name, str) \
 static const char DRV_EXP_TAG(name, param_string_export)[] \
