@@ -274,7 +274,8 @@ pci_vfio_set_bus_master(int dev_fd)
 
 /* pick IOMMU type. returns a pointer to vfio_iommu_type or NULL for error */
 static const struct vfio_iommu_type *
-pci_vfio_set_iommu_type(int vfio_container_fd) {
+pci_vfio_set_iommu_type(int vfio_container_fd)
+{
 	unsigned idx;
 	for (idx = 0; idx < RTE_DIM(iommu_types); idx++) {
 		const struct vfio_iommu_type *t = &iommu_types[idx];
@@ -297,7 +298,8 @@ pci_vfio_set_iommu_type(int vfio_container_fd) {
 
 /* check if we have any supported extensions */
 static int
-pci_vfio_has_supported_extensions(int vfio_container_fd) {
+pci_vfio_has_supported_extensions(int vfio_container_fd)
+{
 	int ret;
 	unsigned idx, n_extensions = 0;
 	for (idx = 0; idx < RTE_DIM(iommu_types); idx++) {
