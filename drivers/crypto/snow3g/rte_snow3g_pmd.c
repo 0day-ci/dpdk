@@ -646,5 +646,5 @@ static struct rte_driver cryptodev_snow3g_pmd_drv = {
 };
 
 PMD_REGISTER_DRIVER(cryptodev_snow3g_pmd_drv, snow3g);
-DRIVER_REGISTER_PARAM_STRING(aesni_gcm, "max_nb_queue_pairs=<int> "
+DRIVER_REGISTER_PARAM_STRING(snow3g, "max_nb_queue_pairs=<int> "
 "max_nb_sessions=<int> socket_id=<int>");
