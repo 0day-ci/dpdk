@@ -1062,7 +1062,6 @@ static int rte_cxgbe_pmd_init(const char *name __rte_unused,
 }
 
 static struct rte_driver rte_cxgbe_driver = {
-	.name = "cxgbe_driver",
 	.type = PMD_PDEV,
 	.init = rte_cxgbe_pmd_init,
 };
