@@ -2827,6 +2827,17 @@ rte_eth_dev_rx_intr_disable(uint8_t port_id,
 }
 
 #ifdef RTE_NIC_BYPASS
+int rte_eth_dev_bypass_supported(uint8_t port_id)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->bypass_supported, -ENOTSUP);
+	return (*dev->dev_ops->bypass_supported)(dev);
+}
+
 int rte_eth_dev_bypass_init(uint8_t port_id)
 {
 	struct rte_eth_dev *dev;

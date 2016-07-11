@@ -10802,22 +10802,14 @@ cmd_reconfig_device_queue(portid_t id, uint8_t dev, uint8_t queue)
 }
 
 #ifdef RTE_NIC_BYPASS
-#include <rte_pci_dev_ids.h>
 uint8_t
 bypass_is_supported(portid_t port_id)
 {
-	struct rte_port   *port;
-	struct rte_pci_id *pci_id;
-
 	if (port_id_is_invalid(port_id, ENABLED_WARN))
 		return 0;
 
-	/* Get the device id. */
-	port    = &ports[port_id];
-	pci_id = &port->dev_info.pci_dev->id;
-
 	/* Check if NIC supports bypass. */
-	if (pci_id->device_id == IXGBE_DEV_ID_82599_BYPASS) {
+	if (rte_eth_dev_bypass_supported(port_id)) {
 		return 1;
 	}
 	else {

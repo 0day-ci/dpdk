@@ -50,6 +50,7 @@ struct ixgbe_bypass_info {
 
 struct rte_eth_dev;
 
+s32 ixgbe_bypass_supported(struct rte_eth_dev *dev);
 void ixgbe_bypass_init(struct rte_eth_dev *dev);
 s32 ixgbe_bypass_state_show(struct rte_eth_dev *dev, u32 *state);
 s32 ixgbe_bypass_state_store(struct rte_eth_dev *dev, u32 *new_state);

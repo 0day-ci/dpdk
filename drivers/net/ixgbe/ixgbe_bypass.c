@@ -412,3 +412,12 @@ ixgbe_bypass_wd_reset(struct rte_eth_dev *dev)
 
 	return ret_val;
 }
+
+s32
+ixgbe_bypass_supported(struct rte_eth_dev *dev)
+{
+	if (dev->pci_dev->id.device_id == IXGBE_DEV_ID_82599_BYPASS)
+		return 0;
+	else
+		return -ENOTSUP;
+}

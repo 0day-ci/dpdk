@@ -1390,6 +1390,7 @@ enum {
 	((x) == RTE_BYPASS_TMT_OFF || \
 	((x) > RTE_BYPASS_TMT_OFF && (x) < RTE_BYPASS_TMT_NUM))
 
+typedef int32_t (*bypass_supported_t)(struct rte_eth_dev *dev);
 typedef void (*bypass_init_t)(struct rte_eth_dev *dev);
 typedef int32_t (*bypass_state_set_t)(struct rte_eth_dev *dev, uint32_t *new_state);
 typedef int32_t (*bypass_state_show_t)(struct rte_eth_dev *dev, uint32_t *state);
@@ -1494,6 +1495,7 @@ struct eth_dev_ops {
 	/**< Set eeprom */
   /* bypass control */
 #ifdef RTE_NIC_BYPASS
+	bypass_supported_t bypass_supported;
   bypass_init_t bypass_init;
   bypass_state_set_t bypass_state_set;
   bypass_state_show_t bypass_state_show;
@@ -3576,8 +3578,20 @@ int rte_eth_set_vf_rate_limit(uint8_t port_id, uint16_t vf,
 			uint16_t tx_rate, uint64_t q_msk);
 
 /**
+ * Check if the bypass functions is supported by a specific device.
+ *
+ * @param port
+ *   The port identifier of the Ethernet device.
+ * @return
+ *   - (0) if supported.
+ *   - (-ENOTSUP) if hardware doesn't support.
+ *   - (-EINVAL) if bad parameter.
+ */
+int rte_eth_dev_bypass_supported(uint8_t port);
+
+/**
  * Initialize bypass logic. This function needs to be called before
- * executing any other bypass API.
+ * executing any other bypass API except rte_eth_dev_bypass_supported.
  *
  * @param port
  *   The port identifier of the Ethernet device.

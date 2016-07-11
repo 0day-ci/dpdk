@@ -518,6 +518,7 @@ static const struct eth_dev_ops ixgbe_eth_dev_ops = {
 	.reta_update          = ixgbe_dev_rss_reta_update,
 	.reta_query           = ixgbe_dev_rss_reta_query,
 #ifdef RTE_NIC_BYPASS
+	.bypass_supported     = ixgbe_bypass_supported,
 	.bypass_init          = ixgbe_bypass_init,
 	.bypass_state_set     = ixgbe_bypass_state_store,
 	.bypass_state_show    = ixgbe_bypass_state_show,
