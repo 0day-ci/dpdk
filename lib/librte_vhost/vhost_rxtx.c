@@ -669,8 +669,8 @@ make_rarp_packet(struct rte_mbuf *rarp_mbuf, const struct ether_addr *mac)
 }
 
 static inline int __attribute__((always_inline))
-copy_desc_to_mbuf(struct virtio_net *dev, struct vhost_virtqueue *vq,
-		  struct rte_mbuf *m, uint16_t desc_idx,
+copy_desc_to_mbuf(struct virtio_net *dev, struct vring_desc *descs,
+		  uint16_t max_desc, struct rte_mbuf *m, uint16_t desc_idx,
 		  struct rte_mempool *mbuf_pool)
 {
 	struct vring_desc *desc;
@@ -683,7 +683,7 @@ copy_desc_to_mbuf(struct virtio_net *dev, struct vhost_virtqueue *vq,
 	/* A counter to avoid desc dead loop chain */
 	uint32_t nr_desc = 1;
 
-	desc = &vq->desc[desc_idx];
+	desc = &descs[desc_idx];
 	if (unlikely(desc->len < dev->vhost_hlen))
 		return -1;
 
@@ -698,7 +698,7 @@ copy_desc_to_mbuf(struct virtio_net *dev, struct vhost_virtqueue *vq,
 	 */
 	if (likely((desc->len == dev->vhost_hlen) &&
 		   (desc->flags & VRING_DESC_F_NEXT) != 0)) {
-		desc = &vq->desc[desc->next];
+		desc = &descs[desc->next];
 
 		desc_addr = gpa_to_vva(dev, desc->addr);
 		rte_prefetch0((void *)(uintptr_t)desc_addr);
@@ -731,10 +731,10 @@ copy_desc_to_mbuf(struct virtio_net *dev, struct vhost_virtqueue *vq,
 			if ((desc->flags & VRING_DESC_F_NEXT) == 0)
 				break;
 
-			if (unlikely(desc->next >= vq->size ||
-				     ++nr_desc >= vq->size))
+			if (unlikely(desc->next >= max_desc ||
+				     ++nr_desc >= max_desc))
 				return -1;
-			desc = &vq->desc[desc->next];
+			desc = &descs[desc->next];
 
 			desc_addr = gpa_to_vva(dev, desc->addr);
 			rte_prefetch0((void *)(uintptr_t)desc_addr);
@@ -859,10 +859,24 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 	/* Prefetch descriptor index. */
 	rte_prefetch0(&vq->desc[desc_indexes[0]]);
 	for (i = 0; i < count; i++) {
+		struct vring_desc *desc;
+		uint16_t size, idx;
 		int err;
 
 		if (likely(i + 1 < count))
 			rte_prefetch0(&vq->desc[desc_indexes[i + 1]]);
+
+		if (vq->desc[desc_indexes[i]].flags & VRING_DESC_F_INDIRECT) {
+			desc = (struct vring_desc *)gpa_to_vva(dev,
+					vq->desc[desc_indexes[i]].addr);
+			rte_prefetch0(desc);
+			size = vq->desc[desc_indexes[i]].len / sizeof(*desc);
+			idx = 0;
+		} else {
+			desc = vq->desc;
+			size = vq->size;
+			idx = desc_indexes[i];
+		}
 
 		pkts[i] = rte_pktmbuf_alloc(mbuf_pool);
 		if (unlikely(pkts[i] == NULL)) {
@@ -870,8 +884,7 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 				"Failed to allocate memory for mbuf.\n");
 			break;
 		}
-		err = copy_desc_to_mbuf(dev, vq, pkts[i], desc_indexes[i],
-					mbuf_pool);
+		err = copy_desc_to_mbuf(dev, desc, size, pkts[i], idx, mbuf_pool);
 		if (unlikely(err)) {
 			rte_pktmbuf_free(pkts[i]);
 			break;

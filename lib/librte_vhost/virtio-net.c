@@ -76,7 +76,8 @@ struct virtio_net_device_ops const *notify_ops;
 				(1ULL << VIRTIO_NET_F_CSUM)    | \
 				(1ULL << VIRTIO_NET_F_GUEST_CSUM) | \
 				(1ULL << VIRTIO_NET_F_GUEST_TSO4) | \
-				(1ULL << VIRTIO_NET_F_GUEST_TSO6))
+				(1ULL << VIRTIO_NET_F_GUEST_TSO6) | \
+				(1ULL << VIRTIO_RING_F_INDIRECT_DESC))
 
 static uint64_t VHOST_FEATURES = VHOST_SUPPORTED_FEATURES;
 
