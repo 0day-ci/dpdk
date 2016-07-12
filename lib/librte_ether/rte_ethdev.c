@@ -195,25 +195,37 @@ rte_eth_dev_allocate(const char *name, enum rte_eth_dev_type type)
 	uint8_t port_id;
 	struct rte_eth_dev *eth_dev;
 
-	port_id = rte_eth_dev_find_free_port();
-	if (port_id == RTE_MAX_ETHPORTS) {
-		RTE_PMD_DEBUG_TRACE("Reached maximum number of Ethernet ports\n");
-		return NULL;
-	}
-
 	if (rte_eth_dev_data == NULL)
 		rte_eth_dev_data_alloc();
 
-	if (rte_eth_dev_allocated(name) != NULL) {
-		RTE_PMD_DEBUG_TRACE("Ethernet Device with name %s already allocated!\n",
-				name);
-		return NULL;
+	if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+		port_id = rte_eth_dev_find_free_port();
+		if (port_id == RTE_MAX_ETHPORTS) {
+			RTE_PMD_DEBUG_TRACE("Reached maximum number of Ethernet ports\n");
+			return NULL;
+		}
+
+		if (rte_eth_dev_allocated(name) != NULL) {
+			RTE_PMD_DEBUG_TRACE("Ethernet Device with name %s already allocated!\n",
+					name);
+			return NULL;
+		}
+	} else {
+		if (rte_eth_dev_get_port_by_name(name, &port_id) != 0) {
+			RTE_PMD_DEBUG_TRACE("Ethernet Device with name %s could not be found!\n",
+					name);
+			return NULL;
+		}
 	}
 
 	eth_dev = &rte_eth_devices[port_id];
 	eth_dev->data = &rte_eth_dev_data[port_id];
-	snprintf(eth_dev->data->name, sizeof(eth_dev->data->name), "%s", name);
-	eth_dev->data->port_id = port_id;
+
+	if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+		snprintf(eth_dev->data->name, sizeof(eth_dev->data->name), "%s", name);
+		eth_dev->data->port_id = port_id;
+	}
+
 	eth_dev->attached = DEV_ATTACHED;
 	eth_dev->dev_type = type;
 	nb_ports++;
@@ -293,8 +305,10 @@ rte_eth_dev_init(struct rte_pci_driver *pci_drv,
 			pci_drv->name,
 			(unsigned) pci_dev->id.vendor_id,
 			(unsigned) pci_dev->id.device_id);
-	if (rte_eal_process_type() == RTE_PROC_PRIMARY)
+	if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
 		rte_free(eth_dev->data->dev_private);
+		memset(eth_dev->data, 0, sizeof(*rte_eth_dev_data));
+	}
 	rte_eth_dev_release_port(eth_dev);
 	return diag;
 }
@@ -330,8 +344,10 @@ rte_eth_dev_uninit(struct rte_pci_device *pci_dev)
 	/* free ether device */
 	rte_eth_dev_release_port(eth_dev);
 
-	if (rte_eal_process_type() == RTE_PROC_PRIMARY)
+	if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
 		rte_free(eth_dev->data->dev_private);
+		memset(eth_dev->data, 0, sizeof(*rte_eth_dev_data));
+	}
 
 	eth_dev->pci_dev = NULL;
 	eth_dev->driver = NULL;
