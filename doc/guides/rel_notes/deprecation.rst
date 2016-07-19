@@ -41,3 +41,9 @@ Deprecation Notices
 * The mempool functions for single/multi producer/consumer are deprecated and
   will be removed in 16.11.
   It is replaced by rte_mempool_generic_get/put functions.
+
+* ABI changes are planned for 16.11 in the ``rte_mbuf`` structure: some
+  fields will be reordered to facilitate the writing of ``data_off``,
+  ``refcnt``, and ``nb_segs`` in one operation. Indeed, some platforms
+  have an overhead if the store address is not naturally aligned. The
+  useless ``port`` field will also be removed at the same occasion.
