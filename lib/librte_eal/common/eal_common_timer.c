@@ -47,9 +47,18 @@
 /* The frequency of the RDTSC timer resolution */
 static uint64_t eal_tsc_resolution_hz;
 
+/* User function which replaces rte_delay_us function */
+static void (*rte_delay_us_override)(unsigned) = NULL;
+
 void
 rte_delay_us(unsigned us)
 {
+	if (unlikely(rte_delay_us_override != NULL))
+	{
+	    rte_delay_us_override(us);
+	    return;
+	}
+
 	const uint64_t start = rte_get_timer_cycles();
 	const uint64_t ticks = (uint64_t)us * rte_get_timer_hz() / 1E6;
 	while ((rte_get_timer_cycles() - start) < ticks)
@@ -83,4 +92,14 @@ set_tsc_freq(void)
 
 	RTE_LOG(DEBUG, EAL, "TSC frequency is ~%" PRIu64 " KHz\n", freq / 1000);
 	eal_tsc_resolution_hz = freq;
+}
+
+void rte_delay_us_callback_register(void (*userfunc)(unsigned))
+{
+    rte_delay_us_override = userfunc;
+}
+
+void rte_delay_us_callback_unregister(void)
+{
+    rte_delay_us_override = NULL;
 }

@@ -202,4 +202,17 @@ rte_delay_ms(unsigned ms)
 	rte_delay_us(ms * 1000);
 }
 
+/**
+ * Replace rte_delay_us with user defined function.
+ *
+ * @param userfunc
+ *   User function which replaces rte_delay_us.
+ */
+void rte_delay_us_callback_register(void(*userfunc)(unsigned));
+
+/**
+ * Unregister user callback function. Restores original rte_delay_us.
+ */
+void rte_delay_us_callback_unregister(void);
+
 #endif /* _RTE_CYCLES_H_ */

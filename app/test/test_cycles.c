@@ -90,3 +90,42 @@ test_cycles(void)
 }
 
 REGISTER_TEST_COMMAND(cycles_autotest, test_cycles);
+
+/*
+ * rte_delay_us_callback test
+ *
+ * - check if callback is correctly registered/unregistered
+ *
+ */
+
+static int pattern;
+static void my_rte_delay_us(unsigned us)
+{
+    pattern += us;
+}
+
+static int
+test_user_delay_us(void)
+{
+    pattern = 0;
+
+    rte_delay_us_callback_register(my_rte_delay_us);
+
+    rte_delay_us(2);
+    if (pattern != 2)
+        return -1;
+
+    rte_delay_us(3);
+    if (pattern != 5)
+        return -1;
+
+    rte_delay_us_callback_unregister();
+
+    rte_delay_us(3);
+    if (pattern != 5)
+        return -1;
+
+    return 0;
+}
+
+REGISTER_TEST_COMMAND(user_delay_us, test_user_delay_us);
