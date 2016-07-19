@@ -3278,10 +3278,44 @@ i40e_set_tx_function(struct rte_eth_dev *dev)
 }
 
 /* Stubs needed for linkage when CONFIG_RTE_I40E_INC_VECTOR is set to 'n' */
-int __attribute__((weak))
+int __attribute__((cold))
 i40e_rx_vec_dev_conf_condition_check(struct rte_eth_dev __rte_unused *dev)
 {
+#ifndef RTE_LIBRTE_I40E_INC_VECTOR
 	return -1;
+#else
+#ifndef RTE_LIBRTE_IEEE1588
+	struct rte_eth_rxmode *rxmode = &dev->data->dev_conf.rxmode;
+	struct rte_fdir_conf *fconf = &dev->data->dev_conf.fdir_conf;
+
+	/* need SSE4.1 support */
+	if (!rte_cpu_get_flag_enabled(RTE_CPUFLAG_SSE4_1))
+		return -1;
+
+#ifndef RTE_LIBRTE_I40E_RX_OLFLAGS_ENABLE
+	/* whithout rx ol_flags, no VP flag report */
+	if (rxmode->hw_vlan_strip != 0 ||
+	    rxmode->hw_vlan_extend != 0)
+		return -1;
+#endif /* RTE_LIBRTE_I40E_RX_OLFLAGS_ENABLE */
+
+	/* no fdir support */
+	if (fconf->mode != RTE_FDIR_MODE_NONE)
+		return -1;
+
+	 /* - no csum error report support
+	 * - no header split support
+	 */
+	if (rxmode->hw_ip_checksum == 1 ||
+	    rxmode->header_split == 1)
+		return -1;
+
+	return 0;
+#else
+	RTE_SET_USED(dev);
+	return -1;
+#endif /* RTE_LIBRTE_IEEE1588 */
+#endif /* RTE_LIBRTE_I40E_INC_VECTOR */
 }
 
 uint16_t __attribute__((weak))
