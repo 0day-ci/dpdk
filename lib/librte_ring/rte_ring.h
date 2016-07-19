@@ -100,6 +100,7 @@ extern "C" {
 #include <rte_lcore.h>
 #include <rte_atomic.h>
 #include <rte_branch_prediction.h>
+#include <rte_memzone.h>
 
 #define RTE_TAILQ_RING_NAME "RTE_RING"
 
@@ -126,8 +127,10 @@ struct rte_ring_debug_stats {
 } __rte_cache_aligned;
 #endif
 
-#define RTE_RING_NAMESIZE 32 /**< The maximum length of a ring name. */
 #define RTE_RING_MZ_PREFIX "RG_"
+/**< The maximum length of a ring name. */
+#define RTE_RING_NAMESIZE (RTE_MEMZONE_NAMESIZE - \
+			   sizeof(RTE_RING_MZ_PREFIX) + 1)
 
 #ifndef RTE_RING_PAUSE_REP_COUNT
 #define RTE_RING_PAUSE_REP_COUNT 0 /**< Yield after pause num of times, no yield

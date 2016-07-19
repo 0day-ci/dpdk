@@ -120,7 +120,9 @@ struct rte_mempool_objsz {
 	/**< Total size of an object (header + elt + trailer). */
 };
 
-#define RTE_MEMPOOL_NAMESIZE 32 /**< Maximum length of a memory pool. */
+/**< Maximum length of a memory pool's name. */
+#define RTE_MEMPOOL_NAMESIZE (RTE_RING_NAMESIZE - \
+			      sizeof(RTE_MEMPOOL_MZ_PREFIX) + 1)
 #define RTE_MEMPOOL_MZ_PREFIX "MP_"
 
 /* "MP_<name>" */
