@@ -41,3 +41,10 @@ Deprecation Notices
 * The mempool functions for single/multi producer/consumer are deprecated and
   will be removed in 16.11.
   It is replaced by rte_mempool_generic_get/put functions.
+
+* The ethtool support will be removed from KNI in 16.11.
+  It is implemented only for igb and ixgbe.
+  It is really hard to maintain because it requires some out-of-tree kernel
+  code to be duplicated in this kernel module.
+  Removing this partial support will help to restrict the PCI id definitions
+  to the PMD code.
