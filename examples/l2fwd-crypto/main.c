@@ -1793,6 +1793,12 @@ initialize_cryptodevs(struct l2fwd_crypto_options *options, unsigned nb_ports,
 		if (retval < 0) {
 			printf("Failed to setup queue pair %u on cryptodev %u",
 					0, cdev_id);
+		}
+		/* Start device */
+		retval = rte_cryptodev_start(cdev_id);
+		if (retval < 0) {
+			printf("rte_cryptodev_start:err=%d, cdev_id=%u\n",
+			       retval, (unsigned)cdev_id);
 			return -1;
 		}
 
