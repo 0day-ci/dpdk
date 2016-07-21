@@ -1091,8 +1091,8 @@ static struct rte_driver pmd_pcap_drv = {
 
 PMD_REGISTER_DRIVER(pmd_pcap_drv, eth_pcap);
 DRIVER_REGISTER_PARAM_STRING(eth_pcap,
-	"rx_pcap=<string> "
-	"tx_pcap=<string> "
-	"rx_iface=<ifc> "
-	"tx_iface=<ifc> "
-	"iface=<ifc>");
+	ETH_PCAP_RX_PCAP_ARG"=<string> "
+	ETH_PCAP_TX_PCAP_ARG"=<string> "
+	ETH_PCAP_RX_IFACE_ARG"=<ifc> "
+	ETH_PCAP_TX_IFACE_ARG"=<ifc> "
+	ETH_PCAP_IFACE_ARG"=<ifc>");
