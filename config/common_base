@@ -307,6 +307,7 @@ CONFIG_RTE_PMD_RING_MAX_TX_RINGS=16
 # Compile software PMD backed by PCAP files
 #
 CONFIG_RTE_LIBRTE_PMD_PCAP=n
+CONFIG_RTE_PMD_PCAP_MAX_QUEUES=16
 
 #
 # Compile link bonding PMD library

@@ -87,22 +87,22 @@ struct pcap_tx_queue {
 
 struct rx_pcaps {
 	unsigned num_of_rx;
-	pcap_t *pcaps[RTE_PMD_RING_MAX_RX_RINGS];
-	const char *names[RTE_PMD_RING_MAX_RX_RINGS];
-	const char *types[RTE_PMD_RING_MAX_RX_RINGS];
+	pcap_t *pcaps[RTE_PMD_PCAP_MAX_QUEUES];
+	const char *names[RTE_PMD_PCAP_MAX_QUEUES];
+	const char *types[RTE_PMD_PCAP_MAX_QUEUES];
 };
 
 struct tx_pcaps {
 	unsigned num_of_tx;
-	pcap_dumper_t *dumpers[RTE_PMD_RING_MAX_TX_RINGS];
-	pcap_t *pcaps[RTE_PMD_RING_MAX_RX_RINGS];
-	const char *names[RTE_PMD_RING_MAX_RX_RINGS];
-	const char *types[RTE_PMD_RING_MAX_RX_RINGS];
+	pcap_dumper_t *dumpers[RTE_PMD_PCAP_MAX_QUEUES];
+	pcap_t *pcaps[RTE_PMD_PCAP_MAX_QUEUES];
+	const char *names[RTE_PMD_PCAP_MAX_QUEUES];
+	const char *types[RTE_PMD_PCAP_MAX_QUEUES];
 };
 
 struct pmd_internals {
-	struct pcap_rx_queue rx_queue[RTE_PMD_RING_MAX_RX_RINGS];
-	struct pcap_tx_queue tx_queue[RTE_PMD_RING_MAX_TX_RINGS];
+	struct pcap_rx_queue rx_queue[RTE_PMD_PCAP_MAX_QUEUES];
+	struct pcap_tx_queue tx_queue[RTE_PMD_PCAP_MAX_QUEUES];
 	int if_index;
 	int single_iface;
 };
