@@ -563,6 +563,7 @@ convert_to_cpuset(rte_cpuset_t *cpusetp,
  * lcores, cpus could be a single digit/range or a group.
  * '(' and ')' are necessary if it's a group.
  * If not supply '@cpus', the value of cpus uses the same as lcores.
+ * The 'a-b' in lcores not within '(' and ')' means a,a+1,...,b-1,b .
  * e.g. '1,2@(5-7),(3-5)@(0,2),(0,6),7-8' means start 9 EAL thread as below
  *   lcore 0 runs on cpuset 0x41 (cpu 0,6)
  *   lcore 1 runs on cpuset 0x2 (cpu 1)
@@ -571,6 +572,15 @@ convert_to_cpuset(rte_cpuset_t *cpusetp,
  *   lcore 6 runs on cpuset 0x41 (cpu 0,6)
  *   lcore 7 runs on cpuset 0x80 (cpu 7)
  *   lcore 8 runs on cpuset 0x100 (cpu 8)
+ * e.g. '0-2,(3-5)@(3,4),6@(5,6),7@(5-7)'means start 8 EAL threads as below
+ *   lcore 0 runs on cpuset 0x1 (cpu 0)
+ *   lcore 1 runs on cpuset 0x2 (cpu 1)
+ *   lcore 2 runs on cpuset ox4 (cpu 2)
+ *   lcore 3,4,5 runs on cpuset 0x18 (cpu 3,4)
+ *   lcore 6 runs on cpuset 0x60 (cpu 5,6)
+ *   lcore 7 runs on cpuset 0xe0 (cpu 5,6,7)
+ * The second case is used to test bugfix for lflags not be cleared after use
+ */
  */
 static int
 eal_parse_lcores(const char *lcores)
@@ -678,6 +688,8 @@ eal_parse_lcores(const char *lcores)
 			rte_memcpy(&lcore_config[idx].cpuset, &cpuset,
 				   sizeof(rte_cpuset_t));
 		}
+
+		lflags = 0;
 
 		lcores = end + 1;
 	} while (*end != '\0');
