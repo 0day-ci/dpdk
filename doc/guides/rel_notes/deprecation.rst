@@ -41,3 +41,10 @@ Deprecation Notices
 * The mempool functions for single/multi producer/consumer are deprecated and
   will be removed in 16.11.
   It is replaced by rte_mempool_generic_get/put functions.
+
+* In 16.11 ABI changes are plained: the ``rte_eth_dev`` structure will be
+  extended with new function pointer ``tx_pkt_prep`` allowing verification
+  and processing of packet burst to meet HW specific requirements before
+  transmit. Also new fields will be added to the ``rte_eth_desc_lim`` structure:
+  ``nb_seg_max`` and ``nb_mtu_seg_max`` provideing information about number of
+  segments limit to be transmitted by device for TSO/non-TSO packets.
