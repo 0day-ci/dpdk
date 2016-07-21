@@ -1273,6 +1273,10 @@ cryptodevs_init(void)
 						&qp_conf, dev_conf.socket_id))
 				rte_panic("Failed to setup queue %u for "
 						"cdev_id %u\n",	0, cdev_id);
+		/* Start device */
+		if (rte_cryptodev_start(cdev_id))
+			rte_panic("Failed to start crypto dev for "
+						"cdev_id=%u\n", cdev_id);
 	}
 
 	printf("\n");
