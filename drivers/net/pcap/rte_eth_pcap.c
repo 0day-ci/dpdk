@@ -786,13 +786,11 @@ open_single_iface(const char *iface, pcap_t **pcap)
 
 static int
 rte_pmd_init_internals(const char *name, const unsigned nb_rx_queues,
-		const unsigned nb_tx_queues,
-		const unsigned numa_node,
-		struct pmd_internals **internals,
-		struct rte_eth_dev **eth_dev,
-		struct rte_kvargs *kvlist)
+		const unsigned nb_tx_queues, struct pmd_internals **internals,
+		struct rte_eth_dev **eth_dev, struct rte_kvargs *kvlist)
 {
 	struct rte_eth_dev_data *data = NULL;
+	unsigned int numa_node = rte_socket_id();
 	unsigned k_idx;
 	struct rte_kvargs_pair *pair = NULL;
 
@@ -802,8 +800,8 @@ rte_pmd_init_internals(const char *name, const unsigned nb_rx_queues,
 			break;
 	}
 
-	RTE_LOG(INFO, PMD,
-			"Creating pcap-backed ethdev on numa socket %u\n", numa_node);
+	RTE_LOG(INFO, PMD, "Creating pcap-backed ethdev on numa socket %u\n",
+		numa_node);
 
 	/* now do all data allocation - for eth_dev structure
 	 * and internal (private) data
@@ -812,7 +810,8 @@ rte_pmd_init_internals(const char *name, const unsigned nb_rx_queues,
 	if (data == NULL)
 		goto error;
 
-	*internals = rte_zmalloc_socket(name, sizeof(**internals), 0, numa_node);
+	*internals = rte_zmalloc_socket(name, sizeof(**internals), 0,
+			numa_node);
 	if (*internals == NULL)
 		goto error;
 
@@ -869,9 +868,8 @@ error:
 static int
 rte_eth_from_pcaps_common(const char *name, struct pmd_devargs *rx_queues,
 		const unsigned nb_rx_queues, struct pmd_devargs *tx_queues,
-		const unsigned nb_tx_queues, const unsigned numa_node,
-		struct rte_kvargs *kvlist, struct pmd_internals **internals,
-		struct rte_eth_dev **eth_dev)
+		const unsigned nb_tx_queues, struct rte_kvargs *kvlist,
+		struct pmd_internals **internals, struct rte_eth_dev **eth_dev)
 {
 	unsigned i;
 
@@ -881,8 +879,8 @@ rte_eth_from_pcaps_common(const char *name, struct pmd_devargs *rx_queues,
 	if (tx_queues == NULL && nb_tx_queues > 0)
 		return -1;
 
-	if (rte_pmd_init_internals(name, nb_rx_queues, nb_tx_queues, numa_node,
-			internals, eth_dev, kvlist) < 0)
+	if (rte_pmd_init_internals(name, nb_rx_queues, nb_tx_queues, internals,
+			eth_dev, kvlist) < 0)
 		return -1;
 
 	for (i = 0; i < nb_rx_queues; i++) {
@@ -910,17 +908,15 @@ rte_eth_from_pcaps_common(const char *name, struct pmd_devargs *rx_queues,
 static int
 rte_eth_from_pcaps(const char *name, struct pmd_devargs *rx_queues,
 		const unsigned nb_rx_queues, struct pmd_devargs *tx_queues,
-		const unsigned nb_tx_queues, const unsigned numa_node,
-		struct rte_kvargs *kvlist, int single_iface,
-		unsigned int using_dumpers)
+		const unsigned nb_tx_queues, struct rte_kvargs *kvlist,
+		int single_iface, unsigned int using_dumpers)
 {
 	struct pmd_internals *internals = NULL;
 	struct rte_eth_dev *eth_dev = NULL;
 	int ret;
 
 	ret = rte_eth_from_pcaps_common(name, rx_queues, nb_rx_queues,
-			tx_queues, nb_tx_queues, numa_node, kvlist,
-			&internals, &eth_dev);
+		tx_queues, nb_tx_queues, kvlist, &internals, &eth_dev);
 
 	if (ret < 0)
 		return ret;
@@ -942,15 +938,13 @@ rte_eth_from_pcaps(const char *name, struct pmd_devargs *rx_queues,
 static int
 rte_pmd_pcap_devinit(const char *name, const char *params)
 {
-	unsigned numa_node, using_dumpers = 0;
+	unsigned using_dumpers = 0;
 	int ret;
 	struct rte_kvargs *kvlist;
 	struct pmd_devargs pcaps = {0};
 	struct pmd_devargs dumpers = {0};
 
 	RTE_LOG(INFO, PMD, "Initializing pmd_pcap for %s\n", name);
-
-	numa_node = rte_socket_id();
 
 	gettimeofday(&start_time, NULL);
 	start_cycles = rte_get_timer_cycles();
@@ -974,7 +968,7 @@ rte_pmd_pcap_devinit(const char *name, const char *params)
 		dumpers.queue[0].name = pcaps.queue[0].name;
 		dumpers.queue[0].type = pcaps.queue[0].type;
 		ret = rte_eth_from_pcaps(name, &pcaps, 1, &dumpers, 1,
-				numa_node, kvlist, 1, using_dumpers);
+				kvlist, 1, using_dumpers);
 		goto free_kvlist;
 	}
 
@@ -1032,7 +1026,7 @@ rte_pmd_pcap_devinit(const char *name, const char *params)
 		goto free_kvlist;
 
 	ret = rte_eth_from_pcaps(name, &pcaps, pcaps.num_of_queue, &dumpers,
-		dumpers.num_of_queue, numa_node, kvlist, 0, using_dumpers);
+		dumpers.num_of_queue, kvlist, 0, using_dumpers);
 
 free_kvlist:
 	rte_kvargs_free(kvlist);
