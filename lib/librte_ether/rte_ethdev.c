@@ -226,7 +226,8 @@ rte_eth_dev_create_unique_device_name(char *name, size_t size,
 {
 	int ret;
 
-	ret = snprintf(name, size, "%d:%d.%d",
+	ret = snprintf(name, size, "%d:%d:%d.%d",
+			pci_dev->addr.domain,
 			pci_dev->addr.bus, pci_dev->addr.devid,
 			pci_dev->addr.function);
 	if (ret < 0)
