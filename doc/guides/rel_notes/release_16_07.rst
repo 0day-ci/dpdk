@@ -40,9 +40,9 @@ New Features
 
 * **Added mempool external cache for non-EAL thread.**
 
-   Added new functions to create, free or flush a user-owned mempool
-   cache for non-EAL threads. Previously, cache was always disabled
-   on these threads.
+  Added new functions to create, free or flush a user-owned mempool
+  cache for non-EAL threads. Previously, cache was always disabled
+  on these threads.
 
 * **Changed the memory allocation in mempool library.**
 
