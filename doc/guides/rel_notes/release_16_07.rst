@@ -34,32 +34,36 @@ New Features
 
      Refer to the previous release notes for examples.
 
-* **Removed mempool cache if not needed.**
+* **Removed the mempool cache memory if caching is not being used.**
 
   The size of the mempool structure is reduced if the per-lcore cache is disabled.
 
 * **Added mempool external cache for non-EAL thread.**
 
   Added new functions to create, free or flush a user-owned mempool
-  cache for non-EAL threads. Previously, cache was always disabled
+  cache for non-EAL threads. Previously, caching was always disabled
   on these threads.
 
-* **Changed the memory allocation in mempool library.**
+* **Changed the memory allocation scheme in the mempool library.**
 
-  * Added ability to allocate a large mempool in virtually fragmented memory.
+  * Added the ability to allocate a large mempool in fragmented virtual memory.
   * Added new APIs to populate a mempool with memory.
   * Added an API to free a mempool.
   * Modified the API of rte_mempool_obj_iter() function.
-  * Dropped specific Xen Dom0 code.
-  * Dropped specific anonymous mempool code in testpmd.
+  * Dropped the specific Xen Dom0 code.
+  * Dropped the specific anonymous mempool code in testpmd.
 
-* **Added new driver for Broadcom NetXtreme-C devices.**
+* **Added a new driver for Broadcom NetXtreme-C devices.**
 
   Added the new bnxt driver for Broadcom NetXtreme-C devices. See the
   "Network Interface Controller Drivers" document for more details on this
   new driver.
 
-* **Added new driver for ThunderX nicvf device.**
+* **Added a new driver for ThunderX nicvf devices.**
+
+  Added the new thunderx net driver for ThunderX nicvf devices. See the
+  "Network Interface Controller Drivers" document for more details on this
+  new driver.
 
 * **Added mailbox interrupt support for ixgbe and igb VFs.**
 
@@ -84,11 +88,11 @@ New Features
 
   Updated the i40e base driver, which includes support for new devices IDs.
 
-* **Supported virtio on IBM POWER8.**
+* **Added support for virtio on IBM POWER8.**
 
   The ioports are mapped in memory when using Linux UIO.
 
-* **Virtio support for containers.**
+* **Added virtio support for containers.**
 
   Add a new virtual device, named virtio_user, to support virtio for containers.
 
@@ -103,22 +107,24 @@ New Features
 
 * **Added vhost-user client mode.**
 
-  DPDK vhost-user could be the server as well as the client. It supports
-  server mode only before, now it also supports client mode. Client mode
-  is enabled when ``RTE_VHOST_USER_CLIENT`` flag is set while calling
+  DPDK vhost-user can now act in client mode as well as in server mode.
+  Previously, it supported server mode only, but client mode support has
+  been added in this release. Client mode is enabled when
+  ``RTE_VHOST_USER_CLIENT`` flag is set while calling
   ``rte_vhost_driver_register``.
 
-  When DPDK vhost-user restarts from normal or abnormal quit (say crash),
-  the client mode would allow DPDK to establish the connect again.  Note
-  that a brand new QEMU version (v2.7 or above) is needed, otherwise, the
-  reconnect won't work.
+  When DPDK vhost-user restarts after a normal or abnormal process termination,
+  i.e. application graceful exit or an application crash,
+  client mode allows DPDK to re-establish existing connections again.  Note
+  that QEMU v2.7 or above is needed, in order for the reconnect to work.
 
   DPDK vhost-user will also try to reconnect by default when
 
-  * the first connect fails (when QEMU is not started yet)
-  * the connection is broken (when QEMU restarts)
+  * the first connect fails (e.g. when QEMU is not started yet)
+  * the connection is broken (e.g. when QEMU restarts)
 
-  It can be turned off if flag ``RTE_VHOST_USER_NO_RECONNECT`` is set.
+  This reconnection support can be turned off if flag
+  ``RTE_VHOST_USER_NO_RECONNECT`` is set.
 
 * **Added NSH packet recognition in i40e.**
 
@@ -127,7 +133,7 @@ New Features
   Now AESNI MB PMD supports 128/192/256-bit counter mode AES encryption and
   decryption.
 
-* **Added support of AES counter mode for Intel QuickAssist devices.**
+* **Added AES counter mode support for Intel QuickAssist devices.**
 
   Enabled support for the AES CTR algorithm for Intel QuickAssist devices.
   Provided support for algorithm-chaining operations.
@@ -160,7 +166,7 @@ New Features
 
 * **Added keepalive enhancements.**
 
-  Adds support for reporting of core states other than dead to
+  Adds support for reporting of core states other than "dead" to
   monitoring applications, enabling the support of broader liveness
   reporting to external processes.
 
