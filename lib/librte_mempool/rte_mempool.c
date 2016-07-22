@@ -157,10 +157,10 @@ rte_mempool_obj_iter(struct rte_mempool *mp,
 	rte_mempool_obj_cb_t *obj_cb, void *obj_cb_arg)
 {
 	struct rte_mempool_objhdr *hdr;
-	void *obj;
+	void *obj, *temp;
 	unsigned n = 0;
 
-	STAILQ_FOREACH(hdr, &mp->elt_list, next) {
+	STAILQ_FOREACH_SAFE(hdr, &mp->elt_list, next, temp) {
 		obj = (char *)hdr + sizeof(*hdr);
 		obj_cb(mp, obj_cb_arg, obj, n);
 		n++;
@@ -176,8 +176,9 @@ rte_mempool_mem_iter(struct rte_mempool *mp,
 {
 	struct rte_mempool_memhdr *hdr;
 	unsigned n = 0;
+	void *temp;
 
-	STAILQ_FOREACH(hdr, &mp->mem_list, next) {
+	STAILQ_FOREACH_SAFE(hdr, &mp->mem_list, next, temp) {
 		mem_cb(mp, mem_cb_arg, hdr, n);
 		n++;
 	}
@@ -1283,12 +1284,13 @@ void rte_mempool_walk(void (*func)(struct rte_mempool *, void *),
 {
 	struct rte_tailq_entry *te = NULL;
 	struct rte_mempool_list *mempool_list;
+	void *temp;
 
 	mempool_list = RTE_TAILQ_CAST(rte_mempool_tailq.head, rte_mempool_list);
 
 	rte_rwlock_read_lock(RTE_EAL_MEMPOOL_RWLOCK);
 
-	TAILQ_FOREACH(te, mempool_list, next) {
+	TAILQ_FOREACH_SAFE(te, mempool_list, next, temp) {
 		(*func)((struct rte_mempool *) te->data, arg);
 	}
 
