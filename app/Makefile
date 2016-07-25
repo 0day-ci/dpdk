@@ -31,12 +31,17 @@
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
+ifeq ($(CONFIG_RTE_ENABLE_TESTS),y)
 DIRS-$(CONFIG_RTE_APP_TEST) += test
 DIRS-$(CONFIG_RTE_LIBRTE_ACL) += test-acl
 DIRS-$(CONFIG_RTE_LIBRTE_PIPELINE) += test-pipeline
 DIRS-$(CONFIG_RTE_TEST_PMD) += test-pmd
 DIRS-$(CONFIG_RTE_LIBRTE_CMDLINE) += cmdline_test
+endif
+
+ifeq ($(CONFIG_RTE_ENABLE_TOOLS),y)
 DIRS-$(CONFIG_RTE_EXEC_ENV_LINUXAPP) += proc_info
 DIRS-$(CONFIG_RTE_LIBRTE_PDUMP) += pdump
+endif
 
 include $(RTE_SDK)/mk/rte.subdir.mk
