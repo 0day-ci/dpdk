@@ -41,6 +41,7 @@
 #include <rte_cycles.h>
 #include <rte_kvargs.h>
 #include <rte_dev.h>
+#include <rte_errno.h>
 
 #include <net/if.h>
 
@@ -360,8 +361,10 @@ eth_pcap_tx(void *queue,
 			}
 		}
 
-		if (unlikely(ret != 0))
+		if (unlikely(ret != 0)) {
+			rte_errno = ret;
 			break;
+		}
 		num_tx++;
 		tx_bytes += mbuf->pkt_len;
 		rte_pktmbuf_free(mbuf);
