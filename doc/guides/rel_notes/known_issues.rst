@@ -620,3 +620,25 @@ The last EAL argument is replaced by the program name in argv[]
 
 **Driver/Module**:
    Environment Abstraction Layer (EAL).
+
+
+I40e VF can't receive the promiscuous unicast/multicast/broadcast packet.
+---------------------------------------------------------
+
+**Description**:
+   Use i40e linux kernel driver PF generate VF, and run testpmd, set Promiscuous mode and
+   All multicast mode to be enabled, then send packet with unknown destination MAC address
+   to VF, but VF can't receive the packet.
+
+**Implication**:
+   So far, the promiscuous mode is not supported by DPDK i40e VF driver if use i40e Linux kernel
+   driver as host driver.
+
+**Resolution/Workaround**:
+   Don't use promiscuous mode in i40e VF if use i40e Linux kernel driver as host driver.
+
+**Affected Environment/Platform**:
+   All.
+
+**Driver/Module**:
+   Poll Mode Driver (PMD).
