@@ -2319,8 +2319,7 @@ i40e_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 
 	stats->ipackets = pf->main_vsi->eth_stats.rx_unicast +
 			pf->main_vsi->eth_stats.rx_multicast +
-			pf->main_vsi->eth_stats.rx_broadcast -
-			pf->main_vsi->eth_stats.rx_discards;
+			pf->main_vsi->eth_stats.rx_broadcast;
 	stats->opackets = pf->main_vsi->eth_stats.tx_unicast +
 			pf->main_vsi->eth_stats.tx_multicast +
 			pf->main_vsi->eth_stats.tx_broadcast;
