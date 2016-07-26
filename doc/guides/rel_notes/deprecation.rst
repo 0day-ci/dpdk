@@ -41,3 +41,10 @@ Deprecation Notices
 * The mempool functions for single/multi producer/consumer are deprecated and
   will be removed in 16.11.
   It is replaced by rte_mempool_generic_get/put functions.
+
+* The i40e eth_dev_ops about enable and disable promiscuous and all multicast
+  mode are planned to modify the return type from void to int, in order to reflect
+  the real status of the hardware driver configure result to APIs users. The deprecated ops include,
+  i40evf_dev_promiscuous_enable, i40evf_dev_promiscuous_disable, i40evf_dev_allmulticast_enable,
+  i40evf_dev_allmulticast_disable, i40e_dev_promiscuous_enable, i40e_dev_promiscuous_disable,
+  i40e_dev_allmulticast_enable, i40e_dev_allmulticast_disable.
