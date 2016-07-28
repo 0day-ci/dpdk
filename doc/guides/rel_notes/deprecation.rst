@@ -41,3 +41,6 @@ Deprecation Notices
 * The mempool functions for single/multi producer/consumer are deprecated and
   will be removed in 16.11.
   It is replaced by rte_mempool_generic_get/put functions.
+
+* The support for Xen Dom0 is broken and seems not to be used.
+  It will be removed in 16.11.
