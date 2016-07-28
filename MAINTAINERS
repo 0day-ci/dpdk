@@ -30,8 +30,9 @@ F: scripts/checkpatches.sh
 F: scripts/load-devel-config.sh
 F: scripts/test-build.sh
 
-Stable Branches
----------------
+Stable Branch 16.07
+-------------------
+M: Yuanhan Liu <yuanhan.liu@linux.intel.com>
 T: git://dpdk.org/dpdk-stable
 
 Security Issues
