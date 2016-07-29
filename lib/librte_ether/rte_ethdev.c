@@ -177,6 +177,19 @@ rte_eth_dev_allocated(const char *name)
 	return NULL;
 }
 
+struct rte_eth_dev_data *
+rte_eth_dev_data_shared_allocated(const char *name)
+{
+	unsigned i;
+
+	for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
+		if (strcmp(rte_eth_dev_data[i].name, name) == 0)
+			return &rte_eth_dev_data[i];
+	}
+
+	return NULL;
+}
+
 static uint8_t
 rte_eth_dev_find_free_port(void)
 {
@@ -189,10 +202,43 @@ rte_eth_dev_find_free_port(void)
 	return RTE_MAX_ETHPORTS;
 }
 
+static uint8_t
+rte_eth_dev_find_free_dev_data_id(void)
+{
+	unsigned i;
+
+	for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
+		if (!strlen(rte_eth_dev_data[i].name))
+			return i;
+	}
+	return RTE_MAX_ETHPORTS;
+}
+
+int
+rte_eth_dev_release_dev_data(uint8_t port_id)
+{
+	char device[RTE_ETH_NAME_MAX_LEN];
+	struct rte_eth_dev_data *eth_dev_data = NULL;
+
+	/* get device name by port id */
+	if (rte_eth_dev_get_name_by_port(port_id, device))
+		return -EINVAL;
+
+	/* look for an entry in the shared device data */
+	eth_dev_data = rte_eth_dev_data_shared_allocated(device);
+	if (eth_dev_data == NULL)
+		return -EINVAL;
+
+	/* clear an entry in the shared device data */
+	memset(eth_dev_data, 0, sizeof(struct rte_eth_dev_data));
+
+	return 0;
+}
+
 struct rte_eth_dev *
 rte_eth_dev_allocate(const char *name, enum rte_eth_dev_type type)
 {
-	uint8_t port_id;
+	uint8_t port_id, dev_data_id;
 	struct rte_eth_dev *eth_dev;
 
 	port_id = rte_eth_dev_find_free_port();
@@ -204,14 +250,28 @@ rte_eth_dev_allocate(const char *name, enum rte_eth_dev_type type)
 	if (rte_eth_dev_data == NULL)
 		rte_eth_dev_data_alloc();
 
+	dev_data_id = rte_eth_dev_find_free_dev_data_id();
+
+	if (dev_data_id == RTE_MAX_ETHPORTS) {
+		RTE_PMD_DEBUG_TRACE("Reached maximum number of Ethernet ports by all "
+				"the processes\n");
+		return NULL;
+	}
+
 	if (rte_eth_dev_allocated(name) != NULL) {
 		RTE_PMD_DEBUG_TRACE("Ethernet Device with name %s already allocated!\n",
 				name);
 		return NULL;
 	}
 
+	if (rte_eth_dev_data_shared_allocated(name) != NULL) {
+		RTE_PMD_DEBUG_TRACE("Ethernet Device with name %s already allocated by "
+				"another process!\n", name);
+		return NULL;
+	}
+
 	eth_dev = &rte_eth_devices[port_id];
-	eth_dev->data = &rte_eth_dev_data[port_id];
+	eth_dev->data = &rte_eth_dev_data[dev_data_id];
 	snprintf(eth_dev->data->name, sizeof(eth_dev->data->name), "%s", name);
 	eth_dev->data->port_id = port_id;
 	eth_dev->attached = DEV_ATTACHED;
@@ -237,6 +297,7 @@ rte_eth_dev_create_unique_device_name(char *name, size_t size,
 int
 rte_eth_dev_release_port(struct rte_eth_dev *eth_dev)
 {
+
 	if (eth_dev == NULL)
 		return -EINVAL;
 
@@ -418,9 +479,7 @@ rte_eth_dev_get_name_by_port(uint8_t port_id, char *name)
 		return -EINVAL;
 	}
 
-	/* shouldn't check 'rte_eth_devices[i].data',
-	 * because it might be overwritten by VDEV PMD */
-	tmp = rte_eth_dev_data[port_id].name;
+	tmp = rte_eth_devices[port_id].data->name;
 	strcpy(name, tmp);
 	return 0;
 }
@@ -439,9 +498,7 @@ rte_eth_dev_get_port_by_name(const char *name, uint8_t *port_id)
 
 	for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
 
-		if (!strncmp(name,
-			rte_eth_dev_data[i].name, strlen(name))) {
-
+		if (!strncmp(name, rte_eth_devices[i].data->name, strlen(name))) {
 			*port_id = i;
 
 			return 0;
@@ -632,6 +689,8 @@ int
 rte_eth_dev_detach(uint8_t port_id, char *name)
 {
 	struct rte_pci_addr addr;
+	struct rte_eth_dev_data *eth_dev_data = NULL;
+	char device[RTE_ETH_NAME_MAX_LEN];
 	int ret = -1;
 
 	if (name == NULL) {
@@ -641,6 +700,15 @@ rte_eth_dev_detach(uint8_t port_id, char *name)
 
 	/* check whether the driver supports detach feature, or not */
 	if (rte_eth_dev_is_detachable(port_id))
+		goto err;
+
+	/* get device name by port id */
+	if (rte_eth_dev_get_name_by_port(port_id, device))
+		goto err;
+
+	/* look for an entry in the shared device data */
+	eth_dev_data = rte_eth_dev_data_shared_allocated(device);
+	if (eth_dev_data == NULL)
 		goto err;
 
 	if (rte_eth_dev_get_device_type(port_id) == RTE_ETH_DEV_PCI) {
@@ -661,6 +729,9 @@ rte_eth_dev_detach(uint8_t port_id, char *name)
 		if (ret < 0)
 			goto err;
 	}
+
+	/* clear an entry in the shared device data */
+	memset(eth_dev_data, 0, sizeof(struct rte_eth_dev_data));
 
 	return 0;
 

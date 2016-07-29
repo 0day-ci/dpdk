@@ -1748,6 +1748,29 @@ struct rte_eth_dev *rte_eth_dev_allocated(const char *name);
 
 /**
  * @internal
+ * Returns a shared ethdev slot specified by the unique identifier name.
+ *
+ * @param	name
+ *  The pointer to the Unique identifier name for each shared Ethernet device
+ *  between multiple processes.
+ * @return
+ *   - The pointer to the shared ethdev slot, on success. NULL on error
+ */
+struct rte_eth_dev_data *rte_eth_dev_data_shared_allocated(const char *name);
+
+/**
+ * @internal
+ * Release device data kept in a common memory for all processes.
+ *
+ * @param	port_id
+ *   The port identifier of the device to release device data.
+ * @return
+ *   - 0 on success, negative on error
+ */
+int rte_eth_dev_release_dev_data(uint8_t port_id);
+
+/**
+ * @internal
  * Allocates a new ethdev slot for an ethernet device and returns the pointer
  * to that slot for the driver to use.
  *
