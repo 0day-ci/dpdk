@@ -94,6 +94,9 @@ API Changes
 
    This section is a comment. Make sure to start the actual text at the margin.
 
+* The ``rte_ivshmem`` feature (including library and EAL code) has been removed
+  in 16.11 because it had some design issues which were not planned to be fixed.
+
 
 ABI Changes
 -----------
