@@ -453,8 +453,10 @@ mbuf_pool_create(uint16_t mbuf_seg_size, unsigned nb_mbuf,
 			rte_mempool_obj_iter(rte_mp, rte_pktmbuf_init, NULL);
 		} else {
 			/* wrapper to rte_mempool_create() */
-			rte_mp = rte_pktmbuf_pool_create(pool_name, nb_mbuf,
-				mb_mempool_cache, 0, mbuf_seg_size, socket_id);
+			rte_mp = rte_mempool_lookup(pool_name);
+			if (rte_mp == NULL)
+				rte_mp = rte_pktmbuf_pool_create(pool_name, nb_mbuf,
+						mb_mempool_cache, 0, mbuf_seg_size, socket_id);
 		}
 	}
 
@@ -1610,6 +1612,29 @@ detach_port(uint8_t port_id)
 	return;
 }
 
+void free_mp_shared_dev_data(portid_t pid)
+{
+	portid_t pi;
+
+	if (port_id_is_invalid(pid, ENABLED_WARN))
+		return;
+
+	/* free data only if the secondary process exits */
+	if (rte_eal_process_type() != RTE_PROC_SECONDARY)
+		return;
+
+	FOREACH_PORT(pi, ports) {
+		if (pid != pi && pid != (portid_t)RTE_PORT_ALL)
+			continue;
+
+		if (!port_is_closed(pi))
+			return;
+
+		if (rte_eth_dev_release_dev_data(pi) < 0)
+			return;
+	}
+}
+
 void
 pmd_test_exit(void)
 {
@@ -1625,6 +1650,7 @@ pmd_test_exit(void)
 			fflush(stdout);
 			stop_port(pt_id);
 			close_port(pt_id);
+			free_mp_shared_dev_data(pt_id);
 		}
 	}
 	printf("\nBye...\n");

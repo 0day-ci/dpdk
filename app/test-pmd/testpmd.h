@@ -553,6 +553,7 @@ void attach_port(char *identifier);
 void detach_port(uint8_t port_id);
 int all_ports_stopped(void);
 int port_is_started(portid_t port_id);
+void free_mp_shared_dev_data(portid_t pid);
 void pmd_test_exit(void);
 void fdir_get_infos(portid_t port_id);
 void fdir_set_flex_mask(portid_t port_id,
