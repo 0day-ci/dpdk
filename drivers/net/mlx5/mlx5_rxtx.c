@@ -1572,7 +1572,7 @@ mlx5_rx_burst(void *dpdk_rxq, struct rte_mbuf **pkts, uint16_t pkts_n)
 		rte_prefetch0(wqe);
 		rep = rte_mbuf_raw_alloc(rxq->mp);
 		if (unlikely(rep == NULL)) {
-			while (pkt != seg) {
+			while (pkt && pkt != seg) {
 				assert(pkt != (*rxq->elts)[idx]);
 				seg = NEXT(pkt);
 				rte_mbuf_refcnt_set(pkt, 0);
