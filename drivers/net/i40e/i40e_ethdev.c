@@ -704,7 +704,7 @@ rte_i40e_dev_atomic_write_link_status(struct rte_eth_dev *dev,
 /*
  * Driver initialization routine.
  * Invoked once at EAL init time.
- * Register itself as the [Poll Mode] Driver of PCI IXGBE devices.
+ * Register itself as the [Poll Mode] Driver of PCI Fortville devices.
  */
 static int
 rte_i40e_pmd_init(const char *name __rte_unused,
