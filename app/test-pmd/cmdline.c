@@ -3426,6 +3426,26 @@ struct cmd_csum_tunnel_result {
 };
 
 static void
+check_tunnel_tso_support(uint8_t port_id)
+{
+	struct rte_eth_dev_info dev_info;
+
+	rte_eth_dev_info_get(port_id, &dev_info);
+	if (!(dev_info.tx_offload_capa & DEV_TX_OFFLOAD_VXLAN_TNL_TSO))
+		printf("Warning: TSO enabled but VXLAN TUNNEL TSO not "
+		       "supported by port %d\n", port_id);
+	if (!(dev_info.tx_offload_capa & DEV_TX_OFFLOAD_GRE_TNL_TSO))
+		printf("Warning: TSO enabled but GRE TUNNEL TSO not "
+			"supported by port %d\n", port_id);
+	if (!(dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPIP_TNL_TSO))
+		printf("Warning: TSO enabled but IPIP TUNNEL TSO not "
+		       "supported by port %d\n", port_id);
+	if (!(dev_info.tx_offload_capa & DEV_TX_OFFLOAD_GENEVE_TNL_TSO))
+		printf("Warning: TSO enabled but GENEVE TUNNEL TSO not "
+		       "supported by port %d\n", port_id);
+}
+
+static void
 cmd_csum_tunnel_parsed(void *parsed_result,
 		       __attribute__((unused)) struct cmdline *cl,
 		       __attribute__((unused)) void *data)
@@ -3435,10 +3455,13 @@ cmd_csum_tunnel_parsed(void *parsed_result,
 	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
 
-	if (!strcmp(res->onoff, "on"))
+	if (!strcmp(res->onoff, "on")) {
 		ports[res->port_id].tx_ol_flags |=
 			TESTPMD_TX_OFFLOAD_PARSE_TUNNEL;
-	else
+
+		if (ports[res->port_id].tso_segsz != 0)
+			check_tunnel_tso_support(res->port_id);
+	} else
 		ports[res->port_id].tx_ol_flags &=
 			(~TESTPMD_TX_OFFLOAD_PARSE_TUNNEL);
 
@@ -3502,10 +3525,17 @@ cmd_tso_set_parsed(void *parsed_result,
 
 	/* display warnings if configuration is not supported by the NIC */
 	rte_eth_dev_info_get(res->port_id, &dev_info);
-	if ((ports[res->port_id].tso_segsz != 0) &&
-		(dev_info.tx_offload_capa & DEV_TX_OFFLOAD_TCP_TSO) == 0) {
-		printf("Warning: TSO enabled but not "
-			"supported by port %d\n", res->port_id);
+	if (ports[res->port_id].tso_segsz != 0) {
+		if (ports[res->port_id].tx_ol_flags &
+		    TESTPMD_TX_OFFLOAD_PARSE_TUNNEL)
+			check_tunnel_tso_support(res->port_id);
+		/* For packets,
+		 * (1) when tnl parse is disabled;
+		 * (2) when tnl parse is enabled but not deemed as tnl pkts
+		 */
+		if (!(dev_info.tx_offload_capa & DEV_TX_OFFLOAD_TCP_TSO))
+			printf("Warning: TSO enabled but not "
+			       "supported by port %d\n", res->port_id);
 	}
 }
 
