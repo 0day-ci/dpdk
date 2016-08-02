@@ -45,6 +45,7 @@
 struct rte_logs rte_logs = {
 	.type = ~0,
 	.level = RTE_LOG_DEBUG,
+	.silent = 1,
 	.file = NULL,
 };
 
@@ -102,6 +103,18 @@ rte_get_log_level(void)
 	return rte_logs.level;
 }
 
+void
+rte_log_silence_stdout(void)
+{
+	rte_logs.silent = 0;
+}
+
+int
+rte_log_stdout(void)
+{
+	return rte_logs.silent;
+}
+
 /* Set global log type */
 void
 rte_set_log_type(uint32_t type, int enable)
@@ -124,6 +137,7 @@ int rte_log_cur_msg_loglevel(void)
 {
 	return RTE_PER_LCORE(log_cur_msg).loglevel;
 }
+
 
 /* get the current logtype for the message beeing processed */
 int rte_log_cur_msg_logtype(void)

@@ -56,6 +56,7 @@ extern "C" {
 struct rte_logs {
 	uint32_t type;  /**< Bitfield with enabled logs. */
 	uint32_t level; /**< Log level. */
+	uint32_t silent:1; /**< Silent mode - Don't print to STDOUT */
 	FILE *file;     /**< Pointer to current FILE* for logs. */
 };
 
@@ -179,6 +180,20 @@ int rte_log_cur_msg_loglevel(void);
  *   The logtype of the message being processed.
  */
 int rte_log_cur_msg_logtype(void);
+
+/**
+ * Silence output to stdout by logging facilities
+ */
+void rte_log_silence_stdout(void);
+
+/**
+ * Check if echoing log output to stdout is enabled.
+ *
+ * @return
+ * - Returns 1 if echoing to stdout is enabled
+ * - Returns 0 if logging is in silent mode
+ */
+int rte_log_stdout(void);
 
 /**
  * @deprecated

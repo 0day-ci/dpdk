@@ -41,6 +41,8 @@ enum {
 	OPT_PCI_BLACKLIST_NUM   = 'b',
 #define OPT_PCI_WHITELIST     "pci-whitelist"
 	OPT_PCI_WHITELIST_NUM   = 'w',
+#define OPT_SILENT_STDOUT     "log-stdout-silent"
+	OPT_SILENT_STDOUT_NUM   = 's',
 
 	/* first long only option value must be >= 256, so that we won't
 	 * conflict with short options */

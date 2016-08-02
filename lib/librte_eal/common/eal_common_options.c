@@ -69,6 +69,7 @@ eal_short_options[] =
 	"r:" /* memory ranks */
 	"v"  /* version */
 	"w:" /* pci-whitelist */
+	"s"  /* silence log output to stdout */
 	;
 
 const struct option
@@ -95,6 +96,7 @@ eal_long_options[] = {
 	{OPT_VFIO_INTR,         1, NULL, OPT_VFIO_INTR_NUM        },
 	{OPT_VMWARE_TSC_MAP,    0, NULL, OPT_VMWARE_TSC_MAP_NUM   },
 	{OPT_XEN_DOM0,          0, NULL, OPT_XEN_DOM0_NUM         },
+	{OPT_SILENT_STDOUT,     0, NULL, OPT_SILENT_STDOUT_NUM    },
 	{0,                     0, NULL, 0                        }
 };
 
@@ -842,6 +844,10 @@ eal_parse_common_option(int opt, const char *optarg,
 		RTE_LOG(CRIT, EAL, "RTE Version: '%s'\n", rte_version());
 		break;
 
+	case OPT_SILENT_STDOUT_NUM:
+		rte_log_silence_stdout();
+		break;
+
 	/* long options */
 	case OPT_HUGE_UNLINK_NUM:
 		conf->hugepage_unlink = 1;
@@ -906,6 +912,7 @@ eal_parse_common_option(int opt, const char *optarg,
 		conf->log_level = log;
 		break;
 	}
+
 	case OPT_LCORES_NUM:
 		if (eal_parse_lcores(optarg) < 0) {
 			RTE_LOG(ERR, EAL, "invalid parameter for --"
@@ -1028,6 +1035,7 @@ eal_common_usage(void)
 	       "  --"OPT_PROC_TYPE"         Type of this process (primary|secondary|auto)\n"
 	       "  --"OPT_SYSLOG"            Set syslog facility\n"
 	       "  --"OPT_LOG_LEVEL"         Set default log level\n"
+	       "  -s, --"OPT_SILENT_STDOUT" Silent mode, supress output to STDOUT\n"
 	       "  -v                  Display version information on startup\n"
 	       "  -h, --help          This help\n"
 	       "\nEAL options for DEBUG use only:\n"

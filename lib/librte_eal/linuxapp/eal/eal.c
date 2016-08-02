@@ -748,6 +748,7 @@ rte_eal_init(int argc, char **argv)
 
 	thread_id = pthread_self();
 
+
 	if (rte_eal_log_early_init() < 0)
 		rte_panic("Cannot init early logs\n");
 

@@ -56,12 +56,14 @@ static ssize_t
 console_log_write(__attribute__((unused)) void *c, const char *buf, size_t size)
 {
 	char copybuf[BUFSIZ + 1];
-	ssize_t ret;
+	ssize_t ret = 0;
 	uint32_t loglevel;
-
+ 
 	/* write on stdout */
-	ret = fwrite(buf, 1, size, stdout);
-	fflush(stdout);
+	if (rte_log_stdout()) {
+		ret = fwrite(buf, 1, size, stdout);
+		fflush(stdout);
+	}
 
 	/* truncate message if too big (should not happen) */
 	if (size > BUFSIZ)
@@ -111,11 +113,14 @@ rte_eal_log_init(const char *id, int facility)
 static ssize_t
 early_log_write(__attribute__((unused)) void *c, const char *buf, size_t size)
 {
-	ssize_t ret;
-	ret = fwrite(buf, size, 1, stdout);
-	fflush(stdout);
-	if (ret == 0)
-		return -1;
+	ssize_t ret = 0;
+
+	if (rte_log_stdout()) {
+		ret = fwrite(buf, size, 1, stdout);
+		fflush(stdout);
+		if (ret == 0)
+			return -1;
+	}
 	return ret;
 }
 
