@@ -32,8 +32,9 @@
 #
 # toolchain:
 #
-#   - define CC, LD, AR, AS, ... (overriden by cmdline value)
+#   - define CC, CXX, LD, AR, AS, ... (overriden by cmdline value)
 #   - define TOOLCHAIN_CFLAGS variable (overriden by cmdline value)
+#   - define TOOLCHAIN_CXXFLAGS variable (overriden by cmdline value)
 #   - define TOOLCHAIN_LDFLAGS variable (overriden by cmdline value)
 #   - define TOOLCHAIN_ASFLAGS variable (overriden by cmdline value)
 #
@@ -42,6 +43,7 @@
 # x86->x86 compiler
 
 CC        = icc
+CXX       = icc
 KERNELCC  = gcc
 CPP       = cpp
 AS        = nasm
@@ -57,9 +59,11 @@ HOSTCC    = icc
 else
 HOSTCC    = gcc
 endif
+HOSTCXX   = icc
 HOSTAS    = as
 
 TOOLCHAIN_CFLAGS =
+TOOLCHAIN_CXXFLAGS =
 TOOLCHAIN_LDFLAGS =
 TOOLCHAIN_ASFLAGS =
 
@@ -83,5 +87,5 @@ ifeq ($(shell test $(ICC_MAJOR_VERSION) -ge 14 && echo 1), 1)
 	TOOLCHAIN_CFLAGS += -no-inline-max-size -no-inline-max-total-size
 endif
 
-export CC AS AR LD OBJCOPY OBJDUMP STRIP READELF
-export TOOLCHAIN_CFLAGS TOOLCHAIN_LDFLAGS TOOLCHAIN_ASFLAGS
+export CC CXX AS AR LD OBJCOPY OBJDUMP STRIP READELF
+export TOOLCHAIN_CFLAGS TOOLCHAIN_CXXFLAGS TOOLCHAIN_LDFLAGS TOOLCHAIN_ASFLAGS

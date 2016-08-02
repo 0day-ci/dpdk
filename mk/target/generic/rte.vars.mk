@@ -138,7 +138,10 @@ endif
 LDFLAGS += -L$(RTE_SDK_BIN)/lib
 endif
 
+CXXFLAGS := $(CFLAGS)
+
 export CFLAGS
+export CXXFLAGS
 export LDFLAGS
 
 endif

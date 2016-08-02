@@ -32,8 +32,9 @@
 #
 # toolchain:
 #
-#   - define CC, LD, AR, AS, ... (overriden by cmdline value)
+#   - define CC, CXX, LD, AR, AS, ... (overriden by cmdline value)
 #   - define TOOLCHAIN_CFLAGS variable (overriden by cmdline value)
+#   - define TOOLCHAIN_CXXFLAGS variable (overriden by cmdline value)
 #   - define TOOLCHAIN_LDFLAGS variable (overriden by cmdline value)
 #   - define TOOLCHAIN_ASFLAGS variable (overriden by cmdline value)
 #
@@ -41,6 +42,7 @@
 CC        = $(CROSS)gcc
 KERNELCC  = $(CROSS)gcc
 CPP       = $(CROSS)cpp
+CXX       = $(CROSS)g++
 # for now, we don't use as but nasm.
 # AS      = $(CROSS)as
 AS        = nasm
@@ -57,10 +59,16 @@ HOSTCC    = $(CC)
 else
 HOSTCC    = gcc
 endif
+ifeq ("$(origin CXX)", "command line")
+HOSTCXX    = $(CXX)
+else
+HOSTCXX    = g++
+endif
 HOSTAS    = as
 
 TOOLCHAIN_ASFLAGS =
 TOOLCHAIN_CFLAGS =
+TOOLCHAIN_CXXFLAGS =
 TOOLCHAIN_LDFLAGS =
 
 ifeq ($(CONFIG_RTE_LIBRTE_GCOV),y)
@@ -99,5 +107,5 @@ ifeq ($(shell test $(GCC_VERSION) -lt 47 && echo 1), 1)
 WERROR_FLAGS += -Wno-uninitialized
 endif
 
-export CC AS AR LD OBJCOPY OBJDUMP STRIP READELF
-export TOOLCHAIN_CFLAGS TOOLCHAIN_LDFLAGS TOOLCHAIN_ASFLAGS
+export CC CXX AS AR LD OBJCOPY OBJDUMP STRIP READELF
+export TOOLCHAIN_CFLAGS TOOLCHAIN_CXXFLAGS TOOLCHAIN_LDFLAGS TOOLCHAIN_ASFLAGS

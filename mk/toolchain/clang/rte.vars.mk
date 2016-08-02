@@ -32,8 +32,9 @@
 #
 # toolchain:
 #
-#   - define CC, LD, AR, AS, ... (overriden by cmdline value)
+#   - define CC, CXX, LD, AR, AS, ... (overriden by cmdline value)
 #   - define TOOLCHAIN_CFLAGS variable (overriden by cmdline value)
+#   - define TOOLCHAIN_CXXFLAGS variable (overriden by cmdline value)
 #   - define TOOLCHAIN_LDFLAGS variable (overriden by cmdline value)
 #   - define TOOLCHAIN_ASFLAGS variable (overriden by cmdline value)
 #
@@ -41,6 +42,7 @@
 CC        = $(CROSS)clang
 KERNELCC  = $(CROSS)gcc
 CPP       = $(CROSS)cpp
+CXX       = $(CROSS)clang++
 # for now, we don't use as but nasm.
 # AS      = $(CROSS)as
 AS        = nasm
@@ -57,10 +59,16 @@ HOSTCC    = $(CC)
 else
 HOSTCC    = clang
 endif
+ifeq ("$(origin CXX)", "command line")
+HOSTCXX    = $(CXX)
+else
+HOSTCXX    = clang++
+endif
 HOSTAS    = as
 
 TOOLCHAIN_ASFLAGS =
 TOOLCHAIN_CFLAGS =
+TOOLCHAIN_CXXFLAGS =
 TOOLCHAIN_LDFLAGS =
 
 WERROR_FLAGS := -W -Wall -Wstrict-prototypes -Wmissing-prototypes
@@ -79,5 +87,5 @@ include $(RTE_SDK)/mk/toolchain/$(RTE_TOOLCHAIN)/rte.toolchain-compat.mk
 # workaround clang bug with warning "missing field initializer" for "= {0}"
 WERROR_FLAGS += -Wno-missing-field-initializers
 
-export CC AS AR LD OBJCOPY OBJDUMP STRIP READELF
-export TOOLCHAIN_CFLAGS TOOLCHAIN_LDFLAGS TOOLCHAIN_ASFLAGS
+export CC CXX AS AR LD OBJCOPY OBJDUMP STRIP READELF
+export TOOLCHAIN_CFLAGS TOOLCHAIN_CXXFLAGS TOOLCHAIN_LDFLAGS TOOLCHAIN_ASFLAGS
