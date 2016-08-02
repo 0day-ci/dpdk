@@ -579,6 +579,11 @@ CONFIG_RTE_APP_TEST=y
 CONFIG_RTE_APP_TEST_RESOURCE_TAR=n
 
 #
+# Compile the google test unit tests
+#
+CONFIG_RTE_TEST_GTEST=y
+
+#
 # Compile the PMD test application
 #
 CONFIG_RTE_TEST_PMD=y

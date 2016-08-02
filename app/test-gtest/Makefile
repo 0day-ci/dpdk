@@ -1,6 +1,7 @@
 #   BSD LICENSE
+#   BSD LICENSE
 #
-#   Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
+#   Copyright(c) 2016 Intel Corporation. All rights reserved.
 #   All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or without
@@ -29,15 +30,38 @@
 #   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 #   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
+ifneq ($(MAKECMDGOALS),clean)
+ifeq ($(GTEST_DIR),)
+$(error "Please define GTEST_DIR environment variable")
+endif
+
+ifeq ($(GMOCK_DIR),)
+$(error "Please define GMOCK_DIR environment variable")
+endif
+endif
+
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DIRS-$(CONFIG_RTE_APP_TEST) += test
-DIRS-$(CONFIG_RTE_LIBRTE_ACL) += test-acl
-DIRS-$(CONFIG_RTE_LIBRTE_PIPELINE) += test-pipeline
-DIRS-$(CONFIG_RTE_TEST_PMD) += test-pmd
-DIRS-$(CONFIG_RTE_LIBRTE_CMDLINE) += cmdline_test
-DIRS-$(CONFIG_RTE_EXEC_ENV_LINUXAPP) += proc_info
-DIRS-$(CONFIG_RTE_LIBRTE_PDUMP) += pdump
-DIRS-$(CONFIG_RTE_TEST_GTEST) += test-gtest
+# binary name
+APP = test-gtest
 
-include $(RTE_SDK)/mk/rte.subdir.mk
+# all source are stored in SRCS-y
+SRCS-y := main.cpp
+SRCS-y += test_mempool.cpp
+
+CFLAGS += -O0
+CFLAGS += $(WERROR_FLAGS)
+
+CXXFLAGS += -std=c++11
+CXXFLAGS += -I$(GTEST_DIR)/include 
+CXXFLAGS += -I$(GMOCK_DIR)/include
+
+LDFLAGS += -lstdc++
+LDFLAGS += -L$(GMOCK_DIR) -lgmock
+
+# this application needs libraries first
+DEPDIRS-y += lib drivers
+
+include $(RTE_SDK)/mk/rte.app.mk
+
