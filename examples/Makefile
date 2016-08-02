@@ -46,6 +46,7 @@ endif
 DIRS-y += ethtool
 DIRS-y += exception_path
 DIRS-y += helloworld
+DIRS-y += helloworld-cpp
 DIRS-$(CONFIG_RTE_LIBRTE_PIPELINE) += ip_pipeline
 ifeq ($(CONFIG_RTE_LIBRTE_LPM),y)
 DIRS-$(CONFIG_RTE_IP_FRAG) += ip_reassembly
