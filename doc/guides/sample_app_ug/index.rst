@@ -77,6 +77,7 @@ Sample Applications User Guide
     performance_thread
     ipsec_secgw
     pdump
+    pmdinfo
 
 **Figures**
 
