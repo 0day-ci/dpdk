@@ -78,6 +78,7 @@ Sample Applications User Guide
     ipsec_secgw
     pdump
     pmdinfo
+    devbind
 
 **Figures**
 
