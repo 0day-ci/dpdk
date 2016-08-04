@@ -115,7 +115,7 @@ man_pages = [("testpmd_app_ug/run_app", "testpmd",
              ("sample_app_ug/pmdinfo", "dpdk-pmdinfo",
               "dump a PMDs hardware support info", "", 1),
              ("sample_app_ug/devbind", "dpdk-devbind",
-              "check device status and bind/unbind them from drivers", "", 1)]
+              "check device status and bind/unbind them from drivers", "", 8)]
 
 ######## :numref: fallback ########
 # The following hook functions add some simple handling for the :numref:
