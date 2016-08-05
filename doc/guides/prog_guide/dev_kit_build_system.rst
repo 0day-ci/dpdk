@@ -93,20 +93,20 @@ Each build directory contains include files, libraries, and applications:
     cmdline_cirbuf.h           rte_cycles.h         rte_memory.h
     cmdline.h                  rte_debug.h          rte_mempool.h
     cmdline_parse_etheraddr.h  rte_eal.h            rte_memzone.h
-    cmdline_parse.h            rte_errno.h          rte_pci_dev_ids.h
-    cmdline_parse_ipaddr.h     rte_ethdev.h         rte_pci.h
-    cmdline_parse_num.h        rte_ether.h          rte_per_lcore.h
-    cmdline_parse_portlist.h   rte_fbk_hash.h       rte_prefetch.h
-    cmdline_parse_string.h     rte_hash_crc.h       rte_random.h
-    cmdline_rdline.h           rte_hash.h           rte_ring.h
-    cmdline_socket.h           rte_interrupts.h     rte_rwlock.h
-    cmdline_vt100.h            rte_ip.h             rte_sctp.h
-    exec-env                   rte_jhash.h          rte_spinlock.h
-    rte_alarm.h                rte_launch.h         rte_string_fns.h
-    rte_atomic.h               rte_lcore.h          rte_tailq.h
-    rte_branch_prediction.h    rte_log.h            rte_tcp.h
-    rte_byteorder.h            rte_lpm.h            rte_timer.h
-    rte_common.h               rte_malloc.h         rte_udp.h
+    cmdline_parse.h            rte_errno.h          rte_pci.h
+    cmdline_parse_ipaddr.h     rte_ethdev.h         rte_per_lcore.h
+    cmdline_parse_num.h        rte_ether.h          rte_prefetch.h
+    cmdline_parse_portlist.h   rte_fbk_hash.h       rte_random.h
+    cmdline_parse_string.h     rte_hash_crc.h       rte_ring.h
+    cmdline_rdline.h           rte_hash.h           rte_rwlock.h
+    cmdline_socket.h           rte_interrupts.h     rte_sctp.h
+    cmdline_vt100.h            rte_ip.h             rte_spinlock.h
+    exec-env                   rte_jhash.h          rte_string_fns.h
+    rte_alarm.h                rte_launch.h         rte_tailq.h
+    rte_atomic.h               rte_lcore.h          rte_tcp.h
+    rte_branch_prediction.h    rte_log.h            rte_timer.h
+    rte_byteorder.h            rte_lpm.h            rte_udp.h
+    rte_common.h               rte_malloc.h
     rte_config.h               rte_mbuf.h
 
 
