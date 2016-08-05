@@ -313,6 +313,17 @@ virtio_user_eth_dev_alloc(const char *name)
 	return eth_dev;
 }
 
+static void
+virtio_user_eth_dev_free(struct rte_eth_dev *eth_dev)
+{
+	struct rte_eth_dev_data *data = eth_dev->data;
+	struct virtio_hw *hw = data->dev_private;
+
+	rte_free(hw->virtio_user_dev);
+	rte_free(hw);
+	rte_eth_dev_release_port(eth_dev);
+}
+
 /* Dev initialization routine. Invoked once for each virtio vdev at
  * EAL init time, see rte_eal_dev_init().
  * Returns 0 on success.
@@ -328,7 +339,7 @@ virtio_user_pmd_devinit(const char *name, const char *params)
 	uint64_t queue_size = VIRTIO_USER_DEF_Q_SZ;
 	char *path = NULL;
 	char *mac_addr = NULL;
-	int ret = -1;
+	int result = -1, ret;
 
 	if (!params || params[0] == '\0') {
 		PMD_INIT_LOG(ERR, "arg %s is mandatory for virtio_user",
@@ -411,15 +422,19 @@ virtio_user_pmd_devinit(const char *name, const char *params)
 
 	hw = eth_dev->data->dev_private;
 	if (virtio_user_dev_init(hw->virtio_user_dev, path, queues, cq,
-				 queue_size, mac_addr) < 0)
+				 queue_size, mac_addr) < 0) {
+		PMD_INIT_LOG(ERR, "virtio_user_dev_init fails");
+		virtio_user_eth_dev_free(eth_dev);
 		goto end;
+	}
 
 	/* previously called by rte_eal_pci_probe() for physical dev */
 	if (eth_virtio_dev_init(eth_dev) < 0) {
 		PMD_INIT_LOG(ERR, "eth_virtio_dev_init fails");
+		virtio_user_eth_dev_free(eth_dev);
 		goto end;
 	}
-	ret = 0;
+	result = 0;
 
 end:
 	if (kvlist)
@@ -428,7 +443,7 @@ end:
 		free(path);
 	if (mac_addr)
 		free(mac_addr);
-	return ret;
+	return result;
 }
 
 /** Called by rte_eth_dev_detach() */
