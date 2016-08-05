@@ -131,6 +131,13 @@ virtio_user_start_device(struct virtio_user_dev *dev)
 		}
 	}
 
+	/* As this feature is negotiated from the vhost, all queues are
+	 * initialized in the disabled state. For non-mq case, we enable
+	 * the 1st queue pair by default.
+	 */
+	if (dev->features & (1ull << VHOST_USER_GET_PROTOCOL_FEATURES))
+		vhost_user_enable_queue_pair(dev->vhostfd, 0, 1);
+
 	/* After setup all virtqueues, we need to set_features so that these
 	 * features can be set into each virtqueue in vhost side. And before
 	 * that, make sure VHOST_USER_F_PROTOCOL_FEATURES is added if mq is
