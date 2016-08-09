@@ -263,7 +263,8 @@ $(RTE_OUTPUT)/app/$(APP).map: $(APP)
 #
 .PHONY: clean
 clean: _postclean
-	$(Q)rm -f $(_BUILD_TARGETS) $(_INSTALL_TARGETS) $(_CLEAN_TARGETS)
+	$(Q)rm -f $(_BUILD_TARGETS) $(_INSTALL_TARGETS) $(_CLEAN_TARGETS) \
+	test_resource.res test_resource_c.o test_resource_c.res.o
 
 .PHONY: doclean
 doclean:
