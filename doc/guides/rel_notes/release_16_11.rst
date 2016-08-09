@@ -94,7 +94,8 @@ API Changes
 
    This section is a comment. Make sure to start the actual text at the margin.
 
-* The log history is removed.
+* The ``file_name`` data type of ``struct rte_port_source_params`` and
+  ``struct rte_port_sink_params`` is changed from `char *`` to ``const char *``.
 
 
 ABI Changes
