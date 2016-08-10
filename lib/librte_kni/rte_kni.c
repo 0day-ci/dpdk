@@ -479,8 +479,11 @@ rte_kni_release(struct rte_kni *kni)
 
 	/* mbufs in all fifo should be released, except request/response */
 	kni_free_fifo(kni->tx_q);
-	kni_free_fifo(kni->rx_q);
-	kni_free_fifo(kni->alloc_q);
+	/*
+	 * TODO: A function to free fifo with physicall address required
+	 * kni_free_fifo(kni->rx_q);
+	 * kni_free_fifo(kni->alloc_q);
+	 */
 	kni_free_fifo(kni->free_q);
 
 	slot_id = kni->slot_id;
@@ -547,7 +550,18 @@ rte_kni_handle_request(struct rte_kni *kni)
 unsigned
 rte_kni_tx_burst(struct rte_kni *kni, struct rte_mbuf **mbufs, unsigned num)
 {
-	unsigned ret = kni_fifo_put(kni->rx_q, (void **)mbufs, num);
+	void *phy_mbufs[num];
+	unsigned ret;
+	unsigned int i;
+
+	for (i = 0; i < num; i++) {
+		struct rte_mbuf *m = mbufs[i];
+		unsigned long diff = (unsigned long)m->buf_addr -
+			(unsigned long)m->buf_physaddr;
+		phy_mbufs[i] = (void *)((unsigned long)m - diff);
+	}
+
+	ret = kni_fifo_put(kni->rx_q, phy_mbufs, num);
 
 	/* Get mbufs from free_q and then free them */
 	kni_free_mbufs(kni);
@@ -585,6 +599,7 @@ kni_allocate_mbufs(struct rte_kni *kni)
 {
 	int i, ret;
 	struct rte_mbuf *pkts[MAX_MBUF_BURST_NUM];
+	void *phys[MAX_MBUF_BURST_NUM];
 
 	RTE_BUILD_BUG_ON(offsetof(struct rte_mbuf, pool) !=
 			 offsetof(struct rte_kni_mbuf, pool));
@@ -614,13 +629,16 @@ kni_allocate_mbufs(struct rte_kni *kni)
 			RTE_LOG(ERR, KNI, "Out of memory\n");
 			break;
 		}
+		phys[i] = (void *)((unsigned long)pkts[i] -
+				((unsigned long)pkts[i]->buf_addr -
+				 (unsigned long)pkts[i]->buf_physaddr));
 	}
 
 	/* No pkt mbuf alocated */
 	if (i <= 0)
 		return;
 
-	ret = kni_fifo_put(kni->alloc_q, (void **)pkts, i);
+	ret = kni_fifo_put(kni->alloc_q, phys, i);
 
 	/* Check if any mbufs not put into alloc_q, and then free them */
 	if (ret >= 0 && ret < i && ret < MAX_MBUF_BURST_NUM) {
