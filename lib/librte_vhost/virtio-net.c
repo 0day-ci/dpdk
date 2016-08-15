@@ -567,6 +567,7 @@ vhost_set_vring_addr(int vid, struct vhost_vring_addr *addr)
 			"some packets maybe resent for Tx and dropped for Rx\n",
 			vq->last_used_idx, vq->used->idx);
 		vq->last_used_idx     = vq->used->idx;
+		vq->last_used_idx_res = vq->used->idx;
 	}
 
 	vq->log_guest_addr = addr->log_guest_addr;
@@ -598,6 +599,7 @@ vhost_set_vring_base(int vid, struct vhost_vring_state *state)
 
 	/* State->index refers to the queue index. The txq is 1, rxq is 0. */
 	dev->virtqueue[state->index]->last_used_idx = state->num;
+	dev->virtqueue[state->index]->last_used_idx_res = state->num;
 
 	return 0;
 }

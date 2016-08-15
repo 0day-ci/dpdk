@@ -175,6 +175,25 @@ uint16_t rte_vhost_enqueue_burst(int vid, uint16_t queue_id,
 	struct rte_mbuf **pkts, uint16_t count);
 
 /**
+ * This function adds buffers to the virtio devices RX virtqueue. Buffers can
+ * be received from the physical port or from another virtual device. A packet
+ * count is returned to indicate the number of packets that were successfully
+ * added to the RX queue. This version is multi-producer safe.
+ * @param vid
+ *  virtio-net device ID
+ * @param queue_id
+ *  virtio queue index in mq case
+ * @param pkts
+ *  array to contain packets to be enqueued
+ * @param count
+ *  packets num to be enqueued
+ * @return
+ *  num of packets enqueued
+ */
+uint16_t rte_vhost_enqueue_burst_mp(int vid, uint16_t queue_id,
+	struct rte_mbuf **pkts, uint16_t count);
+
+/**
  * This function gets guest buffers from the virtio device TX virtqueue,
  * construct host mbufs, copies guest buffer content to host mbufs and
  * store them in pkts to be processed.

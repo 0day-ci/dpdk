@@ -72,6 +72,8 @@ struct vhost_virtqueue {
 
 	/* Last index used on the available ring */
 	volatile uint16_t	last_used_idx;
+	/* Used for multiple devices reserving buffers */
+	volatile uint16_t       last_used_idx_res;
 #define VIRTIO_INVALID_EVENTFD		(-1)
 #define VIRTIO_UNINITIALIZED_EVENTFD	(-2)
 

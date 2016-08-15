@@ -212,6 +212,47 @@ copy_mbuf_to_desc(struct virtio_net *dev, struct vhost_virtqueue *vq,
 	return 0;
 }
 
+/*
+ * As many data cores may want to access available buffers
+ * they need to be reserved.
+ */
+static inline uint32_t
+reserve_avail_buf(struct vhost_virtqueue *vq, uint32_t count, bool mp,
+		  uint16_t *start)
+{
+	uint16_t res_start_idx;
+	uint16_t avail_idx;
+	uint16_t free_entries;
+	int success;
+
+	count = RTE_MIN(count, (uint32_t)MAX_PKT_BURST);
+
+again:
+	res_start_idx = mp ? vq->last_used_idx_res : vq->last_used_idx;
+	avail_idx = *((volatile uint16_t *)&vq->avail->idx);
+
+	free_entries = avail_idx - res_start_idx;
+	count = RTE_MIN(count, free_entries);
+	if (count == 0)
+		return 0;
+
+	if (mp) {
+		uint16_t res_end_idx = res_start_idx + count;
+
+		/*
+		* update vq->last_used_idx_res atomically; try again if failed.
+		*/
+		success = rte_atomic16_cmpset(&vq->last_used_idx_res,
+					res_start_idx, res_end_idx);
+		if (unlikely(!success))
+			goto again;
+	}
+
+	*start = res_start_idx;
+
+	return count;
+}
+
 /**
  * This function adds buffers to the virtio devices RX virtqueue. Buffers can
  * be received from the physical port or from another virtio device. A packet
@@ -221,10 +262,10 @@ copy_mbuf_to_desc(struct virtio_net *dev, struct vhost_virtqueue *vq,
  */
 static inline uint32_t __attribute__((always_inline))
 virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
-	      struct rte_mbuf **pkts, uint32_t count)
+	      struct rte_mbuf **pkts, uint32_t count, bool mp)
 {
 	struct vhost_virtqueue *vq;
-	uint16_t avail_idx, free_entries, start_idx;
+	uint16_t start_idx;
 	uint16_t desc_indexes[MAX_PKT_BURST];
 	uint16_t used_idx;
 	uint32_t i;
@@ -240,11 +281,7 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 	if (unlikely(vq->enabled == 0))
 		return 0;
 
-	avail_idx = *((volatile uint16_t *)&vq->avail->idx);
-	start_idx = vq->last_used_idx;
-	free_entries = avail_idx - start_idx;
-	count = RTE_MIN(count, free_entries);
-	count = RTE_MIN(count, (uint32_t)MAX_PKT_BURST);
+	count = reserve_avail_buf(vq, count, mp, &start_idx);
 	if (count == 0)
 		return 0;
 
@@ -284,14 +321,24 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 
 	rte_smp_wmb();
 
+	if (mp) {
+		/*
+		 * Wait until it's our turn to add our buffer to the
+		 * used ring.
+		 */
+		while (unlikely(vq->last_used_idx != start_idx))
+			rte_pause();
+	}
+
 	*(volatile uint16_t *)&vq->used->idx += count;
-	vq->last_used_idx += count;
 	vhost_log_used_vring(dev, vq,
 		offsetof(struct vring_used, idx),
 		sizeof(vq->used->idx));
 
 	/* flush used->idx update before we read avail->flags. */
 	rte_mb();
+
+	vq->last_used_idx = start_idx + count;
 
 	/* Kick the guest if necessary. */
 	if (!(vq->avail->flags & VRING_AVAIL_F_NO_INTERRUPT)
@@ -545,7 +592,19 @@ rte_vhost_enqueue_burst(int vid, uint16_t queue_id,
 	if (dev->features & (1 << VIRTIO_NET_F_MRG_RXBUF))
 		return virtio_dev_merge_rx(dev, queue_id, pkts, count);
 	else
-		return virtio_dev_rx(dev, queue_id, pkts, count);
+		return virtio_dev_rx(dev, queue_id, pkts, count, false);
+}
+
+uint16_t
+rte_vhost_enqueue_burst_mp(int vid, uint16_t queue_id,
+	struct rte_mbuf **pkts, uint16_t count)
+{
+	struct virtio_net *dev = get_device(vid);
+
+	if (!dev)
+		return 0;
+
+	return virtio_dev_rx(dev, queue_id, pkts, count, true);
 }
 
 static void
