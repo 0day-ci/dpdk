@@ -36,6 +36,11 @@ New Features
 
      This section is a comment. Make sure to start the actual text at the margin.
 
+* **Added support for new gcc -march option.**
+
+  The GCC 4.9 ``-march`` option supports the Intel processor code names.
+  The config option ``RTE_MACHINE`` can be used to pass code names to the compiler as ``-march`` flag.
+
 
 Resolved Issues
 ---------------
