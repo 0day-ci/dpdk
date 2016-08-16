@@ -93,6 +93,7 @@ static char *lo_mode = NULL;
 /* Kernel thread mode */
 static char *kthread_mode = NULL;
 static unsigned multiple_kthread_on = 0;
+static int bind_to_core = -1;
 
 #define KNI_DEV_IN_USE_BIT_NUM 0 /* Bit number for device in use */
 
@@ -239,12 +240,17 @@ kni_open(struct inode *inode, struct file *file)
 	if (multiple_kthread_on == 0) {
 		KNI_PRINT("Single kernel thread for all KNI devices\n");
 		/* Create kernel thread for RX */
-		knet->kni_kthread = kthread_run(kni_thread_single, (void *)knet,
+		knet->kni_kthread = kthread_create(kni_thread_single, (void *)knet,
 						"kni_single");
 		if (IS_ERR(knet->kni_kthread)) {
 			KNI_ERR("Unable to create kernel threaed\n");
 			return PTR_ERR(knet->kni_kthread);
 		}
+		if (bind_to_core >= 0) {
+			KNI_PRINT("Bind main thread to core %d\n", bind_to_core);
+			kthread_bind(knet->kni_kthread, bind_to_core);
+		}
+		wake_up_process(knet->kni_kthread);
 	} else
 		KNI_PRINT("Multiple kernel thread mode enabled\n");
 
@@ -697,4 +703,9 @@ MODULE_PARM_DESC(kthread_mode,
 "    single    Single kernel thread mode enabled.\n"
 "    multiple  Multiple kernel thread mode enabled.\n"
 "\n"
+);
+
+module_param(bind_to_core, int, S_IRUGO);
+MODULE_PARM_DESC(bind_to_core,
+"Bind KNI main kernel thread to specific core (default=-1(disabled)):\n"
 );
