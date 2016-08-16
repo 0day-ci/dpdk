@@ -68,10 +68,10 @@ struct rte_bucket_4_32 {
 	uint64_t next_valid;
 
 	/* Cache lines 1 and 2 */
-	uint64_t key[4][4];
+	uint64_t key[4][4] __rte_cache_aligned;
 
 	/* Cache line 3 */
-	uint8_t data[0];
+	uint8_t data[0] __rte_cache_aligned;
 };
 
 struct rte_table_hash {
