@@ -36,6 +36,11 @@ New Features
 
      This section is a comment. Make sure to start the actual text at the margin.
 
+   * **Added data-rate metrics to the extended statistics.**
+
+     Adds peak and average incoming and outgoing data-rate metrics to the
+     extended statistics, the calculation of which is controlled by
+     applications that wish for these to be derived.
 
 Resolved Issues
 ---------------

@@ -1656,6 +1656,19 @@ struct rte_eth_dev_sriov {
 
 #define RTE_ETH_NAME_MAX_LEN (32)
 
+struct rte_eth_dev_stats {
+	uint64_t *list_ibuckets;
+	uint64_t *list_obuckets;
+	uint32_t cnt_buckets;
+	uint32_t next_bucket;
+	uint64_t last_ibytes;
+	uint64_t last_obytes;
+	uint64_t peak_ibytes;
+	uint64_t peak_obytes;
+	uint64_t total_ibytes;
+	uint64_t total_obytes;
+};
+
 /**
  * @internal
  * The data part, with no function pointers, associated with each ethernet device.
@@ -1670,6 +1683,7 @@ struct rte_eth_dev_data {
 	void **tx_queues; /**< Array of pointers to TX queues. */
 	uint16_t nb_rx_queues; /**< Number of RX queues. */
 	uint16_t nb_tx_queues; /**< Number of TX queues. */
+	struct rte_eth_dev_stats stats; /**< Device stats metrics */
 
 	struct rte_eth_dev_sriov sriov;    /**< SRIOV data */
 
@@ -2326,6 +2340,33 @@ int rte_eth_xstats_get_names(uint8_t port_id,
  */
 int rte_eth_xstats_get(uint8_t port_id, struct rte_eth_xstat *xstats,
 		unsigned n);
+
+/**
+ *  Initialise device statistics.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device
+ * @param cnt_buckets
+ *   Number of sampling buckets within sampling window.
+ * @return
+ *   - Zero on success.
+ *   - Negative value on error.
+ */
+int rte_eth_dev_stats_init(uint8_t port_id, uint32_t cnt_buckets);
+
+/**
+ *  Calculate device statistics.
+ *  This function need to be called periodically. The time between each
+ *  invocation is the sampling period of an individual time bucket within
+ *  the sampling window.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device
+ * @return
+ *   - Zero on success.
+ *   - Negative value on error.
+ */
+int rte_eth_dev_stats_calc(uint8_t port_id);
 
 /**
  * Reset extended statistics of an Ethernet device.

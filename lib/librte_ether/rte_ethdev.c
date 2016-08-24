@@ -101,6 +101,7 @@ static const struct rte_eth_xstats_name_off rte_stats_strings[] = {
 };
 
 #define RTE_NB_STATS (sizeof(rte_stats_strings) / sizeof(rte_stats_strings[0]))
+#define RTE_NB_DEV_STATS 4
 
 static const struct rte_eth_xstats_name_off rte_rxq_stats_strings[] = {
 	{"packets", offsetof(struct rte_eth_stats, q_ipackets)},
@@ -1499,6 +1500,7 @@ void
 rte_eth_stats_reset(uint8_t port_id)
 {
 	struct rte_eth_dev *dev;
+	struct rte_eth_dev_stats *dev_stats;
 
 	RTE_ETH_VALID_PORTID_OR_RET(port_id);
 	dev = &rte_eth_devices[port_id];
@@ -1506,6 +1508,19 @@ rte_eth_stats_reset(uint8_t port_id)
 	RTE_FUNC_PTR_OR_RET(*dev->dev_ops->stats_reset);
 	(*dev->dev_ops->stats_reset)(dev);
 	dev->data->rx_mbuf_alloc_failed = 0;
+
+	/* Clear device running stat counts */
+	dev_stats = &dev->data->stats;
+	memset(dev_stats->list_ibuckets, 0,
+		sizeof(uint64_t) * dev_stats->cnt_buckets);
+	memset(dev_stats->list_obuckets, 0,
+		sizeof(uint64_t) * dev_stats->cnt_buckets);
+	dev_stats->last_ibytes = 0;
+	dev_stats->last_obytes = 0;
+	dev_stats->peak_ibytes = 0;
+	dev_stats->peak_obytes = 0;
+	dev_stats->total_ibytes = 0;
+	dev_stats->total_obytes = 0;
 }
 
 static int
@@ -1522,7 +1537,7 @@ get_xstats_count(uint8_t port_id)
 			return count;
 	} else
 		count = 0;
-	count += RTE_NB_STATS;
+	count += RTE_NB_STATS + RTE_NB_DEV_STATS;
 	count += dev->data->nb_rx_queues * RTE_NB_RXQ_STATS;
 	count += dev->data->nb_tx_queues * RTE_NB_TXQ_STATS;
 	return count;
@@ -1574,6 +1589,19 @@ rte_eth_xstats_get_names(uint8_t port_id,
 		}
 	}
 
+	snprintf(xstats_names[cnt_used_entries++].name,
+		sizeof(xstats_names[0].name),
+		"tx_peak_bytes");
+	snprintf(xstats_names[cnt_used_entries++].name,
+		sizeof(xstats_names[0].name),
+		"tx_mean_bytes");
+	snprintf(xstats_names[cnt_used_entries++].name,
+		sizeof(xstats_names[0].name),
+		"rx_peak_bytes");
+	snprintf(xstats_names[cnt_used_entries++].name,
+		sizeof(xstats_names[0].name),
+		"rx_mean_bytes");
+
 	if (dev->dev_ops->xstats_get_names != NULL) {
 		/* If there are any driver-specific xstats, append them
 		 * to end of list.
@@ -1600,14 +1628,16 @@ rte_eth_xstats_get(uint8_t port_id, struct rte_eth_xstat *xstats,
 	unsigned count = 0, i, q;
 	signed xcount = 0;
 	uint64_t val, *stats_ptr;
+	struct rte_eth_dev_stats *dev_stats;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
 	dev = &rte_eth_devices[port_id];
+	dev_stats = &dev->data->stats;
 
 	/* Return generic statistics */
 	count = RTE_NB_STATS + (dev->data->nb_rx_queues * RTE_NB_RXQ_STATS) +
-		(dev->data->nb_tx_queues * RTE_NB_TXQ_STATS);
+		(dev->data->nb_tx_queues * RTE_NB_TXQ_STATS) + RTE_NB_DEV_STATS;
 
 	/* implemented by the driver */
 	if (dev->dev_ops->xstats_get != NULL) {
@@ -1659,10 +1689,83 @@ rte_eth_xstats_get(uint8_t port_id, struct rte_eth_xstat *xstats,
 		}
 	}
 
+	xstats[count++].value = dev_stats->peak_obytes;
+	xstats[count++].value =
+		dev_stats->total_obytes / dev_stats->cnt_buckets;
+	xstats[count++].value = dev_stats->peak_ibytes;
+	xstats[count++].value =
+		dev_stats->total_ibytes / dev_stats->cnt_buckets;
+
 	for (i = 0; i < count + xcount; i++)
 		xstats[i].id = i;
 
 	return count + xcount;
+}
+
+int
+rte_eth_dev_stats_init(uint8_t port_id, uint32_t cnt_buckets)
+{
+	struct rte_eth_dev *dev;
+	struct rte_eth_dev_stats *stats;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
+	dev = &rte_eth_devices[port_id];
+	stats = &dev->data->stats;
+
+	memset(stats, 0, sizeof(struct rte_eth_dev_stats));
+	stats->list_ibuckets = rte_zmalloc(
+		NULL, sizeof(uint64_t) * cnt_buckets, 0);
+	stats->list_obuckets = rte_zmalloc(
+		NULL, sizeof(uint64_t) * cnt_buckets, 0);
+	if (stats->list_ibuckets == NULL || stats->list_obuckets == NULL)
+		return -ENOMEM;
+	stats->cnt_buckets = cnt_buckets;
+	return 0;
+}
+
+int
+rte_eth_dev_stats_calc(uint8_t port_id)
+{
+	struct rte_eth_dev *dev;
+	uint64_t *metric;
+	uint64_t cnt_bytes_in_bucket;
+	struct rte_eth_dev_stats *stats;
+	struct rte_eth_stats eth_stats;
+	unsigned ret_code;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
+	dev = &rte_eth_devices[port_id];
+	stats = &dev->data->stats;
+
+	ret_code = rte_eth_stats_get(port_id, &eth_stats);
+	if (ret_code != 0)
+		return ret_code;
+
+	/* tx_good_bytes */
+	metric = RTE_PTR_ADD(&eth_stats, rte_stats_strings[3].offset);
+	cnt_bytes_in_bucket = *metric - stats->last_obytes;
+	stats->last_obytes = *metric;
+	if (cnt_bytes_in_bucket > stats->peak_obytes)
+		stats->peak_obytes = cnt_bytes_in_bucket;
+	stats->total_obytes -= stats->list_obuckets[stats->next_bucket];
+	stats->total_obytes += cnt_bytes_in_bucket;
+	stats->list_obuckets[stats->next_bucket] = cnt_bytes_in_bucket;
+
+	/* rx_good_bytes */
+	metric = RTE_PTR_ADD(&eth_stats, rte_stats_strings[2].offset);
+	cnt_bytes_in_bucket = *metric - stats->last_ibytes;
+	stats->last_ibytes = *metric;
+	if (cnt_bytes_in_bucket > stats->peak_ibytes)
+		stats->peak_ibytes = cnt_bytes_in_bucket;
+	stats->total_ibytes -= stats->list_ibuckets[stats->next_bucket];
+	stats->total_ibytes += cnt_bytes_in_bucket;
+	stats->list_ibuckets[stats->next_bucket] = cnt_bytes_in_bucket;
+
+	/* index wraparound */
+	if (++stats->next_bucket == stats->cnt_buckets)
+		stats->next_bucket = 0;
+
+	return 0;
 }
 
 /* reset ethdev extended statistics */
