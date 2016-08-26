@@ -239,6 +239,7 @@ extern struct fwd_engine icmp_echo_engine;
 #ifdef RTE_LIBRTE_IEEE1588
 extern struct fwd_engine ieee1588_fwd_engine;
 #endif
+extern struct fwd_engine txprep_fwd_engine;
 
 extern struct fwd_engine * fwd_engines[]; /**< NULL terminated array. */
 

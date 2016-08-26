@@ -1,6 +1,6 @@
 #   BSD LICENSE
 #
-#   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+#   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
 #   All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or without
@@ -49,6 +49,7 @@ SRCS-y += parameters.c
 SRCS-$(CONFIG_RTE_LIBRTE_CMDLINE) += cmdline.c
 SRCS-y += config.c
 SRCS-y += iofwd.c
+SRCS-y += txprep.c
 SRCS-y += macfwd.c
 SRCS-y += macswap.c
 SRCS-y += flowgen.c
