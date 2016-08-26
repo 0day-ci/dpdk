@@ -1068,4 +1068,6 @@ static struct rte_driver rte_cxgbe_driver = {
 
 PMD_REGISTER_DRIVER(rte_cxgbe_driver, cxgb4);
 DRIVER_REGISTER_PCI_TABLE(cxgb4, cxgb4_pci_tbl);
+DRIVER_REGISTER_KMOD_DEP(cxgb4,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");
 

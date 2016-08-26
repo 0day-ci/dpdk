@@ -135,4 +135,6 @@ static struct rte_driver pmd_qat_drv = {
 
 PMD_REGISTER_DRIVER(pmd_qat_drv, CRYPTODEV_NAME_QAT_SYM_PMD);
 DRIVER_REGISTER_PCI_TABLE(CRYPTODEV_NAME_QAT_SYM_PMD, pci_id_qat_map);
+DRIVER_REGISTER_KMOD_DEP(CRYPTODEV_NAME_QAT_SYM_PMD,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");
 

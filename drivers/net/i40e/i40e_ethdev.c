@@ -723,6 +723,8 @@ static struct rte_driver rte_i40e_driver = {
 
 PMD_REGISTER_DRIVER(rte_i40e_driver, i40e);
 DRIVER_REGISTER_PCI_TABLE(i40e, pci_id_i40e_map);
+DRIVER_REGISTER_KMOD_DEP(i40e,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");
 
 /*
  * Initialize registers for flexible payload, which should be set by NVM.

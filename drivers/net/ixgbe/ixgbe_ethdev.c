@@ -7421,5 +7421,9 @@ static struct rte_driver rte_ixgbevf_driver = {
 
 PMD_REGISTER_DRIVER(rte_ixgbe_driver, ixgbe);
 DRIVER_REGISTER_PCI_TABLE(ixgbe, pci_id_ixgbe_map);
+DRIVER_REGISTER_KMOD_DEP(ixgbe,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");
 PMD_REGISTER_DRIVER(rte_ixgbevf_driver, ixgbevf);
 DRIVER_REGISTER_PCI_TABLE(ixgbevf, pci_id_ixgbevf_map);
+DRIVER_REGISTER_KMOD_DEP(ixgbevf,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

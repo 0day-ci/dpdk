@@ -2488,6 +2488,8 @@ static struct rte_driver rte_nfp_net_driver = {
 
 PMD_REGISTER_DRIVER(rte_nfp_net_driver, nfp);
 DRIVER_REGISTER_PCI_TABLE(nfp, pci_id_nfp_net_map);
+DRIVER_REGISTER_KMOD_DEP(nfp,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");
 
 /*
  * Local variables:

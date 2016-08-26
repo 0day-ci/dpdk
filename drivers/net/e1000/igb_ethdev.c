@@ -5257,5 +5257,9 @@ eth_igb_configure_msix_intr(struct rte_eth_dev *dev)
 
 PMD_REGISTER_DRIVER(pmd_igb_drv, igb);
 DRIVER_REGISTER_PCI_TABLE(igb, pci_id_igb_map);
+DRIVER_REGISTER_KMOD_DEP(igb,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");
 PMD_REGISTER_DRIVER(pmd_igbvf_drv, igbvf);
 DRIVER_REGISTER_PCI_TABLE(igbvf, pci_id_igbvf_map);
+DRIVER_REGISTER_KMOD_DEP(igbvf,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

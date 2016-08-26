@@ -667,5 +667,9 @@ static struct rte_driver rte_bnx2xvf_driver = {
 
 PMD_REGISTER_DRIVER(rte_bnx2x_driver, bnx2x);
 DRIVER_REGISTER_PCI_TABLE(bnx2x, pci_id_bnx2x_map);
+DRIVER_REGISTER_KMOD_DEP(bnx2x,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");
 PMD_REGISTER_DRIVER(rte_bnx2xvf_driver, bnx2xvf);
 DRIVER_REGISTER_PCI_TABLE(bnx2xvf, pci_id_bnx2xvf_map);
+DRIVER_REGISTER_KMOD_DEP(bnx2xvf,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

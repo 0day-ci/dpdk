@@ -763,3 +763,6 @@ static struct rte_driver rte_mlx5_driver = {
 
 PMD_REGISTER_DRIVER(rte_mlx5_driver, mlx5);
 DRIVER_REGISTER_PCI_TABLE(mlx5, mlx5_pci_id_map);
+DRIVER_REGISTER_KMOD_DEP(mlx5,
+	"ptp,inet_lro,ib_sa,ib_mad,ib_netlink,ib_addr,"
+	"ib_core,ib_uverbs,mlx5_core,mlx5_ib");

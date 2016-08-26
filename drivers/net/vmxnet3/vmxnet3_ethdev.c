@@ -955,3 +955,5 @@ static struct rte_driver rte_vmxnet3_driver = {
 
 PMD_REGISTER_DRIVER(rte_vmxnet3_driver, vmxnet3);
 DRIVER_REGISTER_PCI_TABLE(vmxnet3, pci_id_vmxnet3_map);
+DRIVER_REGISTER_KMOD_DEP(vmxnet3,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

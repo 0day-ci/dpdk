@@ -1068,3 +1068,5 @@ static struct rte_driver bnxt_pmd_drv = {
 
 PMD_REGISTER_DRIVER(bnxt_pmd_drv, bnxt);
 DRIVER_REGISTER_PCI_TABLE(bnxt, bnxt_pci_id_map);
+DRIVER_REGISTER_KMOD_DEP(bnxt,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

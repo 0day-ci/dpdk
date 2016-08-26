@@ -203,6 +203,20 @@ RTE_STR(table)
 static const char DRV_EXP_TAG(name, param_string_export)[] \
 __attribute__((used)) = str
 
+/**
+ * Advertise the list of kernel modules required to run this driver
+ *
+ * This string list the name of kernel modules, separated by commas. The
+ * order is important. If several modules lists are possible, they are
+ * separated by colons.
+ *
+ * Example: "uio,igb_uio:uio,uio_pci_generic" means either "uio,igb_uio"
+ * or "uio,uio_pci_generic".
+ */
+#define DRIVER_REGISTER_KMOD_DEP(name, str) \
+static const char DRV_EXP_TAG(name, kmod_dep_export)[] \
+__attribute__((used)) = str
+
 #ifdef __cplusplus
 }
 #endif

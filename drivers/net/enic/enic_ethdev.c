@@ -642,3 +642,5 @@ static struct rte_driver rte_enic_driver = {
 
 PMD_REGISTER_DRIVER(rte_enic_driver, enic);
 DRIVER_REGISTER_PCI_TABLE(enic, pci_id_enic_map);
+DRIVER_REGISTER_KMOD_DEP(enic,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

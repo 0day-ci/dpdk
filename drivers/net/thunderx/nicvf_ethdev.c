@@ -1785,3 +1785,5 @@ static struct rte_driver rte_nicvf_driver = {
 
 PMD_REGISTER_DRIVER(rte_nicvf_driver, thunderx_nicvf);
 DRIVER_REGISTER_PCI_TABLE(thunderx_nicvf, pci_id_nicvf_map);
+DRIVER_REGISTER_KMOD_DEP(thunderx_nicvf,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

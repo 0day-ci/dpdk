@@ -1530,5 +1530,9 @@ static struct rte_driver rte_qede_driver = {
 
 PMD_REGISTER_DRIVER(rte_qede_driver, qede);
 DRIVER_REGISTER_PCI_TABLE(qede, pci_id_qede_map);
+DRIVER_REGISTER_KMOD_DEP(qede,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");
 PMD_REGISTER_DRIVER(rte_qedevf_driver, qedevf);
 DRIVER_REGISTER_PCI_TABLE(qedevf, pci_id_qedevf_map);
+DRIVER_REGISTER_KMOD_DEP(qedevf,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

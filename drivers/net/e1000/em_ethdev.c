@@ -1806,3 +1806,5 @@ struct rte_driver em_pmd_drv = {
 
 PMD_REGISTER_DRIVER(em_pmd_drv, em);
 DRIVER_REGISTER_PCI_TABLE(em, pci_id_em_map);
+DRIVER_REGISTER_KMOD_DEP(em,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

@@ -85,6 +85,7 @@ else \
 
 enum opt_params {
 	PMD_PARAM_STRING = 0,
+	PMD_KMOD_DEP,
 	PMD_OPT_MAX
 };
 

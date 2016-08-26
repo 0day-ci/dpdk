@@ -1570,3 +1570,5 @@ static struct rte_driver rte_virtio_driver = {
 
 PMD_REGISTER_DRIVER(rte_virtio_driver, virtio_net);
 DRIVER_REGISTER_PCI_TABLE(virtio_net, pci_id_virtio_map);
+DRIVER_REGISTER_KMOD_DEP(virtio_net,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

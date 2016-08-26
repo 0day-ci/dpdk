@@ -1709,3 +1709,5 @@ struct rte_driver ena_pmd_drv = {
 
 PMD_REGISTER_DRIVER(ena_pmd_drv, ena);
 DRIVER_REGISTER_PCI_TABLE(ena, pci_id_ena_map);
+DRIVER_REGISTER_KMOD_DEP(ena,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

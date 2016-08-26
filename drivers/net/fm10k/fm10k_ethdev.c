@@ -3086,3 +3086,5 @@ static struct rte_driver rte_fm10k_driver = {
 
 PMD_REGISTER_DRIVER(rte_fm10k_driver, fm10k);
 DRIVER_REGISTER_PCI_TABLE(fm10k, pci_id_fm10k_map);
+DRIVER_REGISTER_KMOD_DEP(fm10k,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");

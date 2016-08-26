@@ -1586,6 +1586,8 @@ static struct rte_driver rte_i40evf_driver = {
 
 PMD_REGISTER_DRIVER(rte_i40evf_driver, i40evf);
 DRIVER_REGISTER_PCI_TABLE(i40evf, pci_id_i40evf_map);
+DRIVER_REGISTER_KMOD_DEP(i40evf,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");
 
 static int
 i40evf_dev_configure(struct rte_eth_dev *dev)

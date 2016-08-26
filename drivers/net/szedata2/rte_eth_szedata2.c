@@ -1602,3 +1602,5 @@ static struct rte_driver rte_szedata2_driver = {
 
 PMD_REGISTER_DRIVER(rte_szedata2_driver, RTE_SZEDATA2_DRIVER_NAME);
 DRIVER_REGISTER_PCI_TABLE(RTE_SZEDATA2_DRIVER_NAME, rte_szedata2_pci_id_table);
+DRIVER_REGISTER_KMOD_DEP(RTE_SZEDATA2_DRIVER_NAME,
+	"uio,igb_uio:uio,uio_pci_generic:vfio,vfio-pci");
