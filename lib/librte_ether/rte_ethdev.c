@@ -2306,6 +2306,22 @@ rte_eth_dev_default_mac_addr_set(uint8_t port_id, struct ether_addr *addr)
 }
 
 int
+rte_eth_dev_set_vf_mac_addr(uint8_t port_id, uint16_t vf, struct ether_addr *addr)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	if (!is_valid_assigned_ether_addr(addr))
+		return -EINVAL;
+
+	dev = &rte_eth_devices[port_id];
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_mac_addr, -ENOTSUP);
+
+	return (*dev->dev_ops->set_vf_mac_addr)(dev, vf, addr);
+}
+
+int
 rte_eth_dev_set_vf_rxmode(uint8_t port_id,  uint16_t vf,
 				uint16_t rx_mode, uint8_t on)
 {
@@ -2488,6 +2504,149 @@ rte_eth_dev_set_vf_vlan_filter(uint8_t port_id, uint16_t vlan_id,
 	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_vlan_filter, -ENOTSUP);
 	return (*dev->dev_ops->set_vf_vlan_filter)(dev, vlan_id,
 						   vf_mask, vlan_on);
+}
+
+int
+rte_eth_dev_set_vf_vlan_anti_spoof(uint8_t port_id,
+			       uint16_t vf, uint8_t on)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+	if (vf > 63) {
+		RTE_PMD_DEBUG_TRACE("VF VLAN anti spoof:VF %d > 63\n", vf);
+		return -EINVAL;
+	}
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_vlan_anti_spoof, -ENOTSUP);
+	(*dev->dev_ops->set_vf_vlan_anti_spoof)(dev, vf, on);
+	return 0;
+}
+
+int
+rte_eth_dev_set_vf_mac_anti_spoof(uint8_t port_id,
+			       uint16_t vf, uint8_t on)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+	if (vf > 63) {
+		RTE_PMD_DEBUG_TRACE("VF MAC anti spoof:VF %d > 63\n", vf);
+		return -EINVAL;
+	}
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_mac_anti_spoof, -ENOTSUP);
+	(*dev->dev_ops->set_vf_mac_anti_spoof)(dev, vf, on);
+	return 0;
+}
+
+int
+rte_eth_dev_vf_ping(uint8_t port_id, int32_t vf)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+	if (vf > 63) {
+		RTE_PMD_DEBUG_TRACE("VF ping: VF %d > 64\n", vf);
+		return -EINVAL;
+	}
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->vf_ping, -ENOTSUP);
+	return (*dev->dev_ops->vf_ping)(dev, vf);
+}
+
+int
+rte_eth_dev_set_vf_vlan_strip(uint8_t port_id, uint16_t vf, int on)
+{
+	struct rte_eth_dev *dev;
+	struct rte_eth_dev_info dev_info;
+	uint16_t queues_per_pool;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+	if (vf > 63) {
+		RTE_PMD_DEBUG_TRACE("VF vlan strip set VF %d > 63\n", vf);
+		return -EINVAL;
+	}
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_vlan_strip, -ENOTSUP);
+
+	rte_eth_dev_info_get(port_id, &dev_info);
+	queues_per_pool = dev_info.vmdq_queue_num/dev_info.max_vmdq_pools;
+
+	(*dev->dev_ops->set_vf_vlan_strip)(dev, on, queues_per_pool);
+	return 0;
+}
+
+int
+rte_eth_dev_set_vf_vlan_insert(uint8_t port_id, uint16_t vf, int on)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+	if (vf > 63) {
+		RTE_PMD_DEBUG_TRACE("VF vlan insert set VF %d > 63\n", vf);
+		return -EINVAL;
+	}
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_vlan_insert, -ENOTSUP);
+
+	(*dev->dev_ops->set_vf_vlan_insert)(dev, vf, on);
+	return 0;
+}
+
+int
+rte_eth_dev_set_tx_loopback(uint8_t port_id, int on)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_tx_loopback, -ENOTSUP);
+
+	(*dev->dev_ops->set_tx_loopback)(dev, on);
+	return 0;
+}
+
+int
+rte_eth_dev_set_all_queues_drop_en(uint8_t port_id, int state)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_all_queues_drop_en, -ENOTSUP);
+
+	(*dev->dev_ops->set_all_queues_drop_en)(dev, state);
+	return 0;
+}
+
+int
+rte_eth_dev_set_vf_split_drop_en(uint8_t port_id, uint16_t vf, int state)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_vf_split_drop_en, -ENOTSUP);
+
+	(*dev->dev_ops->set_vf_split_drop_en)(dev, vf, state);
+	return 0;
 }
 
 int rte_eth_set_queue_rate_limit(uint8_t port_id, uint16_t queue_idx,

@@ -1230,6 +1230,11 @@ typedef void (*eth_mac_addr_set_t)(struct rte_eth_dev *dev,
 				  struct ether_addr *mac_addr);
 /**< @internal Set a MAC address into Receive Address Address Register */
 
+typedef int (*eth_set_vf_mac_addr_t)(struct rte_eth_dev *dev,
+				  uint16_t vf,
+				  struct ether_addr *mac_addr);
+/**< @internal Set VF address into Receive Address Address Register */
+
 typedef int (*eth_uc_hash_table_set_t)(struct rte_eth_dev *dev,
 				  struct ether_addr *mac_addr,
 				  uint8_t on);
@@ -1260,6 +1265,43 @@ typedef int (*eth_set_vf_vlan_filter_t)(struct rte_eth_dev *dev,
 				  uint64_t vf_mask,
 				  uint8_t vlan_on);
 /**< @internal Set VF VLAN pool filter */
+
+typedef void (*eth_set_vf_vlan_anti_spoof_t)(struct rte_eth_dev *dev,
+				  uint16_t vf,
+				  uint8_t on);
+/**< @internal Set VF VLAN anti spoof */
+
+typedef void (*eth_set_vf_mac_anti_spoof_t)(struct rte_eth_dev *dev,
+				  uint16_t vf,
+				  uint8_t on);
+/**< @internal Set VF MAC anti spoof */
+
+typedef int (*eth_vf_ping_t)(struct rte_eth_dev *dev,
+				int32_t vf);
+/**< @internal ping one or all vf's */
+
+typedef void (*eth_set_vf_vlan_strip_t)(struct rte_eth_dev *dev,
+				  int on,
+				  uint16_t queues_per_pool);
+/**< @internal Set VF vlan strip */
+
+typedef void (*eth_set_vf_vlan_insert_t)(struct rte_eth_dev *dev,
+				  uint16_t vf,
+				  int vlan);
+/**< @internal Set VF vlan insert */
+
+typedef void (*eth_set_tx_loopback_t)(struct rte_eth_dev *dev,
+				  int on);
+/**< @internal Set tx loopback */
+
+typedef void (*eth_set_all_queues_drop_en_t)(struct rte_eth_dev *dev,
+				  int state);
+/**< @internal Set all queues drop */
+
+typedef void (*eth_set_vf_split_drop_en_t)(struct rte_eth_dev *dev,
+				  uint16_t vf,
+				  int state);
+/**< @internal Set the enable drop bit in the VF split rx control register */
 
 typedef int (*eth_set_queue_rate_limit_t)(struct rte_eth_dev *dev,
 				uint16_t queue_idx,
@@ -1465,6 +1507,7 @@ struct eth_dev_ops {
 	eth_mac_addr_remove_t      mac_addr_remove; /**< Remove MAC address */
 	eth_mac_addr_add_t         mac_addr_add;  /**< Add a MAC address */
 	eth_mac_addr_set_t         mac_addr_set;  /**< Set a MAC address */
+	eth_set_vf_mac_addr_t      set_vf_mac_addr;  /**< Set a VF MAC address */
 	eth_uc_hash_table_set_t    uc_hash_table_set;  /**< Set Unicast Table Array */
 	eth_uc_all_hash_table_set_t uc_all_hash_table_set;  /**< Set Unicast hash bitmap */
 	eth_mirror_rule_set_t	   mirror_rule_set;  /**< Add a traffic mirror rule.*/
@@ -1473,6 +1516,14 @@ struct eth_dev_ops {
 	eth_set_vf_rx_t            set_vf_rx;  /**< enable/disable a VF receive */
 	eth_set_vf_tx_t            set_vf_tx;  /**< enable/disable a VF transmit */
 	eth_set_vf_vlan_filter_t   set_vf_vlan_filter;  /**< Set VF VLAN filter */
+	eth_set_vf_vlan_anti_spoof_t  set_vf_vlan_anti_spoof; /**< Set VF VLAN anti spoof */
+	eth_set_vf_mac_anti_spoof_t   set_vf_mac_anti_spoof;  /**< Set VF MAC anti spoof */
+	eth_vf_ping_t             vf_ping;  /**< Ping one or all VF's */
+	eth_set_vf_vlan_strip_t   set_vf_vlan_strip; /** <Set VF VLAN strip */
+	eth_set_vf_vlan_insert_t  set_vf_vlan_insert; /** <Set VF VLAN insert */
+	eth_set_tx_loopback_t  set_tx_loopback; /** <Set tx loopback */
+	eth_set_all_queues_drop_en_t  set_all_queues_drop_en; /** <Set queue drop enable bit */
+	eth_set_vf_split_drop_en_t  set_vf_split_drop_en; /** <Set split drop enable bit.*/
 	/** Add UDP tunnel port. */
 	eth_udp_tunnel_port_add_t udp_tunnel_port_add;
 	/** Del UDP tunnel port. */
@@ -3389,7 +3440,25 @@ int rte_eth_dev_mac_addr_remove(uint8_t port, struct ether_addr *mac_addr);
  */
 int rte_eth_dev_default_mac_addr_set(uint8_t port, struct ether_addr *mac_addr);
 
+/**
+ * Set the VF MAC address.
+ *
+ * @param port
+ *   The port identifier of the Ethernet device.
+ * @param vf
+ *   VF id.
+ * @param mac_addr
+ *   VF MAC address.
 
+ * @return
+ *   - (0) if successful, or *mac_addr* didn't exist.
+ *   - (-ENOTSUP) if hardware doesn't support.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if MAC address is invalid.
+ */
+
+int rte_eth_dev_set_vf_mac_addr(uint8_t port, uint16_t vf,
+				struct ether_addr *mac_addr);
 /**
  * Update Redirection Table(RETA) of Receive Side Scaling of Ethernet device.
  *
@@ -3555,6 +3624,160 @@ rte_eth_dev_set_vf_vlan_filter(uint8_t port, uint16_t vlan_id,
 				uint64_t vf_mask,
 				uint8_t vlan_on);
 
+/**
+ * Enable/Disable VF VLAN anti spoofing.
+ *
+ * @param port
+ *    The port identifier of the Ethernet device.
+ * @param vf
+ *    VF on which to set VLAN anti spoofing.
+ * @param vlan_on
+ *    1 - Enable VFs VLAN anti spoofing.
+ *    0 - Disable VFs VLAN anti spoofing.
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP) if hardware doesn't support.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if bad parameter.
+ */
+int
+rte_eth_dev_set_vf_vlan_anti_spoof(uint8_t port,
+				uint16_t vf,
+				uint8_t on);
+
+/**
+ * Enable/Disable VF MAC anti spoofing.
+ *
+ * @param port
+ *    The port identifier of the Ethernet device.
+ * @param vf
+ *    VF on which to set MAC anti spoofing.
+ * @param vlan_on
+ *    1 - Enable VFs MAC anti spoofing.
+ *    0 - Disable VFs MAC anti spoofing.
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP) if hardware doesn't support.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if bad parameter.
+ */
+int
+rte_eth_dev_set_vf_mac_anti_spoof(uint8_t port,
+				uint16_t vf,
+				uint8_t on);
+
+/**
+ * Ping all or specified VF
+ *
+ * @param port
+ *   The port identifier of the Ethernet device.
+ * @param vf
+ *   specify VF to ping or all if -1.
+ *
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP) if hardware doesn't support this feature.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if bad parameter.
+ */
+int
+rte_eth_dev_vf_ping(uint8_t port, int32_t vf);
+
+/**
+ * Enable/Disable vf vlan strip
+ *
+ * @param port
+ *    The port identifier of the Ethernet device.
+ * @param vf
+ *    ID specifying VF.
+ * @param on
+ *    1 - Enable VF's vlan strip.
+ *    0 - Disable VF's vlan strip
+ * @param queues_per_pool
+ *    The number of queues per pool.
+ *
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP) if hardware doesn't support this feature.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if bad parameter.
+ */
+int
+rte_eth_dev_set_vf_vlan_strip(uint8_t port, uint16_t vf, int on);
+
+/**
+ * Enable/Disable vf vlan insert
+ *
+ * @param port
+ *    The port identifier of the Ethernet device.
+ * @param vf
+ *    ID specifying VF.
+ * @param on
+ *    1 - Enable VF's vlan insert.
+ *    0 - Disable VF's vlan insert
+ *
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP) if hardware doesn't support this feature.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if bad parameter.
+ */
+int
+rte_eth_dev_set_vf_vlan_insert(uint8_t port, uint16_t vf, int on);
+
+/**
+ * Enable/Disable tx loopback
+ *
+ * @param port
+ *    The port identifier of the Ethernet device.
+ * @param on
+ *    1 - Enable tx loopback.
+ *    0 - Disable tx loopback.
+ *
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP) if hardware doesn't support this feature.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if bad parameter.
+ */
+int
+rte_eth_dev_set_tx_loopback(uint8_t port, int on);
+/**
+ * set all queues drop enable bit
+ *
+ * @param port
+ *    The port identifier of the Ethernet device.
+ * @param state
+ *    1 - set the queue drop enable bit for all pools.
+ *    0 - reset the queue drop enable bit for all pools.
+ *
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP) if hardware doesn't support this feature.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if bad parameter.
+ */
+int
+rte_eth_dev_set_all_queues_drop_en(uint8_t port, int state);
+/**
+ * set drop enable bit in the VF split rx control register
+ *
+ * @param port
+ *    The port identifier of the Ethernet device.
+ * @param vf
+ *    ID specifying VF.
+ * @param state
+ *    1 - set the drop enable bit in the split rx control register.
+ *    0 - reset the drop enable bit in the split rx control register.
+ *
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP) if hardware doesn't support this feature.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if bad parameter.
+ */
+int
+rte_eth_dev_set_vf_split_drop_en(uint8_t port, uint16_t vf, int state);
 /**
  * Set a traffic mirroring rule on an Ethernet device
  *
