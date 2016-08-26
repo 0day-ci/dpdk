@@ -4368,6 +4368,19 @@ rte_eth_dev_get_port_by_name(const char *name, uint8_t *port_id);
 int
 rte_eth_dev_get_name_by_port(uint8_t port_id, char *name);
 
+/**
+ * Wrapper for use by pci drivers as a .devinit function to attach to a ethdev
+ * interface.
+ */
+int rte_eth_dev_pci_probe(struct rte_pci_driver *pci_drv,
+			  struct rte_pci_device *pci_dev);
+
+/**
+ * Wrapper for use by pci drivers as a .devuninit function to detach a ethdev
+ * interface.
+ */
+int rte_eth_dev_pci_remove(struct rte_pci_device *pci_dev);
+
 #ifdef __cplusplus
 }
 #endif

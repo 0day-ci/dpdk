@@ -245,9 +245,9 @@ rte_eth_dev_release_port(struct rte_eth_dev *eth_dev)
 	return 0;
 }
 
-static int
-rte_eth_dev_init(struct rte_pci_driver *pci_drv,
-		 struct rte_pci_device *pci_dev)
+int
+rte_eth_dev_pci_probe(struct rte_pci_driver *pci_drv,
+		      struct rte_pci_device *pci_dev)
 {
 	struct eth_driver    *eth_drv;
 	struct rte_eth_dev *eth_dev;
@@ -299,8 +299,8 @@ rte_eth_dev_init(struct rte_pci_driver *pci_drv,
 	return diag;
 }
 
-static int
-rte_eth_dev_uninit(struct rte_pci_device *pci_dev)
+int
+rte_eth_dev_pci_remove(struct rte_pci_device *pci_dev)
 {
 	const struct eth_driver *eth_drv;
 	struct rte_eth_dev *eth_dev;
@@ -357,8 +357,8 @@ rte_eth_dev_uninit(struct rte_pci_device *pci_dev)
 void
 rte_eth_driver_register(struct eth_driver *eth_drv)
 {
-	eth_drv->pci_drv.devinit = rte_eth_dev_init;
-	eth_drv->pci_drv.devuninit = rte_eth_dev_uninit;
+	eth_drv->pci_drv.devinit = rte_eth_dev_pci_probe;
+	eth_drv->pci_drv.devuninit = rte_eth_dev_pci_remove;
 	rte_eal_pci_register(&eth_drv->pci_drv);
 }
 
