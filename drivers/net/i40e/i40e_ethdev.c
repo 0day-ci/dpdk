@@ -7568,7 +7568,16 @@ i40e_hash_filter_inset_select(struct i40e_hw *hw,
 		PMD_DRV_LOG(ERR, "invalid flow_type input.");
 		return -EINVAL;
 	}
+
+#ifdef X722_SUPPORT
+	/* get translated pctype value in fd pctype register */
+	pctype = i40e_read_rx_ctl(hw,
+		I40E_GLQF_FD_PCTYPES(i40e_flowtype_to_pctype(
+		conf->flow_type)));
+#else
 	pctype = i40e_flowtype_to_pctype(conf->flow_type);
+#endif
+
 	ret = i40e_parse_input_set(&input_set, pctype, conf->field,
 				   conf->inset_size);
 	if (ret) {
@@ -7637,7 +7646,9 @@ i40e_fdir_filter_inset_select(struct i40e_pf *pf,
 		PMD_DRV_LOG(ERR, "invalid flow_type input.");
 		return -EINVAL;
 	}
+
 	pctype = i40e_flowtype_to_pctype(conf->flow_type);
+
 	ret = i40e_parse_input_set(&input_set, pctype, conf->field,
 				   conf->inset_size);
 	if (ret) {
