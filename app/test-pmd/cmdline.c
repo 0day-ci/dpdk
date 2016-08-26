@@ -10585,6 +10585,697 @@ cmdline_parse_inst_t cmd_config_e_tag_filter_del = {
 	},
 };
 
+/* vf vlan anti spoof configuration */
+
+/* Common result structure for vf vlan anti spoof */
+struct cmd_vf_vlan_anti_spoof_result {
+	cmdline_fixed_string_t set;
+	cmdline_fixed_string_t vf;
+	cmdline_fixed_string_t vlan;
+	cmdline_fixed_string_t antispoof;
+	uint8_t port_id;
+	uint32_t vf_id;
+	uint8_t on;
+};
+
+/* Common CLI fields for vf vlan anti spoof enable disable */
+cmdline_parse_token_string_t cmd_vf_vlan_anti_spoof_set =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_anti_spoof_result,
+		 set, "set");
+cmdline_parse_token_string_t cmd_vf_vlan_anti_spoof_vf =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_anti_spoof_result,
+		 vf, "vf");
+cmdline_parse_token_string_t cmd_vf_vlan_anti_spoof_vlan =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_anti_spoof_result,
+		 vlan, "vlan");
+cmdline_parse_token_string_t cmd_vf_vlan_anti_spoof_antispoof =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_anti_spoof_result,
+		 antispoof, "antispoof");
+cmdline_parse_token_num_t cmd_vf_vlan_anti_spoof_port_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_anti_spoof_result,
+		 port_id, UINT8);
+cmdline_parse_token_num_t cmd_vf_vlan_anti_spoof_vf_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_anti_spoof_result,
+		 vf_id, UINT32);
+cmdline_parse_token_num_t cmd_vf_vlan_anti_spoof_on =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_anti_spoof_result,
+		 on, UINT8);
+
+static void
+cmd_set_vf_vlan_anti_spoof_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_vf_vlan_anti_spoof_result *res = parsed_result;
+	int ret = 0;
+
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
+		return;
+
+	if (res->vf_id > 63) {
+		printf("vf_id must be less than 64.\n");
+		return;
+	}
+	ret = rte_eth_dev_set_vf_vlan_anti_spoof(res->port_id, res->vf_id, res->on);
+	if (ret < 0)
+		printf("vf vlan anti spoofing programming error: (%s)\n",
+		       strerror(-ret));
+}
+
+cmdline_parse_inst_t cmd_set_vf_vlan_anti_spoof = {
+	.f = cmd_set_vf_vlan_anti_spoof_parsed,
+	.data = NULL,
+	.help_str = "enable/disable vf vlan anti spoof",
+	.tokens = {
+		(void *)&cmd_vf_vlan_anti_spoof_set,
+		(void *)&cmd_vf_vlan_anti_spoof_vf,
+		(void *)&cmd_vf_vlan_anti_spoof_vlan,
+		(void *)&cmd_vf_vlan_anti_spoof_antispoof,
+		(void *)&cmd_vf_vlan_anti_spoof_port_id,
+		(void *)&cmd_vf_vlan_anti_spoof_vf_id,
+		(void *)&cmd_vf_vlan_anti_spoof_on,
+		NULL,
+	},
+};
+
+/* vf mac anti spoof configuration */
+
+/* Common result structure for vf mac anti spoof */
+struct cmd_vf_mac_anti_spoof_result {
+	cmdline_fixed_string_t set;
+	cmdline_fixed_string_t vf;
+	cmdline_fixed_string_t mac;
+	cmdline_fixed_string_t antispoof;
+	uint8_t port_id;
+	uint32_t vf_id;
+	uint8_t on;
+};
+
+/* Common CLI fields for vf mac anti spoof enable disable */
+cmdline_parse_token_string_t cmd_vf_mac_anti_spoof_set =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_mac_anti_spoof_result,
+		 set, "set");
+cmdline_parse_token_string_t cmd_vf_mac_anti_spoof_vf =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_mac_anti_spoof_result,
+		 vf, "vf");
+cmdline_parse_token_string_t cmd_vf_mac_anti_spoof_mac =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_mac_anti_spoof_result,
+		 mac, "mac");
+cmdline_parse_token_string_t cmd_vf_mac_anti_spoof_antispoof =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_mac_anti_spoof_result,
+		 antispoof, "antispoof");
+cmdline_parse_token_num_t cmd_vf_mac_anti_spoof_port_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_mac_anti_spoof_result,
+		 port_id, UINT8);
+cmdline_parse_token_num_t cmd_vf_mac_anti_spoof_vf_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_mac_anti_spoof_result,
+		 vf_id, UINT32);
+cmdline_parse_token_num_t cmd_vf_mac_anti_spoof_on =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_mac_anti_spoof_result,
+		 on, UINT8);
+
+static void
+cmd_set_vf_mac_anti_spoof_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_vf_mac_anti_spoof_result *res = parsed_result;
+	int ret = 0;
+
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
+		return;
+
+	if (res->vf_id > 63) {
+		printf("vf_id must be less than 64.\n");
+		return;
+	}
+
+	ret = rte_eth_dev_set_vf_mac_anti_spoof(res->port_id, res->vf_id, res->on);
+	if (ret < 0)
+		printf("vf vlan mac spoofing programming error: (%s)\n",
+		       strerror(-ret));
+}
+
+cmdline_parse_inst_t cmd_set_vf_mac_anti_spoof = {
+	.f = cmd_set_vf_mac_anti_spoof_parsed,
+	.data = NULL,
+	.help_str = "enable/disable vf mac anti spoof",
+	.tokens = {
+		(void *)&cmd_vf_mac_anti_spoof_set,
+		(void *)&cmd_vf_mac_anti_spoof_vf,
+		(void *)&cmd_vf_mac_anti_spoof_mac,
+		(void *)&cmd_vf_mac_anti_spoof_antispoof,
+		(void *)&cmd_vf_mac_anti_spoof_port_id,
+		(void *)&cmd_vf_mac_anti_spoof_vf_id,
+		(void *)&cmd_vf_mac_anti_spoof_on,
+		NULL,
+	},
+};
+
+/* vf ping configuration */
+
+/* Common result structure for vf ping */
+struct cmd_vf_ping_result {
+	cmdline_fixed_string_t vf;
+	cmdline_fixed_string_t ping;
+	uint8_t port_id;
+	int32_t vf_id;
+};
+
+/* Common CLI fields for ping vfs */
+cmdline_parse_token_string_t cmd_vf_ping_vf =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_ping_result,
+		 vf, "vf");
+cmdline_parse_token_string_t cmd_vf_ping_ping =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_ping_result,
+		 ping, "ping");
+cmdline_parse_token_num_t cmd_vf_ping_port_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_ping_result,
+		 port_id, UINT8);
+cmdline_parse_token_num_t cmd_vf_ping_vf_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_ping_result,
+		 vf_id, INT32);
+
+static void
+cmd_vf_ping_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_vf_ping_result *res = parsed_result;
+	int ret = 0;
+
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
+		return;
+
+	if (res->vf_id > 63) {
+		printf("vf_id must be less than 64.\n");
+		return;
+	}
+
+	ret = rte_eth_dev_vf_ping(res->port_id, res->vf_id);
+	if (ret < 0)
+		printf("ping vfs programming error: (%s)\n",
+		       strerror(-ret));
+}
+
+cmdline_parse_inst_t cmd_vf_ping = {
+	.f = cmd_vf_ping_parsed,
+	.data = NULL,
+	.help_str = "ping all or specified vf",
+	.tokens = {
+		(void *)&cmd_vf_ping_vf,
+		(void *)&cmd_vf_ping_ping,
+		(void *)&cmd_vf_ping_port_id,
+		(void *)&cmd_vf_ping_vf_id,
+		NULL,
+	},
+};
+
+/* vf vlan strip configuration */
+
+/* Common result structure for vf mac anti spoof */
+struct cmd_vf_vlan_strip_result {
+	cmdline_fixed_string_t set;
+	cmdline_fixed_string_t vf;
+	cmdline_fixed_string_t vlan;
+	cmdline_fixed_string_t strip;
+	uint8_t port_id;
+	uint16_t vf_id;
+	uint8_t on;
+};
+
+/* Common CLI fields for vf vlan strip enable disable */
+cmdline_parse_token_string_t cmd_vf_vlan_strip_set =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_strip_result,
+		 set, "set");
+cmdline_parse_token_string_t cmd_vf_vlan_strip_vf =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_strip_result,
+		 vf, "vf");
+cmdline_parse_token_string_t cmd_vf_vlan_strip_vlan =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_strip_result,
+		 vlan, "vlan");
+cmdline_parse_token_string_t cmd_vf_vlan_strip_strip =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_strip_result,
+		 strip, "strip");
+cmdline_parse_token_num_t cmd_vf_vlan_strip_port_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_strip_result,
+		 port_id, UINT8);
+cmdline_parse_token_num_t cmd_vf_vlan_strip_vf_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_strip_result,
+		 vf_id, UINT16);
+cmdline_parse_token_num_t cmd_vf_vlan_strip_on =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_strip_result,
+		 on, UINT8);
+
+static void
+cmd_set_vf_vlan_strip_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_vf_vlan_strip_result *res = parsed_result;
+	int ret = 0;
+
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
+		return;
+
+	if (res->vf_id > 63) {
+		printf("vf_id must be less than 64.\n");
+		return;
+	}
+
+	ret = rte_eth_dev_set_vf_vlan_strip(res->port_id, res->vf_id, res->on);
+	if (ret < 0)
+		printf("vf vlan strip programming error: (%s)\n",
+		       strerror(-ret));
+}
+
+cmdline_parse_inst_t cmd_set_vf_vlan_strip = {
+	.f = cmd_set_vf_vlan_strip_parsed,
+	.data = NULL,
+	.help_str = "enable/disable vf vlan strip",
+	.tokens = {
+		(void *)&cmd_vf_vlan_strip_set,
+		(void *)&cmd_vf_vlan_strip_vf,
+		(void *)&cmd_vf_vlan_strip_vlan,
+		(void *)&cmd_vf_vlan_strip_strip,
+		(void *)&cmd_vf_vlan_strip_port_id,
+		(void *)&cmd_vf_vlan_strip_vf_id,
+		(void *)&cmd_vf_vlan_strip_on,
+		NULL,
+	},
+};
+
+/* vf vlan insert configuration */
+
+/* Common result structure for vf vlan insert */
+struct cmd_vf_vlan_insert_result {
+	cmdline_fixed_string_t set;
+	cmdline_fixed_string_t vf;
+	cmdline_fixed_string_t vlan;
+	cmdline_fixed_string_t insert;
+	uint8_t port_id;
+	uint16_t vf_id;
+	uint8_t on;
+};
+
+/* Common CLI fields for vf vlan insert enable disable */
+cmdline_parse_token_string_t cmd_vf_vlan_insert_set =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_insert_result,
+		 set, "set");
+cmdline_parse_token_string_t cmd_vf_vlan_insert_vf =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_insert_result,
+		 vf, "vf");
+cmdline_parse_token_string_t cmd_vf_vlan_insert_vlan =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_insert_result,
+		 vlan, "vlan");
+cmdline_parse_token_string_t cmd_vf_vlan_insert_insert =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_insert_result,
+		 insert, "insert");
+cmdline_parse_token_num_t cmd_vf_vlan_insert_port_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_insert_result,
+		 port_id, UINT8);
+cmdline_parse_token_num_t cmd_vf_vlan_insert_vf_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_insert_result,
+		 vf_id, UINT16);
+cmdline_parse_token_num_t cmd_vf_vlan_insert_on =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_insert_result,
+		 on, UINT8);
+
+static void
+cmd_set_vf_vlan_insert_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_vf_vlan_insert_result *res = parsed_result;
+	int ret = 0;
+
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
+		return;
+
+	if (res->vf_id > 63) {
+		printf("vf_id must be less than 64.\n");
+		return;
+	}
+
+	ret = rte_eth_dev_set_vf_vlan_insert(res->port_id, res->vf_id, res->on);
+	if (ret < 0)
+		printf("vf vlan insert programming error: (%s)\n",
+		       strerror(-ret));
+}
+
+cmdline_parse_inst_t cmd_set_vf_vlan_insert = {
+	.f = cmd_set_vf_vlan_insert_parsed,
+	.data = NULL,
+	.help_str = "enable/disable vf vlan insert",
+	.tokens = {
+		(void *)&cmd_vf_vlan_insert_set,
+		(void *)&cmd_vf_vlan_insert_vf,
+		(void *)&cmd_vf_vlan_insert_vlan,
+		(void *)&cmd_vf_vlan_insert_insert,
+		(void *)&cmd_vf_vlan_insert_port_id,
+		(void *)&cmd_vf_vlan_insert_vf_id,
+		(void *)&cmd_vf_vlan_insert_on,
+		NULL,
+	},
+};
+
+/* tx loopback configuration */
+
+/* Common result structure for tx loopback */
+struct cmd_tx_loopback_result {
+	cmdline_fixed_string_t set;
+	cmdline_fixed_string_t tx;
+	cmdline_fixed_string_t loopback;
+	uint8_t port_id;
+	uint8_t on;
+};
+
+/* Common CLI fields for tx loopback enable disable */
+cmdline_parse_token_string_t cmd_tx_loopback_set =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_tx_loopback_result,
+		 set, "set");
+cmdline_parse_token_string_t cmd_tx_loopback_tx =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_tx_loopback_result,
+		 tx, "tx");
+cmdline_parse_token_string_t cmd_tx_loopback_loopback =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_tx_loopback_result,
+		 loopback, "loopback");
+cmdline_parse_token_num_t cmd_tx_loopback_port_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_tx_loopback_result,
+		 port_id, UINT8);
+cmdline_parse_token_num_t cmd_tx_loopback_on =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_tx_loopback_result,
+		 on, UINT8);
+
+static void
+cmd_set_tx_loopback_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_tx_loopback_result *res = parsed_result;
+	int ret = 0;
+
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
+		return;
+
+	ret = rte_eth_dev_set_tx_loopback(res->port_id, res->on);
+	if (ret < 0)
+		printf("tx loopback programming error: (%s)\n",
+		       strerror(-ret));
+}
+
+cmdline_parse_inst_t cmd_set_tx_loopback = {
+	.f = cmd_set_tx_loopback_parsed,
+	.data = NULL,
+	.help_str = "enable/disable vf vlan insert",
+	.tokens = {
+		(void *)&cmd_tx_loopback_set,
+		(void *)&cmd_tx_loopback_tx,
+		(void *)&cmd_tx_loopback_loopback,
+		(void *)&cmd_tx_loopback_port_id,
+		(void *)&cmd_tx_loopback_on,
+		NULL,
+	},
+};
+
+/* all queues drop enable configuration */
+
+/* Common result structure for all queues drop enable */
+struct cmd_all_queues_drop_en_result {
+	cmdline_fixed_string_t set;
+	cmdline_fixed_string_t all;
+	cmdline_fixed_string_t queues;
+	cmdline_fixed_string_t drop;
+	uint8_t port_id;
+	uint8_t on;
+};
+
+/* Common CLI fields for tx loopback enable disable */
+cmdline_parse_token_string_t cmd_all_queues_drop_en_set =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_all_queues_drop_en_result,
+		 set, "set");
+cmdline_parse_token_string_t cmd_all_queues_drop_en_all =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_all_queues_drop_en_result,
+		 all, "all");
+cmdline_parse_token_string_t cmd_all_queues_drop_en_queues =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_all_queues_drop_en_result,
+		 queues, "queues");
+cmdline_parse_token_string_t cmd_all_queues_drop_en_drop =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_all_queues_drop_en_result,
+		 drop, "drop");
+cmdline_parse_token_num_t cmd_all_queues_drop_en_port_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_all_queues_drop_en_result,
+		 port_id, UINT8);
+cmdline_parse_token_num_t cmd_all_queues_drop_en_on =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_all_queues_drop_en_result,
+		 on, UINT8);
+
+static void
+cmd_set_all_queues_drop_en_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_all_queues_drop_en_result *res = parsed_result;
+	int ret = 0;
+
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
+		return;
+
+	ret = rte_eth_dev_set_all_queues_drop_en(res->port_id, res->on);
+	if (ret < 0)
+		printf("all queues drop enable programming error: (%s)\n",
+		       strerror(-ret));
+}
+
+cmdline_parse_inst_t cmd_set_all_queues_drop_en = {
+	.f = cmd_set_all_queues_drop_en_parsed,
+	.data = NULL,
+	.help_str = "enable/disable all queues drop enable bits",
+	.tokens = {
+		(void *)&cmd_all_queues_drop_en_set,
+		(void *)&cmd_all_queues_drop_en_all,
+		(void *)&cmd_all_queues_drop_en_queues,
+		(void *)&cmd_all_queues_drop_en_drop,
+		(void *)&cmd_all_queues_drop_en_port_id,
+		(void *)&cmd_all_queues_drop_en_on,
+		NULL,
+	},
+};
+
+/* vf split drop enable configuration */
+
+/* Common result structure for vf split drop enable */
+struct cmd_vf_split_drop_en_result {
+	cmdline_fixed_string_t set;
+	cmdline_fixed_string_t vf;
+	cmdline_fixed_string_t split;
+	cmdline_fixed_string_t drop;
+	uint8_t port_id;
+	uint16_t vf_id;
+	uint8_t on;
+};
+
+/* Common CLI fields for vf split drop enable disable */
+cmdline_parse_token_string_t cmd_vf_split_drop_en_set =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_split_drop_en_result,
+		 set, "set");
+cmdline_parse_token_string_t cmd_vf_split_drop_en_vf =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_split_drop_en_result,
+		 vf, "vf");
+cmdline_parse_token_string_t cmd_vf_split_drop_en_split =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_split_drop_en_result,
+		 split, "split");
+cmdline_parse_token_string_t cmd_vf_split_drop_en_drop =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_split_drop_en_result,
+		 drop, "drop");
+cmdline_parse_token_num_t cmd_vf_split_drop_en_port_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_split_drop_en_result,
+		 port_id, UINT8);
+cmdline_parse_token_num_t cmd_vf_split_drop_en_vf_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_split_drop_en_result,
+		 vf_id, UINT16);
+cmdline_parse_token_num_t cmd_vf_split_drop_en_on =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_split_drop_en_result,
+		 on, UINT8);
+
+static void
+cmd_set_vf_split_drop_en_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_vf_split_drop_en_result *res = parsed_result;
+	int ret = 0;
+
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
+		return;
+
+	if (res->vf_id > 63) {
+		printf("vf_id must be less than 64.\n");
+		return;
+	}
+
+	ret = rte_eth_dev_set_vf_split_drop_en(res->port_id, res->vf_id, res->on);
+	if (ret < 0)
+		printf("vf split drop enable programming error: (%s)\n",
+		       strerror(-ret));
+}
+
+cmdline_parse_inst_t cmd_set_vf_split_drop_en = {
+	.f = cmd_set_vf_split_drop_en_parsed,
+	.data = NULL,
+	.help_str = "enable/disable vf split drop enable",
+	.tokens = {
+		(void *)&cmd_vf_split_drop_en_set,
+		(void *)&cmd_vf_split_drop_en_vf,
+		(void *)&cmd_vf_split_drop_en_split,
+		(void *)&cmd_vf_split_drop_en_drop,
+		(void *)&cmd_vf_split_drop_en_port_id,
+		(void *)&cmd_vf_split_drop_en_vf_id,
+		(void *)&cmd_vf_split_drop_en_on,
+		NULL,
+	},
+};
+
+/* vf mac address configuration */
+
+/* Common result structure for vf mac address */
+struct cmd_set_vf_mac_addr_result {
+	cmdline_fixed_string_t set;
+	cmdline_fixed_string_t vf;
+	cmdline_fixed_string_t mac;
+	cmdline_fixed_string_t addr;
+	uint8_t port_id;
+	uint16_t vf_id;
+	struct ether_addr mac_addr;
+
+};
+
+/* Common CLI fields for vf split drop enable disable */
+cmdline_parse_token_string_t cmd_set_vf_mac_addr_set =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_set_vf_mac_addr_result,
+		 set, "set");
+cmdline_parse_token_string_t cmd_set_vf_mac_addr_vf =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_set_vf_mac_addr_result,
+		 vf, "vf");
+cmdline_parse_token_string_t cmd_set_vf_mac_addr_mac =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_set_vf_mac_addr_result,
+		 mac, "mac");
+cmdline_parse_token_string_t cmd_set_vf_mac_addr_addr =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_set_vf_mac_addr_result,
+		 addr, "addr");
+cmdline_parse_token_num_t cmd_set_vf_mac_addr_port_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_set_vf_mac_addr_result,
+		 port_id, UINT8);
+cmdline_parse_token_num_t cmd_set_vf_mac_addr_vf_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_set_vf_mac_addr_result,
+		 vf_id, UINT16);
+cmdline_parse_token_etheraddr_t cmd_set_vf_mac_addr_mac_addr =
+	TOKEN_ETHERADDR_INITIALIZER(struct cmd_set_vf_mac_addr_result,
+		 mac_addr);
+
+static void
+cmd_set_vf_mac_addr_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_set_vf_mac_addr_result *res = parsed_result;
+	int ret = 0;
+
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
+		return;
+
+	if (res->vf_id > 63) {
+		printf("vf_id must be less than 64.\n");
+		return;
+	}
+
+	ret = rte_eth_dev_set_vf_mac_addr(res->port_id, res->vf_id, &res->mac_addr);
+	if (ret < 0)
+		printf("set vf mac addr programming error: (%s)\n",
+		       strerror(-ret));
+}
+
+cmdline_parse_inst_t cmd_set_vf_mac_addr = {
+	.f = cmd_set_vf_mac_addr_parsed,
+	.data = NULL,
+	.help_str = "set vf mac address",
+	.tokens = {
+		(void *)&cmd_set_vf_mac_addr_set,
+		(void *)&cmd_set_vf_mac_addr_vf,
+		(void *)&cmd_set_vf_mac_addr_mac,
+		(void *)&cmd_set_vf_mac_addr_addr,
+		(void *)&cmd_set_vf_mac_addr_port_id,
+		(void *)&cmd_set_vf_mac_addr_vf_id,
+		(void *)&cmd_set_vf_mac_addr_mac_addr,
+		NULL,
+	},
+};
+
 /* ******************************************************************************** */
 
 /* list of instructions */
@@ -10739,6 +11430,15 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_config_e_tag_forwarding_en_dis,
 	(cmdline_parse_inst_t *)&cmd_config_e_tag_filter_add,
 	(cmdline_parse_inst_t *)&cmd_config_e_tag_filter_del,
+	(cmdline_parse_inst_t *)&cmd_set_vf_vlan_anti_spoof,
+	(cmdline_parse_inst_t *)&cmd_set_vf_mac_anti_spoof,
+	(cmdline_parse_inst_t *)&cmd_vf_ping,
+	(cmdline_parse_inst_t *)&cmd_set_vf_vlan_strip,
+	(cmdline_parse_inst_t *)&cmd_set_vf_vlan_insert,
+	(cmdline_parse_inst_t *)&cmd_set_tx_loopback,
+	(cmdline_parse_inst_t *)&cmd_set_all_queues_drop_en,
+	(cmdline_parse_inst_t *)&cmd_set_vf_split_drop_en,
+	(cmdline_parse_inst_t *)&cmd_set_vf_mac_addr,
 	NULL,
 };
 
