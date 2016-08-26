@@ -185,8 +185,8 @@ static const char DRIVER_EXPORT_NAME_ARRAY(this_pmd_name, idx) \
 __attribute__((used)) = RTE_STR(name)
 
 #define PMD_REGISTER_DRIVER(drv, nm)\
-void devinitfn_ ##drv(void);\
-void __attribute__((constructor, used)) devinitfn_ ##drv(void)\
+RTE_INIT(devinitfn_ ##drv);\
+static void devinitfn_ ##drv(void)\
 {\
 	(drv).name = RTE_STR(nm);\
 	rte_eal_driver_register(&drv);\
