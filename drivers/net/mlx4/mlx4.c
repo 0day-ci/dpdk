@@ -5911,7 +5911,9 @@ static const struct rte_pci_id mlx4_pci_id_map[] = {
 
 static struct eth_driver mlx4_driver = {
 	.pci_drv = {
-		.name = MLX4_DRIVER_NAME,
+		.driver = {
+			.name = MLX4_DRIVER_NAME
+		},
 		.id_table = mlx4_pci_id_map,
 		.devinit = mlx4_pci_devinit,
 		.drv_flags = RTE_PCI_DRV_INTR_LSC,
