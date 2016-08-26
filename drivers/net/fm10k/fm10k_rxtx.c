@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2013-2015 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2013-2016 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -35,6 +35,7 @@
 
 #include <rte_ethdev.h>
 #include <rte_common.h>
+#include <rte_pkt.h>
 #include "fm10k.h"
 #include "base/fm10k_type.h"
 
@@ -64,6 +65,12 @@ static inline void dump_rxd(union fm10k_rx_desc *rxd)
 	PMD_RX_LOG(DEBUG, "+----------------|----------------+");
 }
 #endif
+
+#define FM10K_TX_OFFLOAD_MASK (  \
+		PKT_TX_VLAN_PKT |        \
+		PKT_TX_IP_CKSUM |        \
+		PKT_TX_L4_MASK |         \
+		PKT_TX_TCP_SEG)
 
 /* @note: When this function is changed, make corresponding change to
  * fm10k_dev_supported_ptypes_get()
@@ -582,4 +589,82 @@ fm10k_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
 		FM10K_PCI_REG_WRITE(q->tail_ptr, q->next_free);
 
 	return count;
+}
+
+uint16_t
+fm10k_prep_pkts(void *tx_queue __rte_unused, struct rte_mbuf **tx_pkts,
+		uint16_t nb_pkts)
+{
+	int i, ret;
+	struct rte_mbuf *m;
+	struct fm10k_tx_queue *q = tx_queue;
+
+	for (i = 0; i < nb_pkts; i++) {
+		m = tx_pkts[i];
+
+		if (m->ol_flags & PKT_TX_TCP_SEG) {
+			uint8_t hdrlen = m->outer_l2_len + m->outer_l3_len + m->l2_len +
+				m->l3_len + m->l4_len;
+
+			if (q->hw_ring[q->next_free].flags & FM10K_TXD_FLAG_FTAG)
+				hdrlen += sizeof(struct fm10k_ftag);
+
+			if ((hdrlen < FM10K_TSO_MIN_HEADERLEN) ||
+					(hdrlen > FM10K_TSO_MAX_HEADERLEN) ||
+					(m->tso_segsz < FM10K_TSO_MINMSS)) {
+				rte_errno = -EINVAL;
+				return i;
+			}
+		}
+
+		if ((m->ol_flags & PKT_TX_OFFLOAD_MASK) !=
+				(m->ol_flags & FM10K_TX_OFFLOAD_MASK)) {
+			rte_errno = -EINVAL;
+			return i;
+		}
+
+#ifdef RTE_LIBRTE_ETHDEV_DEBUG
+		ret = rte_validate_tx_offload(m);
+		if (ret != 0) {
+			rte_errno = ret;
+			return i;
+		}
+#endif
+		ret = rte_phdr_cksum_fix(m);
+		if (ret != 0) {
+			rte_errno = ret;
+			return i;
+		}
+	}
+
+	return i;
+}
+
+/* fm10k vector TX path doesn't support tx offloads */
+uint16_t
+fm10k_prep_pkts_simple(void *tx_queue __rte_unused, struct rte_mbuf **tx_pkts,
+		uint16_t nb_pkts)
+{
+	int i;
+	struct rte_mbuf *m;
+	uint64_t ol_flags;
+
+	for (i = 0; i < nb_pkts; i++) {
+		m = tx_pkts[i];
+		ol_flags = m->ol_flags;
+
+		/* simple tx path doesn't support multi-segments */
+		if (m->nb_segs != 1) {
+			rte_errno = -EINVAL;
+			return i;
+		}
+
+		/* For simple path no tx offloads are supported */
+		if (ol_flags & PKT_TX_OFFLOAD_MASK) {
+			rte_errno = -EINVAL;
+			return i;
+		}
+	}
+
+	return i;
 }
