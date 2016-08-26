@@ -759,12 +759,14 @@ rte_pmd_xenvirt_devuninit(const char *name)
 	return 0;
 }
 
-static struct rte_driver pmd_xenvirt_drv = {
-	.type = PMD_VDEV,
-	.init = rte_pmd_xenvirt_devinit,
-	.uninit = rte_pmd_xenvirt_devuninit,
+static struct rte_vdev_driver pmd_xenvirt_drv = {
+	.driver = {
+		.type = PMD_VDEV,
+		.init = rte_pmd_xenvirt_devinit,
+		.uninit = rte_pmd_xenvirt_devuninit
+	},
 };
 
-PMD_REGISTER_DRIVER(pmd_xenvirt_drv, eth_xenvirt);
+DRIVER_REGISTER_VDEV(eth_xenvirt, pmd_xenvirt_drv);
 DRIVER_REGISTER_PARAM_STRING(eth_xenvirt,
 	"mac=<mac addr>");

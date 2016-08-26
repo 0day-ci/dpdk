@@ -42,7 +42,7 @@
 #include <rte_ip_frag.h>
 #include <rte_devargs.h>
 #include <rte_kvargs.h>
-#include <rte_dev.h>
+#include <rte_vdev.h>
 #include <rte_alarm.h>
 #include <rte_cycles.h>
 
@@ -2508,13 +2508,15 @@ bond_ethdev_configure(struct rte_eth_dev *dev)
 	return 0;
 }
 
-static struct rte_driver bond_drv = {
-	.type = PMD_VDEV,
-	.init = bond_init,
-	.uninit = bond_uninit,
+static struct rte_vdev_driver bond_drv = {
+	.driver = {
+		.type = PMD_VDEV,
+		.init = bond_init,
+		.uninit = bond_uninit
+	},
 };
 
-PMD_REGISTER_DRIVER(bond_drv, eth_bond);
+DRIVER_REGISTER_VDEV(eth_bond, bond_drv);
 
 DRIVER_REGISTER_PARAM_STRING(eth_bond,
 	"slave=<ifc> "
