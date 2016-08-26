@@ -139,3 +139,10 @@ DPDK_16.07 {
 	rte_eth_dev_get_port_by_name;
 	rte_eth_xstats_get_names;
 } DPDK_16.04;
+
+DPDK_16.11 {
+	global:
+
+	_rte_eth_dev_callback_process_generic;
+	_rte_eth_dev_callback_process_vf;
+} DPDK_16.07;
