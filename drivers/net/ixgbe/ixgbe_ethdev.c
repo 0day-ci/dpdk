@@ -240,6 +240,8 @@ static void ixgbe_add_rar(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
 static void ixgbe_remove_rar(struct rte_eth_dev *dev, uint32_t index);
 static void ixgbe_set_default_mac_addr(struct rte_eth_dev *dev,
 					   struct ether_addr *mac_addr);
+static int ixgbe_set_vf_mac_addr(struct rte_eth_dev *dev, uint16_t vf,
+				struct ether_addr *mac_addr);
 static void ixgbe_dcb_init(struct ixgbe_hw *hw, struct ixgbe_dcb_config *dcb_config);
 
 /* For Virtual Function support */
@@ -280,6 +282,19 @@ static int ixgbe_set_pool_rx(struct rte_eth_dev *dev, uint16_t pool, uint8_t on)
 static int ixgbe_set_pool_tx(struct rte_eth_dev *dev, uint16_t pool, uint8_t on);
 static int ixgbe_set_pool_vlan_filter(struct rte_eth_dev *dev, uint16_t vlan,
 		uint64_t pool_mask, uint8_t vlan_on);
+static void ixgbe_set_vf_vlan_anti_spoof(struct rte_eth_dev *dev,
+		uint16_t vf, uint8_t on);
+static void ixgbe_set_vf_mac_anti_spoof(struct rte_eth_dev *dev,
+		uint16_t vf, uint8_t on);
+static int ixgbe_vf_ping(struct rte_eth_dev *dev, int32_t vf);
+static void ixgbe_set_vf_vlan_strip(struct rte_eth_dev *dev,
+		int on, uint16_t queues_per_pool);
+static void ixgbe_set_vf_vlan_insert(struct rte_eth_dev *dev, uint16_t vf,
+		int vlan);
+static void ixgbe_set_tx_loopback(struct rte_eth_dev *dev, int on);
+static void ixgbe_set_all_queues_drop_en(struct rte_eth_dev *dev, int state);
+static void ixgbe_set_vf_split_drop_en(struct rte_eth_dev *dev, uint16_t vf,
+		int state);
 static int ixgbe_mirror_rule_set(struct rte_eth_dev *dev,
 		struct rte_eth_mirror_conf *mirror_conf,
 		uint8_t rule_id, uint8_t on);
@@ -562,6 +577,7 @@ static const struct eth_dev_ops ixgbe_eth_dev_ops = {
 	.mac_addr_add         = ixgbe_add_rar,
 	.mac_addr_remove      = ixgbe_remove_rar,
 	.mac_addr_set         = ixgbe_set_default_mac_addr,
+	.set_vf_mac_addr      = ixgbe_set_vf_mac_addr,
 	.uc_hash_table_set    = ixgbe_uc_hash_table_set,
 	.uc_all_hash_table_set  = ixgbe_uc_all_hash_table_set,
 	.mirror_rule_set      = ixgbe_mirror_rule_set,
@@ -570,6 +586,14 @@ static const struct eth_dev_ops ixgbe_eth_dev_ops = {
 	.set_vf_rx            = ixgbe_set_pool_rx,
 	.set_vf_tx            = ixgbe_set_pool_tx,
 	.set_vf_vlan_filter   = ixgbe_set_pool_vlan_filter,
+	.set_vf_vlan_anti_spoof  = ixgbe_set_vf_vlan_anti_spoof,
+	.set_vf_mac_anti_spoof   = ixgbe_set_vf_mac_anti_spoof,
+	.vf_ping              = ixgbe_vf_ping,
+	.set_vf_vlan_strip    = ixgbe_set_vf_vlan_strip,
+	.set_vf_vlan_insert   = ixgbe_set_vf_vlan_insert,
+	.set_tx_loopback      = ixgbe_set_tx_loopback,
+	.set_all_queues_drop_en = ixgbe_set_all_queues_drop_en,
+	.set_vf_split_drop_en = ixgbe_set_vf_split_drop_en,
 	.set_queue_rate_limit = ixgbe_set_queue_rate_limit,
 	.set_vf_rate_limit    = ixgbe_set_vf_rate_limit,
 	.reta_update          = ixgbe_dev_rss_reta_update,
@@ -4069,6 +4093,22 @@ ixgbe_set_default_mac_addr(struct rte_eth_dev *dev, struct ether_addr *addr)
 }
 
 static int
+ixgbe_set_vf_mac_addr(struct rte_eth_dev *dev, uint16_t vf, struct ether_addr *mac_addr)
+{
+	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct ixgbe_vf_info *vfinfo =
+		*(IXGBE_DEV_PRIVATE_TO_P_VFDATA(dev->data->dev_private));
+	int rar_entry = hw->mac.num_rar_entries - (vf + 1);
+	uint8_t *new_mac = (uint8_t *)(mac_addr);
+
+	if (is_valid_assigned_ether_addr((struct ether_addr *)new_mac)) {
+		rte_memcpy(vfinfo[vf].vf_mac_addresses, new_mac, ETHER_ADDR_LEN);
+		return hw->mac.ops.set_rar(hw, rar_entry, new_mac, vf, IXGBE_RAH_AV);
+	}
+	return -1;
+}
+
+static int
 ixgbe_dev_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 {
 	uint32_t hlreg0;
@@ -4372,6 +4412,16 @@ ixgbevf_vlan_strip_queue_set(struct rte_eth_dev *dev, uint16_t queue, int on)
 }
 
 static void
+ixgbe_set_vf_vlan_strip(struct rte_eth_dev *dev, int on,
+		uint16_t queues_per_pool)
+{
+	uint16_t q;
+
+	for (q = 0; q < queues_per_pool; q++)
+		ixgbevf_vlan_strip_queue_set(dev, q, on);
+}
+
+static void
 ixgbevf_vlan_offload_set(struct rte_eth_dev *dev, int mask)
 {
 	struct ixgbe_hw *hw =
@@ -4659,6 +4709,135 @@ ixgbe_set_pool_vlan_filter(struct rte_eth_dev *dev, uint16_t vlan,
 	}
 
 	return ret;
+}
+
+static void
+ixgbe_set_vf_vlan_anti_spoof(struct rte_eth_dev *dev,
+			uint16_t vf, uint8_t on)
+{
+	struct ixgbe_hw *hw =
+			IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+
+	struct ixgbe_mac_info *mac = &hw->mac;
+
+	mac->ops.set_vlan_anti_spoofing(hw, on, vf);
+}
+
+static void
+ixgbe_set_vf_mac_anti_spoof(struct rte_eth_dev *dev,
+			uint16_t vf, uint8_t on)
+{
+	struct ixgbe_hw *hw =
+		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct ixgbe_mac_info *mac = &hw->mac;
+
+	mac->ops.set_mac_anti_spoofing(hw, on, vf);
+}
+
+static int
+ixgbe_vf_ping(struct rte_eth_dev *dev, int32_t vf)
+{
+	int ret = 0;
+	struct ixgbe_hw *hw =
+		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+
+	struct ixgbe_vf_info *vfinfo =
+		*IXGBE_DEV_PRIVATE_TO_P_VFDATA(dev->data->dev_private);
+
+	u32 ping;
+	int i;
+
+	for (i = 0; i < dev->pci_dev->max_vfs; i++) {
+		ping = IXGBE_PF_CONTROL_MSG;
+		if (vfinfo[i].clear_to_send)
+			ping |= IXGBE_VT_MSGTYPE_CTS;
+
+		/* ping every VF or only one specified */
+		if (vf < 0 || vf == i)
+			ixgbe_write_mbx(hw, &ping, 1, i);
+	}
+
+	return ret;
+}
+
+static void
+ixgbe_set_vf_vlan_insert(struct rte_eth_dev *dev, uint16_t vf, int vlan)
+{
+	struct ixgbe_hw *hw =
+		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	uint32_t ctrl;
+
+	PMD_INIT_FUNC_TRACE();
+
+	ctrl = IXGBE_READ_REG(hw, IXGBE_VMVIR(vf));
+	if (vlan) {
+		ctrl = vlan;
+		ctrl |= IXGBE_VMVIR_VLANA_DEFAULT;
+	} else {
+		ctrl = 0;
+	}
+
+	IXGBE_WRITE_REG(hw, IXGBE_VMVIR(vf), ctrl);
+}
+
+static void
+ixgbe_set_tx_loopback(struct rte_eth_dev *dev, int on)
+{
+	struct ixgbe_hw *hw =
+		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	uint32_t ctrl;
+
+	PMD_INIT_FUNC_TRACE();
+
+	ctrl = IXGBE_READ_REG(hw, IXGBE_PFDTXGSWC);
+	/* enable or disable VMDQ loopback */
+	if (on)
+		ctrl |= IXGBE_PFDTXGSWC_VT_LBEN;
+	else
+		ctrl &= ~IXGBE_PFDTXGSWC_VT_LBEN;
+
+	IXGBE_WRITE_REG(hw, IXGBE_PFDTXGSWC, ctrl);
+}
+
+static void
+ixgbe_set_all_queues_drop_en(struct rte_eth_dev *dev, int state)
+{
+	struct ixgbe_hw *hw =
+		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	uint32_t reg_value;
+	int i;
+	int num_queues = (int)(IXGBE_QDE_IDX_MASK >> IXGBE_QDE_IDX_SHIFT);
+
+	PMD_INIT_FUNC_TRACE();
+
+	for (i = 0; i <= num_queues; i++) {
+		reg_value = IXGBE_QDE_WRITE |
+				(i << IXGBE_QDE_IDX_SHIFT) |
+				(state & IXGBE_QDE_ENABLE);
+		IXGBE_WRITE_REG(hw, IXGBE_QDE, reg_value);
+	}
+}
+
+static void
+ixgbe_set_vf_split_drop_en(struct rte_eth_dev *dev, uint16_t vf, int state)
+{
+	struct ixgbe_hw *hw =
+		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	uint32_t reg_value;
+
+	PMD_INIT_FUNC_TRACE();
+
+	/* only support VF's 0 to 63 */
+	if (vf > 63)
+		return;
+
+	reg_value = IXGBE_READ_REG(hw, IXGBE_SRRCTL(vf));
+	if (state)
+		reg_value |= IXGBE_SRRCTL_DROP_EN;
+	else
+		reg_value &= ~IXGBE_SRRCTL_DROP_EN;
+
+	IXGBE_WRITE_REG(hw, IXGBE_SRRCTL(vf), reg_value);
 }
 
 #define IXGBE_MRCTL_VPME  0x01 /* Virtual Pool Mirroring. */
