@@ -2511,9 +2511,9 @@ bond_ethdev_configure(struct rte_eth_dev *dev)
 static struct rte_vdev_driver bond_drv = {
 	.driver = {
 		.type = PMD_VDEV,
-		.init = bond_init,
-		.uninit = bond_uninit
 	},
+	.init = bond_init,
+	.uninit = bond_uninit
 };
 
 DRIVER_REGISTER_VDEV(eth_bond, bond_drv);

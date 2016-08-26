@@ -762,9 +762,9 @@ rte_pmd_xenvirt_devuninit(const char *name)
 static struct rte_vdev_driver pmd_xenvirt_drv = {
 	.driver = {
 		.type = PMD_VDEV,
-		.init = rte_pmd_xenvirt_devinit,
-		.uninit = rte_pmd_xenvirt_devuninit
 	},
+	.init = rte_pmd_xenvirt_devinit,
+	.uninit = rte_pmd_xenvirt_devuninit
 };
 
 DRIVER_REGISTER_VDEV(eth_xenvirt, pmd_xenvirt_drv);

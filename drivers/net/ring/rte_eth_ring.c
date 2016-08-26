@@ -626,9 +626,9 @@ rte_pmd_ring_devuninit(const char *name)
 static struct rte_vdev_driver pmd_ring_drv = {
 	.driver = {
 		.type = PMD_VDEV,
-		.init = rte_pmd_ring_devinit,
-		.uninit = rte_pmd_ring_devuninit
 	},
+	.init = rte_pmd_ring_devinit,
+	.uninit = rte_pmd_ring_devuninit
 };
 
 DRIVER_REGISTER_VDEV(eth_ring, pmd_ring_drv);

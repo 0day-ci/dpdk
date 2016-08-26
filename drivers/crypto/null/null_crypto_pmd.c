@@ -271,9 +271,9 @@ cryptodev_null_uninit(const char *name)
 static struct rte_vdev_driver cryptodev_null_pmd_drv = {
 	.driver = {
 		.type = PMD_VDEV,
-		.init = cryptodev_null_init,
-		.uninit = cryptodev_null_uninit
 	},
+	.init = cryptodev_null_init,
+	.uninit = cryptodev_null_uninit
 };
 
 DRIVER_REGISTER_VDEV(CRYPTODEV_NAME_NULL_PMD, cryptodev_null_pmd_drv);
