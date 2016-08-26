@@ -52,6 +52,7 @@ Network Interface Controller Drivers
     qede
     szedata2
     thunderx
+    ntnic
     virtio
     vhost
     vmxnet3

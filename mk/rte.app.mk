@@ -120,6 +120,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_MPIPE_PMD)      += -lrte_pmd_mpipe -lgxio
 _LDLIBS-$(CONFIG_RTE_LIBRTE_NFP_PMD)        += -lrte_pmd_nfp -lm
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_NULL)       += -lrte_pmd_null
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_PCAP)       += -lrte_pmd_pcap -lpcap
+
 _LDLIBS-$(CONFIG_RTE_LIBRTE_QEDE_PMD)       += -lrte_pmd_qede -lz
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_RING)       += -lrte_pmd_ring
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SZEDATA2)   += -lrte_pmd_szedata2 -lsze2
@@ -143,6 +144,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_KASUMI)     += -lrte_pmd_kasumi
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_KASUMI)     += -L$(LIBSSO_KASUMI_PATH)/build -lsso_kasumi
 endif # CONFIG_RTE_LIBRTE_CRYPTODEV
 
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_NTNIC)      += -lrte_pmd_ntnic -L$(NAPATECH3_PATH)/lib -lntapi
 endif # !CONFIG_RTE_BUILD_SHARED_LIBS
 
 _LDLIBS-y += --no-whole-archive
@@ -162,6 +164,11 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_VHOST)          += -lfuse
 endif
 _LDLIBS-$(CONFIG_RTE_PORT_PCAP)             += -lpcap
 endif # !CONFIG_RTE_BUILD_SHARED_LIBS
+
+ifeq ($(CONFIG_RTE_LIBRTE_PMD_NTNIC),y)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_NTNIC) += -L$(NAPATECH3_PATH)/lib -lntapi
+endif
+
 
 _LDLIBS-y += $(EXECENV_LDLIBS)
 

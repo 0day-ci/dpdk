@@ -356,6 +356,11 @@ M: Sony Chacko <sony.chacko@qlogic.com>
 F: drivers/net/qede/
 F: doc/guides/nics/qede.rst
 
+Napatech ntnic
+M: Finn Christensen <fc@napatech.com>
+F: drivers/net/ntnic/
+F: doc/guides/nics/ntnic.rst
+
 RedHat virtio
 M: Huawei Xie <huawei.xie@intel.com>
 M: Yuanhan Liu <yuanhan.liu@linux.intel.com>

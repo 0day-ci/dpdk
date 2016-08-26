@@ -309,6 +309,12 @@ CONFIG_RTE_PMD_RING_MAX_TX_RINGS=16
 CONFIG_RTE_LIBRTE_PMD_PCAP=n
 
 #
+# Compile software PMD backed by NTNIC files
+#
+CONFIG_RTE_LIBRTE_PMD_NTNIC=n
+
+
+#
 # Compile link bonding PMD library
 #
 CONFIG_RTE_LIBRTE_PMD_BOND=y
