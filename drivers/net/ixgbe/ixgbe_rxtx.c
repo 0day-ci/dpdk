@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
  *   Copyright 2014 6WIND S.A.
  *   All rights reserved.
  *
@@ -71,6 +71,7 @@
 #include <rte_string_fns.h>
 #include <rte_errno.h>
 #include <rte_ip.h>
+#include <rte_pkt.h>
 
 #include "ixgbe_logs.h"
 #include "base/ixgbe_api.h"
@@ -902,6 +903,84 @@ end_of_tx:
 	txq->tx_tail = tx_id;
 
 	return nb_tx;
+}
+
+/*********************************************************************
+ *
+ *  TX prep functions
+ *
+ **********************************************************************/
+uint16_t
+ixgbe_prep_pkts(void *tx_queue, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
+{
+	int i, ret;
+	struct rte_mbuf *m;
+	struct ixgbe_tx_queue *txq = (struct ixgbe_tx_queue *)tx_queue;
+
+	for (i = 0; i < nb_pkts; i++) {
+		m = tx_pkts[i];
+
+		/**
+		 * Check if packet meets requirements for number of segments
+		 *
+		 * NOTE: for ixgbe it's always (40 - WTHRESH) for both TSO and non-TSO
+		 */
+
+		if (m->nb_segs > IXGBE_TX_MAX_SEG - txq->wthresh) {
+			rte_errno = -EINVAL;
+			return i;
+		}
+
+		if ((m->ol_flags & PKT_TX_OFFLOAD_MASK) !=
+				(m->ol_flags & IXGBE_TX_OFFLOAD_MASK)) {
+			rte_errno = -EINVAL;
+			return i;
+		}
+
+#ifdef RTE_LIBRTE_ETHDEV_DEBUG
+		ret = rte_validate_tx_offload(m);
+		if (ret != 0) {
+			rte_errno = ret;
+			return i;
+		}
+#endif
+		ret = rte_phdr_cksum_fix(m);
+		if (ret != 0) {
+			rte_errno = ret;
+			return i;
+		}
+	}
+
+	return i;
+}
+
+/* ixgbe simple path as well as vector TX doesn't support tx offloads */
+uint16_t
+ixgbe_prep_pkts_simple(void *tx_queue __rte_unused, struct rte_mbuf **tx_pkts,
+		uint16_t nb_pkts)
+{
+	int i;
+	struct rte_mbuf *m;
+	uint64_t ol_flags;
+
+	for (i = 0; i < nb_pkts; i++) {
+		m = tx_pkts[i];
+		ol_flags = m->ol_flags;
+
+		/* simple tx path doesn't support multi-segments */
+		if (m->nb_segs != 1) {
+			rte_errno = -EINVAL;
+			return i;
+		}
+
+		/* For simple path (simple and vector) no tx offloads are supported */
+		if (ol_flags & PKT_TX_OFFLOAD_MASK) {
+			rte_errno = -EINVAL;
+			return i;
+		}
+	}
+
+	return i;
 }
 
 /*********************************************************************
@@ -2290,6 +2369,7 @@ ixgbe_set_tx_function(struct rte_eth_dev *dev, struct ixgbe_tx_queue *txq)
 		} else
 #endif
 		dev->tx_pkt_burst = ixgbe_xmit_pkts_simple;
+		dev->tx_pkt_prep = ixgbe_prep_pkts_simple;
 	} else {
 		PMD_INIT_LOG(DEBUG, "Using full-featured tx code path");
 		PMD_INIT_LOG(DEBUG,
@@ -2301,6 +2381,7 @@ ixgbe_set_tx_function(struct rte_eth_dev *dev, struct ixgbe_tx_queue *txq)
 				(unsigned long)txq->tx_rs_thresh,
 				(unsigned long)RTE_PMD_IXGBE_TX_MAX_BURST);
 		dev->tx_pkt_burst = ixgbe_xmit_pkts;
+		dev->tx_pkt_prep = ixgbe_prep_pkts;
 	}
 }
 
