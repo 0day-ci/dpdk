@@ -1762,26 +1762,12 @@ static struct eth_driver rte_nicvf_pmd = {
 		.name = "rte_nicvf_pmd",
 		.id_table = pci_id_nicvf_map,
 		.drv_flags = RTE_PCI_DRV_NEED_MAPPING | RTE_PCI_DRV_INTR_LSC,
+		.devinit = rte_eth_dev_pci_probe,
+		.devuninit = rte_eth_dev_pci_remove,
 	},
 	.eth_dev_init = nicvf_eth_dev_init,
 	.dev_private_size = sizeof(struct nicvf),
 };
 
-static int
-rte_nicvf_pmd_init(const char *name __rte_unused, const char *para __rte_unused)
-{
-	PMD_INIT_FUNC_TRACE();
-	PMD_INIT_LOG(INFO, "librte_pmd_thunderx nicvf version %s",
-			THUNDERX_NICVF_PMD_VERSION);
-
-	rte_eth_driver_register(&rte_nicvf_pmd);
-	return 0;
-}
-
-static struct rte_driver rte_nicvf_driver = {
-	.type = PMD_PDEV,
-	.init = rte_nicvf_pmd_init,
-};
-
-PMD_REGISTER_DRIVER(rte_nicvf_driver, thunderx_nicvf);
+DRIVER_REGISTER_PCI(thunderx_nicvf, rte_nicvf_pmd.pci_drv);
 DRIVER_REGISTER_PCI_TABLE(thunderx_nicvf, pci_id_nicvf_map);
