@@ -68,6 +68,7 @@ struct vhost_dev {
 	struct device_statistics stats;
 	TAILQ_ENTRY(vhost_dev) global_vdev_entry;
 	TAILQ_ENTRY(vhost_dev) lcore_vdev_entry;
+	struct vswitch_port *vs_port;
 } __rte_cache_aligned;
 
 TAILQ_HEAD(vhost_dev_tailq_list, vhost_dev);
@@ -86,6 +87,15 @@ struct lcore_info {
 	volatile uint8_t	dev_removal_flag;
 
 	struct vhost_dev_tailq_list vdev_list;
+};
+
+#define MAX_PKT_BURST 32		/* Max burst size for RX/TX */
+
+/* Used for queueing bursts of TX packets. */
+struct mbuf_table {
+	unsigned len;
+	unsigned txq_id;
+	struct rte_mbuf *m_table[MAX_PKT_BURST];
 };
 
 #endif /* _MAIN_H_ */

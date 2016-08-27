@@ -54,6 +54,7 @@
 #include <rte_tcp.h>
 
 #include "main.h"
+#include "vswitch_common.h"
 
 #ifndef MAX_QUEUES
 #define MAX_QUEUES 128
@@ -65,7 +66,6 @@
 #define MBUF_CACHE_SIZE	128
 #define MBUF_DATA_SIZE	RTE_MBUF_DEFAULT_BUF_SIZE
 
-#define MAX_PKT_BURST 32		/* Max burst size for RX/TX */
 #define BURST_TX_DRAIN_US 100	/* TX drain every ~100us */
 
 #define BURST_RX_WAIT_US 15	/* Defines how long we wait between retries on RX */
@@ -103,7 +103,6 @@ static uint32_t enabled_port_mask = 0;
 static uint32_t promiscuous;
 
 /* number of devices/queues to support*/
-static uint32_t num_queues = 0;
 static uint32_t num_devices;
 
 static struct rte_mempool *mbuf_pool;
@@ -111,6 +110,8 @@ static int mergeable;
 
 /* Do vlan strip on host, enabled on default */
 static uint32_t vlan_strip = 1;
+
+static uint32_t jumbo_frame_en = 0;
 
 /* Enable VM2VM communications. If this is disabled then the MAC address compare is skipped. */
 typedef enum {
@@ -146,74 +147,16 @@ static char dev_basename[MAX_BASENAME_SZ] = "vhost-net";
 static char switch_dev[MAX_BASENAME_SZ] = "vmdq";
 static uint32_t switch_max_ports = MAX_DEVICES;
 
-/* empty vmdq configuration structure. Filled in programatically */
-static struct rte_eth_conf vmdq_conf_default = {
-	.rxmode = {
-		.mq_mode        = ETH_MQ_RX_VMDQ_ONLY,
-		.split_hdr_size = 0,
-		.header_split   = 0, /**< Header Split disabled */
-		.hw_ip_checksum = 0, /**< IP checksum offload disabled */
-		.hw_vlan_filter = 0, /**< VLAN filtering disabled */
-		/*
-		 * It is necessary for 1G NIC such as I350,
-		 * this fixes bug of ipv4 forwarding in guest can't
-		 * forward pakets from one virtio dev to another virtio dev.
-		 */
-		.hw_vlan_strip  = 1, /**< VLAN strip enabled. */
-		.jumbo_frame    = 0, /**< Jumbo Frame Support disabled */
-		.hw_strip_crc   = 0, /**< CRC stripped by hardware */
-	},
-
-	.txmode = {
-		.mq_mode = ETH_MQ_TX_NONE,
-	},
-	.rx_adv_conf = {
-		/*
-		 * should be overridden separately in code with
-		 * appropriate values
-		 */
-		.vmdq_rx_conf = {
-			.nb_queue_pools = ETH_8_POOLS,
-			.enable_default_pool = 0,
-			.default_pool = 0,
-			.nb_pool_maps = 0,
-			.pool_map = {{0, 0},},
-		},
-	},
-};
-
+struct vswitch_dev *vswitch_dev_g;
 static unsigned lcore_ids[RTE_MAX_LCORE];
 static uint8_t ports[RTE_MAX_ETHPORTS];
 static unsigned num_ports = 0; /**< The number of ports specified in command line */
-static uint16_t num_pf_queues, num_vmdq_queues;
-static uint16_t vmdq_pool_base, vmdq_queue_base;
-static uint16_t queues_per_pool;
-
-const uint16_t vlan_tags[] = {
-	1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007,
-	1008, 1009, 1010, 1011,	1012, 1013, 1014, 1015,
-	1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023,
-	1024, 1025, 1026, 1027, 1028, 1029, 1030, 1031,
-	1032, 1033, 1034, 1035, 1036, 1037, 1038, 1039,
-	1040, 1041, 1042, 1043, 1044, 1045, 1046, 1047,
-	1048, 1049, 1050, 1051, 1052, 1053, 1054, 1055,
-	1056, 1057, 1058, 1059, 1060, 1061, 1062, 1063,
-};
-
-/* ethernet addresses of ports */
-static struct ether_addr vmdq_ports_eth_addr[RTE_MAX_ETHPORTS];
 
 static struct vhost_dev_tailq_list vhost_dev_list =
 	TAILQ_HEAD_INITIALIZER(vhost_dev_list);
 
 static struct lcore_info lcore_info[RTE_MAX_LCORE];
 
-/* Used for queueing bursts of TX packets. */
-struct mbuf_table {
-	unsigned len;
-	unsigned txq_id;
-	struct rte_mbuf *m_table[MAX_PKT_BURST];
-};
 
 /* TX queue for each data core. */
 struct mbuf_table lcore_tx_queue[RTE_MAX_LCORE];
@@ -221,35 +164,6 @@ struct mbuf_table lcore_tx_queue[RTE_MAX_LCORE];
 #define MBUF_TABLE_DRAIN_TSC	((rte_get_tsc_hz() + US_PER_S - 1) \
 				 / US_PER_S * BURST_TX_DRAIN_US)
 #define VLAN_HLEN       4
-
-/*
- * Builds up the correct configuration for VMDQ VLAN pool map
- * according to the pool & queue limits.
- */
-static inline int
-get_eth_conf(struct rte_eth_conf *eth_conf, uint32_t num_devices)
-{
-	struct rte_eth_vmdq_rx_conf conf;
-	struct rte_eth_vmdq_rx_conf *def_conf =
-		&vmdq_conf_default.rx_adv_conf.vmdq_rx_conf;
-	unsigned i;
-
-	memset(&conf, 0, sizeof(conf));
-	conf.nb_queue_pools = (enum rte_eth_nb_pools)num_devices;
-	conf.nb_pool_maps = num_devices;
-	conf.enable_loop_back = def_conf->enable_loop_back;
-	conf.rx_mode = def_conf->rx_mode;
-
-	for (i = 0; i < conf.nb_pool_maps; i++) {
-		conf.pool_map[i].vlan_id = vlan_tags[ i ];
-		conf.pool_map[i].pools = (1UL << i);
-	}
-
-	(void)(rte_memcpy(eth_conf, &vmdq_conf_default, sizeof(*eth_conf)));
-	(void)(rte_memcpy(&eth_conf->rx_adv_conf.vmdq_rx_conf, &conf,
-		   sizeof(eth_conf->rx_adv_conf.vmdq_rx_conf)));
-	return 0;
-}
 
 /*
  * Validate the device number according to the max pool number gotten form
@@ -274,16 +188,25 @@ static inline int
 port_init(uint8_t port)
 {
 	struct rte_eth_dev_info dev_info;
-	struct rte_eth_conf port_conf;
 	struct rte_eth_rxconf *rxconf;
 	struct rte_eth_txconf *txconf;
 	int16_t rx_rings, tx_rings;
 	uint16_t rx_ring_size, tx_ring_size;
+	struct vswitch_port *vs_port;
 	int retval;
 	uint16_t q;
 
+	if (port >= rte_eth_dev_count()) return -1;
+
+	vs_port = vs_add_port(vswitch_dev_g, port, VSWITCH_PTYPE_PHYS, NULL);
+
+	if (!vs_port) {
+		rte_exit(EXIT_FAILURE, "Failed to add port [%d] to vsdev %s\n",
+			 port, vswitch_dev_g->name);
+	}
+
 	/* The max pool number from dev_info will be used to validate the pool number specified in cmd line */
-	rte_eth_dev_info_get (port, &dev_info);
+	rte_eth_dev_info_get (vs_port->port_id, &dev_info);
 
 	if (dev_info.max_rx_queues > MAX_QUEUES) {
 		rte_exit(EXIT_FAILURE,
@@ -298,32 +221,9 @@ port_init(uint8_t port)
 	/* Enable vlan offload */
 	txconf->txq_flags &= ~ETH_TXQ_FLAGS_NOVLANOFFL;
 
-	/*configure the number of supported virtio devices based on VMDQ limits */
-	num_devices = dev_info.max_vmdq_pools;
-
 	rx_ring_size = RTE_TEST_RX_DESC_DEFAULT;
 	tx_ring_size = RTE_TEST_TX_DESC_DEFAULT;
 	tx_rings = (uint16_t)rte_lcore_count();
-
-	retval = validate_num_devices(MAX_DEVICES);
-	if (retval < 0)
-		return retval;
-
-	/* Get port configuration. */
-	retval = get_eth_conf(&port_conf, num_devices);
-	if (retval < 0)
-		return retval;
-	/* NIC queues are divided into pf queues and vmdq queues.  */
-	num_pf_queues = dev_info.max_rx_queues - dev_info.vmdq_queue_num;
-	queues_per_pool = dev_info.vmdq_queue_num / dev_info.max_vmdq_pools;
-	num_vmdq_queues = num_devices * queues_per_pool;
-	num_queues = num_pf_queues + num_vmdq_queues;
-	vmdq_queue_base = dev_info.vmdq_queue_base;
-	vmdq_pool_base  = dev_info.vmdq_pool_base;
-	printf("pf queue num: %u, configured vmdq pool num: %u, each vmdq pool has %u queues\n",
-		num_pf_queues, num_devices, queues_per_pool);
-
-	if (port >= rte_eth_dev_count()) return -1;
 
 	if (enable_tx_csum == 0)
 		rte_vhost_feature_disable(1ULL << VIRTIO_NET_F_CSUM);
@@ -337,10 +237,11 @@ port_init(uint8_t port)
 
 	rx_rings = (uint16_t)dev_info.max_rx_queues;
 	/* Configure ethernet device. */
-	retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
+	retval = rte_eth_dev_configure(vs_port->port_id, rx_rings, tx_rings,
+				       &vs_port->port_conf);
 	if (retval != 0) {
 		RTE_LOG(ERR, VHOST_PORT, "Failed to configure port %u: %s.\n",
-			port, strerror(-retval));
+			vs_port->port_id, strerror(-retval));
 		return retval;
 	}
 
@@ -353,7 +254,7 @@ port_init(uint8_t port)
 		if (retval < 0) {
 			RTE_LOG(ERR, VHOST_PORT,
 				"Failed to setup rx queue %u of port %u: %s.\n",
-				q, port, strerror(-retval));
+				q, vs_port->port_id, strerror(-retval));
 			return retval;
 		}
 	}
@@ -369,28 +270,10 @@ port_init(uint8_t port)
 		}
 	}
 
-	/* Start the device. */
-	retval  = rte_eth_dev_start(port);
-	if (retval < 0) {
-		RTE_LOG(ERR, VHOST_PORT, "Failed to start port %u: %s\n",
-			port, strerror(-retval));
-		return retval;
-	}
-
 	if (promiscuous)
 		rte_eth_promiscuous_enable(port);
 
-	rte_eth_macaddr_get(port, &vmdq_ports_eth_addr[port]);
-	RTE_LOG(INFO, VHOST_PORT, "Max virtio devices supported: %u\n", num_devices);
-	RTE_LOG(INFO, VHOST_PORT, "Port %u MAC: %02"PRIx8" %02"PRIx8" %02"PRIx8
-			" %02"PRIx8" %02"PRIx8" %02"PRIx8"\n",
-			(unsigned)port,
-			vmdq_ports_eth_addr[port].addr_bytes[0],
-			vmdq_ports_eth_addr[port].addr_bytes[1],
-			vmdq_ports_eth_addr[port].addr_bytes[2],
-			vmdq_ports_eth_addr[port].addr_bytes[3],
-			vmdq_ports_eth_addr[port].addr_bytes[4],
-			vmdq_ports_eth_addr[port].addr_bytes[5]);
+	vs_port_start(vs_port);
 
 	return 0;
 }
@@ -542,9 +425,6 @@ us_vhost_parse_args(int argc, char **argv)
 
 		case 'P':
 			promiscuous = 1;
-			vmdq_conf_default.rx_adv_conf.vmdq_rx_conf.rx_mode =
-				ETH_VMDQ_ACCEPT_BROADCAST |
-				ETH_VMDQ_ACCEPT_MULTICAST;
 			rte_vhost_feature_enable(1ULL << VIRTIO_NET_F_CTRL_RX);
 
 			break;
@@ -632,11 +512,8 @@ us_vhost_parse_args(int argc, char **argv)
 					return -1;
 				} else {
 					mergeable = !!ret;
-					if (ret) {
-						vmdq_conf_default.rxmode.jumbo_frame = 1;
-						vmdq_conf_default.rxmode.max_rx_pkt_len
-							= JUMBO_FRAME_MAX_SIZE;
-					}
+					if (ret)
+						jumbo_frame_en = 1;
 				}
 			}
 
@@ -651,8 +528,6 @@ us_vhost_parse_args(int argc, char **argv)
 					return -1;
 				} else {
 					vlan_strip = !!ret;
-					vmdq_conf_default.rxmode.hw_vlan_strip =
-						vlan_strip;
 				}
 			}
 
@@ -747,8 +622,7 @@ static unsigned check_ports_num(unsigned nb_ports)
 	return valid_num_ports;
 }
 
-static inline struct vhost_dev *__attribute__((always_inline))
-find_vhost_dev(struct ether_addr *mac)
+struct vhost_dev *find_vhost_dev(struct ether_addr *mac)
 {
 	struct vhost_dev *vdev;
 
@@ -759,95 +633,6 @@ find_vhost_dev(struct ether_addr *mac)
 	}
 
 	return NULL;
-}
-
-/*
- * This function learns the MAC address of the device and registers this along with a
- * vlan tag to a VMDQ.
- */
-static int
-link_vmdq(struct vhost_dev *vdev, struct rte_mbuf *m)
-{
-	struct ether_hdr *pkt_hdr;
-	int i, ret;
-
-	/* Learn MAC address of guest device from packet */
-	pkt_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
-
-	if (find_vhost_dev(&pkt_hdr->s_addr)) {
-		RTE_LOG(ERR, VHOST_DATA,
-			"(%d) device is using a registered MAC!\n",
-			vdev->vid);
-		return -1;
-	}
-
-	for (i = 0; i < ETHER_ADDR_LEN; i++)
-		vdev->mac_address.addr_bytes[i] = pkt_hdr->s_addr.addr_bytes[i];
-
-	/* vlan_tag currently uses the device_id. */
-	vdev->vlan_tag = vlan_tags[vdev->vid];
-
-	/* Print out VMDQ registration info. */
-	RTE_LOG(INFO, VHOST_DATA,
-		"(%d) mac %02x:%02x:%02x:%02x:%02x:%02x and vlan %d registered\n",
-		vdev->vid,
-		vdev->mac_address.addr_bytes[0], vdev->mac_address.addr_bytes[1],
-		vdev->mac_address.addr_bytes[2], vdev->mac_address.addr_bytes[3],
-		vdev->mac_address.addr_bytes[4], vdev->mac_address.addr_bytes[5],
-		vdev->vlan_tag);
-
-	/* Register the MAC address. */
-	ret = rte_eth_dev_mac_addr_add(ports[0], &vdev->mac_address,
-				(uint32_t)vdev->vid + vmdq_pool_base);
-	if (ret)
-		RTE_LOG(ERR, VHOST_DATA,
-			"(%d) failed to add device MAC address to VMDQ\n",
-			vdev->vid);
-
-	/* Enable stripping of the vlan tag as we handle routing. */
-	if (vlan_strip)
-		rte_eth_dev_set_vlan_strip_on_queue(ports[0],
-			(uint16_t)vdev->vmdq_rx_q, 1);
-
-	/* Set device as ready for RX. */
-	vdev->ready = DEVICE_RX;
-
-	return 0;
-}
-
-/*
- * Removes MAC address and vlan tag from VMDQ. Ensures that nothing is adding buffers to the RX
- * queue before disabling RX on the device.
- */
-static inline void
-unlink_vmdq(struct vhost_dev *vdev)
-{
-	unsigned i = 0;
-	unsigned rx_count;
-	struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
-
-	if (vdev->ready == DEVICE_RX) {
-		/*clear MAC and VLAN settings*/
-		rte_eth_dev_mac_addr_remove(ports[0], &vdev->mac_address);
-		for (i = 0; i < 6; i++)
-			vdev->mac_address.addr_bytes[i] = 0;
-
-		vdev->vlan_tag = 0;
-
-		/*Clear out the receive buffers*/
-		rx_count = rte_eth_rx_burst(ports[0],
-					(uint16_t)vdev->vmdq_rx_q, pkts_burst, MAX_PKT_BURST);
-
-		while (rx_count) {
-			for (i = 0; i < rx_count; i++)
-				rte_pktmbuf_free(pkts_burst[i]);
-
-			rx_count = rte_eth_rx_burst(ports[0],
-					(uint16_t)vdev->vmdq_rx_q, pkts_burst, MAX_PKT_BURST);
-		}
-
-		vdev->ready = DEVICE_MAC_LEARNING;
-	}
 }
 
 static inline void __attribute__((always_inline))
@@ -869,8 +654,7 @@ virtio_xmit(struct vhost_dev *dst_vdev, struct vhost_dev *src_vdev,
  * Check if the packet destination MAC address is for a local device. If so then put
  * the packet on that devices RX queue. If not then return.
  */
-static inline int __attribute__((always_inline))
-virtio_tx_local(struct vhost_dev *vdev, struct rte_mbuf *m)
+int virtio_tx_local(struct vhost_dev *vdev, struct rte_mbuf *m)
 {
 	struct ether_hdr *pkt_hdr;
 	struct vhost_dev *dst_vdev;
@@ -901,69 +685,9 @@ virtio_tx_local(struct vhost_dev *vdev, struct rte_mbuf *m)
 	return 0;
 }
 
-/*
- * Check if the destination MAC of a packet is one local VM,
- * and get its vlan tag, and offset if it is.
- */
-static inline int __attribute__((always_inline))
-find_local_dest(struct vhost_dev *vdev, struct rte_mbuf *m,
-	uint32_t *offset, uint16_t *vlan_tag)
+struct mbuf_table *vhost_switch_get_txq(uint16_t core_id)
 {
-	struct vhost_dev *dst_vdev;
-	struct ether_hdr *pkt_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
-
-	dst_vdev = find_vhost_dev(&pkt_hdr->d_addr);
-	if (!dst_vdev)
-		return 0;
-
-	if (vdev->vid == dst_vdev->vid) {
-		RTE_LOG(DEBUG, VHOST_DATA,
-			"(%d) TX: src and dst MAC is same. Dropping packet.\n",
-			vdev->vid);
-		return -1;
-	}
-
-	/*
-	 * HW vlan strip will reduce the packet length
-	 * by minus length of vlan tag, so need restore
-	 * the packet length by plus it.
-	 */
-	*offset  = VLAN_HLEN;
-	*vlan_tag = vlan_tags[vdev->vid];
-
-	RTE_LOG(DEBUG, VHOST_DATA,
-		"(%d) TX: pkt to local VM device id: (%d), vlan tag: %u.\n",
-		vdev->vid, dst_vdev->vid, *vlan_tag);
-
-	return 0;
-}
-
-static uint16_t
-get_psd_sum(void *l3_hdr, uint64_t ol_flags)
-{
-	if (ol_flags & PKT_TX_IPV4)
-		return rte_ipv4_phdr_cksum(l3_hdr, ol_flags);
-	else /* assume ethertype == ETHER_TYPE_IPv6 */
-		return rte_ipv6_phdr_cksum(l3_hdr, ol_flags);
-}
-
-static void virtio_tx_offload(struct rte_mbuf *m)
-{
-	void *l3_hdr;
-	struct ipv4_hdr *ipv4_hdr = NULL;
-	struct tcp_hdr *tcp_hdr = NULL;
-	struct ether_hdr *eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
-
-	l3_hdr = (char *)eth_hdr + m->l2_len;
-
-	if (m->ol_flags & PKT_TX_IPV4) {
-		ipv4_hdr = l3_hdr;
-		ipv4_hdr->hdr_checksum = 0;
-		m->ol_flags |= PKT_TX_IP_CKSUM;
-	}
-
-	tcp_hdr = (struct tcp_hdr *)((char *)l3_hdr + m->l3_len);
-	tcp_hdr->cksum = get_psd_sum(l3_hdr, m->ol_flags);
+	return &lcore_tx_queue[core_id];
 }
 
 static inline void
@@ -973,110 +697,32 @@ free_pkts(struct rte_mbuf **pkts, uint16_t n)
 		rte_pktmbuf_free(pkts[n]);
 }
 
-static inline void __attribute__((always_inline))
-do_drain_mbuf_table(struct mbuf_table *tx_q)
+void do_drain_mbuf_table(struct mbuf_table *tx_q)
 {
 	uint16_t count;
+	struct vswitch_port *tx_port;
 
-	count = rte_eth_tx_burst(ports[0], tx_q->txq_id,
-				 tx_q->m_table, tx_q->len);
+	/* Let switch implmentation decide which physical port to do tx to.
+	 * Every switch implmentation may have it's own strategy, for example
+	 * VMDQ does tx to only one Physical port. Having a scheduler function
+	 * which is switch specefic give flexibility to have another strategy
+	 * for a switch
+	 */
+	tx_port = vs_sched_tx_port(vswitch_dev_g, VSWITCH_PTYPE_PHYS,
+				     rte_lcore_id());
+	if (unlikely(!tx_port))
+	    goto out;
+
+	count = tx_port->do_tx(tx_port, rte_lcore_id(), NULL, tx_q->m_table,
+				  tx_q->len);
+
 	if (unlikely(count < tx_q->len))
 		free_pkts(&tx_q->m_table[count], tx_q->len - count);
 
 	tx_q->len = 0;
+out:
+	return;
 }
-
-/*
- * This function routes the TX packet to the correct interface. This
- * may be a local device or the physical port.
- */
-static inline void __attribute__((always_inline))
-virtio_tx_route(struct vhost_dev *vdev, struct rte_mbuf *m, uint16_t vlan_tag)
-{
-	struct mbuf_table *tx_q;
-	unsigned offset = 0;
-	const uint16_t lcore_id = rte_lcore_id();
-	struct ether_hdr *nh;
-
-
-	nh = rte_pktmbuf_mtod(m, struct ether_hdr *);
-	if (unlikely(is_broadcast_ether_addr(&nh->d_addr))) {
-		struct vhost_dev *vdev2;
-
-		TAILQ_FOREACH(vdev2, &vhost_dev_list, global_vdev_entry) {
-			virtio_xmit(vdev2, vdev, m);
-		}
-		goto queue2nic;
-	}
-
-	/*check if destination is local VM*/
-	if ((vm2vm_mode == VM2VM_SOFTWARE) && (virtio_tx_local(vdev, m) == 0)) {
-		rte_pktmbuf_free(m);
-		return;
-	}
-
-	if (unlikely(vm2vm_mode == VM2VM_HARDWARE)) {
-		if (unlikely(find_local_dest(vdev, m, &offset,
-					     &vlan_tag) != 0)) {
-			rte_pktmbuf_free(m);
-			return;
-		}
-	}
-
-	RTE_LOG(DEBUG, VHOST_DATA,
-		"(%d) TX: MAC address is external\n", vdev->vid);
-
-queue2nic:
-
-	/*Add packet to the port tx queue*/
-	tx_q = &lcore_tx_queue[lcore_id];
-
-	nh = rte_pktmbuf_mtod(m, struct ether_hdr *);
-	if (unlikely(nh->ether_type == rte_cpu_to_be_16(ETHER_TYPE_VLAN))) {
-		/* Guest has inserted the vlan tag. */
-		struct vlan_hdr *vh = (struct vlan_hdr *) (nh + 1);
-		uint16_t vlan_tag_be = rte_cpu_to_be_16(vlan_tag);
-		if ((vm2vm_mode == VM2VM_HARDWARE) &&
-			(vh->vlan_tci != vlan_tag_be))
-			vh->vlan_tci = vlan_tag_be;
-	} else {
-		m->ol_flags |= PKT_TX_VLAN_PKT;
-
-		/*
-		 * Find the right seg to adjust the data len when offset is
-		 * bigger than tail room size.
-		 */
-		if (unlikely(vm2vm_mode == VM2VM_HARDWARE)) {
-			if (likely(offset <= rte_pktmbuf_tailroom(m)))
-				m->data_len += offset;
-			else {
-				struct rte_mbuf *seg = m;
-
-				while ((seg->next != NULL) &&
-					(offset > rte_pktmbuf_tailroom(seg)))
-					seg = seg->next;
-
-				seg->data_len += offset;
-			}
-			m->pkt_len += offset;
-		}
-
-		m->vlan_tci = vlan_tag;
-	}
-
-	if (m->ol_flags & PKT_TX_TCP_SEG)
-		virtio_tx_offload(m);
-
-	tx_q->m_table[tx_q->len++] = m;
-	if (enable_stats) {
-		vdev->stats.tx_total++;
-		vdev->stats.tx++;
-	}
-
-	if (unlikely(tx_q->len == MAX_PKT_BURST))
-		do_drain_mbuf_table(tx_q);
-}
-
 
 static inline void __attribute__((always_inline))
 drain_mbuf_table(struct mbuf_table *tx_q)
@@ -1101,60 +747,54 @@ drain_mbuf_table(struct mbuf_table *tx_q)
 static inline void __attribute__((always_inline))
 drain_eth_rx(struct vhost_dev *vdev)
 {
-	uint16_t rx_count, enqueue_count;
+	uint16_t rx_count;
 	struct rte_mbuf *pkts[MAX_PKT_BURST];
+	uint16_t rxq = vdev->vs_port->phys_port_rxq;
+	struct vswitch_port *rx_port;
 
-	rx_count = rte_eth_rx_burst(ports[0], vdev->vmdq_rx_q,
-				    pkts, MAX_PKT_BURST);
+	/* Let switch implmentation decide which physical port to do rx from.
+	 * Every switch implmentation may have it's own strategy, for example
+	 * VMDQ does rx from only one Physical port. Having a scheduler function
+	 * which is switch specefic give flexibility to have another strategy
+	 * for a switch
+	 */
+	rx_port = vs_sched_rx_port(vswitch_dev_g, VSWITCH_PTYPE_PHYS,
+				     rte_lcore_id());
+	if (unlikely(!rx_port))
+	    goto out;
+
+	rx_count = rx_port->do_rx(rx_port, rxq, NULL, pkts, MAX_PKT_BURST);
+
 	if (!rx_count)
 		return;
 
-	/*
-	 * When "enable_retry" is set, here we wait and retry when there
-	 * is no enough free slots in the queue to hold @rx_count packets,
-	 * to diminish packet loss.
-	 */
-	if (enable_retry &&
-	    unlikely(rx_count > rte_vhost_avail_entries(vdev->vid,
-			VIRTIO_RXQ))) {
-		uint32_t retry;
+	vs_lookup_n_fwd(rx_port, pkts, rx_count, rxq);
 
-		for (retry = 0; retry < burst_rx_retry_num; retry++) {
-			rte_delay_us(burst_rx_delay_time);
-			if (rx_count <= rte_vhost_avail_entries(vdev->vid,
-					VIRTIO_RXQ))
-				break;
-		}
-	}
-
-	enqueue_count = rte_vhost_enqueue_burst(vdev->vid, VIRTIO_RXQ,
-						pkts, rx_count);
 	if (enable_stats) {
 		rte_atomic64_add(&vdev->stats.rx_total_atomic, rx_count);
-		rte_atomic64_add(&vdev->stats.rx_atomic, enqueue_count);
 	}
 
 	free_pkts(pkts, rx_count);
+out:
+	return;
 }
 
 static inline void __attribute__((always_inline))
 drain_virtio_tx(struct vhost_dev *vdev)
 {
 	struct rte_mbuf *pkts[MAX_PKT_BURST];
+	struct vswitch_port *vs_port = vdev->vs_port;
 	uint16_t count;
-	uint16_t i;
 
-	count = rte_vhost_dequeue_burst(vdev->vid, VIRTIO_TXQ, mbuf_pool,
+	count = rte_vhost_dequeue_burst(vdev->vid, VIRTIO_RXQ, mbuf_pool,
 					pkts, MAX_PKT_BURST);
 
-	/* setup VMDq for the first packet */
-	if (unlikely(vdev->ready == DEVICE_MAC_LEARNING) && count) {
-		if (vdev->remove || link_vmdq(vdev, pkts[0]) == -1)
+	if (unlikely(vdev->ready == DEVICE_MAC_LEARNING)) {
+		if (vdev->remove || vs_learn_port(vs_port, pkts, count))
 			free_pkts(pkts, count);
 	}
 
-	for (i = 0; i < count; ++i)
-		virtio_tx_route(vdev, pkts[i], vlan_tags[vdev->vid]);
+	vs_lookup_n_fwd(vs_port, pkts, count, VIRTIO_RXQ);
 }
 
 /*
@@ -1208,7 +848,7 @@ switch_worker(void *arg __rte_unused)
 		TAILQ_FOREACH(vdev, &lcore_info[lcore_id].vdev_list,
 			      lcore_vdev_entry) {
 			if (unlikely(vdev->remove)) {
-				unlink_vmdq(vdev);
+				vs_unlearn_port(vdev->vs_port);
 				vdev->ready = DEVICE_SAFE_REMOVE;
 				continue;
 			}
@@ -1234,6 +874,7 @@ static void
 destroy_device(int vid)
 {
 	struct vhost_dev *vdev = NULL;
+	struct vswitch_port *vs_port;
 	int lcore;
 
 	TAILQ_FOREACH(vdev, &vhost_dev_list, global_vdev_entry) {
@@ -1269,6 +910,10 @@ destroy_device(int vid)
 
 	lcore_info[vdev->coreid].device_num--;
 
+	vs_port = vdev->vs_port;
+	vs_port_stop(vs_port);
+	vs_del_port(vs_port);
+
 	RTE_LOG(INFO, VHOST_DATA,
 		"(%d) device has been removed from data core\n",
 		vdev->vid);
@@ -1286,6 +931,7 @@ new_device(int vid)
 	int lcore, core_add = 0;
 	uint32_t device_num_min = num_devices;
 	struct vhost_dev *vdev;
+	struct vswitch_port *vs_port;
 
 	vdev = rte_zmalloc("vhost device", sizeof(*vdev), RTE_CACHE_LINE_SIZE);
 	if (vdev == NULL) {
@@ -1297,7 +943,6 @@ new_device(int vid)
 	vdev->vid = vid;
 
 	TAILQ_INSERT_TAIL(&vhost_dev_list, vdev, global_vdev_entry);
-	vdev->vmdq_rx_q = vid * queues_per_pool + vmdq_queue_base;
 
 	/*reset ready flag*/
 	vdev->ready = DEVICE_MAC_LEARNING;
@@ -1319,6 +964,16 @@ new_device(int vid)
 	/* Disable notifications. */
 	rte_vhost_enable_guest_notification(vid, VIRTIO_RXQ, 0);
 	rte_vhost_enable_guest_notification(vid, VIRTIO_TXQ, 0);
+
+	vs_port = vs_add_port(vswitch_dev_g, vid, VSWITCH_PTYPE_VIRTIO, vdev);
+
+	if (!vs_port) {
+		rte_exit(EXIT_FAILURE, "Failed to add port [%d] to vsdev %s\n",
+			 vs_port->port_id, vswitch_dev_g->name);
+	}
+
+	vdev->vs_port = vs_port;
+	vs_port_start(vs_port);
 
 	RTE_LOG(INFO, VHOST_DATA,
 		"(%d) device has been added to data core %d\n",
@@ -1445,6 +1100,28 @@ create_mbuf_pool(uint16_t nr_port, uint32_t nr_switch_core, uint32_t mbuf_size,
 		rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 }
 
+static uint64_t get_vswitch_conf_flags(void)
+{
+	uint64_t vs_conf_flags = 0;
+
+	if (vm2vm_mode == VM2VM_HARDWARE)
+		vs_conf_flags |= VS_CNF_FLG_VM2VM_HARDWARE;
+
+	if (vm2vm_mode == VM2VM_SOFTWARE)
+		vs_conf_flags |= VS_CNF_FLG_VM2VM_SOFTWARE;
+
+	if (promiscuous)
+		vs_conf_flags |= VS_CNF_FLG_PROMISCOUS_EN;
+
+	if (jumbo_frame_en)
+		vs_conf_flags |= VS_CNF_FLG_JUMBO_EN;
+
+	if (enable_stats)
+		vs_conf_flags |= VS_CNF_FLG_STATS_EN;
+
+	return vs_conf_flags;
+}
+
 /*
  * Main function, does initialisation and calls the per-lcore functions. The CUSE
  * device is also registered here to handle the IOCTLs.
@@ -1458,7 +1135,7 @@ main(int argc, char *argv[])
 	uint8_t portid;
 	static pthread_t tid;
 	char thread_name[RTE_MAX_THREAD_NAME_LEN];
-	uint64_t flags = 0;
+	uint64_t flags = 0, vswitch_conf_flags;
 
 	signal(SIGINT, sigint_handler);
 
@@ -1469,11 +1146,19 @@ main(int argc, char *argv[])
 	argc -= ret;
 	argv += ret;
 
+	vs_vswitch_init();
+
+	/* TBD:XXX: This needs to be removed here, when constructor mechanism
+	 * for registering swittches is in place
+	 */
+	vmdq_switch_impl_init();
+
 	/* parse app arguments */
 	ret = us_vhost_parse_args(argc, argv);
 	if (ret < 0)
 		rte_exit(EXIT_FAILURE, "Invalid argument\n");
 
+	/*TBD:XXX: vdev list or the vdev ports */
 	for (lcore_id = 0; lcore_id < RTE_MAX_LCORE; lcore_id ++)
 		TAILQ_INIT(&lcore_info[lcore_id].vdev_list);
 
@@ -1498,6 +1183,13 @@ main(int argc, char *argv[])
 		return -1;
 	}
 
+	vswitch_dev_g = vs_get_vswitch_dev(switch_dev);
+	if (!vswitch_dev_g) {
+		RTE_LOG(INFO, VHOST_CONFIG, "switch dev %s not supported\n",
+			switch_dev);
+		return -1;
+	}
+
 	/*
 	 * FIXME: here we are trying to allocate mbufs big enough for
 	 * @MAX_QUEUES, but the truth is we're never going to use that
@@ -1507,12 +1199,8 @@ main(int argc, char *argv[])
 	create_mbuf_pool(valid_num_ports, rte_lcore_count() - 1, MBUF_DATA_SIZE,
 			 MAX_QUEUES, RTE_TEST_RX_DESC_DEFAULT, MBUF_CACHE_SIZE);
 
-	if (vm2vm_mode == VM2VM_HARDWARE) {
-		/* Enable VT loop back to let L2 switch to do it. */
-		vmdq_conf_default.rx_adv_conf.vmdq_rx_conf.enable_loop_back = 1;
-		RTE_LOG(DEBUG, VHOST_CONFIG,
-			"Enable loop back for L2 switch in vmdq.\n");
-	}
+	vswitch_conf_flags = get_vswitch_conf_flags();
+	vs_switch_dev_init(vswitch_dev_g, vswitch_conf_flags);
 
 	/* initialize all ports */
 	for (portid = 0; portid < nb_ports; portid++) {
