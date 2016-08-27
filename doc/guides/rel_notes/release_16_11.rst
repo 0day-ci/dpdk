@@ -36,6 +36,14 @@ New Features
 
      This section is a comment. Make sure to start the actual text at the margin.
 
+   * **Updated the ixgbe base driver.**
+
+     Updated the ixgbe base driver, including the following changes:
+
+     * add X550em_a 10G PHY support
+     * add VF multicast promiscuous mode support
+     * support flow control auto negotiation for X550em_a 1G PHY
+     * add X550em_a FW ALEF support
 
 Resolved Issues
 ---------------
