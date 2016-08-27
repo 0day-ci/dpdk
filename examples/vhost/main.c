@@ -142,6 +142,10 @@ static uint32_t burst_rx_retry_num = BURST_RX_RETRIES;
 /* Character device basename. Can be set by user. */
 static char dev_basename[MAX_BASENAME_SZ] = "vhost-net";
 
+/* vswitch device name and maximum number of ports */
+static char switch_dev[MAX_BASENAME_SZ] = "vmdq";
+static uint32_t switch_max_ports = MAX_DEVICES;
+
 /* empty vmdq configuration structure. Filled in programatically */
 static struct rte_eth_conf vmdq_conf_default = {
 	.rxmode = {
@@ -408,6 +412,22 @@ us_vhost_parse_basename(const char *q_arg)
 }
 
 /*
+ * Set switch device name.
+ */
+static int
+us_vhost_parse_switch_name(const char *q_arg)
+{
+	/* parse number string */
+
+	if (strnlen(q_arg, MAX_BASENAME_SZ) > MAX_BASENAME_SZ)
+		return -1;
+	else
+		snprintf((char*)&switch_dev, MAX_BASENAME_SZ, "%s", q_arg);
+
+	return 0;
+}
+
+/*
  * Parse the portmask provided at run time.
  */
 static int
@@ -501,6 +521,8 @@ us_vhost_parse_args(int argc, char **argv)
 		{"tx-csum", required_argument, NULL, 0},
 		{"tso", required_argument, NULL, 0},
 		{"client", no_argument, &client_mode, 1},
+		{"switch", required_argument, NULL, 0},
+		{"max-ports", required_argument, NULL, 0},
 		{NULL, 0, 0, 0},
 	};
 
@@ -652,6 +674,27 @@ us_vhost_parse_args(int argc, char **argv)
 					RTE_LOG(INFO, VHOST_CONFIG, "Invalid argument for character device basename (Max %d characters)\n", MAX_BASENAME_SZ);
 					us_vhost_usage(prgname);
 					return -1;
+				}
+			}
+
+			/* Set vswitch_driver name */
+			if (!strncmp(long_option[option_index].name, "switch", MAX_LONG_OPT_SZ)) {
+				if (us_vhost_parse_switch_name(optarg) == -1) {
+					RTE_LOG(INFO, VHOST_CONFIG, "Invalid argument for character switch dev (Max %d characters)\n", MAX_BASENAME_SZ);
+					us_vhost_usage(prgname);
+					return -1;
+				}
+			}
+
+			/* Specify Max ports in vswitch. */
+			if (!strncmp(long_option[option_index].name, "max-ports", MAX_LONG_OPT_SZ)) {
+				ret = parse_num_opt(optarg, INT32_MAX);
+				if (ret == -1) {
+					RTE_LOG(INFO, VHOST_CONFIG, "Invalid argument for switch max ports [0-N]\n");
+					us_vhost_usage(prgname);
+					return -1;
+				} else {
+					switch_max_ports = ret;
 				}
 			}
 
