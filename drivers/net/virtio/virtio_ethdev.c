@@ -92,6 +92,7 @@ static void virtio_mac_addr_add(struct rte_eth_dev *dev,
 static void virtio_mac_addr_remove(struct rte_eth_dev *dev, uint32_t index);
 static void virtio_mac_addr_set(struct rte_eth_dev *dev,
 				struct ether_addr *mac_addr);
+static int  virtio_mtu_set(struct rte_eth_dev *dev, uint16_t mtu);
 
 static int virtio_dev_queue_stats_mapping_set(
 	__rte_unused struct rte_eth_dev *eth_dev,
@@ -652,6 +653,16 @@ virtio_dev_allmulticast_disable(struct rte_eth_dev *dev)
 		PMD_INIT_LOG(ERR, "Failed to disable allmulticast");
 }
 
+static int 
+virtio_mtu_set(struct rte_eth_dev *dev, uint16_t mtu) 
+{
+   struct virtio_hw *hw = dev->data->dev_private;
+   if (unlikely(mtu < (uint32_t)hw->vtnet_hdr_size + ETHER_HDR_LEN)) {
+       return -1;
+   }
+   return 0;
+}
+
 /*
  * dev_ops for virtio, bare necessities for basic operation
  */
@@ -664,6 +675,7 @@ static const struct eth_dev_ops virtio_eth_dev_ops = {
 	.promiscuous_disable     = virtio_dev_promiscuous_disable,
 	.allmulticast_enable     = virtio_dev_allmulticast_enable,
 	.allmulticast_disable    = virtio_dev_allmulticast_disable,
+	.mtu_set                 = virtio_mtu_set,
 
 	.dev_infos_get           = virtio_dev_info_get,
 	.stats_get               = virtio_dev_stats_get,
