@@ -1066,7 +1066,7 @@ void ixgbe_set_lan_id_multi_port_pcie(struct ixgbe_hw *hw)
 	if (hw->device_id == IXGBE_DEV_ID_X550EM_A_SFP) {
 		hw->eeprom.ops.read(hw, IXGBE_EEPROM_CTRL_4, &ee_ctrl_4);
 		bus->instance_id = (ee_ctrl_4 & IXGBE_EE_CTRL_4_INST_ID) >>
-			IXGBE_EE_CTRL_4_INST_ID_SHIFT;
+				   IXGBE_EE_CTRL_4_INST_ID_SHIFT;
 	}
 }
 
@@ -2877,7 +2877,7 @@ out:
  *  advertised settings
  **/
 s32 ixgbe_negotiate_fc(struct ixgbe_hw *hw, u32 adv_reg, u32 lp_reg,
-			      u32 adv_sym, u32 adv_asm, u32 lp_sym, u32 lp_asm)
+		       u32 adv_sym, u32 adv_asm, u32 lp_sym, u32 lp_asm)
 {
 	if ((!(adv_reg)) ||  (!(lp_reg))) {
 		ERROR_REPORT3(IXGBE_ERROR_UNSUPPORTED,
@@ -3920,7 +3920,8 @@ s32 ixgbe_set_vfta_generic(struct ixgbe_hw *hw, u32 vlan, u32 vind,
 	vfta_delta = 1 << (vlan % 32);
 	vfta = IXGBE_READ_REG(hw, IXGBE_VFTA(regidx));
 
-	/* vfta_delta represents the difference between the current value
+	/*
+	 * vfta_delta represents the difference between the current value
 	 * of vfta and the value we want in the register.  Since the diff
 	 * is an XOR mask we can just update the vfta using an XOR
 	 */
@@ -3953,7 +3954,7 @@ vfta_update:
  *  @vind: VMDq output index that maps queue to VLAN id in VLVFB
  *  @vlan_on: boolean flag to turn on/off VLAN in VLVF
  *  @vfta_delta: pointer to the difference between the current value of VFTA
- * and the desired value
+ *		 and the desired value
  *  @vfta: the desired value of the VFTA
  *  @vlvf_bypass: boolean flag indicating updating default pool is okay
  *
@@ -3980,6 +3981,7 @@ s32 ixgbe_set_vlvf_generic(struct ixgbe_hw *hw, u32 vlan, u32 vind,
 	 */
 	if (!(IXGBE_READ_REG(hw, IXGBE_VT_CTL) & IXGBE_VT_CTL_VT_ENABLE))
 		return IXGBE_SUCCESS;
+
 	vlvf_index = ixgbe_find_vlvf_slot(hw, vlan, vlvf_bypass);
 	if (vlvf_index < 0)
 		return vlvf_index;
@@ -4009,6 +4011,7 @@ s32 ixgbe_set_vlvf_generic(struct ixgbe_hw *hw, u32 vlan, u32 vind,
 
 		return IXGBE_SUCCESS;
 	}
+
 	/* If there are still bits set in the VLVFB registers
 	 * for the VLAN ID indicated we need to see if the
 	 * caller is requesting that we clear the VFTA entry bit.
@@ -4413,43 +4416,31 @@ u8 ixgbe_calculate_checksum(u8 *buffer, u32 length)
 }
 
 /**
- *  ixgbe_host_interface_command - Issue command to manageability block
+ *  ixgbe_hic_unlocked - Issue command to manageability block unlocked
  *  @hw: pointer to the HW structure
- *  @buffer: contains the command to write and where the return status will
- *   be placed
+ *  @buffer: command to write and where the return status will be placed
  *  @length: length of buffer, must be multiple of 4 bytes
  *  @timeout: time in ms to wait for command completion
- *  @return_data: read and return data from the buffer (true) or not (false)
- *   Needed because FW structures are big endian and decoding of
- *   these fields can be 8 bit or 16 bit based on command. Decoding
- *   is not easily understood without making a table of commands.
- *   So we will leave this up to the caller to read back the data
- *   in these cases.
  *
  *  Communicates with the manageability block. On success return IXGBE_SUCCESS
  *  else returns semaphore error when encountering an error acquiring
  *  semaphore or IXGBE_ERR_HOST_INTERFACE_COMMAND when command fails.
+ *
+ *  This function assumes that the IXGBE_GSSR_SW_MNG_SM semaphore is held
+ *  by the caller.
  **/
-s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, u32 *buffer,
-				 u32 length, u32 timeout, bool return_data)
+s32 ixgbe_hic_unlocked(struct ixgbe_hw *hw, u32 *buffer, u32 length,
+		       u32 timeout)
 {
-	u32 hicr, i, bi, fwsts;
-	u32 hdr_size = sizeof(struct ixgbe_hic_hdr);
-	u16 buf_len;
+	u32 hicr, i, fwsts;
 	u16 dword_len;
-	s32 status;
 
-	DEBUGFUNC("ixgbe_host_interface_command");
+	DEBUGFUNC("ixgbe_hic_unlocked");
 
-	if (length == 0 || length > IXGBE_HI_MAX_BLOCK_BYTE_LENGTH) {
+	if (!length || length > IXGBE_HI_MAX_BLOCK_BYTE_LENGTH) {
 		DEBUGOUT1("Buffer length failure buffersize=%d.\n", length);
 		return IXGBE_ERR_HOST_INTERFACE_COMMAND;
 	}
-	/* Take management host interface semaphore */
-	status = hw->mac.ops.acquire_swfw_sync(hw, IXGBE_GSSR_SW_MNG_SM);
-
-	if (status)
-		return status;
 
 	/* Set bit 9 of FWSTS clearing FW reset indication */
 	fwsts = IXGBE_READ_REG(hw, IXGBE_FWSTS);
@@ -4457,17 +4448,15 @@ s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, u32 *buffer,
 
 	/* Check that the host interface is enabled. */
 	hicr = IXGBE_READ_REG(hw, IXGBE_HICR);
-	if ((hicr & IXGBE_HICR_EN) == 0) {
+	if (!(hicr & IXGBE_HICR_EN)) {
 		DEBUGOUT("IXGBE_HOST_EN bit disabled.\n");
-		status = IXGBE_ERR_HOST_INTERFACE_COMMAND;
-		goto rel_out;
+		return IXGBE_ERR_HOST_INTERFACE_COMMAND;
 	}
 
 	/* Calculate length in DWORDs. We must be DWORD aligned */
-	if ((length % (sizeof(u32))) != 0) {
+	if (length % sizeof(u32)) {
 		DEBUGOUT("Buffer length failure, not aligned to dword");
-		status = IXGBE_ERR_INVALID_ARGUMENT;
-		goto rel_out;
+		return IXGBE_ERR_INVALID_ARGUMENT;
 	}
 
 	dword_len = length >> 2;
@@ -4490,13 +4479,58 @@ s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, u32 *buffer,
 	}
 
 	/* Check command completion */
-	if ((timeout != 0 && i == timeout) ||
+	if ((timeout && i == timeout) ||
 	    !(IXGBE_READ_REG(hw, IXGBE_HICR) & IXGBE_HICR_SV)) {
 		ERROR_REPORT1(IXGBE_ERROR_CAUTION,
 			     "Command has failed with no status valid.\n");
-		status = IXGBE_ERR_HOST_INTERFACE_COMMAND;
-		goto rel_out;
+		return IXGBE_ERR_HOST_INTERFACE_COMMAND;
 	}
+
+	return IXGBE_SUCCESS;
+}
+
+/**
+ *  ixgbe_host_interface_command - Issue command to manageability block
+ *  @hw: pointer to the HW structure
+ *  @buffer: contains the command to write and where the return status will
+ *   be placed
+ *  @length: length of buffer, must be multiple of 4 bytes
+ *  @timeout: time in ms to wait for command completion
+ *  @return_data: read and return data from the buffer (true) or not (false)
+ *   Needed because FW structures are big endian and decoding of
+ *   these fields can be 8 bit or 16 bit based on command. Decoding
+ *   is not easily understood without making a table of commands.
+ *   So we will leave this up to the caller to read back the data
+ *   in these cases.
+ *
+ *  Communicates with the manageability block. On success return IXGBE_SUCCESS
+ *  else returns semaphore error when encountering an error acquiring
+ *  semaphore or IXGBE_ERR_HOST_INTERFACE_COMMAND when command fails.
+ **/
+s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, u32 *buffer,
+				 u32 length, u32 timeout, bool return_data)
+{
+	u32 hdr_size = sizeof(struct ixgbe_hic_hdr);
+	u16 dword_len;
+	u16 buf_len;
+	s32 status;
+	u32 bi;
+
+	DEBUGFUNC("ixgbe_host_interface_command");
+
+	if (length == 0 || length > IXGBE_HI_MAX_BLOCK_BYTE_LENGTH) {
+		DEBUGOUT1("Buffer length failure buffersize=%d.\n", length);
+		return IXGBE_ERR_HOST_INTERFACE_COMMAND;
+	}
+
+	/* Take management host interface semaphore */
+	status = hw->mac.ops.acquire_swfw_sync(hw, IXGBE_GSSR_SW_MNG_SM);
+	if (status)
+		return status;
+
+	status = ixgbe_hic_unlocked(hw, buffer, length, timeout);
+	if (status)
+		goto rel_out;
 
 	if (!return_data)
 		goto rel_out;
@@ -4512,7 +4546,7 @@ s32 ixgbe_host_interface_command(struct ixgbe_hw *hw, u32 *buffer,
 
 	/* If there is any thing in data position pull it in */
 	buf_len = ((struct ixgbe_hic_hdr *)buffer)->buf_len;
-	if (buf_len == 0)
+	if (!buf_len)
 		goto rel_out;
 
 	if (length < buf_len + hdr_size) {
