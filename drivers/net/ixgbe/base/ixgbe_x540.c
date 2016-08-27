@@ -271,6 +271,7 @@ mac_reset_top:
 	if (ixgbe_validate_mac_addr(hw->mac.san_addr) == 0) {
 		/* Save the SAN MAC RAR index */
 		hw->mac.san_mac_rar_index = hw->mac.num_rar_entries - 1;
+
 		hw->mac.ops.set_rar(hw, hw->mac.san_mac_rar_index,
 				    hw->mac.san_addr, 0, IXGBE_RAH_AV);
 
@@ -783,7 +784,6 @@ s32 ixgbe_acquire_swfw_sync_X540(struct ixgbe_hw *hw, u32 mask)
 			IXGBE_WRITE_REG(hw, IXGBE_SWFW_SYNC_BY_MAC(hw),
 					swfw_sync);
 			ixgbe_release_swfw_sync_semaphore(hw);
-			msec_delay(5);
 			return IXGBE_SUCCESS;
 		}
 		/* Firmware currently using resource (fwmask), hardware
@@ -860,7 +860,7 @@ void ixgbe_release_swfw_sync_X540(struct ixgbe_hw *hw, u32 mask)
 	IXGBE_WRITE_REG(hw, IXGBE_SWFW_SYNC_BY_MAC(hw), swfw_sync);
 
 	ixgbe_release_swfw_sync_semaphore(hw);
-	msec_delay(5);
+	msec_delay(2);
 }
 
 /**
