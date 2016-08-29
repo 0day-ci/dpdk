@@ -41,6 +41,11 @@ New Features
   Added a new function ``rte_pktmbuf_read()`` to read the packet data from an
   mbuf chain, linearizing if required.
 
+* **Added a function to get the packet type from packet data.**
+
+  Added a new function ``rte_net_get_ptype()`` to parse an Ethernet packet
+  in an mbuf chain and retrieve its packet type by software.
+
 Resolved Issues
 ---------------
 
