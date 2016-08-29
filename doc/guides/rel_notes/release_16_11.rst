@@ -46,6 +46,10 @@ New Features
   Added a new function ``rte_net_get_ptype()`` to parse an Ethernet packet
   in an mbuf chain and retrieve its packet type by software.
 
+* **Added functions to dump the packet type as a string.**
+
+  Added new functions ``rte_get_ptype_*()`` to dump a packet type as a string.
+
 Resolved Issues
 ---------------
 
