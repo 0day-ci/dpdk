@@ -398,6 +398,7 @@ F: drivers/net/null/
 
 Crypto Drivers
 --------------
+T: Pablo de Lara <pablo.de.lara.guarch@intel.com>
 
 Intel AES-NI GCM PMD
 M: Declan Doherty <declan.doherty@intel.com>
