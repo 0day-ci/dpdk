@@ -304,6 +304,12 @@ rte_vhost_enqueue_burst(int vid, uint16_t queue_id,
 	/* start enqueuing packets 1 by 1 */
 	avail_idx = *((volatile uint16_t *)&vq->avail->idx);
 	while (pkt_left && avail_idx != vq->last_used_idx) {
+		/* prefetch the next desc */
+		if (pkt_left > 1 && avail_idx != vq->last_used_idx + 1)
+			rte_prefetch0(&vq->desc[vq->avail->ring[
+					(vq->last_used_idx + 1) &
+					(vq->size - 1)]]);
+
 		if (enqueue_packet(dev, vq, avail_idx, pkts[pkt_idx],
 					is_mrg_rxbuf))
 			break;
