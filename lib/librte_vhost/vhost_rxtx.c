@@ -196,6 +196,7 @@ enqueue_packet(struct virtio_net *dev, struct vhost_virtqueue *vq,
 	uint32_t mbuf_len;
 	uint32_t mbuf_avail;
 	uint32_t copy_len;
+	uint32_t copy_virtio_hdr;
 	uint32_t extra_buffers = 0;
 
 	/* start with the first mbuf of the packet */
@@ -210,12 +211,12 @@ enqueue_packet(struct virtio_net *dev, struct vhost_virtqueue *vq,
 	if (unlikely(!desc_addr))
 		goto error;
 
-	/* handle virtio header */
+	/*
+	 * handle virtio header, the actual write operation is delayed
+	 * for cache optimization, to reduce CPU pipeline stall cycles.
+	 */
 	virtio_hdr = (struct virtio_net_hdr_mrg_rxbuf *)(uintptr_t)desc_addr;
-	virtio_enqueue_offload(mbuf, &(virtio_hdr->hdr));
-	if (is_mrg_rxbuf)
-		virtio_hdr->num_buffers = extra_buffers + 1;
-
+	copy_virtio_hdr = 1;
 	vhost_log_write(dev, desc->addr, dev->vhost_hlen);
 	PRINT_PACKET(dev, (uintptr_t)desc_addr, dev->vhost_hlen, 0);
 	desc_offset = dev->vhost_hlen;
@@ -266,8 +267,15 @@ enqueue_packet(struct virtio_net *dev, struct vhost_virtqueue *vq,
 				goto error;
 		}
 
-		/* copy mbuf data */
+		/* copy virtio header and mbuf data */
 		copy_len = RTE_MIN(desc->len - desc_offset, mbuf_avail);
+		if (copy_virtio_hdr) {
+			copy_virtio_hdr = 0;
+			virtio_enqueue_offload(mbuf, &(virtio_hdr->hdr));
+			if (is_mrg_rxbuf)
+				virtio_hdr->num_buffers = extra_buffers + 1;
+		}
+
 		rte_memcpy((void *)(uintptr_t)desc_addr,
 				rte_pktmbuf_mtod_offset(mbuf, void *,
 					mbuf_len - mbuf_avail),
