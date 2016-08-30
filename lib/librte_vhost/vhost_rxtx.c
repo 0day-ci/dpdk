@@ -134,16 +134,51 @@ virtio_enqueue_offload(struct rte_mbuf *m_buf, struct virtio_net_hdr *net_hdr)
 }
 
 static inline void __attribute__((always_inline))
-update_used_ring(struct virtio_net *dev, struct vhost_virtqueue *vq,
-		uint32_t desc_chain_head, uint32_t desc_chain_len)
+update_used_ring(struct vhost_virtqueue *vq, uint32_t desc_chain_head,
+		uint32_t desc_chain_len)
 {
-	uint32_t used_idx_round = vq->last_used_idx & (vq->size - 1);
+	vq->shadow_used_ring[vq->shadow_used_idx].id = desc_chain_head;
+	vq->shadow_used_ring[vq->shadow_used_idx].len = desc_chain_len;
+	vq->shadow_used_idx++;
+}
 
-	vq->used->ring[used_idx_round].id = desc_chain_head;
-	vq->used->ring[used_idx_round].len = desc_chain_len;
-	vhost_log_used_vring(dev, vq, offsetof(struct vring_used,
-				ring[used_idx_round]),
-			sizeof(vq->used->ring[used_idx_round]));
+static inline void __attribute__((always_inline))
+flush_used_ring(struct virtio_net *dev, struct vhost_virtqueue *vq,
+		uint32_t used_idx_start)
+{
+	if (used_idx_start + vq->shadow_used_idx < vq->size) {
+		rte_memcpy(&vq->used->ring[used_idx_start],
+				&vq->shadow_used_ring[0],
+				vq->shadow_used_idx *
+				sizeof(struct vring_used_elem));
+		vhost_log_used_vring(dev, vq,
+				offsetof(struct vring_used,
+					ring[used_idx_start]),
+				vq->shadow_used_idx *
+				sizeof(struct vring_used_elem));
+	} else {
+		uint32_t part_1 = vq->size - used_idx_start;
+		uint32_t part_2 = vq->shadow_used_idx - part_1;
+
+		rte_memcpy(&vq->used->ring[used_idx_start],
+				&vq->shadow_used_ring[0],
+				part_1 *
+				sizeof(struct vring_used_elem));
+		vhost_log_used_vring(dev, vq,
+				offsetof(struct vring_used,
+					ring[used_idx_start]),
+				part_1 *
+				sizeof(struct vring_used_elem));
+		rte_memcpy(&vq->used->ring[0],
+				&vq->shadow_used_ring[part_1],
+				part_2 *
+				sizeof(struct vring_used_elem));
+		vhost_log_used_vring(dev, vq,
+				offsetof(struct vring_used,
+					ring[0]),
+				part_2 *
+				sizeof(struct vring_used_elem));
+	}
 }
 
 static inline uint32_t __attribute__((always_inline))
@@ -208,7 +243,7 @@ enqueue_packet(struct virtio_net *dev, struct vhost_virtqueue *vq,
 					goto error;
 			} else if (is_mrg_rxbuf) {
 				/* start with the next desc chain */
-				update_used_ring(dev, vq, desc_chain_head,
+				update_used_ring(vq, desc_chain_head,
 						desc_chain_len);
 				vq->last_used_idx++;
 				extra_buffers++;
@@ -245,7 +280,7 @@ enqueue_packet(struct virtio_net *dev, struct vhost_virtqueue *vq,
 		desc_chain_len += copy_len;
 	}
 
-	update_used_ring(dev, vq, desc_chain_head, desc_chain_len);
+	update_used_ring(vq, desc_chain_head, desc_chain_len);
 	vq->last_used_idx++;
 
 	return 0;
@@ -276,6 +311,7 @@ rte_vhost_enqueue_burst(int vid, uint16_t queue_id,
 {
 	struct vhost_virtqueue *vq;
 	struct virtio_net *dev;
+	uint32_t used_idx_start;
 	uint32_t pkt_left = count;
 	uint32_t pkt_idx = 0;
 	uint32_t pkt_sent = 0;
@@ -302,6 +338,8 @@ rte_vhost_enqueue_burst(int vid, uint16_t queue_id,
 		is_mrg_rxbuf = 1;
 
 	/* start enqueuing packets 1 by 1 */
+	vq->shadow_used_idx = 0;
+	used_idx_start = vq->last_used_idx & (vq->size - 1);
 	avail_idx = *((volatile uint16_t *)&vq->avail->idx);
 	while (pkt_left && avail_idx != vq->last_used_idx) {
 		/* prefetch the next desc */
@@ -318,6 +356,10 @@ rte_vhost_enqueue_burst(int vid, uint16_t queue_id,
 		pkt_sent++;
 		pkt_left--;
 	}
+
+	/* batch update used ring for better performance */
+	if (likely(vq->shadow_used_idx > 0))
+		flush_used_ring(dev, vq, used_idx_start);
 
 	/* update used idx and kick the guest if necessary */
 	if (pkt_sent)

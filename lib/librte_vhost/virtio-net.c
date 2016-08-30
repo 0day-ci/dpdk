@@ -152,10 +152,26 @@ cleanup_device(struct virtio_net *dev, int destroy)
 static void
 free_device(struct virtio_net *dev)
 {
+	struct vhost_virtqueue *vq_0;
+	struct vhost_virtqueue *vq_1;
 	uint32_t i;
 
-	for (i = 0; i < dev->virt_qp_nb; i++)
-		rte_free(dev->virtqueue[i * VIRTIO_QNUM]);
+	for (i = 0; i < dev->virt_qp_nb; i++) {
+		vq_0 = dev->virtqueue[i * VIRTIO_QNUM];
+		if (vq_0->shadow_used_ring) {
+			rte_free(vq_0->shadow_used_ring);
+			vq_0->shadow_used_ring = NULL;
+		}
+
+		vq_1 = dev->virtqueue[i * VIRTIO_QNUM + 1];
+		if (vq_1->shadow_used_ring) {
+			rte_free(vq_1->shadow_used_ring);
+			vq_1->shadow_used_ring = NULL;
+		}
+
+		/* malloc together, free together */
+		rte_free(vq_0);
+	}
 
 	rte_free(dev);
 }
@@ -418,13 +434,26 @@ int
 vhost_set_vring_num(int vid, struct vhost_vring_state *state)
 {
 	struct virtio_net *dev;
+	struct vhost_virtqueue *vq;
 
 	dev = get_device(vid);
 	if (dev == NULL)
 		return -1;
 
 	/* State->index refers to the queue index. The txq is 1, rxq is 0. */
-	dev->virtqueue[state->index]->size = state->num;
+	vq = dev->virtqueue[state->index];
+	vq->size = state->num;
+	if (!vq->shadow_used_ring) {
+		vq->shadow_used_ring = rte_malloc(NULL,
+				vq->size * sizeof(struct vring_used_elem),
+				RTE_CACHE_LINE_SIZE);
+		if (!vq->shadow_used_ring) {
+			RTE_LOG(ERR, VHOST_CONFIG,
+				"Failed to allocate memory"
+				" for shadow used ring.\n");
+			return -1;
+		}
+	}
 
 	return 0;
 }
@@ -610,6 +639,7 @@ int
 vhost_get_vring_base(int vid, uint32_t index,
 	struct vhost_vring_state *state)
 {
+	struct vhost_virtqueue *vq;
 	struct virtio_net *dev;
 
 	dev = get_device(vid);
@@ -617,6 +647,12 @@ vhost_get_vring_base(int vid, uint32_t index,
 		return -1;
 
 	state->index = index;
+	vq = dev->virtqueue[state->index];
+	if (vq->shadow_used_ring) {
+		rte_free(vq->shadow_used_ring);
+		vq->shadow_used_ring = NULL;
+	}
+
 	/* State->index refers to the queue index. The txq is 1, rxq is 0. */
 	state->num = dev->virtqueue[state->index]->last_used_idx;
 

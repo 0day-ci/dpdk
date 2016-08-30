@@ -85,6 +85,10 @@ struct vhost_virtqueue {
 
 	/* Physical address of used ring, for logging */
 	uint64_t		log_guest_addr;
+
+	/* Shadow used ring for performance */
+	struct vring_used_elem	*shadow_used_ring;
+	uint32_t		shadow_used_idx;
 } __rte_cache_aligned;
 
 /* Old kernels have no such macro defined */
