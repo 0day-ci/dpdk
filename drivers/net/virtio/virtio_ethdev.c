@@ -558,6 +558,9 @@ virtio_dev_close(struct rte_eth_dev *dev)
 	vtpci_reset(hw);
 	virtio_dev_free_mbufs(dev);
 	virtio_free_queues(dev);
+
+	hw->opened = 0;
+
 }
 
 static void
@@ -1393,9 +1396,10 @@ virtio_dev_start(struct rte_eth_dev *dev)
 	virtio_dev_link_update(dev, 0);
 
 	/* On restart after stop do not touch queues */
-	if (hw->started)
+	if (hw->opened) {
+		hw->started = 1;
 		return 0;
-
+	}
 	/* Do final configuration before rx/tx engine starts */
 	virtio_dev_rxtx_start(dev);
 	vtpci_reinit_complete(hw);
@@ -1430,6 +1434,8 @@ virtio_dev_start(struct rte_eth_dev *dev)
 		txvq = dev->data->tx_queues[i];
 		VIRTQUEUE_DUMP(txvq->vq);
 	}
+
+	hw->opened = 1;
 
 	return 0;
 }

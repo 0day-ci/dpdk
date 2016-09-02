@@ -252,6 +252,7 @@ struct virtio_hw {
 	uint8_t	    vlan_strip;
 	uint8_t	    use_msix;
 	uint8_t     started;
+	uint8_t     opened;
 	uint8_t     modern;
 	uint8_t     mac_addr[ETHER_ADDR_LEN];
 	uint32_t    notify_off_multiplier;
