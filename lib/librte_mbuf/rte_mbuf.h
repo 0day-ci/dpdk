@@ -786,7 +786,7 @@ struct rte_mbuf {
 	 */
 	union {
 		rte_atomic16_t refcnt_atomic; /**< Atomically accessed refcnt */
-		uint16_t refcnt;              /**< Non-atomically accessed refcnt */
+		volatile uint16_t refcnt;     /**< Non-atomically accessed refcnt */
 	};
 	uint8_t nb_segs;          /**< Number of segments. */
 	uint8_t port;             /**< Input port. */
@@ -1060,16 +1060,12 @@ static inline uint16_t
 rte_mbuf_refcnt_update(struct rte_mbuf *m, int16_t value)
 {
 	/*
-	 * The atomic_add is an expensive operation, so we don't want to
-	 * call it in the case where we know we are the uniq holder of
-	 * this mbuf (i.e. ref_cnt == 1). Otherwise, an atomic
-	 * operation has to be used because concurrent accesses on the
-	 * reference counter can occur.
+	 * This shell always call atomic_add
+	 *
+	 * when mbuf is allocated by cpu1 and freed by cpu2. cpu1 cache may not be updated by such a set operation.
+	 * causes refcnt reads incorrect values
+	 * 
 	 */
-	if (likely(rte_mbuf_refcnt_read(m) == 1)) {
-		rte_mbuf_refcnt_set(m, 1 + value);
-		return 1 + value;
-	}
 
 	return (uint16_t)(rte_atomic16_add_return(&m->refcnt_atomic, value));
 }
