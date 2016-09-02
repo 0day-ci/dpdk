@@ -46,6 +46,7 @@ struct virtnet_ctl;
 #define VIRTIO_PCI_VENDORID     0x1AF4
 #define VIRTIO_PCI_DEVICEID_MIN 0x1000
 #define VIRTIO_PCI_DEVICEID_MAX 0x103F
+#define VIRTIO_PCI_MODERN_DEVICEID_NET 0x1041
 
 /* VirtIO ABI version, this must match exactly. */
 #define VIRTIO_PCI_ABI_VERSION 0
