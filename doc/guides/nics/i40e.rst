@@ -411,3 +411,36 @@ configuration passed on the EAL command line.
 
 The floating VEB functionality requires a NIC firmware version of 5.0
 or greater.
+
+
+Limitations or Known issues
+---------------------------
+
+MPLS packet classification on X710/XL710
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Before NIC firmware version of 5.0, MPLS packet cannot be recognized by NIC.
+The L2 Payload flow type in flow director can be used to classify MPLS packet
+by the command in testpmd like:
+
+   testpmd> flow_director_filter 0 mode IP add flow l2_payload ether \
+            0x8847 flexbytes () fwd pf queue <N> fd_id <M>
+
+In the NIC firmware whose version is 5.0 or greater, very limited MPLS support
+is added: Native MPLS skip is implemented, that is, packet type can be
+recognized like MPLS header is skipped, while no new packet type and no more
+meta data is extracted from MPLS header. With this change, L2 Payload flow
+type in flow director cannot be used to classify MPLS packet as previous.
+Meanwhile, Ethertype filter can be used to classify MPLS packet by the command
+in testpmd like:
+
+   testpmd> ethertype_filter 0 add mac_ignr 00:00:00:00:00:00 ethertype \
+            0x8847 fwd queue <M>
+
+16 Byte Descriptor cannot be used on DPDK VF
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If Linux i40e kerel driver is used as host driver, while DPDK i40e PMD is used
+as VF driver, DPDK cannot choose 16 byte descriptor receive descriptor. That
+is to say, user should keep "CONFIG_RTE_LIBRTE_I40E_16BYTE_RX_DESC=n" in config
+file.
