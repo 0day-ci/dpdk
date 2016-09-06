@@ -59,11 +59,6 @@ _LDLIBS-y += -L$(RTE_SDK_BIN)/lib
 #
 # Order is important: from higher level to lower level
 #
-
-ifeq ($(CONFIG_RTE_EXEC_ENV_LINUXAPP),y)
-_LDLIBS-$(CONFIG_RTE_LIBRTE_KNI)            += -lrte_kni
-endif
-
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PIPELINE)       += -lrte_pipeline
 _LDLIBS-$(CONFIG_RTE_LIBRTE_TABLE)          += -lrte_table
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PORT)           += -lrte_port
@@ -83,6 +78,10 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_JOBSTATS)       += -lrte_jobstats
 _LDLIBS-$(CONFIG_RTE_LIBRTE_POWER)          += -lrte_power
 
 _LDLIBS-y += --whole-archive
+
+ifeq ($(CONFIG_RTE_EXEC_ENV_LINUXAPP),y)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_KNI)            += -lrte_kni
+endif
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_TIMER)          += -lrte_timer
 _LDLIBS-$(CONFIG_RTE_LIBRTE_HASH)           += -lrte_hash
@@ -114,6 +113,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_ENIC_PMD)       += -lrte_pmd_enic
 _LDLIBS-$(CONFIG_RTE_LIBRTE_FM10K_PMD)      += -lrte_pmd_fm10k
 _LDLIBS-$(CONFIG_RTE_LIBRTE_I40E_PMD)       += -lrte_pmd_i40e
 _LDLIBS-$(CONFIG_RTE_LIBRTE_IXGBE_PMD)      += -lrte_pmd_ixgbe
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_KNI)        += -lrte_pmd_kni
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX4_PMD)       += -lrte_pmd_mlx4 -libverbs
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -lrte_pmd_mlx5 -libverbs
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MPIPE_PMD)      += -lrte_pmd_mpipe -lgxio
