@@ -3915,4 +3915,11 @@ skb_set_hash(struct sk_buff *skb, __u32 hash, __always_unused int type)
 /* ndo_bridge_getlink adds new filter_mask and vlan_fill parameters */
 #define HAVE_NDO_BRIDGE_GETLINK_FILTER_MASK_VLAN_FILL
 #endif /* >= 4.2.0 */
+
+#if ( LINUX_VERSION_CODE >= KERNEL_VERSION(4,8,0) )
+#ifndef DEFINE_PCI_DEVICE_TABLE
+#define DEFINE_PCI_DEVICE_TABLE(_table) const struct pci_device_id _table[]
+#endif /* DEFINE_PCI_DEVICE_TABLE */
+#endif /* >= 4.8.0 */
+
 #endif /* _KCOMPAT_H_ */

@@ -3140,4 +3140,10 @@ static inline int __kc_pci_vfs_assigned(struct pci_dev *dev)
 #define SET_ETHTOOL_OPS(netdev, ops) ((netdev)->ethtool_ops = (ops))
 #endif /* >= 3.16.0 */
 
+#if ( LINUX_VERSION_CODE >= KERNEL_VERSION(4,8,0) )
+#ifndef DEFINE_PCI_DEVICE_TABLE
+#define DEFINE_PCI_DEVICE_TABLE(_table) const struct pci_device_id _table[]
+#endif /* DEFINE_PCI_DEVICE_TABLE */
+#endif /* >= 4.8.0 */
+
 #endif /* _KCOMPAT_H_ */
