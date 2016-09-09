@@ -361,6 +361,9 @@ kni_dev_remove(struct kni_dev *dev)
 		igb_kni_remove(dev->pci_dev);
 
 	if (dev->net_dev) {
+		if (dev->net_dev->state == NETREG_REGISTERED) {
+			unregister_netdev(dev->net_dev);
+		}
 		unregister_netdev(dev->net_dev);
 		free_netdev(dev->net_dev);
 	}
