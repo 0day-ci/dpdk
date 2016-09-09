@@ -72,6 +72,10 @@ static struct ether_addr base_eth_addr = {
 	}
 };
 
+struct vhost_xstats {
+	uint64_t stat[16];
+};
+
 struct vhost_queue {
 	int vid;
 	rte_atomic32_t allow_queuing;
@@ -85,7 +89,8 @@ struct vhost_queue {
 	uint64_t missed_pkts;
 	uint64_t rx_bytes;
 	uint64_t tx_bytes;
-};
+	struct vhost_xstats xstats;
+	};
 
 struct pmd_internal {
 	char *dev_name;
@@ -127,6 +132,274 @@ struct rte_vhost_vring_state {
 
 static struct rte_vhost_vring_state *vring_states[RTE_MAX_ETHPORTS];
 
+enum rte_vhostqueue_rxtx {
+	RTE_VHOSTQUEUE_RX = 0,
+	RTE_VHOSTQUEUE_TX = 1
+};
+
+#define RTE_ETH_VHOST_XSTATS_NAME_SIZE 64
+
+struct rte_vhost_xstats_name_off {
+	char name[RTE_ETH_VHOST_XSTATS_NAME_SIZE];
+	uint64_t offset;
+};
+
+/* [rt]_qX_ is prepended to the name string here */
+static const struct rte_vhost_xstats_name_off rte_vhost_rxq_stat_strings[] = {
+	{"good_packets",
+			offsetof(struct vhost_queue, rx_pkts)},
+	{"total_bytes",
+			offsetof(struct vhost_queue, rx_bytes)},
+	{"dropped_pkts",
+			offsetof(struct vhost_queue, missed_pkts)},
+	{"broadcast_packets",
+			offsetof(struct vhost_queue, xstats.stat[8])},
+	{"multicast_packets",
+			offsetof(struct vhost_queue, xstats.stat[9])},
+	{"ucast_packets",
+			offsetof(struct vhost_queue, xstats.stat[10])},
+	{"undersize_errors",
+			offsetof(struct vhost_queue, xstats.stat[0])},
+	{"size_64_packets",
+			offsetof(struct vhost_queue, xstats.stat[1])},
+	{"size_65_to_127_packets",
+			offsetof(struct vhost_queue, xstats.stat[2])},
+	{"size_128_to_255_packets",
+			offsetof(struct vhost_queue, xstats.stat[3])},
+	{"size_256_to_511_packets",
+			offsetof(struct vhost_queue, xstats.stat[4])},
+	{"size_512_to_1023_packets",
+			offsetof(struct vhost_queue, xstats.stat[5])},
+	{"size_1024_to_1522_packets",
+			offsetof(struct vhost_queue, xstats.stat[6])},
+	{"size_1523_to_max_packets",
+			offsetof(struct vhost_queue, xstats.stat[7])},
+	{"errors",
+			offsetof(struct vhost_queue, xstats.stat[11])},
+	{"fragmented_errors",
+			offsetof(struct vhost_queue, xstats.stat[12])},
+	{"jabber_errors",
+			offsetof(struct vhost_queue, xstats.stat[13])},
+	{"unknown_protos_packets",
+			offsetof(struct vhost_queue, xstats.stat[14])},
+};
+
+/* [tx]_qX_ is prepended to the name string here */
+static const struct rte_vhost_xstats_name_off rte_vhost_txq_stat_strings[] = {
+	{"good_packets",
+			offsetof(struct vhost_queue, tx_pkts)},
+	{"total_bytes",
+			offsetof(struct vhost_queue, tx_bytes)},
+	{"dropped_pkts",
+			offsetof(struct vhost_queue, missed_pkts)},
+	{"broadcast_packets",
+			offsetof(struct vhost_queue, xstats.stat[8])},
+	{"multicast_packets",
+			offsetof(struct vhost_queue, xstats.stat[9])},
+	{"ucast_packets",
+			offsetof(struct vhost_queue, xstats.stat[10])},
+	{"size_64_packets",
+			offsetof(struct vhost_queue, xstats.stat[1])},
+	{"size_65_to_127_packets",
+			offsetof(struct vhost_queue, xstats.stat[2])},
+	{"size_128_to_255_packets",
+			offsetof(struct vhost_queue, xstats.stat[3])},
+	{"size_256_to_511_packets",
+			offsetof(struct vhost_queue, xstats.stat[4])},
+	{"size_512_to_1023_packets",
+			offsetof(struct vhost_queue, xstats.stat[5])},
+	{"size_1024_to_1522_packets",
+			offsetof(struct vhost_queue, xstats.stat[6])},
+	{"size_1523_to_max_packets",
+			offsetof(struct vhost_queue, xstats.stat[7])},
+	{"errors",
+			offsetof(struct vhost_queue, xstats.stat[11])},
+};
+
+#define VHOST_NB_RXQ_XSTATS (sizeof(rte_vhost_rxq_stat_strings) / \
+			     sizeof(rte_vhost_rxq_stat_strings[0]))
+
+#define VHOST_NB_TXQ_XSTATS (sizeof(rte_vhost_txq_stat_strings) / \
+			     sizeof(rte_vhost_txq_stat_strings[0]))
+
+static void
+vhost_dev_xstats_reset(struct rte_eth_dev *dev)
+{
+	struct vhost_queue *vqrx = NULL;
+	struct vhost_queue *vqtx = NULL;
+	unsigned int i = 0;
+
+	for (i = 0; i < dev->data->nb_rx_queues; i++) {
+		if (!dev->data->rx_queues[i])
+			continue;
+		vqrx = (struct vhost_queue *)dev->data->rx_queues[i];
+		vqrx->rx_pkts = 0;
+		vqrx->rx_bytes = 0;
+		vqrx->missed_pkts = 0;
+		memset(&vqrx->xstats, 0, sizeof(vqrx->xstats));
+	}
+	for (i = 0; i < dev->data->nb_tx_queues; i++) {
+		if (!dev->data->tx_queues[i])
+			continue;
+		vqtx = (struct vhost_queue *)dev->data->tx_queues[i];
+		vqtx->tx_pkts = 0;
+		vqtx->tx_bytes = 0;
+		vqtx->missed_pkts = 0;
+		memset(&vqtx->xstats, 0, sizeof(vqtx->xstats));
+	}
+}
+
+static int
+vhost_dev_xstats_get_names(struct rte_eth_dev *dev,
+			   struct rte_eth_xstat_name *xstats_names,
+			   __rte_unused unsigned int limit)
+{
+	unsigned int i = 0;
+	unsigned int t = 0;
+	int count = 0;
+	int nstats = dev->data->nb_rx_queues * VHOST_NB_RXQ_XSTATS
+			+ dev->data->nb_tx_queues * VHOST_NB_TXQ_XSTATS;
+
+	if (xstats_names) {
+		for (i = 0; i < dev->data->nb_rx_queues; i++) {
+			struct vhost_queue *rxvq = dev->data->rx_queues[i];
+
+			if (!rxvq)
+				continue;
+			for (t = 0; t < VHOST_NB_RXQ_XSTATS; t++) {
+				snprintf(xstats_names[count].name,
+					 sizeof(xstats_names[count].name),
+					 "rx_q%u_%s", i,
+					 rte_vhost_rxq_stat_strings[t].name);
+				count++;
+			}
+		}
+		for (i = 0; i < dev->data->nb_tx_queues; i++) {
+			struct vhost_queue *txvq = dev->data->tx_queues[i];
+
+			if (!txvq)
+				continue;
+			for (t = 0; t < VHOST_NB_TXQ_XSTATS; t++) {
+				snprintf(xstats_names[count].name,
+					 sizeof(xstats_names[count].name),
+					 "tx_q%u_%s", i,
+					 rte_vhost_txq_stat_strings[t].name);
+				count++;
+			}
+		}
+		return count;
+	}
+	return nstats;
+}
+
+static int
+vhost_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
+		     unsigned int n)
+{
+	unsigned int i;
+	unsigned int t;
+	unsigned int count = 0;
+
+	unsigned int nxstats = dev->data->nb_rx_queues * VHOST_NB_RXQ_XSTATS
+				+ dev->data->nb_tx_queues * VHOST_NB_TXQ_XSTATS;
+
+	if (n < nxstats)
+		return nxstats;
+
+	for (i = 0; i < dev->data->nb_rx_queues; i++) {
+		struct vhost_queue *rxvq =
+			(struct vhost_queue *)dev->data->rx_queues[i];
+
+		if (!rxvq)
+			continue;
+
+		for (t = 0; t < VHOST_NB_RXQ_XSTATS; t++) {
+			xstats[count].value = *(uint64_t *)(((char *)rxvq)
+				+ rte_vhost_rxq_stat_strings[t].offset);
+			count++;
+		}
+	}
+
+	for (i = 0; i < dev->data->nb_tx_queues; i++) {
+		struct vhost_queue *txvq =
+			(struct vhost_queue *)dev->data->tx_queues[i];
+
+		if (!txvq)
+			continue;
+
+		for (t = 0; t < VHOST_NB_TXQ_XSTATS; t++) {
+			xstats[count].value = *(uint64_t *)(((char *)txvq)
+				+ rte_vhost_txq_stat_strings[t].offset);
+			count++;
+		}
+	}
+
+	return count;
+}
+
+static void
+vhost_update_packet_xstats(struct vhost_queue *vq,
+			   struct rte_mbuf **bufs,
+			   uint16_t nb_rxtx,
+			   uint16_t nb_bufs,
+			   enum rte_vhostqueue_rxtx vqueue_rxtx)
+{
+	uint32_t pkt_len = 0;
+	uint64_t i = 0;
+	uint64_t index;
+	struct ether_addr *ea = NULL;
+	struct vhost_xstats *xstats_update = &vq->xstats;
+
+	for (i = 0; i < nb_rxtx ; i++) {
+		pkt_len = bufs[i]->pkt_len;
+		if (pkt_len == 64) {
+			xstats_update->stat[1]++;
+
+		} else if (pkt_len > 64 && pkt_len < 1024) {
+			index = (sizeof(pkt_len) * 8)
+				- __builtin_clz(pkt_len) - 5;
+			xstats_update->stat[index]++;
+		} else {
+			if (pkt_len < 64)
+				xstats_update->stat[0]++;
+			else if (pkt_len <= 1522)
+				xstats_update->stat[6]++;
+			else if (pkt_len > 1522)
+				xstats_update->stat[7]++;
+		}
+
+		ea = rte_pktmbuf_mtod(bufs[i], struct ether_addr *);
+		if (is_multicast_ether_addr(ea)) {
+			if (is_broadcast_ether_addr(ea))
+				/* broadcast++; */
+				xstats_update->stat[8]++;
+			else
+				/* multicast++; */
+				xstats_update->stat[9]++;
+		}
+	}
+	/* non-multi/broadcast, multi/broadcast, including those
+	 * that were discarded or not sent. from rfc2863
+	 */
+	if (vqueue_rxtx == RTE_VHOSTQUEUE_RX) {
+		xstats_update->stat[10] =  vq->rx_pkts + vq->missed_pkts
+					   - (xstats_update->stat[8]
+					   + xstats_update->stat[9]);
+	} else {
+		for (i = nb_rxtx; i < nb_bufs ; i++) {
+			ea = rte_pktmbuf_mtod(bufs[i], struct ether_addr *);
+			if (is_multicast_ether_addr(ea)) {
+				if (is_broadcast_ether_addr(ea))
+					xstats_update->stat[8]++;
+				else
+					xstats_update->stat[9]++;
+			}
+		}
+		xstats_update->stat[10] =  vq->tx_pkts + vq->missed_pkts
+			- (xstats_update->stat[8] + xstats_update->stat[9]);
+	}
+}
+
 static uint16_t
 eth_vhost_rx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 {
@@ -151,6 +424,8 @@ eth_vhost_rx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 		bufs[i]->port = r->port;
 		r->rx_bytes += bufs[i]->pkt_len;
 	}
+
+	vhost_update_packet_xstats(r, bufs, nb_rx, nb_rx, RTE_VHOSTQUEUE_RX);
 
 out:
 	rte_atomic32_set(&r->while_queuing, 0);
@@ -181,6 +456,8 @@ eth_vhost_tx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 
 	for (i = 0; likely(i < nb_tx); i++)
 		r->tx_bytes += bufs[i]->pkt_len;
+
+	vhost_update_packet_xstats(r, bufs, nb_tx, nb_bufs, RTE_VHOSTQUEUE_TX);
 
 	for (i = 0; likely(i < nb_tx); i++)
 		rte_pktmbuf_free(bufs[i]);
@@ -682,6 +959,9 @@ static const struct eth_dev_ops ops = {
 	.link_update = eth_link_update,
 	.stats_get = eth_stats_get,
 	.stats_reset = eth_stats_reset,
+	.xstats_reset = vhost_dev_xstats_reset,
+	.xstats_get = vhost_dev_xstats_get,
+	.xstats_get_names = vhost_dev_xstats_get_names,
 };
 
 static int
