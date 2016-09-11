@@ -1643,7 +1643,7 @@ i40e_apply_link_speed(struct rte_eth_dev *dev)
 	uint8_t abilities = 0;
 	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct rte_eth_conf *conf = &dev->data->dev_conf;
-
+	enum i40e_aq_link_speed link_speed = i40e_get_link_speed_by_devid(hw->device_id);
 	speed = i40e_parse_link_speeds(conf->link_speeds);
 	abilities |= I40E_AQ_PHY_ENABLE_ATOMIC_LINK;
 	if (!(conf->link_speeds & ETH_LINK_SPEED_FIXED))
@@ -1651,7 +1651,7 @@ i40e_apply_link_speed(struct rte_eth_dev *dev)
 	abilities |= I40E_AQ_PHY_LINK_ENABLED;
 
 	/* Skip changing speed on 40G interfaces, FW does not support */
-	if (i40e_is_40G_device(hw->device_id)) {
+	if (link_speed == I40E_LINK_SPEED_40GB) {
 		speed =  I40E_LINK_SPEED_UNKNOWN;
 		abilities |= I40E_AQ_PHY_AN_ENABLED;
 	}
@@ -2555,6 +2555,7 @@ i40e_dev_info_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *dev_info)
 	struct i40e_pf *pf = I40E_DEV_PRIVATE_TO_PF(dev->data->dev_private);
 	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct i40e_vsi *vsi = pf->main_vsi;
+	enum i40e_aq_link_speed link_speed = I40E_LINK_SPEED_UNKNOWN;
 
 	dev_info->max_rx_queues = vsi->nb_qps;
 	dev_info->max_tx_queues = vsi->nb_qps;
@@ -2625,8 +2626,9 @@ i40e_dev_info_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *dev_info)
 		dev_info->max_rx_queues += dev_info->vmdq_queue_num;
 		dev_info->max_tx_queues += dev_info->vmdq_queue_num;
 	}
-
-	if (i40e_is_40G_device(hw->device_id))
+	
+	link_speed = i40e_get_link_speed_by_devid(hw->device_id);
+	if (link_speed == I40E_LINK_SPEED_40GB)
 		/* For XL710 */
 		dev_info->speed_capa = ETH_LINK_SPEED_40G;
 	else
@@ -2846,6 +2848,7 @@ i40e_flow_ctrl_set(struct rte_eth_dev *dev, struct rte_eth_fc_conf *fc_conf)
 		[RTE_FC_TX_PAUSE] = I40E_FC_TX_PAUSE,
 		[RTE_FC_FULL] = I40E_FC_FULL
 	};
+	enum i40e_aq_link_speed link_speed = I40E_LINK_SPEED_UNKNOWN;
 
 	/* high_water field in the rte_eth_fc_conf using the kilobytes unit */
 
@@ -2873,8 +2876,9 @@ i40e_flow_ctrl_set(struct rte_eth_dev *dev, struct rte_eth_fc_conf *fc_conf)
 	err = i40e_set_fc(hw, &aq_failure, true);
 	if (err < 0)
 		return -ENOSYS;
-
-	if (i40e_is_40G_device(hw->device_id)) {
+	
+	link_speed = i40e_get_link_speed_by_devid(hw->device_id);
+	if (link_speed == I40E_LINK_SPEED_40GB) {
 		/* Configure flow control refresh threshold,
 		 * the value for stat_tx_pause_refresh_timer[8]
 		 * is used for global pause operation.
@@ -8070,10 +8074,11 @@ i40e_configure_registers(struct i40e_hw *hw)
 	uint64_t reg;
 	uint32_t i;
 	int ret;
+	enum i40e_aq_link_speed link_speed = i40e_get_link_speed_by_devid(hw->device_id);
 
 	for (i = 0; i < RTE_DIM(reg_table); i++) {
 		if (reg_table[i].addr == I40E_GL_SWR_PM_UP_THR) {
-			if (i40e_is_40G_device(hw->device_id)) /* For XL710 */
+			if (link_speed == I40E_LINK_SPEED_40GB) /* For XL710 */
 				reg_table[i].val =
 					I40E_GL_SWR_PM_UP_THR_SF_VALUE;
 			else /* For X710 */

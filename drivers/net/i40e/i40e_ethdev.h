@@ -712,4 +712,46 @@ i40e_calc_itr_interval(int16_t interval)
 	(pctype) == I40E_FILTER_PCTYPE_NONF_IPV6_OTHER || \
 	(pctype) == I40E_FILTER_PCTYPE_L2_PAYLOAD)
 
+static inline enum i40e_aq_link_speed
+i40e_get_link_speed_by_devid(u16 dev_id)
+{
+	switch (dev_id) {
+	case I40E_DEV_ID_10G_BASE_T:
+	case I40E_DEV_ID_10G_BASE_T4:
+#ifdef X722_SUPPORT
+#ifdef X722_A0_SUPPORT
+	case I40E_DEV_ID_X722_A0:
+#if defined(INTEGRATED_VF) || defined(VF_DRIVER)
+	case I40E_DEV_ID_X722_A0_VF:
+#endif
+#endif
+	case I40E_DEV_ID_KX_X722:
+	case I40E_DEV_ID_QSFP_X722:
+	case I40E_DEV_ID_SFP_X722:
+	case I40E_DEV_ID_1G_BASE_T_X722:
+	case I40E_DEV_ID_10G_BASE_T_X722:
+	case I40E_DEV_ID_SFP_I_X722:
+#define I40E_DEV_ID_QSFP_I_X722		0x37D4
+#if defined(INTEGRATED_VF) || defined(VF_DRIVER) || defined(I40E_NDIS_SUPPORT)
+	case I40E_DEV_ID_X722_VF:
+	case I40E_DEV_ID_X722_VF_HV:
+#endif
+#endif
+		return I40E_LINK_SPEED_10GB;
+	case I40E_DEV_ID_20G_KR2:
+	case I40E_DEV_ID_20G_KR2_A:
+		return I40E_LINK_SPEED_20GB;
+	case I40E_DEV_ID_25G_B:
+	case I40E_DEV_ID_25G_SFP28:
+		return I40E_LINK_SPEED_25GB;
+	case I40E_DEV_ID_QSFP_A:
+	case I40E_DEV_ID_QSFP_B:
+	case I40E_DEV_ID_QSFP_C:
+		return I40E_LINK_SPEED_40GB;
+	default:
+		return I40E_LINK_SPEED_UNKNOWN;
+	}	
+}
+
+
 #endif /* _I40E_ETHDEV_H_ */
