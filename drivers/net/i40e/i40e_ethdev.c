@@ -202,7 +202,7 @@
 /* Source MAC address */
 #define I40E_REG_INSET_L2_SMAC                   0x1C00000000000000ULL
 /* Outer (S-Tag) VLAN tag in the outer L2 header */
-#define I40E_REG_INSET_L2_OUTER_VLAN             0x0200000000000000ULL
+#define I40E_REG_INSET_L2_OUTER_VLAN             0x0000000004000000ULL
 /* Inner (C-Tag) or single VLAN tag in the outer L2 header */
 #define I40E_REG_INSET_L2_INNER_VLAN             0x0080000000000000ULL
 /* Single VLAN tag in the inner L2 header */
