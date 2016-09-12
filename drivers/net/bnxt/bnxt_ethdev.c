@@ -1054,9 +1054,9 @@ static struct eth_driver bnxt_rte_pmd = {
 	.dev_private_size = sizeof(struct bnxt),
 };
 
-static int bnxt_rte_pmd_init(const char *name, const char *params __rte_unused)
+static int bnxt_rte_pmd_init(const char *name __rte_unused,
+		const char *params __rte_unused)
 {
-	RTE_LOG(INFO, PMD, "bnxt_rte_pmd_init() called for %s\n", name);
 	rte_eth_driver_register(&bnxt_rte_pmd);
 	return 0;
 }
