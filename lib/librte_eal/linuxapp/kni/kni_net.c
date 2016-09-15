@@ -547,7 +547,7 @@ kni_net_tx_timeout(struct net_device *dev)
 {
 	struct kni_dev *kni = netdev_priv(dev);
 
-	KNI_DBG("Transmit timeout at %ld, latency %ld\n", jiffies,
+	pr_debug("Transmit timeout at %ld, latency %ld\n", jiffies,
 			jiffies - dev->trans_start);
 
 	kni->stats.tx_errors++;
@@ -560,7 +560,7 @@ kni_net_tx_timeout(struct net_device *dev)
 static int
 kni_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	KNI_DBG("kni_net_ioctl %d\n",
+	pr_debug("kni_net_ioctl %d\n",
 		((struct kni_dev *)netdev_priv(dev))->group_id);
 
 	return 0;
@@ -578,7 +578,7 @@ kni_net_change_mtu(struct net_device *dev, int new_mtu)
 	struct rte_kni_request req;
 	struct kni_dev *kni = netdev_priv(dev);
 
-	KNI_DBG("kni_net_change_mtu new mtu %d to be set\n", new_mtu);
+	pr_debug("kni_net_change_mtu new mtu %d to be set\n", new_mtu);
 
 	memset(&req, 0, sizeof(req));
 	req.req_id = RTE_KNI_REQ_CHANGE_MTU;
@@ -704,7 +704,7 @@ kni_net_init(struct net_device *dev)
 {
 	struct kni_dev *kni = netdev_priv(dev);
 
-	KNI_DBG("kni_net_init\n");
+	pr_debug("kni_net_init\n");
 
 	init_waitqueue_head(&kni->wq);
 	mutex_init(&kni->sync_lock);

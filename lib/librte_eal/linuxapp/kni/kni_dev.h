@@ -112,12 +112,6 @@ struct kni_dev {
 #endif
 };
 
-#ifdef RTE_KNI_KO_DEBUG
-	#define KNI_DBG(args...) pr_debug(args)
-#else
-	#define KNI_DBG(args...)
-#endif
-
 #ifdef RTE_KNI_VHOST
 unsigned int
 kni_poll(struct file *file, struct socket *sock, poll_table * wait);
@@ -150,17 +144,5 @@ extern struct pci_device_id *ixgbe_pci_tbl;
 int igb_kni_probe(struct pci_dev *pdev, struct net_device **lad_dev);
 void igb_kni_remove(struct pci_dev *pdev);
 extern struct pci_device_id *igb_pci_tbl;
-
-#ifdef RTE_KNI_VHOST_DEBUG_RX
-	#define KNI_DBG_RX(args...) pr_debug(args)
-#else
-	#define KNI_DBG_RX(args...)
-#endif
-
-#ifdef RTE_KNI_VHOST_DEBUG_TX
-	#define KNI_DBG_TX(args...) pr_debug(args)
-#else
-	#define KNI_DBG_TX(args...)
-#endif
 
 #endif

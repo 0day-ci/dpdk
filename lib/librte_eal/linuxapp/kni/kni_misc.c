@@ -376,7 +376,7 @@ kni_ioctl_create(struct net *net,
 	pr_debug("mbuf_va:      0x%p\n", dev_info.mbuf_va);
 	pr_debug("mbuf_size:    %u\n", kni->mbuf_size);
 
-	KNI_DBG("PCI: %02x:%02x.%02x %04x:%04x\n",
+	pr_debug("PCI: %02x:%02x.%02x %04x:%04x\n",
 					dev_info.bus,
 					dev_info.devid,
 					dev_info.function,
@@ -404,7 +404,7 @@ kni_ioctl_create(struct net *net,
 			else
 				ret = -1;
 
-			KNI_DBG("PCI found: pci=0x%p, lad_dev=0x%p\n",
+			pr_debug("PCI found: pci=0x%p, lad_dev=0x%p\n",
 							pci, lad_dev);
 			if (ret == 0) {
 				kni->lad_dev = lad_dev;
@@ -524,7 +524,7 @@ kni_ioctl(struct inode *inode,
 	int ret = -EINVAL;
 	struct net *net = current->nsproxy->net_ns;
 
-	KNI_DBG("IOCTL num=0x%0x param=0x%0lx\n", ioctl_num, ioctl_param);
+	pr_debug("IOCTL num=0x%0x param=0x%0lx\n", ioctl_num, ioctl_param);
 
 	/*
 	 * Switch according to the ioctl called
@@ -540,7 +540,7 @@ kni_ioctl(struct inode *inode,
 		ret = kni_ioctl_release(net, ioctl_num, ioctl_param);
 		break;
 	default:
-		KNI_DBG("IOCTL default\n");
+		pr_debug("IOCTL default\n");
 		break;
 	}
 
