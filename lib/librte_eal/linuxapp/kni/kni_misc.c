@@ -52,7 +52,7 @@ static char *lo_mode;
 
 /* Kernel thread mode */
 static char *kthread_mode;
-static unsigned int multiple_kthread_on;
+static uint32_t multiple_kthread_on;
 
 #define KNI_DEV_IN_USE_BIT_NUM 0 /* Bit number for device in use */
 
@@ -276,8 +276,8 @@ kni_check_param(struct kni_dev *kni, struct rte_kni_device_info *dev)
 }
 
 static int
-kni_ioctl_create(struct net *net,
-		unsigned int ioctl_num, unsigned long ioctl_param)
+kni_ioctl_create(struct net *net, uint32_t ioctl_num,
+		unsigned long ioctl_param)
 {
 	struct kni_net *knet = net_generic(net, kni_net_id);
 	int ret;
@@ -470,8 +470,8 @@ kni_ioctl_create(struct net *net,
 }
 
 static int
-kni_ioctl_release(struct net *net,
-		unsigned int ioctl_num, unsigned long ioctl_param)
+kni_ioctl_release(struct net *net, uint32_t ioctl_num,
+		unsigned long ioctl_param)
 {
 	struct kni_net *knet = net_generic(net, kni_net_id);
 	int ret = -EINVAL;
@@ -517,9 +517,7 @@ kni_ioctl_release(struct net *net,
 }
 
 static int
-kni_ioctl(struct inode *inode,
-	unsigned int ioctl_num,
-	unsigned long ioctl_param)
+kni_ioctl(struct inode *inode, uint32_t ioctl_num, unsigned long ioctl_param)
 {
 	int ret = -EINVAL;
 	struct net *net = current->nsproxy->net_ns;
@@ -548,8 +546,7 @@ kni_ioctl(struct inode *inode,
 }
 
 static int
-kni_compat_ioctl(struct inode *inode,
-		unsigned int ioctl_num,
+kni_compat_ioctl(struct inode *inode, uint32_t ioctl_num,
 		unsigned long ioctl_param)
 {
 	/* 32 bits app on 64 bits OS to be supported later */
