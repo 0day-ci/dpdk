@@ -512,7 +512,6 @@ kni_net_tx_timeout(struct net_device *dev)
 
 	kni->stats.tx_errors++;
 	netif_wake_queue(dev);
-	return;
 }
 
 /*
