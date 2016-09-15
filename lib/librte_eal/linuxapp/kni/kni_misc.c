@@ -183,7 +183,7 @@ kni_open(struct inode *inode, struct file *file)
 
 	/* Create kernel thread for single mode */
 	if (multiple_kthread_on == 0) {
-		pr_debug("Single kernel thread for all KNI devices\n");
+		pr_info("Single kernel thread for all KNI devices\n");
 		/* Create kernel thread for RX */
 		knet->kni_kthread = kthread_run(kni_thread_single, (void *)knet,
 						"kni_single");
@@ -192,7 +192,7 @@ kni_open(struct inode *inode, struct file *file)
 			return PTR_ERR(knet->kni_kthread);
 		}
 	} else
-		pr_debug("Multiple kernel thread mode enabled\n");
+		pr_info("Multiple kernel thread mode enabled\n");
 
 	file->private_data = get_net(net);
 	pr_debug("/dev/kni opened\n");
@@ -593,8 +593,6 @@ kni_init(void)
 {
 	int rc;
 
-	pr_debug("######## DPDK kni module loading ########\n");
-
 	if (kni_parse_kthread_mode() < 0) {
 		pr_err("Invalid parameter for kthread_mode\n");
 		return -EINVAL;
@@ -617,8 +615,6 @@ kni_init(void)
 	/* Configure the lo mode according to the input parameter */
 	kni_net_config_lo_mode(lo_mode);
 
-	pr_debug("######## DPDK kni module loaded  ########\n");
-
 	return 0;
 
 out:
@@ -639,7 +635,6 @@ kni_exit(void)
 #else
 	unregister_pernet_gen_subsys(kni_net_id, &kni_net_ops);
 #endif
-	pr_debug("####### DPDK kni module unloaded  #######\n");
 }
 
 module_init(kni_init);
