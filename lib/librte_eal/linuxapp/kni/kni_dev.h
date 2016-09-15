@@ -84,7 +84,7 @@ struct kni_dev {
 	/* response queue */
 	void *resp_q;
 
-	void * sync_kva;
+	void *sync_kva;
 	void *sync_va;
 
 	void *mbuf_kva;
@@ -97,12 +97,13 @@ struct kni_dev {
 	unsigned long synchro;
 
 #ifdef RTE_KNI_VHOST
-	struct kni_vhost_queue* vhost_queue;
+	struct kni_vhost_queue *vhost_queue;
+
 	volatile enum {
 		BE_STOP = 0x1,
 		BE_START = 0x2,
 		BE_FINISH = 0x4,
-	}vq_status;
+	} vq_status;
 #endif
 };
 
@@ -128,8 +129,8 @@ struct kni_vhost_queue {
 	struct kni_dev *kni;
 	int sockfd;
 	unsigned int flags;
-	struct sk_buff* cache;
-	struct rte_kni_fifo* fifo;
+	struct sk_buff *cache;
+	struct rte_kni_fifo *fifo;
 };
 
 #endif
