@@ -25,6 +25,11 @@
 #ifndef _KNI_DEV_H_
 #define _KNI_DEV_H_
 
+#ifdef pr_fmt
+#undef pr_fmt
+#endif
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/if.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
@@ -107,10 +112,8 @@ struct kni_dev {
 #endif
 };
 
-#define KNI_ERR(args...) printk(KERN_DEBUG "KNI: Error: " args)
-#define KNI_PRINT(args...) printk(KERN_DEBUG "KNI: " args)
 #ifdef RTE_KNI_KO_DEBUG
-	#define KNI_DBG(args...) printk(KERN_DEBUG "KNI: " args)
+	#define KNI_DBG(args...) pr_debug(args)
 #else
 	#define KNI_DBG(args...)
 #endif
@@ -149,13 +152,13 @@ void igb_kni_remove(struct pci_dev *pdev);
 extern struct pci_device_id *igb_pci_tbl;
 
 #ifdef RTE_KNI_VHOST_DEBUG_RX
-	#define KNI_DBG_RX(args...) printk(KERN_DEBUG "KNI RX: " args)
+	#define KNI_DBG_RX(args...) pr_debug(args)
 #else
 	#define KNI_DBG_RX(args...)
 #endif
 
 #ifdef RTE_KNI_VHOST_DEBUG_TX
-	#define KNI_DBG_TX(args...) printk(KERN_DEBUG "KNI TX: " args)
+	#define KNI_DBG_TX(args...) pr_debug(args)
 #else
 	#define KNI_DBG_TX(args...)
 #endif

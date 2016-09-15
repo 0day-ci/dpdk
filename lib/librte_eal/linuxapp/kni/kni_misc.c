@@ -151,10 +151,10 @@ kni_init(void)
 {
 	int rc;
 
-	KNI_PRINT("######## DPDK kni module loading ########\n");
+	pr_debug("######## DPDK kni module loading ########\n");
 
 	if (kni_parse_kthread_mode() < 0) {
-		KNI_ERR("Invalid parameter for kthread_mode\n");
+		pr_err("Invalid parameter for kthread_mode\n");
 		return -EINVAL;
 	}
 
@@ -168,14 +168,14 @@ kni_init(void)
 
 	rc = misc_register(&kni_misc);
 	if (rc != 0) {
-		KNI_ERR("Misc registration failed\n");
+		pr_err("Misc registration failed\n");
 		goto out;
 	}
 
 	/* Configure the lo mode according to the input parameter */
 	kni_net_config_lo_mode(lo_mode);
 
-	KNI_PRINT("######## DPDK kni module loaded  ########\n");
+	pr_debug("######## DPDK kni module loaded  ########\n");
 
 	return 0;
 
@@ -197,7 +197,7 @@ kni_exit(void)
 #else
 	unregister_pernet_gen_subsys(kni_net_id, &kni_net_ops);
 #endif
-	KNI_PRINT("####### DPDK kni module unloaded  #######\n");
+	pr_debug("####### DPDK kni module unloaded  #######\n");
 }
 
 static int __init
@@ -228,19 +228,19 @@ kni_open(struct inode *inode, struct file *file)
 
 	/* Create kernel thread for single mode */
 	if (multiple_kthread_on == 0) {
-		KNI_PRINT("Single kernel thread for all KNI devices\n");
+		pr_debug("Single kernel thread for all KNI devices\n");
 		/* Create kernel thread for RX */
 		knet->kni_kthread = kthread_run(kni_thread_single, (void *)knet,
 						"kni_single");
 		if (IS_ERR(knet->kni_kthread)) {
-			KNI_ERR("Unable to create kernel threaed\n");
+			pr_err("Unable to create kernel threaed\n");
 			return PTR_ERR(knet->kni_kthread);
 		}
 	} else
-		KNI_PRINT("Multiple kernel thread mode enabled\n");
+		pr_debug("Multiple kernel thread mode enabled\n");
 
 	file->private_data = get_net(net);
-	KNI_PRINT("/dev/kni opened\n");
+	pr_debug("/dev/kni opened\n");
 
 	return 0;
 }
@@ -279,7 +279,7 @@ kni_release(struct inode *inode, struct file *file)
 	clear_bit(KNI_DEV_IN_USE_BIT_NUM, &knet->device_in_use);
 
 	put_net(net);
-	KNI_PRINT("/dev/kni closed\n");
+	pr_debug("/dev/kni closed\n");
 
 	return 0;
 }
@@ -367,7 +367,7 @@ kni_check_param(struct kni_dev *kni, struct rte_kni_device_info *dev)
 
 	/* Check if network name has been used */
 	if (!strncmp(kni->name, dev->name, RTE_KNI_NAMESIZE)) {
-		KNI_ERR("KNI name %s duplicated\n", dev->name);
+		pr_err("KNI name %s duplicated\n", dev->name);
 		return -1;
 	}
 
@@ -387,7 +387,7 @@ kni_ioctl_create(struct net *net,
 	struct net_device *lad_dev = NULL;
 	struct kni_dev *kni, *dev, *n;
 
-	printk(KERN_INFO "KNI: Creating kni...\n");
+	pr_info("Creating kni...\n");
 	/* Check the buffer size, to avoid warning */
 	if (_IOC_SIZE(ioctl_num) > sizeof(dev_info))
 		return -EINVAL;
@@ -395,7 +395,7 @@ kni_ioctl_create(struct net *net,
 	/* Copy kni info from user space */
 	ret = copy_from_user(&dev_info, (void *)ioctl_param, sizeof(dev_info));
 	if (ret) {
-		KNI_ERR("copy_from_user in kni_ioctl_create");
+		pr_err("copy_from_user in kni_ioctl_create");
 		return -EIO;
 	}
 
@@ -405,7 +405,7 @@ kni_ioctl_create(struct net *net,
 	 */
 	if (multiple_kthread_on && dev_info.force_bind &&
 				!cpu_online(dev_info.core_id)) {
-		KNI_ERR("cpu %u is not online\n", dev_info.core_id);
+		pr_err("cpu %u is not online\n", dev_info.core_id);
 		return -EINVAL;
 	}
 
@@ -425,7 +425,7 @@ kni_ioctl_create(struct net *net,
 #endif
 							kni_net_init);
 	if (net_dev == NULL) {
-		KNI_ERR("error allocating device \"%s\"\n", dev_info.name);
+		pr_err("error allocating device \"%s\"\n", dev_info.name);
 		return -EBUSY;
 	}
 
@@ -458,22 +458,22 @@ kni_ioctl_create(struct net *net,
 #endif
 	kni->mbuf_size = dev_info.mbuf_size;
 
-	KNI_PRINT("tx_phys:      0x%016llx, tx_q addr:      0x%p\n",
+	pr_debug("tx_phys:      0x%016llx, tx_q addr:      0x%p\n",
 		(unsigned long long) dev_info.tx_phys, kni->tx_q);
-	KNI_PRINT("rx_phys:      0x%016llx, rx_q addr:      0x%p\n",
+	pr_debug("rx_phys:      0x%016llx, rx_q addr:      0x%p\n",
 		(unsigned long long) dev_info.rx_phys, kni->rx_q);
-	KNI_PRINT("alloc_phys:   0x%016llx, alloc_q addr:   0x%p\n",
+	pr_debug("alloc_phys:   0x%016llx, alloc_q addr:   0x%p\n",
 		(unsigned long long) dev_info.alloc_phys, kni->alloc_q);
-	KNI_PRINT("free_phys:    0x%016llx, free_q addr:    0x%p\n",
+	pr_debug("free_phys:    0x%016llx, free_q addr:    0x%p\n",
 		(unsigned long long) dev_info.free_phys, kni->free_q);
-	KNI_PRINT("req_phys:     0x%016llx, req_q addr:     0x%p\n",
+	pr_debug("req_phys:     0x%016llx, req_q addr:     0x%p\n",
 		(unsigned long long) dev_info.req_phys, kni->req_q);
-	KNI_PRINT("resp_phys:    0x%016llx, resp_q addr:    0x%p\n",
+	pr_debug("resp_phys:    0x%016llx, resp_q addr:    0x%p\n",
 		(unsigned long long) dev_info.resp_phys, kni->resp_q);
-	KNI_PRINT("mbuf_phys:    0x%016llx, mbuf_kva:       0x%p\n",
+	pr_debug("mbuf_phys:    0x%016llx, mbuf_kva:       0x%p\n",
 		(unsigned long long) dev_info.mbuf_phys, kni->mbuf_kva);
-	KNI_PRINT("mbuf_va:      0x%p\n", dev_info.mbuf_va);
-	KNI_PRINT("mbuf_size:    %u\n", kni->mbuf_size);
+	pr_debug("mbuf_va:      0x%p\n", dev_info.mbuf_va);
+	pr_debug("mbuf_size:    %u\n", kni->mbuf_size);
 
 	KNI_DBG("PCI: %02x:%02x.%02x %04x:%04x\n",
 					dev_info.bus,
@@ -486,7 +486,7 @@ kni_ioctl_create(struct net *net,
 
 	/* Support Ethtool */
 	while (pci) {
-		KNI_PRINT("pci_bus: %02x:%02x:%02x\n",
+		pr_debug("pci_bus: %02x:%02x:%02x\n",
 					pci->bus->number,
 					PCI_SLOT(pci->devfn),
 					PCI_FUNC(pci->devfn));
@@ -509,7 +509,7 @@ kni_ioctl_create(struct net *net,
 				kni->lad_dev = lad_dev;
 				kni_set_ethtool_ops(kni->net_dev);
 			} else {
-				KNI_ERR("Device not supported by ethtool");
+				pr_err("Device not supported by ethtool");
 				kni->lad_dev = NULL;
 			}
 
@@ -534,7 +534,7 @@ kni_ioctl_create(struct net *net,
 
 	ret = register_netdev(net_dev);
 	if (ret) {
-		KNI_ERR("error %i registering device \"%s\"\n",
+		pr_err("error %i registering device \"%s\"\n",
 					ret, dev_info.name);
 		kni_dev_remove(kni);
 		return -ENODEV;
@@ -582,7 +582,7 @@ kni_ioctl_release(struct net *net,
 
 	ret = copy_from_user(&dev_info, (void *)ioctl_param, sizeof(dev_info));
 	if (ret) {
-		KNI_ERR("copy_from_user in kni_ioctl_release");
+		pr_err("copy_from_user in kni_ioctl_release");
 		return -EIO;
 	}
 
@@ -609,7 +609,7 @@ kni_ioctl_release(struct net *net,
 		break;
 	}
 	up_write(&knet->kni_list_lock);
-	printk(KERN_INFO "KNI: %s release kni named %s\n",
+	pr_info("%s release kni named %s\n",
 		(ret == 0 ? "Successfully" : "Unsuccessfully"), dev_info.name);
 
 	return ret;
@@ -652,7 +652,7 @@ kni_compat_ioctl(struct inode *inode,
 		unsigned long ioctl_param)
 {
 	/* 32 bits app on 64 bits OS to be supported later */
-	KNI_PRINT("Not implemented.\n");
+	pr_debug("Not implemented.\n");
 
 	return -EINVAL;
 }
