@@ -176,6 +176,14 @@ rte_pktmbuf_pool_create(const char *name, unsigned n,
 
 	rte_errno = rte_mempool_set_ops_byname(mp,
 			RTE_MBUF_DEFAULT_MEMPOOL_OPS, NULL);
+
+	/* on error, try falling back to the software based default pool */
+	if (rte_errno == -EOPNOTSUPP) {
+		RTE_LOG(WARNING, MBUF, "Default HW Mempool not supported. "
+			"falling back to sw mempool \"ring_mp_mc\"");
+		rte_errno = rte_mempool_set_ops_byname(mp, "ring_mp_mc", NULL);
+	}
+
 	if (rte_errno != 0) {
 		RTE_LOG(ERR, MBUF, "error setting mempool handler\n");
 		return NULL;
