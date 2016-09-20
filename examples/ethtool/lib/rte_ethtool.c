@@ -57,6 +57,8 @@ rte_ethtool_get_drvinfo(uint8_t port_id, struct ethtool_drvinfo *drvinfo)
 	memset(&dev_info, 0, sizeof(dev_info));
 	rte_eth_dev_info_get(port_id, &dev_info);
 
+	snprintf(drvinfo->fw_version, sizeof(drvinfo->fw_version), "%s",
+			dev_info.fw_version);
 	snprintf(drvinfo->driver, sizeof(drvinfo->driver), "%s",
 		dev_info.driver_name);
 	snprintf(drvinfo->version, sizeof(drvinfo->version), "%s",

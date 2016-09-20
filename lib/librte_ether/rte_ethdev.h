@@ -872,6 +872,7 @@ struct rte_eth_conf {
  * Ethernet device information
  */
 struct rte_eth_dev_info {
+	char fw_version[20]; /**< NIC firmware version. */
 	struct rte_pci_device *pci_dev; /**< Device PCI information. */
 	const char *driver_name; /**< Device Driver name. */
 	unsigned int if_index; /**< Index to bound host interface, or 0 if none.

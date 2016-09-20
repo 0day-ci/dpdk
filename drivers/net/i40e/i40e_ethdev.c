@@ -2556,6 +2556,11 @@ i40e_dev_info_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *dev_info)
 	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct i40e_vsi *vsi = pf->main_vsi;
 
+	snprintf(dev_info->fw_version, 20,
+		 "%d.%d%d 0x%04x",
+		 ((hw->nvm.version >> 12) & 0xf),
+		 ((hw->nvm.version >> 4) & 0xff),
+		 (hw->nvm.version & 0xf), hw->nvm.eetrack);
 	dev_info->max_rx_queues = vsi->nb_qps;
 	dev_info->max_tx_queues = vsi->nb_qps;
 	dev_info->min_rx_bufsize = I40E_BUF_SIZE_MIN;
