@@ -798,6 +798,9 @@ rte_mempool_free(struct rte_mempool *mp);
  * Add a virtually and physically contiguous memory chunk in the pool
  * where objects can be instanciated.
  *
+ * mempool flag MEMPOOL_F_NO_PHYS_CONTIG changes behavior of the function
+ * and removes physical contiguous constraint.
+ *
  * @param mp
  *   A pointer to the mempool structure.
  * @param vaddr

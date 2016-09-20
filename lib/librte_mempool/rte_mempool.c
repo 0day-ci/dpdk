@@ -340,7 +340,9 @@ rte_mempool_free_memchunks(struct rte_mempool *mp)
 }
 
 /* Add objects in the pool, using a physically contiguous memory
- * zone. Return the number of objects added, or a negative value
+ * zone if MEMPOOL_F_NO_PHYS_CONTIG flag is not set.
+ *
+ * Return the number of objects added, or a negative value
  * on error.
  */
 int
