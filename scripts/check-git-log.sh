@@ -114,8 +114,10 @@ bad=$(echo "$headlines" | grep -E --color=always \
 	-e ':.*\<api\>' \
 	-e ':.*\<dma\>' \
 	-e ':.*\<pci\>' \
+	-e ':.*\<lro\>' \
 	-e ':.*\<mtu\>' \
 	-e ':.*\<mac\>' \
+	-e ':.*\<nic\>' \
 	-e ':.*\<numa\>' \
 	-e ':.*\<vlan\>' \
 	-e ':.*\<rss\>' \
