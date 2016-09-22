@@ -143,6 +143,8 @@ rte_eal_tailq_update(struct rte_tailq_elem *t)
 		t->head = rte_eal_tailq_create(t->name);
 	} else {
 		t->head = rte_eal_tailq_lookup(t->name);
+		if (t->head != NULL)
+			rte_tailqs_count++;
 	}
 }
 
@@ -188,9 +190,16 @@ rte_eal_tailqs_init(void)
 		if (t->head == NULL) {
 			RTE_LOG(ERR, EAL,
 				"Cannot initialize tailq: %s\n", t->name);
-			/* no need to TAILQ_REMOVE, we are going to panic in
-			 * rte_eal_init() */
-			goto fail;
+			if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+				/* no need to TAILQ_REMOVE, we are going
+				 * to panic in rte_eal_init() */
+				goto fail;
+			} else {
+				/* This means our list of constructor is
+				 * no the same as primary. Just remove
+				 * that missing tailq and continue */
+				TAILQ_REMOVE(&rte_tailq_elem_head, t, next);
+			}
 		}
 	}
 
