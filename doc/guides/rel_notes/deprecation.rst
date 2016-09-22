@@ -57,3 +57,8 @@ Deprecation Notices
 * API will change for ``rte_port_source_params`` and ``rte_port_sink_params``
   structures. The member ``file_name`` data type will be changed from
   ``char *`` to ``const char *``. This change targets release 16.11.
+
+* igb_uio: iomem mapping and sysfs files created for iomem and ioport in
+  igb_uio will be removed, because we are able to detect these from what Linux
+  has exposed, like the way we have done with uio-pci-generic. This change
+  targets release 17.02.
