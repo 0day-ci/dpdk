@@ -57,3 +57,12 @@ Deprecation Notices
 * API will change for ``rte_port_source_params`` and ``rte_port_sink_params``
   structures. The member ``file_name`` data type will be changed from
   ``char *`` to ``const char *``. This change targets release 16.11.
+
+* In 17.02 ABI changes are planned: the ``rte_filter_op `` enum will be extended
+  with a new member RTE_ETH_FILTER_REPLACE in order to facilitate
+  the new operation - replacing the tunnel filters,
+  the ``rte_eth_tunnel_filter_conf`` structure will be extended with a new field
+  ``filter_type_replace`` handling the bitmask combination of the filter types
+  defined by the values  ETH_TUNNEL_FILTER_XX,
+  define new values for Outer VLAN and Outer Ethertype filters
+  ETH_TUNNEL_FILTER_OVLAN and ETH_TUNNEL_FILTER_OETH.
