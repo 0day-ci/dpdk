@@ -54,7 +54,7 @@ extern "C" {
 struct rte_logs {
 	uint32_t type;  /**< Bitfield with enabled logs. */
 	uint32_t level; /**< Log level. */
-	FILE *file;     /**< Pointer to current FILE* for logs. */
+	FILE *file;     /**< Output file set by rte_openlog_stream, or NULL. */
 };
 
 /** Global log informations */

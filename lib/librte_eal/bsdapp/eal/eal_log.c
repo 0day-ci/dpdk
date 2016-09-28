@@ -52,6 +52,5 @@ rte_eal_log_init(const char *id __rte_unused, int facility __rte_unused)
 int
 rte_eal_log_early_init(void)
 {
-	rte_openlog_stream(stderr);
-	return 0;
+	return rte_eal_common_log_init(stderr);
 }

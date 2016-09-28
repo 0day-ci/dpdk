@@ -48,11 +48,12 @@ struct rte_logs rte_logs = {
 	.file = NULL,
 };
 
+/* Stream to use for logging if rte_logs.file is NULL */
 static FILE *default_log_stream;
 
 /**
  * This global structure stores some informations about the message
- * that is currently beeing processed by one lcore
+ * that is currently being processed by one lcore
  */
 struct log_cur_msg {
 	uint32_t loglevel; /**< log level - see rte_log.h */
@@ -68,10 +69,7 @@ static RTE_DEFINE_PER_LCORE(struct log_cur_msg, log_cur_msg);
 int
 rte_openlog_stream(FILE *f)
 {
-	if (f == NULL)
-		rte_logs.file = default_log_stream;
-	else
-		rte_logs.file = f;
+	rte_logs.file = f;
 	return 0;
 }
 
@@ -127,6 +125,8 @@ rte_vlog(uint32_t level, uint32_t logtype, const char *format, va_list ap)
 {
 	int ret;
 	FILE *f = rte_logs.file;
+	if (f == NULL)
+		f = default_log_stream;
 
 	if ((level > rte_logs.level) || !(logtype & rte_logs.type))
 		return 0;
@@ -158,7 +158,8 @@ rte_log(uint32_t level, uint32_t logtype, const char *format, ...)
 }
 
 /*
- * called by environment-specific log init function
+ * Called during initialization to specify where to log messages if
+ * openlog_stream hasn't been called.
  */
 int
 rte_eal_common_log_init(FILE *default_log)

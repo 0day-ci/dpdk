@@ -136,6 +136,5 @@ rte_eal_log_early_init(void)
 		printf("Cannot configure early_log_stream\n");
 		return -1;
 	}
-	rte_openlog_stream(early_log_stream);
-	return 0;
+	return rte_eal_common_log_init(early_log_stream);
 }
