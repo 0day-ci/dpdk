@@ -211,6 +211,14 @@ extern "C" {
  */
 #define PKT_TX_OUTER_IPV4   (1ULL << 59)
 
+#define PKT_TX_OFFLOAD_MASK (    \
+		PKT_TX_IP_CKSUM |        \
+		PKT_TX_L4_MASK |         \
+		PKT_TX_OUTER_IP_CKSUM |  \
+		PKT_TX_TCP_SEG |         \
+		PKT_TX_QINQ_PKT |        \
+		PKT_TX_VLAN_PKT)
+
 /**
  * Packet outer header is IPv6. This flag must be set when using any
  * outer offload feature (L4 checksum) to tell the NIC that the outer
