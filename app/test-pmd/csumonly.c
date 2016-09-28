@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
  *   Copyright 2014 6WIND S.A.
  *   All rights reserved.
  *
@@ -108,15 +108,6 @@ struct simple_gre_hdr {
 	uint16_t flags;
 	uint16_t proto;
 } __attribute__((__packed__));
-
-static uint16_t
-get_psd_sum(void *l3_hdr, uint16_t ethertype, uint64_t ol_flags)
-{
-	if (ethertype == _htons(ETHER_TYPE_IPv4))
-		return rte_ipv4_phdr_cksum(l3_hdr, ol_flags);
-	else /* assume ethertype == ETHER_TYPE_IPv6 */
-		return rte_ipv6_phdr_cksum(l3_hdr, ol_flags);
-}
 
 static uint16_t
 get_udptcp_checksum(void *l3_hdr, void *l4_hdr, uint16_t ethertype)
@@ -368,11 +359,9 @@ process_inner_cksums(void *l3_hdr, const struct testpmd_offload_info *info,
 		/* do not recalculate udp cksum if it was 0 */
 		if (udp_hdr->dgram_cksum != 0) {
 			udp_hdr->dgram_cksum = 0;
-			if (testpmd_ol_flags & TESTPMD_TX_OFFLOAD_UDP_CKSUM) {
+			if (testpmd_ol_flags & TESTPMD_TX_OFFLOAD_UDP_CKSUM)
 				ol_flags |= PKT_TX_UDP_CKSUM;
-				udp_hdr->dgram_cksum = get_psd_sum(l3_hdr,
-					info->ethertype, ol_flags);
-			} else {
+			else {
 				udp_hdr->dgram_cksum =
 					get_udptcp_checksum(l3_hdr, udp_hdr,
 						info->ethertype);
@@ -381,15 +370,11 @@ process_inner_cksums(void *l3_hdr, const struct testpmd_offload_info *info,
 	} else if (info->l4_proto == IPPROTO_TCP) {
 		tcp_hdr = (struct tcp_hdr *)((char *)l3_hdr + info->l3_len);
 		tcp_hdr->cksum = 0;
-		if (info->tso_segsz != 0) {
+		if (info->tso_segsz != 0)
 			ol_flags |= PKT_TX_TCP_SEG;
-			tcp_hdr->cksum = get_psd_sum(l3_hdr, info->ethertype,
-				ol_flags);
-		} else if (testpmd_ol_flags & TESTPMD_TX_OFFLOAD_TCP_CKSUM) {
+		else if (testpmd_ol_flags & TESTPMD_TX_OFFLOAD_TCP_CKSUM)
 			ol_flags |= PKT_TX_TCP_CKSUM;
-			tcp_hdr->cksum = get_psd_sum(l3_hdr, info->ethertype,
-				ol_flags);
-		} else {
+		else {
 			tcp_hdr->cksum =
 				get_udptcp_checksum(l3_hdr, tcp_hdr,
 					info->ethertype);
@@ -639,7 +624,8 @@ pkt_burst_checksum_forward(struct fwd_stream *fs)
 	void *l3_hdr = NULL, *outer_l3_hdr = NULL; /* can be IPv4 or IPv6 */
 	uint16_t nb_rx;
 	uint16_t nb_tx;
-	uint16_t i;
+	uint16_t nb_prep;
+	uint16_t i, n;
 	uint64_t ol_flags;
 	uint16_t testpmd_ol_flags;
 	uint32_t retry;
@@ -847,31 +833,56 @@ pkt_burst_checksum_forward(struct fwd_stream *fs)
 			printf("\n");
 		}
 	}
-	nb_tx = rte_eth_tx_burst(fs->tx_port, fs->tx_queue, pkts_burst, nb_rx);
-	/*
-	 * Retry if necessary
-	 */
-	if (unlikely(nb_tx < nb_rx) && fs->retry_enabled) {
-		retry = 0;
-		while (nb_tx < nb_rx && retry++ < burst_tx_retry_num) {
-			rte_delay_us(burst_tx_delay_time);
-			nb_tx += rte_eth_tx_burst(fs->tx_port, fs->tx_queue,
-					&pkts_burst[nb_tx], nb_rx - nb_tx);
+
+	n = 0;
+
+	do {
+		nb_prep = rte_eth_tx_prep(fs->tx_port, fs->tx_queue, &pkts_burst[n],
+				nb_rx - n);
+
+		if (nb_prep != nb_rx - n) {
+			printf("Preparing packet burst to transmit failed: %s\n",
+					rte_strerror(rte_errno));
+			/* Drop malicious packet */
+			rte_pktmbuf_free(pkts_burst[n + nb_prep]);
+			fs->fwd_dropped++;
 		}
-	}
-	fs->tx_packets += nb_tx;
+
+		nb_tx = rte_eth_tx_burst(fs->tx_port, fs->tx_queue, &pkts_burst[n],
+				nb_prep);
+
+		/*
+		 * Retry if necessary
+		 */
+		if (unlikely(nb_tx < nb_prep) && fs->retry_enabled) {
+			retry = 0;
+			while ((nb_tx < nb_prep) && (retry++ < burst_tx_retry_num)) {
+				rte_delay_us(burst_tx_delay_time);
+				nb_tx += rte_eth_tx_burst(fs->tx_port, fs->tx_queue,
+						&pkts_burst[nb_tx + n], nb_prep - nb_tx);
+			}
+		}
+
+		fs->tx_packets += nb_tx;
+
+#ifdef RTE_TEST_PMD_RECORD_BURST_STATS
+		fs->tx_burst_stats.pkt_burst_spread[nb_tx]++;
+#endif
+		if (unlikely(nb_tx < nb_prep)) {
+			fs->fwd_dropped += (nb_prep - nb_tx);
+			do {
+				rte_pktmbuf_free(pkts_burst[nb_tx]);
+			} while (++nb_tx < nb_prep);
+		}
+
+		/* If tx_prep failed, skip malicious packet */
+		n += (nb_prep + 1);
+
+	} while (n < nb_rx);
+
 	fs->rx_bad_ip_csum += rx_bad_ip_csum;
 	fs->rx_bad_l4_csum += rx_bad_l4_csum;
 
-#ifdef RTE_TEST_PMD_RECORD_BURST_STATS
-	fs->tx_burst_stats.pkt_burst_spread[nb_tx]++;
-#endif
-	if (unlikely(nb_tx < nb_rx)) {
-		fs->fwd_dropped += (nb_rx - nb_tx);
-		do {
-			rte_pktmbuf_free(pkts_burst[nb_tx]);
-		} while (++nb_tx < nb_rx);
-	}
 #ifdef RTE_TEST_PMD_RECORD_CORE_CYCLES
 	end_tsc = rte_rdtsc();
 	core_cycles = (end_tsc - start_tsc);
