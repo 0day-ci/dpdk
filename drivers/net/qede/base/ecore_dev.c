@@ -2954,13 +2954,14 @@ ecore_hw_prepare_single(struct ecore_hwfn *p_hwfn, void OSAL_IOMEM *p_regview,
 			void OSAL_IOMEM *p_doorbells,
 			struct ecore_hw_prepare_params *p_params)
 {
+	struct ecore_dev *p_dev = p_hwfn->p_dev;
 	enum _ecore_status_t rc = ECORE_SUCCESS;
 
 	/* Split PCI bars evenly between hwfns */
 	p_hwfn->regview = p_regview;
 	p_hwfn->doorbells = p_doorbells;
 
-	if (IS_VF(p_hwfn->p_dev))
+	if (IS_VF(p_dev))
 		return ecore_vf_hw_prepare(p_hwfn);
 
 	/* Validate that chip access is feasible */
@@ -2984,7 +2985,7 @@ ecore_hw_prepare_single(struct ecore_hwfn *p_hwfn, void OSAL_IOMEM *p_regview,
 
 	/* First hwfn learns basic information, e.g., number of hwfns */
 	if (!p_hwfn->my_id) {
-		rc = ecore_get_dev_info(p_hwfn->p_dev);
+		rc = ecore_get_dev_info(p_dev);
 		if (rc != ECORE_SUCCESS)
 			goto err1;
 	}
@@ -2996,6 +2997,12 @@ ecore_hw_prepare_single(struct ecore_hwfn *p_hwfn, void OSAL_IOMEM *p_regview,
 	if (rc) {
 		DP_NOTICE(p_hwfn, true, "Failed initializing mcp command\n");
 		goto err1;
+	}
+
+	if (p_hwfn == ECORE_LEADING_HWFN(p_dev) && !p_dev->recov_in_prog) {
+		rc = ecore_mcp_initiate_pf_flr(p_hwfn, p_hwfn->p_main_ptt);
+		if (rc != ECORE_SUCCESS)
+			DP_NOTICE(p_hwfn, false, "Failed to initiate PF FLR\n");
 	}
 
 	/* Read the device configuration information from the HW and SHMEM */
@@ -3013,7 +3020,7 @@ ecore_hw_prepare_single(struct ecore_hwfn *p_hwfn, void OSAL_IOMEM *p_regview,
 		goto err2;
 	}
 #ifndef ASIC_ONLY
-	if (CHIP_REV_IS_FPGA(p_hwfn->p_dev)) {
+	if (CHIP_REV_IS_FPGA(p_dev)) {
 		DP_NOTICE(p_hwfn, false,
 			  "FPGA: workaround; Prevent DMAE parities\n");
 		ecore_wr(p_hwfn, p_hwfn->p_main_ptt, PCIE_REG_PRTY_MASK, 7);
@@ -3028,7 +3035,7 @@ ecore_hw_prepare_single(struct ecore_hwfn *p_hwfn, void OSAL_IOMEM *p_regview,
 	return rc;
  err2:
 	if (IS_LEAD_HWFN(p_hwfn))
-		ecore_iov_free_hw_info(p_hwfn->p_dev);
+		ecore_iov_free_hw_info(p_dev);
 	ecore_mcp_free(p_hwfn);
  err1:
 	ecore_hw_hwfn_free(p_hwfn);
