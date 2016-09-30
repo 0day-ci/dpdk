@@ -308,6 +308,50 @@ enum _ecore_status_t ecore_hw_init_first_eth(struct ecore_hwfn *p_hwfn,
 					     struct ecore_ptt *p_ptt,
 					     u8 *p_pf);
 #endif
+/**
+ * @brief - Sends crash mdump related info to the MFW.
+ *
+ * @param p_hwfn
+ * @param p_ptt
+ *
+ * @param return ECORE_SUCCESS upon success.
+ */
+enum _ecore_status_t ecore_mcp_mdump_set_values(struct ecore_hwfn *p_hwfn,
+						struct ecore_ptt *p_ptt,
+						u32 epoch);
+
+/**
+ * @brief - Triggers a MFW crash dump procedure.
+ *
+ * @param p_hwfn
+ * @param p_ptt
+ *
+ * @param return ECORE_SUCCESS upon success.
+ */
+enum _ecore_status_t ecore_mcp_mdump_trigger(struct ecore_hwfn *p_hwfn,
+					     struct ecore_ptt *p_ptt);
+
+/**
+ * @brief - Clears the MFW crash dump logs.
+ *
+ * @param p_hwfn
+ * @param p_ptt
+ *
+ * @param return ECORE_SUCCESS upon success.
+ */
+enum _ecore_status_t ecore_mcp_mdump_clear_logs(struct ecore_hwfn *p_hwfn,
+						struct ecore_ptt *p_ptt);
+
+/**
+ * @brief - Gets the MFW crash dump configuration and logs info.
+ *
+ * @param p_hwfn
+ * @param p_ptt
+ *
+ * @param return ECORE_SUCCESS upon success.
+ */
+enum _ecore_status_t ecore_mcp_mdump_get_info(struct ecore_hwfn *p_hwfn,
+					      struct ecore_ptt *p_ptt);
 
 enum _ecore_status_t ecore_mcp_get_resc_info(struct ecore_hwfn *p_hwfn,
 					     struct ecore_ptt *p_ptt,
