@@ -10,9 +10,6 @@
 
 static bool gro_disable = 1;	/* mod_param */
 
-#define QEDE_FASTPATH_TX        (1 << 0)
-#define QEDE_FASTPATH_RX        (1 << 1)
-
 static inline int qede_alloc_rx_buffer(struct qede_rx_queue *rxq)
 {
 	struct rte_mbuf *new_mb = NULL;
@@ -814,7 +811,7 @@ static inline uint32_t qede_rx_cqe_to_pkt_type(uint16_t flags)
 }
 
 int qede_process_sg_pkts(void *p_rxq,  struct rte_mbuf *rx_mb,
-			 int num_frags, uint16_t pkt_len)
+			 int num_segs, uint16_t pkt_len)
 {
 	struct qede_rx_queue *rxq = p_rxq;
 	struct qede_dev *qdev = rxq->qdev;
@@ -825,13 +822,13 @@ int qede_process_sg_pkts(void *p_rxq,  struct rte_mbuf *rx_mb,
 	register struct rte_mbuf *seg2 = NULL;
 
 	seg1 = rx_mb;
-	while (num_frags) {
+	while (num_segs) {
 		cur_size = pkt_len > rxq->rx_buf_size ?
 				rxq->rx_buf_size : pkt_len;
 		if (!cur_size) {
 			PMD_RX_LOG(DEBUG, rxq,
 				   "SG packet, len and num BD mismatch\n");
-			qede_recycle_rx_bd_ring(rxq, qdev, num_frags);
+			qede_recycle_rx_bd_ring(rxq, qdev, num_segs);
 			return -EINVAL;
 		}
 
@@ -852,7 +849,8 @@ int qede_process_sg_pkts(void *p_rxq,  struct rte_mbuf *rx_mb,
 		seg2->data_len = cur_size;
 		seg1->next = seg2;
 		seg1 = seg1->next;
-		num_frags--;
+		num_segs--;
+		rxq->rx_segs++;
 		continue;
 	}
 	seg1 = NULL;
@@ -880,7 +878,7 @@ qede_recv_pkts(void *p_rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 	register struct rte_mbuf *seg1 = NULL;
 	enum eth_rx_cqe_type cqe_type;
 	uint16_t len, pad, preload_idx, pkt_len, parse_flag;
-	uint8_t csum_flag, num_frags;
+	uint8_t csum_flag, num_segs;
 	enum rss_hash_type htype;
 	int ret;
 
@@ -954,11 +952,13 @@ qede_recv_pkts(void *p_rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 
 		if (fp_cqe->bd_num > 1) {
 			pkt_len = rte_le_to_cpu_16(fp_cqe->pkt_len);
-			num_frags = fp_cqe->bd_num - 1;
+			num_segs = fp_cqe->bd_num - 1;
+
+			rxq->rx_segs++;
 
 			pkt_len -= len;
 			seg1 = rx_mb;
-			ret = qede_process_sg_pkts(p_rxq, seg1, num_frags,
+			ret = qede_process_sg_pkts(p_rxq, seg1, num_segs,
 						   pkt_len);
 			if (ret != ECORE_SUCCESS) {
 				qede_recycle_rx_bd_ring(rxq, qdev,
@@ -1020,6 +1020,8 @@ next_cqe:
 	}
 
 	qede_update_rx_prod(qdev, rxq);
+
+	rxq->rcv_pkts += rx_pkt;
 
 	PMD_RX_LOG(DEBUG, rxq, "rx_pkts=%u core=%d\n", rx_pkt, rte_lcore_id());
 
@@ -1213,6 +1215,7 @@ qede_xmit_pkts(void *p_txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 		bd_prod =
 		    rte_cpu_to_le_16(ecore_chain_get_prod_idx(&txq->tx_pbl));
 		nb_pkt_sent++;
+		txq->xmit_pkts++;
 	}
 
 	/* Write value of prod idx into bd_prod */
