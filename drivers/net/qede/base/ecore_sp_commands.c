@@ -391,7 +391,7 @@ enum _ecore_status_t ecore_sp_pf_start(struct ecore_hwfn *p_hwfn,
 		break;
 	default:
 		DP_NOTICE(p_hwfn, true, "Unknown personality %d\n",
-			  p_hwfn->hw_info.personality);
+			 p_hwfn->hw_info.personality);
 		p_ramrod->personality = PERSONALITY_ETH;
 	}
 
@@ -467,16 +467,16 @@ ecore_sp_pf_update_tunn_cfg(struct ecore_hwfn *p_hwfn,
 	rc = ecore_spq_post(p_hwfn, p_ent, OSAL_NULL);
 
 	if ((rc == ECORE_SUCCESS) && p_tunn) {
-		if (p_tunn->update_vxlan_udp_port)
-			ecore_set_vxlan_dest_port(p_hwfn, p_hwfn->p_main_ptt,
-						  p_tunn->vxlan_udp_port);
-		if (p_tunn->update_geneve_udp_port)
-			ecore_set_geneve_dest_port(p_hwfn, p_hwfn->p_main_ptt,
-						   p_tunn->geneve_udp_port);
+	if (p_tunn->update_vxlan_udp_port)
+		ecore_set_vxlan_dest_port(p_hwfn, p_hwfn->p_main_ptt,
+					  p_tunn->vxlan_udp_port);
+	if (p_tunn->update_geneve_udp_port)
+		ecore_set_geneve_dest_port(p_hwfn, p_hwfn->p_main_ptt,
+					   p_tunn->geneve_udp_port);
 
 		ecore_set_hw_tunn_mode(p_hwfn, p_hwfn->p_main_ptt,
 				       p_tunn->tunn_mode);
-		p_hwfn->p_dev->tunn_mode = p_tunn->tunn_mode;
+	p_hwfn->p_dev->tunn_mode = p_tunn->tunn_mode;
 	}
 
 	return rc;
