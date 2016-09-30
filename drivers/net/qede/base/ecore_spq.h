@@ -18,6 +18,7 @@
 union ramrod_data {
 	struct pf_start_ramrod_data			pf_start;
 	struct pf_update_ramrod_data			pf_update;
+	struct rl_update_ramrod_data			rl_update;
 	struct rx_queue_start_ramrod_data		rx_queue_start;
 	struct rx_queue_update_ramrod_data		rx_queue_update;
 	struct rx_queue_stop_ramrod_data		rx_queue_stop;
@@ -101,8 +102,8 @@ struct ecore_spq {
 	/* Bitmap for handling out-of-order completions */
 #define SPQ_RING_SIZE		\
 	(CORE_SPQE_PAGE_SIZE_BYTES / sizeof(struct slow_path_element))
-#define SPQ_COMP_BMAP_SIZE					\
-(SPQ_RING_SIZE / (sizeof(unsigned long) * 8 /* BITS_PER_LONG */))
+/* BITS_PER_LONG */
+#define SPQ_COMP_BMAP_SIZE	(SPQ_RING_SIZE / (sizeof(unsigned long) * 8))
 	unsigned long			p_comp_bitmap[SPQ_COMP_BMAP_SIZE];
 	u8				comp_bitmap_idx;
 #define SPQ_COMP_BMAP_SET_BIT(p_spq, idx)				\
@@ -175,7 +176,8 @@ void ecore_spq_free(struct ecore_hwfn *p_hwfn);
  * @return enum _ecore_status_t
  */
 enum _ecore_status_t
-ecore_spq_get_entry(struct ecore_hwfn *p_hwfn, struct ecore_spq_entry **pp_ent);
+ecore_spq_get_entry(struct ecore_hwfn		*p_hwfn,
+		    struct ecore_spq_entry	**pp_ent);
 
 /**
  * @brief ecore_spq_return_entry - Return an entry to spq free
@@ -194,7 +196,8 @@ void ecore_spq_return_entry(struct ecore_hwfn		*p_hwfn,
  *
  * @return struct ecore_eq* - a newly allocated structure; NULL upon error.
  */
-struct ecore_eq *ecore_eq_alloc(struct ecore_hwfn *p_hwfn, u16 num_elem);
+struct ecore_eq *ecore_eq_alloc(struct ecore_hwfn	*p_hwfn,
+				 u16			num_elem);
 
 /**
  * @brief ecore_eq_setup - Reset the SPQ to its start state.
@@ -202,7 +205,8 @@ struct ecore_eq *ecore_eq_alloc(struct ecore_hwfn *p_hwfn, u16 num_elem);
  * @param p_hwfn
  * @param p_eq
  */
-void ecore_eq_setup(struct ecore_hwfn *p_hwfn, struct ecore_eq *p_eq);
+void ecore_eq_setup(struct ecore_hwfn *p_hwfn,
+		    struct ecore_eq   *p_eq);
 
 /**
  * @brief ecore_eq_deallocate - deallocates the given EQ struct.
@@ -210,7 +214,8 @@ void ecore_eq_setup(struct ecore_hwfn *p_hwfn, struct ecore_eq *p_eq);
  * @param p_hwfn
  * @param p_eq
  */
-void ecore_eq_free(struct ecore_hwfn *p_hwfn, struct ecore_eq *p_eq);
+void ecore_eq_free(struct ecore_hwfn *p_hwfn,
+		   struct ecore_eq   *p_eq);
 
 /**
  * @brief ecore_eq_prod_update - update the FW with default EQ producer
@@ -218,7 +223,8 @@ void ecore_eq_free(struct ecore_hwfn *p_hwfn, struct ecore_eq *p_eq);
  * @param p_hwfn
  * @param prod
  */
-void ecore_eq_prod_update(struct ecore_hwfn *p_hwfn, u16 prod);
+void ecore_eq_prod_update(struct ecore_hwfn	*p_hwfn,
+			  u16			prod);
 
 /**
  * @brief ecore_eq_completion - Completes currently pending EQ elements
@@ -271,7 +277,8 @@ struct ecore_consq *ecore_consq_alloc(struct ecore_hwfn	*p_hwfn);
  * @param p_hwfn
  * @param p_eq
  */
-void ecore_consq_setup(struct ecore_hwfn *p_hwfn, struct ecore_consq *p_consq);
+void ecore_consq_setup(struct ecore_hwfn *p_hwfn,
+		    struct ecore_consq   *p_consq);
 
 /**
  * @brief ecore_consq_free - deallocates the given ConsQ struct.
@@ -279,6 +286,7 @@ void ecore_consq_setup(struct ecore_hwfn *p_hwfn, struct ecore_consq *p_consq);
  * @param p_hwfn
  * @param p_eq
  */
-void ecore_consq_free(struct ecore_hwfn *p_hwfn, struct ecore_consq *p_consq);
+void ecore_consq_free(struct ecore_hwfn *p_hwfn,
+		   struct ecore_consq   *p_consq);
 
 #endif /* __ECORE_SPQ_H__ */
