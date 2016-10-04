@@ -31,6 +31,14 @@
 Profile Your Application
 ========================
 
+Introduction
+------------
+
+The following sections describe the methods to profile DPDK applications on
+different architectures.
+
+x86
+~~~
 Intel processors provide performance counters to monitor events.
 Some tools provided by Intel can be used to profile and benchmark an application.
 See the *VTune Performance Analyzer Essentials* publication from Intel Press for more information.
@@ -50,3 +58,53 @@ The main situations that should be monitored through event counters are:
 Refer to the
 `Intel Performance Analysis Guide <http://software.intel.com/sites/products/collateral/hpc/vtune/performance_analysis_guide.pdf>`_
 for details about application profiling.
+
+ARM64
+~~~~~
+
+Perf
+^^^^
+ARM64 architecture provide performance counters to monitor events.
+The Linux perf tool can be used to profile and benchmark an application.
+In addition to the standard events, perf can be used to profile arm64 specific
+PMU events through raw events(-e -rXX)
+
+Refer to the
+`ARM64 specific PMU events enumeration <http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.100095_0002_04_en/way1382543438508.html>`_
+
+High-resolution cycle counter
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The default cntvct_el0 based rte_rdtsc() provides portable means to get wall
+clock counter at user space. Typically it runs at <= 100MHz.
+
+The alternative method to enable rte_rdtsc() for high resolution
+wall clock counter is through armv8 PMU subsystem.
+The PMU cycle counter runs at CPU frequency, However, access to PMU cycle
+counter from user space is not enabled by default in the arm64 linux kernel.
+It is possible to enable cycle counter at user space access
+by configuring the PMU from the privileged mode (kernel space).
+
+by default rte_rdtsc() implementation uses portable cntvct_el0 scheme.
+Application can choose the PMU based implementation with
+CONFIG_RTE_ARM_EAL_RDTSC_USE_PMU
+
+The PMU based scheme useful for high accuracy performance profiling.
+Find below the example steps to configure the PMU based cycle counter on an
+armv8 machine.
+
+.. code-block:: console
+
+    git clone https://github.com/jerinjacobk/armv8_pmu_cycle_counter_el0
+    cd armv8_pmu_cycle_counter_el0
+    make
+    sudo insmod pmu_el0_cycle_counter.ko
+    cd $DPDK_DIR
+    make config T=arm64-armv8a-linuxapp-gcc
+    echo "CONFIG_RTE_ARM_EAL_RDTSC_USE_PMU=y" >> build/.config
+    make
+
+.. warning::
+
+    This method can not be used in production systems as this may alter PMU
+    state used by standard Linux user space tool like perf.
+
