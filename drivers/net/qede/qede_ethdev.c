@@ -1502,7 +1502,7 @@ static struct eth_driver rte_qede_pmd = {
 	.dev_private_size = sizeof(struct qede_dev),
 };
 
-DRIVER_REGISTER_PCI(net_qede, rte_qede_pmd.pci_drv);
-DRIVER_REGISTER_PCI_TABLE(net_qede, pci_id_qede_map);
-DRIVER_REGISTER_PCI(net_qede_vf, rte_qedevf_pmd.pci_drv);
-DRIVER_REGISTER_PCI_TABLE(net_qede_vf, pci_id_qedevf_map);
+EAL_REGISTER_PCI(net_qede, rte_qede_pmd.pci_drv);
+EAL_REGISTER_PCI_TABLE(net_qede, pci_id_qede_map);
+EAL_REGISTER_PCI(net_qede_vf, rte_qedevf_pmd.pci_drv);
+EAL_REGISTER_PCI_TABLE(net_qede_vf, pci_id_qedevf_map);

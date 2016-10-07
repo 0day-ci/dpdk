@@ -1048,5 +1048,5 @@ static struct eth_driver rte_cxgbe_pmd = {
 	.dev_private_size = sizeof(struct port_info),
 };
 
-DRIVER_REGISTER_PCI(net_cxgbe, rte_cxgbe_pmd.pci_drv);
-DRIVER_REGISTER_PCI_TABLE(net_cxgbe, cxgb4_pci_tbl);
+EAL_REGISTER_PCI(net_cxgbe, rte_cxgbe_pmd.pci_drv);
+EAL_REGISTER_PCI_TABLE(net_cxgbe, cxgb4_pci_tbl);

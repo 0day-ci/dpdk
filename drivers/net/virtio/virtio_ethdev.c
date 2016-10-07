@@ -1558,4 +1558,4 @@ __rte_unused uint8_t is_rx)
 }
 
 DRIVER_EXPORT_NAME(net_virtio, __COUNTER__);
-DRIVER_REGISTER_PCI_TABLE(net_virtio, pci_id_virtio_map);
+EAL_REGISTER_PCI_TABLE(net_virtio, pci_id_virtio_map);

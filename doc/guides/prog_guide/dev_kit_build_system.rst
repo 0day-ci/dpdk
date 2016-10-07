@@ -264,7 +264,7 @@ instance the macro:
 
 .. code-block:: c
 
-   DRIVER_REGISTER_PCI(name, drv)
+   EAL_REGISTER_PCI(name, drv)
 
 Creates the following symbol:
 

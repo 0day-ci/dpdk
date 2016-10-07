@@ -5941,4 +5941,4 @@ rte_mlx4_pmd_init(void)
 }
 
 DRIVER_EXPORT_NAME(net_mlx4, __COUNTER__);
-DRIVER_REGISTER_PCI_TABLE(net_mlx4, mlx4_pci_id_map);
+EAL_REGISTER_PCI_TABLE(net_mlx4, mlx4_pci_id_map);

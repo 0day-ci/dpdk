@@ -1121,5 +1121,5 @@ static struct eth_driver bnxt_rte_pmd = {
 	.dev_private_size = sizeof(struct bnxt),
 };
 
-DRIVER_REGISTER_PCI(net_bnxt, bnxt_rte_pmd.pci_drv);
-DRIVER_REGISTER_PCI_TABLE(net_bnxt, bnxt_pci_id_map);
+EAL_REGISTER_PCI(net_bnxt, bnxt_rte_pmd.pci_drv);
+EAL_REGISTER_PCI_TABLE(net_bnxt, bnxt_pci_id_map);
