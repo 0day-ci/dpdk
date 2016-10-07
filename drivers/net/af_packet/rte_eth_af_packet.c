@@ -894,7 +894,7 @@ static struct rte_vdev_driver pmd_af_packet_drv = {
 	.remove = rte_pmd_af_packet_remove,
 };
 
-DRIVER_REGISTER_VDEV(net_af_packet, pmd_af_packet_drv);
+EAL_REGISTER_VDEV(net_af_packet, pmd_af_packet_drv);
 DRIVER_REGISTER_PARAM_STRING(net_af_packet,
 	"iface=<string> "
 	"qpairs=<int> "

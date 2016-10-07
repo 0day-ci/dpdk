@@ -2513,7 +2513,7 @@ static struct rte_vdev_driver bond_drv = {
 	.remove = bond_remove,
 };
 
-DRIVER_REGISTER_VDEV(net_bonding, bond_drv);
+EAL_REGISTER_VDEV(net_bonding, bond_drv);
 
 DRIVER_REGISTER_PARAM_STRING(net_bonding,
 	"slave=<ifc> "

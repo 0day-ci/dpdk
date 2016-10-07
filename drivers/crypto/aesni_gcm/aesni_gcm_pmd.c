@@ -519,7 +519,7 @@ static struct rte_vdev_driver aesni_gcm_pmd_drv = {
 	.remove = aesni_gcm_remove
 };
 
-DRIVER_REGISTER_VDEV(CRYPTODEV_NAME_AESNI_GCM_PMD, aesni_gcm_pmd_drv);
+EAL_REGISTER_VDEV(CRYPTODEV_NAME_AESNI_GCM_PMD, aesni_gcm_pmd_drv);
 DRIVER_REGISTER_PARAM_STRING(CRYPTODEV_NAME_AESNI_GCM_PMD,
 	"max_nb_queue_pairs=<int> "
 	"max_nb_sessions=<int> "

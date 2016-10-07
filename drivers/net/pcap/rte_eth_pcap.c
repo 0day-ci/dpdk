@@ -1064,7 +1064,7 @@ static struct rte_vdev_driver pmd_pcap_drv = {
 	.remove = pmd_pcap_remove,
 };
 
-DRIVER_REGISTER_VDEV(net_pcap, pmd_pcap_drv);
+EAL_REGISTER_VDEV(net_pcap, pmd_pcap_drv);
 DRIVER_REGISTER_PARAM_STRING(net_pcap,
 	ETH_PCAP_RX_PCAP_ARG "=<string> "
 	ETH_PCAP_TX_PCAP_ARG "=<string> "

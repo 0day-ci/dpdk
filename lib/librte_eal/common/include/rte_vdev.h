@@ -81,7 +81,7 @@ void rte_eal_vdrv_register(struct rte_vdev_driver *driver);
  */
 void rte_eal_vdrv_unregister(struct rte_vdev_driver *driver);
 
-#define DRIVER_REGISTER_VDEV(nm, vdrv)\
+#define EAL_REGISTER_VDEV(nm, vdrv)\
 RTE_INIT(vdrvinitfn_ ##vdrv);\
 static void vdrvinitfn_ ##vdrv(void)\
 {\
