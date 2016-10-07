@@ -692,6 +692,6 @@ static struct rte_vdev_driver pmd_null_drv = {
 };
 
 EAL_REGISTER_VDEV(net_null, pmd_null_drv);
-DRIVER_REGISTER_PARAM_STRING(net_null,
+EAL_REGISTER_PARAM_STRING(net_null,
 	"size=<int> "
 	"copy=<int>");

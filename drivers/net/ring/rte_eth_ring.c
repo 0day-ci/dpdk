@@ -629,5 +629,5 @@ static struct rte_vdev_driver pmd_ring_drv = {
 };
 
 EAL_REGISTER_VDEV(net_ring, pmd_ring_drv);
-DRIVER_REGISTER_PARAM_STRING(net_ring,
+EAL_REGISTER_PARAM_STRING(net_ring,
 	"nodeaction=[attach|detach]");

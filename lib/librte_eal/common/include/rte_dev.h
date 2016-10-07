@@ -234,7 +234,7 @@ __attribute__((used)) = RTE_STR(name)
 static const char DRV_EXP_TAG(name, pci_tbl_export)[] __attribute__((used)) = \
 RTE_STR(table)
 
-#define DRIVER_REGISTER_PARAM_STRING(name, str) \
+#define EAL_REGISTER_PARAM_STRING(name, str) \
 static const char DRV_EXP_TAG(name, param_string_export)[] \
 __attribute__((used)) = str
 

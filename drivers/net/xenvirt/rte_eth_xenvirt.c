@@ -765,5 +765,5 @@ static struct rte_vdev_driver pmd_xenvirt_drv = {
 };
 
 EAL_REGISTER_VDEV(net_xenvirt, pmd_xenvirt_drv);
-DRIVER_REGISTER_PARAM_STRING(net_xenvirt,
+EAL_REGISTER_PARAM_STRING(net_xenvirt,
 	"mac=<mac addr>");
