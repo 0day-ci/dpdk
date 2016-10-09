@@ -36,6 +36,19 @@ New Features
 
      This section is a comment. Make sure to start the actual text at the margin.
 
+* **Added vhost-user dequeue zero copy support**
+
+  The copy in dequeue path is saved, which is meant to improve the performance.
+  In the VM2VM case, the boost is quite impressive. The bigger the packet size,
+  the bigger performance boost you may get. However, for VM2NIC case, there
+  are some limitations, yet the boost is not that impressive as VM2VM case.
+  It may even drop quite a bit for small packets.
+
+  For such reason, this feature is disabled by default. It can be enabled when
+  ``RTE_VHOST_USER_DEQUEUE_ZERO_COPY`` flag is given. Check the vhost section
+  at programming guide for more information.
+
+
 * **Added vhost-user indirect descriptors support.**
 
   If indirect descriptor feature is negotiated, each packet sent by the guest
