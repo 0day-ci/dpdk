@@ -53,3 +53,7 @@ Deprecation Notices
 * API will change for ``rte_port_source_params`` and ``rte_port_sink_params``
   structures. The member ``file_name`` data type will be changed from
   ``char *`` to ``const char *``. This change targets release 16.11.
+
+* In 17.02 ABI change is planned: the ``rte_eth_dev_info`` structure
+  will be extended with a new member ``fw_version`` in order to store
+  the NIC firmware version.
