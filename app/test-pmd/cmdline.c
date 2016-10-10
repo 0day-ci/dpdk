@@ -9070,7 +9070,7 @@ cmd_flow_director_mask_parsed(void *parsed_result,
 			return;
 		}
 
-		mask->vlan_tci_mask = res->vlan_mask;
+		mask->vlan_tci_mask = rte_cpu_to_be_16(res->vlan_mask);
 		mask->mac_addr_byte_mask = res->mac_addr_byte_mask;
 	} else if (fdir_conf.mode ==  RTE_FDIR_MODE_PERFECT_TUNNEL) {
 		if (strcmp(res->mode_value, "Tunnel")) {
@@ -9078,9 +9078,9 @@ cmd_flow_director_mask_parsed(void *parsed_result,
 			return;
 		}
 
-		mask->vlan_tci_mask = res->vlan_mask;
+		mask->vlan_tci_mask = rte_cpu_to_be_16(res->vlan_mask);
 		mask->mac_addr_byte_mask = res->mac_addr_byte_mask;
-		mask->tunnel_id_mask = res->tunnel_id_mask;
+		mask->tunnel_id_mask = rte_cpu_to_be_32(res->tunnel_id_mask);
 		mask->tunnel_type_mask = res->tunnel_type_mask;
 	} else {
 		if (strcmp(res->mode_value, "IP")) {
