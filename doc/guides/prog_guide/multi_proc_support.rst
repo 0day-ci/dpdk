@@ -129,10 +129,13 @@ Support for this usage scenario is provided using the ``--file-prefix`` paramete
 
 By default, the EAL creates hugepage files on each hugetlbfs filesystem using the rtemap_X filename,
 where X is in the range 0 to the maximum number of hugepages -1.
-Similarly, it creates shared configuration files, memory mapped in each process, using the /var/run/.rte_config filename,
-when run as root (or $HOME/.rte_config when run as a non-root user;
-if filesystem and device permissions are set up to allow this).
-The rte part of the filenames of each of the above is configurable using the file-prefix parameter.
+Similarly, it creates shared configuration files, memory mapped in each process.
+When run as root, the name of the configuration file will be
+/var/run/.rte_*host*_config, where *host* is the name of the machine.
+When run as a non-root user, the the name of the configuration file will be
+$HOME/.rte_*host*_config (if filesystem and device permissions are set up to allow this).
+If the ``--file-prefix`` parameter has been specified, its value will be used
+in place of "rte" in the file names.
 
 In addition to specifying the file-prefix parameter,
 any DPDK applications that are to be run side-by-side must explicitly limit their memory use.

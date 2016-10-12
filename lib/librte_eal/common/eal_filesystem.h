@@ -41,7 +41,7 @@
 #define EAL_FILESYSTEM_H
 
 /** Path of rte config file. */
-#define RUNTIME_CONFIG_FMT "%s/.%s_config"
+#define RUNTIME_CONFIG_FMT "%s/.%s_%s_config"
 
 #include <stdint.h>
 #include <limits.h>
@@ -59,11 +59,22 @@ eal_runtime_config_path(void)
 	static char buffer[PATH_MAX]; /* static so auto-zeroed */
 	const char *directory = default_config_dir;
 	const char *home_dir = getenv("HOME");
+	static char nameBuffer[1000];
+	int result;
 
 	if (getuid() != 0 && home_dir != NULL)
 		directory = home_dir;
+
+	/*
+	 * Include the name of the host in the config file path. Otherwise,
+	 * if DPDK applications run on different hosts but share a home
+	 * directory (e.g. via NFS), they will choose the same config
+	 * file and conflict unnecessarily.
+	 */
+	result = gethostname(nameBuffer, sizeof(nameBuffer)-1);
 	snprintf(buffer, sizeof(buffer) - 1, RUNTIME_CONFIG_FMT, directory,
-			internal_config.hugefile_prefix);
+			internal_config.hugefile_prefix,
+		(result == 0) ? nameBuffer : "unknown-host");
 	return buffer;
 }
 
