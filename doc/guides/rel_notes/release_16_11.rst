@@ -99,6 +99,11 @@ New Features
   * AES GCM/CTR mode
 
 
+* **Added functions to dump the offload flags as a string.**
+
+  Added two new functions ``rte_get_rx_ol_flag_list()`` and
+  ``rte_get_tx_ol_flag_list()`` to dump offload flags as a string.
+
 Resolved Issues
 ---------------
 
