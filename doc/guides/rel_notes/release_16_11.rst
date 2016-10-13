@@ -115,6 +115,11 @@ New Features
   good, bad, or not present (useful for virtual drivers). This modification
   was done for IP and L4.
 
+* **Added a LRO mbuf flag.**
+
+  Added a new RX LRO mbuf flag, used when packets are coalesced. This
+  flag indicates that the segment size of original packets is known.
+
 Resolved Issues
 ---------------
 
