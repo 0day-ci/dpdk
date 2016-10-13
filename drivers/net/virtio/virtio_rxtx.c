@@ -209,10 +209,117 @@ virtqueue_enqueue_recv_refill(struct virtqueue *vq, struct rte_mbuf *cookie)
 	return 0;
 }
 
+/* When doing TSO, the IP length is not included in the pseudo header
+ * checksum of the packet given to the PMD, but for virtio it is
+ * expected.
+ */
+static void
+virtio_tso_fix_cksum(struct rte_mbuf *m)
+{
+	/* common case: header is not fragmented */
+	if (likely(rte_pktmbuf_data_len(m) >= m->l2_len + m->l3_len +
+			m->l4_len)) {
+		struct ipv4_hdr *iph;
+		struct ipv6_hdr *ip6h;
+		struct tcp_hdr *th;
+		uint16_t prev_cksum, new_cksum, ip_len, ip_paylen;
+		uint32_t tmp;
+
+		iph = rte_pktmbuf_mtod_offset(m, struct ipv4_hdr *, m->l2_len);
+		th = RTE_PTR_ADD(iph, m->l3_len);
+		if ((iph->version_ihl >> 4) == 4) {
+			iph->hdr_checksum = 0;
+			iph->hdr_checksum = rte_ipv4_cksum(iph);
+			ip_len = iph->total_length;
+			ip_paylen = rte_cpu_to_be_16(rte_be_to_cpu_16(ip_len) -
+				m->l3_len);
+		} else {
+			ip6h = (struct ipv6_hdr *)iph;
+			ip_paylen = ip6h->payload_len;
+		}
+
+		/* calculate the new phdr checksum not including ip_paylen */
+		prev_cksum = th->cksum;
+		tmp = prev_cksum;
+		tmp += ip_paylen;
+		tmp = (tmp & 0xffff) + (tmp >> 16);
+		new_cksum = tmp;
+
+		/* replace it in the packet */
+		th->cksum = new_cksum;
+	} else {
+		const struct ipv4_hdr *iph;
+		struct ipv4_hdr iph_copy;
+		union {
+			uint16_t u16;
+			uint8_t u8[2];
+		} prev_cksum, new_cksum, ip_len, ip_paylen, ip_csum;
+		uint32_t tmp;
+
+		/* Same code than above, but we use rte_pktmbuf_read()
+		 * or we read/write in mbuf data one byte at a time to
+		 * avoid issues if the packet is multi segmented.
+		 */
+
+		uint8_t ip_version;
+
+		ip_version = *rte_pktmbuf_mtod_offset(m, uint8_t *,
+			m->l2_len) >> 4;
+
+		/* calculate ip checksum (API imposes to set it to 0)
+		 * and get ip payload len */
+		if (ip_version == 4) {
+			*rte_pktmbuf_mtod_offset(m, uint8_t *,
+				m->l2_len + 10) = 0;
+			*rte_pktmbuf_mtod_offset(m, uint8_t *,
+				m->l2_len + 11) = 0;
+			iph = rte_pktmbuf_read(m, m->l2_len,
+				sizeof(*iph), &iph_copy);
+			ip_csum.u16 = rte_ipv4_cksum(iph);
+			*rte_pktmbuf_mtod_offset(m, uint8_t *,
+				m->l2_len + 10) = ip_csum.u8[0];
+			*rte_pktmbuf_mtod_offset(m, uint8_t *,
+				m->l2_len + 11) = ip_csum.u8[1];
+
+			ip_len.u8[0] = *rte_pktmbuf_mtod_offset(m, uint8_t *,
+				m->l2_len + 2);
+			ip_len.u8[1] = *rte_pktmbuf_mtod_offset(m, uint8_t *,
+				m->l2_len + 3);
+
+			ip_paylen.u16 = rte_cpu_to_be_16(
+				rte_be_to_cpu_16(ip_len.u16) - m->l3_len);
+		} else {
+			ip_paylen.u8[0] = *rte_pktmbuf_mtod_offset(m, uint8_t *,
+				m->l2_len + 4);
+			ip_paylen.u8[1] = *rte_pktmbuf_mtod_offset(m, uint8_t *,
+				m->l2_len + 5);
+		}
+
+		/* calculate the new phdr checksum not including ip_paylen */
+		/* get phdr cksum at offset 16 of TCP header */
+		prev_cksum.u8[0] = *rte_pktmbuf_mtod_offset(m, uint8_t *,
+			m->l2_len + m->l3_len + 16);
+		prev_cksum.u8[1] = *rte_pktmbuf_mtod_offset(m, uint8_t *,
+			m->l2_len + m->l3_len + 17);
+		tmp = prev_cksum.u16;
+		tmp += ip_paylen.u16;
+		tmp = (tmp & 0xffff) + (tmp >> 16);
+		new_cksum.u16 = tmp;
+
+		/* replace it in the packet */
+		*rte_pktmbuf_mtod_offset(m, uint8_t *,
+			m->l2_len + m->l3_len + 16) = new_cksum.u8[0];
+		*rte_pktmbuf_mtod_offset(m, uint8_t *,
+			m->l2_len + m->l3_len + 17) = new_cksum.u8[1];
+	}
+}
+
 static inline int
 tx_offload_enabled(struct virtio_hw *hw)
 {
-	return vtpci_with_feature(hw, VIRTIO_NET_F_CSUM);
+	return vtpci_with_feature(hw, VIRTIO_NET_F_CSUM) ||
+		vtpci_with_feature(hw, VIRTIO_NET_F_HOST_TSO4) ||
+		vtpci_with_feature(hw, VIRTIO_NET_F_HOST_TSO6);
 }
 
 static inline void
@@ -274,8 +381,11 @@ virtqueue_enqueue_xmit(struct virtnet_tx *txvq, struct rte_mbuf *cookie,
 		idx = start_dp[idx].next;
 	}
 
+	/* Checksum Offload / TSO */
 	if (offload) {
-		/* Checksum Offload */
+		if (cookie->ol_flags & PKT_TX_TCP_SEG)
+			cookie->ol_flags |= PKT_TX_TCP_CKSUM;
+
 		switch (cookie->ol_flags & PKT_TX_L4_MASK) {
 		case PKT_TX_UDP_CKSUM:
 			hdr->csum_start = cookie->l2_len + cookie->l3_len;
@@ -297,9 +407,22 @@ virtqueue_enqueue_xmit(struct virtnet_tx *txvq, struct rte_mbuf *cookie,
 			break;
 		}
 
-		hdr->gso_type = 0;
-		hdr->gso_size = 0;
-		hdr->hdr_len = 0;
+		/* TCP Segmentation Offload */
+		if (cookie->ol_flags & PKT_TX_TCP_SEG) {
+			virtio_tso_fix_cksum(cookie);
+			hdr->gso_type = (cookie->ol_flags & PKT_TX_IPV6) ?
+				VIRTIO_NET_HDR_GSO_TCPV6 :
+				VIRTIO_NET_HDR_GSO_TCPV4;
+			hdr->gso_size = cookie->tso_segsz;
+			hdr->hdr_len =
+				cookie->l2_len +
+				cookie->l3_len +
+				cookie->l4_len;
+		} else {
+			hdr->gso_type = 0;
+			hdr->gso_size = 0;
+			hdr->hdr_len = 0;
+		}
 	}
 
 	do {
