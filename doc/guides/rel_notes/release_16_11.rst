@@ -104,6 +104,11 @@ New Features
   The config option ``RTE_MACHINE`` can be used to pass code names to the compiler as ``-march`` flag.
 
 
+* **Added a functions to calculate the checksum of data in a mbuf.**
+
+  Added a new function ``rte_raw_cksum_mbuf()`` to process the checksum of
+  data embedded in an mbuf chain.
+
 Resolved Issues
 ---------------
 
