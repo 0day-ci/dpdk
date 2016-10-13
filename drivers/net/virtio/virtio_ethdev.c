@@ -1045,14 +1045,13 @@ virtio_vlan_filter_set(struct rte_eth_dev *dev, uint16_t vlan_id, int on)
 }
 
 static int
-virtio_negotiate_features(struct virtio_hw *hw)
+virtio_negotiate_features(struct virtio_hw *hw, uint64_t req_features)
 {
 	uint64_t host_features;
 
 	/* Prepare guest_features: feature that driver wants to support */
-	hw->guest_features = VIRTIO_PMD_GUEST_FEATURES;
 	PMD_INIT_LOG(DEBUG, "guest_features before negotiate = %" PRIx64,
-		hw->guest_features);
+		req_features);
 
 	/* Read device(host) feature bits */
 	host_features = hw->vtpci_ops->get_features(hw);
@@ -1063,6 +1062,7 @@ virtio_negotiate_features(struct virtio_hw *hw)
 	 * Negotiate features: Subset of device feature bits are written back
 	 * guest feature bits.
 	 */
+	hw->guest_features = req_features;
 	hw->guest_features = vtpci_negotiate_features(hw, host_features);
 	PMD_INIT_LOG(DEBUG, "features after negotiate = %" PRIx64,
 		hw->guest_features);
@@ -1080,6 +1080,8 @@ virtio_negotiate_features(struct virtio_hw *hw)
 			return -1;
 		}
 	}
+
+	hw->req_guest_features = req_features;
 
 	return 0;
 }
@@ -1121,8 +1123,9 @@ rx_func_get(struct rte_eth_dev *eth_dev)
 		eth_dev->rx_pkt_burst = &virtio_recv_pkts;
 }
 
+/* reset device and renegotiate features if needed */
 static int
-virtio_init_device(struct rte_eth_dev *eth_dev)
+virtio_init_device(struct rte_eth_dev *eth_dev, uint64_t req_features)
 {
 	struct virtio_hw *hw = eth_dev->data->dev_private;
 	struct virtio_net_config *config;
@@ -1137,7 +1140,7 @@ virtio_init_device(struct rte_eth_dev *eth_dev)
 
 	/* Tell the host we've known how to drive the device. */
 	vtpci_set_status(hw, VIRTIO_CONFIG_STATUS_DRIVER);
-	if (virtio_negotiate_features(hw) < 0)
+	if (virtio_negotiate_features(hw, req_features) < 0)
 		return -1;
 
 	/* If host does not support status then disable LSC */
@@ -1258,8 +1261,8 @@ eth_virtio_dev_init(struct rte_eth_dev *eth_dev)
 
 	eth_dev->data->dev_flags = dev_flags;
 
-	/* reset device and negotiate features */
-	ret = virtio_init_device(eth_dev);
+	/* reset device and negotiate default features */
+	ret = virtio_init_device(eth_dev, VIRTIO_PMD_GUEST_FEATURES);
 	if (ret < 0)
 		return ret;
 
@@ -1338,6 +1341,7 @@ virtio_dev_configure(struct rte_eth_dev *dev)
 {
 	const struct rte_eth_rxmode *rxmode = &dev->data->dev_conf.rxmode;
 	struct virtio_hw *hw = dev->data->dev_private;
+	uint64_t req_features;
 	int ret;
 
 	PMD_INIT_LOG(DEBUG, "configure");
@@ -1345,6 +1349,14 @@ virtio_dev_configure(struct rte_eth_dev *dev)
 	if (rxmode->hw_ip_checksum) {
 		PMD_DRV_LOG(ERR, "HW IP checksum not supported");
 		return -EINVAL;
+	}
+
+	req_features = VIRTIO_PMD_GUEST_FEATURES;
+	/* if request features changed, reinit the device */
+	if (req_features != hw->req_guest_features) {
+		ret = virtio_init_device(dev, req_features);
+		if (ret < 0)
+			return ret;
 	}
 
 	/* Setup and start control queue */
