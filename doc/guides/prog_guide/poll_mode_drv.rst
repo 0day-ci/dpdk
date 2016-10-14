@@ -356,3 +356,9 @@ Some additions in the metadata scheme are as follows:
 An example where queue numbers are used is as follows: ``tx_q7_bytes`` which
 indicates this statistic applies to queue number 7, and represents the number
 of transmitted bytes on that queue.
+
+Extended ixgbe PMD API
+~~~~~~~~~~~~~~~~~~~~~~
+
+In DPDK release v16.11 an API for ixgbe specific functions has been added to the ixgbe PMD.
+The declarations for the API functions are in the header ``rte_pmd_ixgbe.h``.
