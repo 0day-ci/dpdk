@@ -49,3 +49,7 @@ Deprecation Notices
 * mempool: The functions for single/multi producer/consumer are deprecated
   and will be removed in 17.02.
   It is replaced by ``rte_mempool_generic_get/put`` functions.
+
+* librte_ether: an API change is planned for 17.02 for the function
+  ``_rte_eth_dev_callback_process``. In 17.02 the function will return an ``int``
+  instead of ``void`` and a fourth parameter ``void *ret_param`` will be added.
