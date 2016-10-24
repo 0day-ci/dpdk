@@ -44,5 +44,7 @@ DPDK_16.11 {
 
 	rte_cryptodev_pci_probe;
 	rte_cryptodev_pci_remove;
+	rte_cryptodev_soc_probe;
+	rte_cryptodev_soc_remove;
 
 } DPDK_16.07;
