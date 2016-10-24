@@ -159,6 +159,29 @@ int pci_update_device(const struct rte_pci_addr *addr);
 int pci_unbind_kernel_driver(struct rte_pci_device *dev);
 
 /**
+ * Update a soc device object by asking the kernel for the latest information.
+ *
+ * This function is private to EAL.
+ *
+ * @param addr
+ *      The SoC address to look for
+ * @return
+ *   - 0 on success.
+ *   - negative on error.
+ */
+int soc_update_device(const struct rte_soc_addr *addr);
+
+/**
+ * Unbind kernel driver for this device
+ *
+ * This function is private to EAL.
+ *
+ * @return
+ *   0 on success, negative on error
+ */
+int soc_unbind_kernel_driver(struct rte_soc_device *dev);
+
+/**
  * Map the PCI resource of a PCI device in virtual memory
  *
  * This function is private to EAL.

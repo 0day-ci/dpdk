@@ -114,6 +114,26 @@ rte_eal_soc_probe_one_driver(struct rte_soc_driver *drv,
 		return ret;
 	}
 
+	if (!dev->is_dma_coherent) {
+		if (!(drv->drv_flags & RTE_SOC_DRV_ACCEPT_NONCC)) {
+			RTE_LOG(DEBUG, EAL,
+				"  device is not DMA coherent, skipping\n");
+			return 1;
+		}
+	}
+
+	if (drv->drv_flags & RTE_SOC_DRV_NEED_MAPPING) {
+		/* map resources */
+		ret = rte_eal_soc_map_device(dev);
+		if (ret)
+			return ret;
+	} else if (drv->drv_flags & RTE_SOC_DRV_FORCE_UNBIND
+		&& rte_eal_process_type() == RTE_PROC_PRIMARY) {
+		/* unbind */
+		if (soc_unbind_kernel_driver(dev) < 0)
+			return -1;
+	}
+
 	dev->driver = drv;
 	RTE_VERIFY(drv->probe != NULL);
 	return drv->probe(drv, dev);
@@ -165,6 +185,10 @@ rte_eal_soc_detach_dev(struct rte_soc_driver *drv,
 
 	if (drv->remove && (drv->remove(dev) < 0))
 		return -1;	/* negative value is an error */
+
+	if (drv->drv_flags & RTE_SOC_DRV_NEED_MAPPING)
+		/* unmap resources for devices */
+		rte_eal_soc_unmap_device(dev);
 
 	/* clear driver structure */
 	dev->driver = NULL;
@@ -240,6 +264,12 @@ rte_eal_soc_probe_one(const struct rte_soc_addr *addr)
 
 	if (addr == NULL)
 		return -1;
+
+	/* update current SoC device in global list, kernel bindings might have
+	 * changed since last time we looked at it.
+	 */
+	if (soc_update_device(addr) < 0)
+		goto err_return;
 
 	TAILQ_FOREACH(dev, &soc_device_list, next) {
 		if (rte_eal_compare_soc_addr(&dev->addr, addr))

@@ -46,9 +46,11 @@ extern "C" {
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/queue.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <string.h>
+#include <limits.h>
 
 #include <rte_dev.h>
 #include <rte_eal.h>
@@ -62,6 +64,14 @@ extern struct soc_device_list soc_device_list;
 
 TAILQ_HEAD(soc_driver_list, rte_soc_driver); /**< SoC drivers in D-linked Q. */
 TAILQ_HEAD(soc_device_list, rte_soc_device); /**< SoC devices in D-linked Q. */
+
+#define SOC_MAX_RESOURCE 6
+
+struct rte_soc_resource {
+	uint64_t phys_addr;
+	uint64_t len;
+	void *addr;
+};
 
 struct rte_soc_id {
 	union {
@@ -84,8 +94,12 @@ struct rte_soc_device {
 	struct rte_device device;           /**< Inherit code device */
 	struct rte_soc_addr addr;           /**< SoC device Location */
 	struct rte_soc_id *id;              /**< SoC device ID list */
+	struct rte_soc_resource mem_resource[SOC_MAX_RESOURCE];
 	struct rte_intr_handle intr_handle; /**< Interrupt handle */
 	struct rte_soc_driver *driver;      /**< Associated driver */
+	int numa_node;                      /**< NUMA node connection */
+	int is_dma_coherent;                /**< DMA coherent device */
+	enum rte_kernel_driver kdrv;        /**< Kernel driver */
 };
 
 struct rte_soc_driver;
@@ -139,6 +153,8 @@ struct rte_soc_driver {
 #define RTE_SOC_DRV_INTR_LSC	 0x0008
 /** Device driver supports detaching capability */
 #define RTE_SOC_DRV_DETACHABLE	 0x0010
+/** Device driver accepts DMA non-coherent devices */
+#define RTE_SOC_DRV_ACCEPT_NONCC 0x0020
 
 /**
  * Utility function to write a SoC device name, this device name can later be
@@ -254,6 +270,18 @@ int rte_eal_soc_probe_one(const struct rte_soc_addr *addr);
  *   - Negative on error.
  */
 int rte_eal_soc_detach(const struct rte_soc_addr *addr);
+
+/**
+ * Map SoC device resources into userspace.
+ *
+ * This is called by the EAL if (drv_flags & RTE_SOC_DRV_NEED_MAPPING).
+ */
+int rte_eal_soc_map_device(struct rte_soc_device *dev);
+
+/**
+ * Unmap the device resources.
+ */
+void rte_eal_soc_unmap_device(struct rte_soc_device *dev);
 
 /**
  * Dump discovered SoC devices.

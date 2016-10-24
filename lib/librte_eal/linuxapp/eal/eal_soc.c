@@ -63,6 +63,45 @@ soc_get_sysfs_path(void)
 	return path;
 }
 
+int
+soc_unbind_kernel_driver(struct rte_soc_device *dev)
+{
+	char devpath[PATH_MAX];
+
+	snprintf(devpath, sizeof(devpath), "%s/%s",
+		 soc_get_sysfs_path(), dev->addr.name);
+
+	return rte_eal_unbind_kernel_driver(devpath, dev->addr.name);
+}
+
+int
+rte_eal_soc_map_device(struct rte_soc_device *dev)
+{
+	int ret = -1;
+
+	/* try mapping the NIC resources using VFIO if it exists */
+	switch (dev->kdrv) {
+	default:
+		RTE_LOG(DEBUG, EAL,
+			"  Not managed by a supported kernel driver, skipped\n");
+		ret = 1;
+		break;
+	}
+
+	return ret;
+}
+
+void
+rte_eal_soc_unmap_device(struct rte_soc_device *dev)
+{
+	switch (dev->kdrv) {
+	default:
+	RTE_LOG(DEBUG, EAL,
+		"  Not managed by a supported kernel driver, skipped\n");
+		break;
+	}
+}
+
 static char *
 dev_read_uevent(const char *dirname)
 {
@@ -260,6 +299,68 @@ dev_content_free(struct rte_soc_device *dev)
 	}
 }
 
+static int
+dev_setup_associated_driver(struct rte_soc_device *dev, const char *dirname)
+{
+	char filename[PATH_MAX];
+	char driver[PATH_MAX];
+	int ret;
+
+	/* parse driver */
+	snprintf(filename, sizeof(filename), "%s/driver", dirname);
+	ret = rte_eal_get_kernel_driver_by_path(filename, driver);
+	if (ret < 0) {
+		RTE_LOG(ERR, EAL, "Fail to get kernel driver for %s\n",
+			dirname);
+		return 1;
+	}
+
+	if (!ret)
+		dev->kdrv = RTE_KDRV_UNKNOWN;
+	else
+		dev->kdrv = RTE_KDRV_NONE;
+
+	return 0;
+}
+
+static int
+dev_setup_numa_node(struct rte_soc_device *dev, const char *dirname)
+{
+	char filename[PATH_MAX];
+
+	/* if no NUMA support, set default to 0 */
+	unsigned long tmp = 0;
+	int ret = 0;
+
+	/* get numa node */
+	snprintf(filename, sizeof(filename), "%s/numa_node", dirname);
+
+	if (eal_parse_sysfs_value(filename, &tmp) < 0)
+		ret = 1;
+
+	dev->numa_node = tmp;
+	return ret;
+}
+
+static int
+dev_detect_is_coherent(struct rte_soc_device *dev)
+{
+	char filename[PATH_MAX];
+	FILE *f;
+
+	if (dev->addr.fdt_path == NULL)
+		return 0; /* no way to detect */
+
+	snprintf(filename, sizeof(filename), "%s%s/dma-coherent",
+			"/proc/device-tree", dev->addr.fdt_path);
+	f = fopen(filename, "r");
+	if (f == NULL)
+		return 0;
+
+	fclose(f);
+	return 1;
+}
+
 /**
  * Scan one SoC sysfs entry, and fill the devices list from it.
  * We require to have the uevent file with records: OF_FULLNAME and
@@ -299,6 +400,18 @@ soc_scan_one(const char *dirname, const char *name)
 		goto fail;
 	free(uevent); /* not needed anymore */
 
+	ret = dev_setup_associated_driver(dev, dirname);
+	if (ret)
+		goto fail;
+
+	ret = dev_setup_numa_node(dev, dirname);
+	if (ret < 0)
+		goto fail;
+
+	dev->is_dma_coherent = dev_detect_is_coherent(dev);
+	RTE_LOG(DEBUG, EAL, "  DMA %s\n",
+			dev->is_dma_coherent ? "coherent" : "non-coherent");
+
 	/* device is valid, add in list (sorted) */
 	if (TAILQ_EMPTY(&soc_device_list)) {
 		TAILQ_INSERT_TAIL(&soc_device_list, dev, next);
@@ -313,6 +426,11 @@ soc_scan_one(const char *dirname, const char *name)
 			if (ret < 0) {
 				TAILQ_INSERT_BEFORE(dev2, dev, next);
 			} else { /* already registered */
+				dev2->kdrv = dev->kdrv;
+				dev2->is_dma_coherent = dev->is_dma_coherent;
+				memmove(dev2->mem_resource, dev->mem_resource,
+					sizeof(dev->mem_resource));
+
 				dev_content_free(dev2);
 				dev2->addr.fdt_path = dev->addr.fdt_path;
 				dev2->id = dev->id;
@@ -330,6 +448,17 @@ fail:
 	dev_content_free(dev);
 	free(dev);
 	return ret;
+}
+
+int
+soc_update_device(const struct rte_soc_addr *addr)
+{
+	char filename[PATH_MAX];
+
+	snprintf(filename, sizeof(filename), "%s/%s",
+			soc_get_sysfs_path(), addr->name);
+
+	return soc_scan_one(filename, addr->name);
 }
 
 int
