@@ -156,6 +156,10 @@ See the DPDK Getting Started Guides for more information on these options.
 
     Use malloc instead of hugetlbfs.
 
+*   ``--enable-soc``
+
+    Enable SoC framework support
+
 
 Testpmd Command-line Options
 ----------------------------

@@ -75,6 +75,7 @@ const struct option
 eal_long_options[] = {
 	{OPT_BASE_VIRTADDR,     1, NULL, OPT_BASE_VIRTADDR_NUM    },
 	{OPT_CREATE_UIO_DEV,    0, NULL, OPT_CREATE_UIO_DEV_NUM   },
+	{OPT_ENABLE_SOC,        0, NULL, OPT_ENABLE_SOC_NUM       },
 	{OPT_FILE_PREFIX,       1, NULL, OPT_FILE_PREFIX_NUM      },
 	{OPT_HELP,              0, NULL, OPT_HELP_NUM             },
 	{OPT_HUGE_DIR,          1, NULL, OPT_HUGE_DIR_NUM         },
@@ -843,6 +844,10 @@ eal_parse_common_option(int opt, const char *optarg,
 		break;
 
 	/* long options */
+	case OPT_ENABLE_SOC_NUM:
+		conf->enable_soc = 1;
+		break;
+
 	case OPT_HUGE_UNLINK_NUM:
 		conf->hugepage_unlink = 1;
 		break;

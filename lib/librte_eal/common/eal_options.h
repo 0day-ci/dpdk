@@ -49,6 +49,8 @@ enum {
 	OPT_BASE_VIRTADDR_NUM,
 #define OPT_CREATE_UIO_DEV    "create-uio-dev"
 	OPT_CREATE_UIO_DEV_NUM,
+#define OPT_ENABLE_SOC        "enable-soc"
+	OPT_ENABLE_SOC_NUM,
 #define OPT_FILE_PREFIX       "file-prefix"
 	OPT_FILE_PREFIX_NUM,
 #define OPT_HUGE_DIR          "huge-dir"

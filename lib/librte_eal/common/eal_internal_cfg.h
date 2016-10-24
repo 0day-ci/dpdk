@@ -67,6 +67,7 @@ struct internal_config {
 	unsigned hugepage_unlink;         /**< true to unlink backing files */
 	volatile unsigned xen_dom0_support; /**< support app running on Xen Dom0*/
 	volatile unsigned no_pci;         /**< true to disable PCI */
+	volatile unsigned enable_soc;     /**< true to enable SoC */
 	volatile unsigned no_hpet;        /**< true to disable HPET */
 	volatile unsigned vmware_tsc_map; /**< true to use VMware TSC mapping
 										* instead of native TSC */
