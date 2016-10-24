@@ -810,6 +810,9 @@ rte_eal_init(int argc, char **argv)
 		rte_panic("Cannot init VFIO\n");
 #endif
 
+	if (rte_eal_soc_init() < 0)
+		rte_panic("Cannot init SoC\n");
+
 	if (rte_eal_memory_init() < 0)
 		rte_panic("Cannot init memory\n");
 
