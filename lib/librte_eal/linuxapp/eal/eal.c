@@ -969,3 +969,32 @@ error:
 	fclose(f);
 	return -1;
 }
+
+int
+rte_eal_get_kernel_driver_by_path(const char *filename, char *dri_name)
+{
+	int count;
+	char path[PATH_MAX];
+	char *name;
+
+	if (!filename || !dri_name)
+		return -1;
+
+	count = readlink(filename, path, PATH_MAX);
+	if (count >= PATH_MAX)
+		return -1;
+
+	/* For device does not have a driver */
+	if (count < 0)
+		return 1;
+
+	path[count] = '\0';
+
+	name = strrchr(path, '/');
+	if (name) {
+		strncpy(dri_name, name + 1, strlen(name + 1) + 1);
+		return 0;
+	}
+
+	return -1;
+}

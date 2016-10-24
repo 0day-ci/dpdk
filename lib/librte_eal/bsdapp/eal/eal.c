@@ -640,3 +640,10 @@ rte_eal_unbind_kernel_driver(const char *devpath __rte_unused,
 {
 	return -ENOTSUP;
 }
+
+int
+rte_eal_get_kernel_driver_by_path(const char *filename __rte_unused,
+				  char *dri_name __rte_unused)
+{
+	return -ENOTSUP;
+}

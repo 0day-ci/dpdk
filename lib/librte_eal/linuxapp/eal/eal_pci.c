@@ -78,35 +78,6 @@ pci_unbind_kernel_driver(struct rte_pci_device *dev)
 	return rte_eal_unbind_kernel_driver(devpath, devid);
 }
 
-static int
-pci_get_kernel_driver_by_path(const char *filename, char *dri_name)
-{
-	int count;
-	char path[PATH_MAX];
-	char *name;
-
-	if (!filename || !dri_name)
-		return -1;
-
-	count = readlink(filename, path, PATH_MAX);
-	if (count >= PATH_MAX)
-		return -1;
-
-	/* For device does not have a driver */
-	if (count < 0)
-		return 1;
-
-	path[count] = '\0';
-
-	name = strrchr(path, '/');
-	if (name) {
-		strncpy(dri_name, name + 1, strlen(name + 1) + 1);
-		return 0;
-	}
-
-	return -1;
-}
-
 /* Map pci device */
 int
 rte_eal_pci_map_device(struct rte_pci_device *dev)
@@ -354,7 +325,7 @@ pci_scan_one(const char *dirname, uint16_t domain, uint8_t bus,
 
 	/* parse driver */
 	snprintf(filename, sizeof(filename), "%s/driver", dirname);
-	ret = pci_get_kernel_driver_by_path(filename, driver);
+	ret = rte_eal_get_kernel_driver_by_path(filename, driver);
 	if (ret < 0) {
 		RTE_LOG(ERR, EAL, "Fail to get kernel driver\n");
 		free(dev);

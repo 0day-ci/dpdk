@@ -269,6 +269,20 @@ int rte_eal_check_module(const char *module_name);
 int rte_eal_unbind_kernel_driver(const char *devpath, const char *devid);
 
 /**
+ * Extract the kernel driver name from the absolute path to the driver.
+ *
+ * @param filename  path to the driver ("<path-to-device>/driver")
+ * @path  dri_name  target buffer where to place the driver name
+ *                  (should be at least PATH_MAX long)
+ *
+ * @return
+ *      -1   on failure
+ *       0   when successful
+ *       1   when there is no such driver
+ */
+int rte_eal_get_kernel_driver_by_path(const char *filename, char *dri_name);
+
+/**
  * Get cpu core_id.
  *
  * This function is private to the EAL.
