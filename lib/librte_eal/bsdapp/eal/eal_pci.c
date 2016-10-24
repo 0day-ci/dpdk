@@ -89,11 +89,11 @@
 
 /* unbind kernel driver for this device */
 int
-pci_unbind_kernel_driver(struct rte_pci_device *dev __rte_unused)
+pci_unbind_kernel_driver(struct rte_pci_device *dev)
 {
 	RTE_LOG(ERR, EAL, "RTE_PCI_DRV_FORCE_UNBIND flag is not implemented "
 		"for BSD\n");
-	return -ENOTSUP;
+	return rte_eal_unbind_kernel_driver(dev);
 }
 
 /* Map pci device */

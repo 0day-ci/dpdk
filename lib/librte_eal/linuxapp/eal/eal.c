@@ -943,3 +943,29 @@ rte_eal_check_module(const char *module_name)
 	/* Module has been found */
 	return 1;
 }
+
+int
+rte_eal_unbind_kernel_driver(const char *devpath, const char *devid)
+{
+	char filename[PATH_MAX];
+	FILE *f;
+
+	snprintf(filename, sizeof(filename),
+		 "%s/driver/unbind", devpath);
+
+	f = fopen(filename, "w");
+	if (f == NULL) /* device was not bound */
+		return 0;
+
+	if (fwrite(devid, strlen(devid), 1, f) == 0) {
+		RTE_LOG(ERR, EAL, "%s(): could not write to %s\n", __func__,
+				filename);
+		goto error;
+	}
+
+	fclose(f);
+	return 0;
+error:
+	fclose(f);
+	return -1;
+}

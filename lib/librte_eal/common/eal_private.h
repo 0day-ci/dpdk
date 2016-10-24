@@ -256,6 +256,19 @@ int rte_eal_alarm_init(void);
 int rte_eal_check_module(const char *module_name);
 
 /**
+ * Unbind kernel driver bound to the device specified by the given devpath,
+ * and its string identification.
+ *
+ * @param devpath  path to the device directory ("/sys/.../devices/<name>")
+ * @param devid    identification of the device (<name>)
+ *
+ * @return
+ *      -1  unbind has failed
+ *       0  module has been unbound
+ */
+int rte_eal_unbind_kernel_driver(const char *devpath, const char *devid);
+
+/**
  * Get cpu core_id.
  *
  * This function is private to the EAL.

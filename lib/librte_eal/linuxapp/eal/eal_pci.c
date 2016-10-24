@@ -59,38 +59,23 @@ int
 pci_unbind_kernel_driver(struct rte_pci_device *dev)
 {
 	int n;
-	FILE *f;
-	char filename[PATH_MAX];
-	char buf[BUFSIZ];
+	char devpath[PATH_MAX];
+	char devid[BUFSIZ];
 	struct rte_pci_addr *loc = &dev->addr;
 
-	/* open /sys/bus/pci/devices/AAAA:BB:CC.D/driver */
-	snprintf(filename, sizeof(filename),
-		"%s/" PCI_PRI_FMT "/driver/unbind", pci_get_sysfs_path(),
+	/* devpath /sys/bus/pci/devices/AAAA:BB:CC.D */
+	snprintf(devpath, sizeof(devpath),
+		"%s/" PCI_PRI_FMT, pci_get_sysfs_path(),
 		loc->domain, loc->bus, loc->devid, loc->function);
 
-	f = fopen(filename, "w");
-	if (f == NULL) /* device was not bound */
-		return 0;
-
-	n = snprintf(buf, sizeof(buf), PCI_PRI_FMT "\n",
+	n = snprintf(devid, sizeof(devid), PCI_PRI_FMT "\n",
 	             loc->domain, loc->bus, loc->devid, loc->function);
-	if ((n < 0) || (n >= (int)sizeof(buf))) {
+	if ((n < 0) || (n >= (int)sizeof(devid))) {
 		RTE_LOG(ERR, EAL, "%s(): snprintf failed\n", __func__);
-		goto error;
-	}
-	if (fwrite(buf, n, 1, f) == 0) {
-		RTE_LOG(ERR, EAL, "%s(): could not write to %s\n", __func__,
-				filename);
-		goto error;
+		return -1;
 	}
 
-	fclose(f);
-	return 0;
-
-error:
-	fclose(f);
-	return -1;
+	return rte_eal_unbind_kernel_driver(devpath, devid);
 }
 
 static int

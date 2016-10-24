@@ -633,3 +633,10 @@ rte_eal_process_type(void)
 {
 	return rte_config.process_type;
 }
+
+int
+rte_eal_unbind_kernel_driver(const char *devpath __rte_unused,
+			     const char *devid __rte_unused)
+{
+	return -ENOTSUP;
+}
