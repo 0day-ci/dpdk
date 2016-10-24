@@ -104,7 +104,6 @@ static const struct special_flow_init special_flow_init[] = {
 		.hash_types =
 			1 << HASH_RXQ_UDPV6 |
 			1 << HASH_RXQ_IPV6 |
-			1 << HASH_RXQ_ETH |
 			0,
 		.per_vlan = 1,
 	},
