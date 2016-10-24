@@ -44,13 +44,28 @@
 #include <rte_log.h>
 #include <rte_soc.h>
 
-#include "eal_internal_cfg.h"
-#include "eal_filesystem.h"
-#include "eal_private.h"
+#include <eal_internal_cfg.h>
+#include <eal_filesystem.h>
+#include <eal_private.h>
 
 /* Init the SoC EAL subsystem */
 int
 rte_eal_soc_init(void)
 {
+	struct rte_soc_driver *drv;
+
+	/* SoC is disabled by default */
+	if (!internal_config.enable_soc)
+		return 0;
+
+	/* For each registered driver, call their scan routine to perform any
+	 * custom scan for devices (for example, custom buses)
+	 */
+	TAILQ_FOREACH(drv, &soc_driver_list, next) {
+		RTE_VERIFY(drv->scan_fn);
+		drv->scan_fn();
+		/* Ignore all errors from this */
+	}
+
 	return 0;
 }

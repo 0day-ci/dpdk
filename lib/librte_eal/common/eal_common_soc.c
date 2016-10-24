@@ -36,6 +36,8 @@
 #include <sys/queue.h>
 
 #include <rte_log.h>
+#include <rte_common.h>
+#include <rte_soc.h>
 
 #include "eal_private.h"
 
@@ -44,6 +46,208 @@ struct soc_driver_list soc_driver_list =
 	TAILQ_HEAD_INITIALIZER(soc_driver_list);
 struct soc_device_list soc_device_list =
 	TAILQ_HEAD_INITIALIZER(soc_device_list);
+
+int
+rte_eal_soc_match_compat(struct rte_soc_driver *drv,
+			 struct rte_soc_device *dev)
+{
+	int i, j;
+
+	RTE_VERIFY(drv != NULL && drv->id_table != NULL);
+	RTE_VERIFY(dev != NULL && dev->id != NULL);
+
+	for (i = 0; drv->id_table[i].compatible; ++i) {
+		const char *drv_compat = drv->id_table[i].compatible;
+
+		for (j = 0; dev->id[j].compatible; ++j) {
+			const char *dev_compat = dev->id[j].compatible;
+
+			if (!strcmp(drv_compat, dev_compat))
+				return 0;
+		}
+	}
+
+	return 1;
+}
+
+static int
+rte_eal_soc_probe_one_driver(struct rte_soc_driver *drv,
+			     struct rte_soc_device *dev)
+{
+	int ret = 1;
+
+	RTE_VERIFY(drv->match_fn);
+
+	ret = drv->match_fn(drv, dev);
+	if (ret) {
+		RTE_LOG(DEBUG, EAL,
+			" match function failed, skipping\n");
+		return ret;
+	}
+
+	dev->driver = drv;
+	RTE_VERIFY(drv->probe != NULL);
+	return drv->probe(drv, dev);
+}
+
+static int
+soc_probe_all_drivers(struct rte_soc_device *dev)
+{
+	struct rte_soc_driver *drv = NULL;
+	int rc = 0;
+
+	if (dev == NULL)
+		return -1;
+
+	TAILQ_FOREACH(drv, &soc_driver_list, next) {
+		rc = rte_eal_soc_probe_one_driver(drv, dev);
+		if (rc < 0)
+			/* negative value is an error */
+			return -1;
+		if (rc > 0)
+			/* positive value means driver doesn't support it */
+			continue;
+		return 0;
+	}
+	return 1;
+}
+
+/* If the IDs match, call the remove() function of the driver. */
+static int
+rte_eal_soc_detach_dev(struct rte_soc_driver *drv,
+		       struct rte_soc_device *dev)
+{
+	int ret;
+
+	if ((drv == NULL) || (dev == NULL))
+		return -EINVAL;
+
+	ret = drv->match_fn(drv, dev);
+	if (ret) {
+		RTE_LOG(DEBUG, EAL, " driver (%s) didn't match device (%s)\n",
+			drv->driver.name, dev->addr.name);
+		return ret;
+	}
+
+	RTE_LOG(DEBUG, EAL, "SoC device %s\n",
+		dev->addr.name);
+
+	RTE_LOG(DEBUG, EAL, "  remove driver: %s\n", drv->driver.name);
+
+	if (drv->remove && (drv->remove(dev) < 0))
+		return -1;	/* negative value is an error */
+
+	/* clear driver structure */
+	dev->driver = NULL;
+
+	return 0;
+}
+
+/*
+ * Call the remove() function of all registered drivers for the device.
+ *
+ * @param dev
+ *	Device for which detach is to be performed
+ * @return
+ *       0 when successful
+ *      -1 if deinitialization fails
+ *       1 if no driver is found for this device.
+ */
+static int
+soc_detach_all_drivers(struct rte_soc_device *dev)
+{
+	struct rte_soc_driver *dr = NULL;
+	int rc = 0;
+
+	if (dev == NULL)
+		return -1;
+
+	TAILQ_FOREACH(dr, &soc_driver_list, next) {
+		rc = rte_eal_soc_detach_dev(dr, dev);
+		if (rc < 0)
+			/* negative value is an error */
+			return -1;
+		if (rc > 0)
+			/* positive value means driver doesn't support it */
+			continue;
+		return 0;
+	}
+	return 1;
+}
+
+int
+rte_eal_soc_detach(const struct rte_soc_addr *addr)
+{
+	struct rte_soc_device *dev = NULL;
+	int ret = 0;
+
+	if (addr == NULL)
+		return -1;
+
+	TAILQ_FOREACH(dev, &soc_device_list, next) {
+		if (rte_eal_compare_soc_addr(&dev->addr, addr))
+			continue;
+
+		ret = soc_detach_all_drivers(dev);
+		if (ret < 0)
+			goto err_return;
+
+		TAILQ_REMOVE(&soc_device_list, dev, next);
+		return 0;
+	}
+	return -1;
+
+err_return:
+	RTE_LOG(WARNING, EAL, "Requested device %s cannot be used\n",
+		dev->addr.name);
+	return -1;
+}
+
+int
+rte_eal_soc_probe_one(const struct rte_soc_addr *addr)
+{
+	struct rte_soc_device *dev = NULL;
+	int ret = 0;
+
+	if (addr == NULL)
+		return -1;
+
+	TAILQ_FOREACH(dev, &soc_device_list, next) {
+		if (rte_eal_compare_soc_addr(&dev->addr, addr))
+			continue;
+
+		ret = soc_probe_all_drivers(dev);
+		if (ret < 0)
+			goto err_return;
+		return 0;
+	}
+	return -1;
+
+err_return:
+	RTE_LOG(WARNING, EAL,
+		"Requested device %s cannot be used\n", addr->name);
+	return -1;
+}
+
+int
+rte_eal_soc_probe(void)
+{
+	struct rte_soc_device *dev = NULL;
+	int ret = 0;
+
+	TAILQ_FOREACH(dev, &soc_device_list, next) {
+		ret = soc_probe_all_drivers(dev);
+		if (ret < 0) {
+			RTE_LOG(DEBUG, EAL, "Requested device %s"
+				 " cannot be used\n", dev->addr.name);
+			/* Failure for a particular device is logged and
+			 * ignored
+			 */
+		}
+	}
+
+	return ret;
+}
 
 /* dump one device */
 static int
@@ -61,7 +265,6 @@ soc_dump_one_device(FILE *f, struct rte_soc_device *dev)
 	return 0;
 }
 
-/* dump devices on the bus to an output stream */
 void
 rte_eal_soc_dump(FILE *f)
 {
@@ -75,14 +278,18 @@ rte_eal_soc_dump(FILE *f)
 	}
 }
 
-/* register a driver */
 void
 rte_eal_soc_register(struct rte_soc_driver *driver)
 {
+	/* For a valid soc driver, match and scan function
+	 * should be provided.
+	 */
+	RTE_VERIFY(driver != NULL);
+	RTE_VERIFY(driver->match_fn != NULL);
+	RTE_VERIFY(driver->scan_fn != NULL);
 	TAILQ_INSERT_TAIL(&soc_driver_list, driver, next);
 }
 
-/* unregister a driver */
 void
 rte_eal_soc_unregister(struct rte_soc_driver *driver)
 {

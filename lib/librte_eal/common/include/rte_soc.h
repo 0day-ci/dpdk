@@ -62,7 +62,6 @@ extern struct soc_device_list soc_device_list;
 TAILQ_HEAD(soc_driver_list, rte_soc_driver); /**< SoC drivers in D-linked Q. */
 TAILQ_HEAD(soc_device_list, rte_soc_device); /**< SoC devices in D-linked Q. */
 
-
 struct rte_soc_id {
 	const char *compatible; /**< OF compatible specification */
 	uint64_t priv_data;     /**< SoC Driver specific data */
@@ -89,12 +88,29 @@ struct rte_soc_driver;
 /**
  * Initialization function for the driver called during SoC probing.
  */
-typedef int (soc_devinit_t)(struct rte_soc_driver *, struct rte_soc_device *);
+typedef int (soc_probe_t)(struct rte_soc_driver *, struct rte_soc_device *);
 
 /**
  * Uninitialization function for the driver called during hotplugging.
  */
-typedef int (soc_devuninit_t)(struct rte_soc_device *);
+typedef int (soc_remove_t)(struct rte_soc_device *);
+
+/**
+ * SoC device scan callback, called from rte_eal_soc_init.
+ * For various SoC, the bus on which devices are attached maynot be compliant
+ * to a standard platform (or platform bus itself). In which case, extra
+ * steps are implemented by PMD to scan over the bus and add devices to SoC
+ * device list.
+ */
+typedef void (soc_scan_t)(void);
+
+/**
+ * Custom device<=>driver match callback for SoC
+ * Unlike PCI, SoC devices don't have a fixed definition of device
+ * identification. PMDs can implement a specific matching function in which
+ * driver and device objects are provided to perform custom match.
+ */
+typedef int (soc_match_t)(struct rte_soc_driver *, struct rte_soc_device *);
 
 /**
  * A structure describing a SoC driver.
@@ -102,8 +118,10 @@ typedef int (soc_devuninit_t)(struct rte_soc_device *);
 struct rte_soc_driver {
 	TAILQ_ENTRY(rte_soc_driver) next;  /**< Next in list */
 	struct rte_driver driver;          /**< Inherit core driver. */
-	soc_devinit_t *devinit;            /**< Device initialization */
-	soc_devuninit_t *devuninit;        /**< Device uninitialization */
+	soc_probe_t *probe;                 /**< Device probe */
+	soc_remove_t *remove;               /**< Device remove */
+	soc_scan_t *scan_fn;                /**< Callback for scanning SoC bus*/
+	soc_match_t *match_fn;              /**< Callback to match dev<->drv */
 	const struct rte_soc_id *id_table; /**< ID table, NULL terminated */
 };
 
@@ -146,12 +164,63 @@ rte_eal_compare_soc_addr(const struct rte_soc_addr *a0,
 }
 
 /**
+ * Default function for matching the Soc driver with device. Each driver can
+ * either use this function or define their own soc matching function.
+ * This function relies on the compatible string extracted from sysfs. But,
+ * a SoC might have different way of identifying its devices. Such SoC can
+ * override match_fn.
+ *
+ * @return
+ *	 0 on success
+ *	-1 when no match found
+  */
+int
+rte_eal_soc_match_compat(struct rte_soc_driver *drv,
+			 struct rte_soc_device *dev);
+
+/**
+ * Probe SoC devices for registered drivers.
+ *
+ * @return
+ *	0 on success
+ *	!0 in case of any failure in probe
+ */
+int rte_eal_soc_probe(void);
+
+/**
+ * Probe the single SoC device.
+ */
+int rte_eal_soc_probe_one(const struct rte_soc_addr *addr);
+
+/**
+ * Close the single SoC device.
+ *
+ * Scan the SoC devices and find the SoC device specified by the SoC
+ * address, then call the remove() function for registered driver
+ * that has a matching entry in its id_table for discovered device.
+ *
+ * @param addr
+ *	The SoC address to close.
+ * @return
+ *   - 0 on success.
+ *   - Negative on error.
+ */
+int rte_eal_soc_detach(const struct rte_soc_addr *addr);
+
+/**
  * Dump discovered SoC devices.
+ *
+ * @param f
+ *	File to dump device info in.
  */
 void rte_eal_soc_dump(FILE *f);
 
 /**
  * Register a SoC driver.
+ *
+ * @param driver
+ *	Object for SoC driver to register
+ * @return void
  */
 void rte_eal_soc_register(struct rte_soc_driver *driver);
 
@@ -167,6 +236,10 @@ RTE_PMD_EXPORT_NAME(nm, __COUNTER__)
 
 /**
  * Unregister a SoC driver.
+ *
+ * @param driver
+ *	Object for SoC driver to unregister
+ * @return void
  */
 void rte_eal_soc_unregister(struct rte_soc_driver *driver);
 
