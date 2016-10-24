@@ -228,7 +228,7 @@ pci_uio_map_resource_by_index(struct rte_pci_device *dev, int res_idx,
 
 	/* if matching map is found, then use it */
 	offset = res_idx * pagesz;
-	mapaddr = pci_map_resource(NULL, fd, (off_t)offset,
+	mapaddr = rte_eal_map_resource(NULL, fd, (off_t)offset,
 			(size_t)dev->mem_resource[res_idx].len, 0);
 	close(fd);
 	if (mapaddr == MAP_FAILED)

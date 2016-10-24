@@ -36,6 +36,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <sys/queue.h>
+#include <sys/mman.h>
 
 #include <rte_dev.h>
 #include <rte_devargs.h>
@@ -150,4 +151,42 @@ int rte_eal_dev_detach(const char *name)
 err:
 	RTE_LOG(ERR, EAL, "Driver cannot detach the device (%s)\n", name);
 	return -EINVAL;
+}
+
+/* map a particular resource from a file */
+void *
+rte_eal_map_resource(void *requested_addr, int fd, off_t offset, size_t size,
+		 int additional_flags)
+{
+	void *mapaddr;
+
+	/* Map the Memory resource of device */
+	mapaddr = mmap(requested_addr, size, PROT_READ | PROT_WRITE,
+			MAP_SHARED | additional_flags, fd, offset);
+	if (mapaddr == MAP_FAILED) {
+		RTE_LOG(ERR, EAL, "%s(): cannot mmap(%d, %p, 0x%lx, 0x%lx): %s"
+			" (%p)\n", __func__, fd, requested_addr,
+			(unsigned long)size, (unsigned long)offset,
+			strerror(errno), mapaddr);
+	} else
+		RTE_LOG(DEBUG, EAL, "  Device memory mapped at %p\n", mapaddr);
+
+	return mapaddr;
+}
+
+/* unmap a particular resource */
+void
+rte_eal_unmap_resource(void *requested_addr, size_t size)
+{
+	if (requested_addr == NULL)
+		return;
+
+	/* Unmap the Memory resource of device */
+	if (munmap(requested_addr, size)) {
+		RTE_LOG(ERR, EAL, "%s(): cannot munmap(%p, 0x%lx): %s\n",
+			__func__, requested_addr, (unsigned long)size,
+			strerror(errno));
+	} else
+		RTE_LOG(DEBUG, EAL, "  Device memory unmapped at %p\n",
+				requested_addr);
 }

@@ -399,38 +399,6 @@ int rte_eal_pci_map_device(struct rte_pci_device *dev);
 void rte_eal_pci_unmap_device(struct rte_pci_device *dev);
 
 /**
- * @internal
- * Map a particular resource from a file.
- *
- * @param requested_addr
- *      The starting address for the new mapping range.
- * @param fd
- *      The file descriptor.
- * @param offset
- *      The offset for the mapping range.
- * @param size
- *      The size for the mapping range.
- * @param additional_flags
- *      The additional flags for the mapping range.
- * @return
- *   - On success, the function returns a pointer to the mapped area.
- *   - On error, the value MAP_FAILED is returned.
- */
-void *pci_map_resource(void *requested_addr, int fd, off_t offset,
-		size_t size, int additional_flags);
-
-/**
- * @internal
- * Unmap a particular resource.
- *
- * @param requested_addr
- *      The address for the unmapping range.
- * @param size
- *      The size for the unmapping range.
- */
-void pci_unmap_resource(void *requested_addr, size_t size);
-
-/**
  * Probe the single PCI device.
  *
  * Scan the content of the PCI bus, and find the pci device specified by pci

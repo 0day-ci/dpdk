@@ -75,9 +75,11 @@ pci_uio_map_secondary(struct rte_pci_device *dev)
 				return -1;
 			}
 
-			void *mapaddr = pci_map_resource(uio_res->maps[i].addr,
-					fd, (off_t)uio_res->maps[i].offset,
-					(size_t)uio_res->maps[i].size, 0);
+			void *mapaddr = rte_eal_map_resource(
+						uio_res->maps[i].addr, fd,
+						(off_t)uio_res->maps[i].offset,
+						(size_t)uio_res->maps[i].size,
+						0);
 			/* fd is not needed in slave process, close it */
 			close(fd);
 			if (mapaddr != uio_res->maps[i].addr) {
@@ -88,11 +90,11 @@ pci_uio_map_secondary(struct rte_pci_device *dev)
 				if (mapaddr != MAP_FAILED) {
 					/* unmap addrs correctly mapped */
 					for (j = 0; j < i; j++)
-						pci_unmap_resource(
+						rte_eal_unmap_resource(
 							uio_res->maps[j].addr,
 							(size_t)uio_res->maps[j].size);
 					/* unmap addr wrongly mapped */
-					pci_unmap_resource(mapaddr,
+					rte_eal_unmap_resource(mapaddr,
 						(size_t)uio_res->maps[i].size);
 				}
 				return -1;
@@ -150,7 +152,7 @@ pci_uio_map_resource(struct rte_pci_device *dev)
 	return 0;
 error:
 	for (i = 0; i < map_idx; i++) {
-		pci_unmap_resource(uio_res->maps[i].addr,
+		rte_eal_unmap_resource(uio_res->maps[i].addr,
 				(size_t)uio_res->maps[i].size);
 		rte_free(uio_res->maps[i].path);
 	}
@@ -167,7 +169,7 @@ pci_uio_unmap(struct mapped_pci_resource *uio_res)
 		return;
 
 	for (i = 0; i != uio_res->nb_maps; i++) {
-		pci_unmap_resource(uio_res->maps[i].addr,
+		rte_eal_unmap_resource(uio_res->maps[i].addr,
 				(size_t)uio_res->maps[i].size);
 		if (rte_eal_process_type() == RTE_PROC_PRIMARY)
 			rte_free(uio_res->maps[i].path);

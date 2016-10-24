@@ -234,6 +234,38 @@ int rte_eal_dev_attach(const char *name, const char *devargs);
  */
 int rte_eal_dev_detach(const char *name);
 
+/*
+ * @internal
+ * Map a particular resource from a file.
+ *
+ * @param requested_addr
+ *      The starting address for the new mapping range.
+ * @param fd
+ *      The file descriptor.
+ * @param offset
+ *      The offset for the mapping range.
+ * @param size
+ *      The size for the mapping range.
+ * @param additional_flags
+ *      The additional flags for the mapping range.
+ * @return
+ *   - On success, the function returns a pointer to the mapped area.
+ *   - On error, the value MAP_FAILED is returned.
+ */
+void *rte_eal_map_resource(void *requested_addr, int fd, off_t offset,
+			   size_t size, int additional_flags);
+
+/**
+ * @internal
+ * Unmap a particular resource.
+ *
+ * @param requested_addr
+ *      The address for the unmapping range.
+ * @param size
+ *      The size for the unmapping range.
+ */
+void rte_eal_unmap_resource(void *requested_addr, size_t size);
+
 #define RTE_PMD_EXPORT_NAME_ARRAY(n, idx) n##idx[]
 
 #define RTE_PMD_EXPORT_NAME(name, idx) \
