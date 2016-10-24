@@ -64,7 +64,10 @@ TAILQ_HEAD(soc_driver_list, rte_soc_driver); /**< SoC drivers in D-linked Q. */
 TAILQ_HEAD(soc_device_list, rte_soc_device); /**< SoC devices in D-linked Q. */
 
 struct rte_soc_id {
-	const char *compatible; /**< OF compatible specification */
+	union {
+		const char *compatible; /**< OF compatible specification */
+		char *_compatible;
+	};
 	uint64_t priv_data;     /**< SoC Driver specific data */
 };
 
@@ -200,7 +203,16 @@ rte_eal_parse_soc_spec(const char *spec, struct rte_soc_addr *addr)
 }
 
 /**
- * Default function for matching the Soc driver with device. Each driver can
+ * Helper function for scanning for new SoC devices on platform bus.
+ *
+ * @return
+ * 	0 on success
+ *	!0 on failure to scan
+ */
+int rte_eal_soc_scan_platform_bus(void);
+
+/**
+ * Helper function for matching the Soc driver with device. Each driver can
  * either use this function or define their own soc matching function.
  * This function relies on the compatible string extracted from sysfs. But,
  * a SoC might have different way of identifying its devices. Such SoC can
