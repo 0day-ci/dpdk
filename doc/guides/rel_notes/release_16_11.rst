@@ -131,6 +131,10 @@ New Features
   The GCC 4.9 ``-march`` option supports the Intel processor code names.
   The config option ``RTE_MACHINE`` can be used to pass code names to the compiler as ``-march`` flag.
 
+* **Added API's for VF management to the ixgbe PMD.**
+
+  Eight new API's have been added to the ixgbe PMD for VF management from the PF.
+  The declarations for the API's can be found in ``rte_pmd_ixgbe.h``.
 
 Resolved Issues
 ---------------
