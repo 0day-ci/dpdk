@@ -149,6 +149,22 @@ Resolved Issues
 EAL
 ~~~
 
+* **Improved device/driver heirarchy and generalized hotplugging**
+
+  Device and driver relationship has been restructured by introducing generic
+  classes. This paves way for having PCI, VDEV and other device types as
+  just instantiated objects rather than classes in themselves. Hotplugging too
+  has been generalized into EAL so that ethernet or cryptodevices can use the
+  common infrastructure.
+
+  * removed pmd_type as way of segragation of devices
+  * added rte_device class and all PCI and VDEV devices inherit from it
+  * renamed devinit/devuninit handlers to probe/remove to make it more
+    semantically correct with respect to device<=>driver relationship
+  * moved hotplugging support to EAL
+  * helpers and support macros have been renamed to make them more synonymous
+    with their device types (e.g. PMD_REGISTER_DRIVER => DRIVER_REGISTER_PCI)
+
 
 Drivers
 ~~~~~~~
