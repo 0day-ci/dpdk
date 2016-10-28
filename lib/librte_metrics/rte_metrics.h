@@ -52,7 +52,7 @@
 /**
  * Statistic name
  */
-struct rte_stat_name {
+struct rte_metric_name {
 	/** String describing statistic */
 	char name[RTE_METRICS_MAX_NAME_LEN];
 };
@@ -130,7 +130,7 @@ int rte_metrics_reg_metrics(const char **names, uint16_t cnt_names);
  *   - Negative: Failure
  */
 int rte_metrics_get_names(
-	struct rte_stat_name *names,
+	struct rte_metric_name *names,
 	uint16_t capacity);
 
 /**

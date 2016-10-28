@@ -44,6 +44,8 @@
 #define RTE_METRICS_MAX_METRICS 256
 
 
+#define RTE_METRICS_MEMZONE_NAME "RTE_METRICS"
+
 /**
  * Internal stats metadata and value entry.
  *
@@ -62,7 +64,7 @@
  * having a separate set metadata table doesn't save any memory.
  */
 struct rte_metrics_meta_s {
-	struct rte_stat_name name;
+	char name[RTE_METRICS_MAX_NAME_LEN];
 	uint64_t value[RTE_MAX_ETHPORTS];
 	uint16_t idx_next_set;
 	uint16_t idx_next_stat;
@@ -100,10 +102,10 @@ rte_metrics_init(void)
 	if (rte_eal_process_type() != RTE_PROC_PRIMARY)
 		return;
 
-	memzone = rte_memzone_lookup("RTE_STATS");
+	memzone = rte_memzone_lookup(RTE_METRICS_MEMZONE_NAME);
 	if (memzone != NULL)
 		return;
-	memzone = rte_memzone_reserve("RTE_STATS",
+	memzone = rte_memzone_reserve(RTE_METRICS_MEMZONE_NAME,
 		sizeof(struct rte_metrics_data_s), rte_socket_id(), 0);
 	if (memzone == NULL)
 		rte_exit(EXIT_FAILURE, "Unable to allocate stats memzone\n");
@@ -135,7 +137,7 @@ rte_metrics_reg_metrics(const char **names, uint16_t cnt_names)
 		return -EINVAL;
 
 	rte_metrics_init();
-	memzone = rte_memzone_lookup("RTE_STATS");
+	memzone = rte_memzone_lookup(RTE_METRICS_MEMZONE_NAME);
 	if (memzone == NULL)
 		return -EIO;
 	stats = memzone->addr;
@@ -150,7 +152,7 @@ rte_metrics_reg_metrics(const char **names, uint16_t cnt_names)
 
 	for (idx_name = 0; idx_name < cnt_names; idx_name++) {
 		entry = &stats->metadata[idx_name + stats->cnt_stats];
-		strncpy(entry->name.name, names[idx_name],
+		strncpy(entry->name, names[idx_name],
 			RTE_METRICS_MAX_NAME_LEN);
 		memset(entry->value, 0, sizeof(entry->value));
 		entry->idx_next_stat = idx_name + stats->cnt_stats + 1;
@@ -184,7 +186,7 @@ rte_metrics_update_metrics(int port_id,
 	uint16_t cnt_setsize;
 
 	rte_metrics_init();
-	memzone = rte_memzone_lookup("RTE_STATS");
+	memzone = rte_memzone_lookup(RTE_METRICS_MEMZONE_NAME);
 	if (memzone == NULL)
 		return -EIO;
 	stats = memzone->addr;
@@ -211,14 +213,14 @@ rte_metrics_update_metrics(int port_id,
 
 
 int
-rte_metrics_get_names(struct rte_stat_name *names,
+rte_metrics_get_names(struct rte_metric_name *names,
 	uint16_t capacity)
 {
 	struct rte_metrics_data_s *stats;
 	const struct rte_memzone *memzone;
 	uint16_t idx_name;
 
-	memzone = rte_memzone_lookup("RTE_STATS");
+	memzone = rte_memzone_lookup(RTE_METRICS_MEMZONE_NAME);
 	/* If not allocated, fail silently */
 	if (memzone == NULL)
 		return 0;
@@ -229,7 +231,7 @@ rte_metrics_get_names(struct rte_stat_name *names,
 			return -ERANGE;
 		for (idx_name = 0; idx_name < stats->cnt_stats; idx_name++)
 			strncpy(names[idx_name].name,
-				stats->metadata[idx_name].name.name,
+				stats->metadata[idx_name].name,
 				RTE_METRICS_MAX_NAME_LEN);
 	}
 	return stats->cnt_stats;
@@ -246,7 +248,7 @@ rte_metrics_get_values(int port_id,
 	const struct rte_memzone *memzone;
 	uint16_t idx_name;
 
-	memzone = rte_memzone_lookup("RTE_STATS");
+	memzone = rte_memzone_lookup(RTE_METRICS_MEMZONE_NAME);
 	/* If not allocated, fail silently */
 	if (memzone == NULL)
 		return 0;
