@@ -169,7 +169,7 @@ bond_ethdev_rx_burst_8023ad(void *queue, struct rte_mbuf **bufs,
 			/* Remove packet from array if it is slow packet or slave is not
 			 * in collecting state or bondign interface is not in promiscus
 			 * mode and packet address does not match. */
-			if (unlikely(hdr->ether_type == ether_type_slow_be ||
+			if (unlikely((hdr->ether_type == ether_type_slow_be && && !bufs[j]->vlan_tci) ||
 				!collecting || (!promisc &&
 					!is_multicast_ether_addr(&hdr->d_addr) &&
 					!is_same_ether_addr(&bond_mac, &hdr->d_addr)))) {
