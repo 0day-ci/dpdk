@@ -179,7 +179,7 @@ int bnxt_alloc_vnic_attributes(struct bnxt *bp)
 				HW_HASH_INDEX_SIZE * sizeof(*vnic->rss_table) +
 				HW_HASH_KEY_SIZE);
 	uint16_t max_vnics;
-	int i;
+	uint16_t i;
 
 	if (BNXT_PF(bp)) {
 		struct bnxt_pf_info *pf = &bp->pf;
