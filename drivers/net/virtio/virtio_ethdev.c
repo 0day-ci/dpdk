@@ -295,13 +295,19 @@ virtio_dev_queue_release(struct virtqueue *vq)
 	}
 }
 
-int virtio_dev_queue_setup(struct rte_eth_dev *dev,
-			int queue_type,
-			uint16_t queue_idx,
-			uint16_t vtpci_queue_idx,
-			uint16_t nb_desc,
-			unsigned int socket_id,
-			void **pvq)
+static int
+virtio_get_queue_type(struct virtio_hw *hw, uint16_t vtpci_queue_idx)
+{
+	if (vtpci_queue_idx == hw->max_queue_pairs * 2)
+		return VTNET_CQ;
+	else if (vtpci_queue_idx % 2 == 0)
+		return VTNET_RQ;
+	else
+		return VTNET_TQ;
+}
+
+static int
+virtio_init_queue(struct rte_eth_dev *dev, uint16_t vtpci_queue_idx)
 {
 	char vq_name[VIRTQUEUE_MAX_NAME_SZ];
 	char vq_hdr_name[VIRTQUEUE_MAX_NAME_SZ];
@@ -314,6 +320,7 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 	struct virtqueue *vq;
 	size_t sz_hdr_mz = 0;
 	void *sw_ring = NULL;
+	int queue_type = virtio_get_queue_type(hw, vtpci_queue_idx);
 	int ret;
 
 	PMD_INIT_LOG(DEBUG, "setting up queue: %u", vtpci_queue_idx);
@@ -351,18 +358,18 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 		sz_hdr_mz = PAGE_SIZE;
 	}
 
-	vq = rte_zmalloc_socket(vq_name, size, RTE_CACHE_LINE_SIZE, socket_id);
+	vq = rte_zmalloc_socket(vq_name, size, RTE_CACHE_LINE_SIZE,
+				SOCKET_ID_ANY);
 	if (vq == NULL) {
 		PMD_INIT_LOG(ERR, "can not allocate vq");
 		return -ENOMEM;
 	}
+	hw->vqs[vtpci_queue_idx] = vq;
+
 	vq->hw = hw;
 	vq->vq_queue_index = vtpci_queue_idx;
 	vq->vq_nentries = vq_size;
-
-	if (nb_desc == 0 || nb_desc > vq_size)
-		nb_desc = vq_size;
-	vq->vq_free_cnt = nb_desc;
+	vq->vq_free_cnt = vq_size;
 
 	/*
 	 * Reserve a memzone for vring elements
@@ -372,7 +379,8 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 	PMD_INIT_LOG(DEBUG, "vring_size: %d, rounded_vring_size: %d",
 		     size, vq->vq_ring_size);
 
-	mz = rte_memzone_reserve_aligned(vq_name, vq->vq_ring_size, socket_id,
+	mz = rte_memzone_reserve_aligned(vq_name, vq->vq_ring_size,
+					 SOCKET_ID_ANY,
 					 0, VIRTIO_PCI_VRING_ALIGN);
 	if (mz == NULL) {
 		if (rte_errno == EEXIST)
@@ -396,7 +404,7 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 		snprintf(vq_hdr_name, sizeof(vq_hdr_name), "port%d_vq%d_hdr",
 			 dev->data->port_id, vtpci_queue_idx);
 		hdr_mz = rte_memzone_reserve_aligned(vq_hdr_name, sz_hdr_mz,
-						     socket_id, 0,
+						     SOCKET_ID_ANY, 0,
 						     RTE_CACHE_LINE_SIZE);
 		if (hdr_mz == NULL) {
 			if (rte_errno == EEXIST)
@@ -413,7 +421,7 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 			       sizeof(vq->sw_ring[0]);
 
 		sw_ring = rte_zmalloc_socket("sw_ring", sz_sw,
-					     RTE_CACHE_LINE_SIZE, socket_id);
+				RTE_CACHE_LINE_SIZE, SOCKET_ID_ANY);
 		if (!sw_ring) {
 			PMD_INIT_LOG(ERR, "can not allocate RX soft ring");
 			ret = -ENOMEM;
@@ -424,19 +432,14 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 		rxvq = &vq->rxq;
 		rxvq->vq = vq;
 		rxvq->port_id = dev->data->port_id;
-		rxvq->queue_id = queue_idx;
 		rxvq->mz = mz;
-		*pvq = rxvq;
 	} else if (queue_type == VTNET_TQ) {
 		txvq = &vq->txq;
 		txvq->vq = vq;
 		txvq->port_id = dev->data->port_id;
-		txvq->queue_id = queue_idx;
 		txvq->mz = mz;
 		txvq->virtio_net_hdr_mz = hdr_mz;
 		txvq->virtio_net_hdr_mem = hdr_mz->phys_addr;
-
-		*pvq = txvq;
 	} else if (queue_type == VTNET_CQ) {
 		cvq = &vq->cq;
 		cvq->vq = vq;
@@ -444,7 +447,8 @@ int virtio_dev_queue_setup(struct rte_eth_dev *dev,
 		cvq->virtio_net_hdr_mz = hdr_mz;
 		cvq->virtio_net_hdr_mem = hdr_mz->phys_addr;
 		memset(cvq->virtio_net_hdr_mz->addr, 0, PAGE_SIZE);
-		*pvq = cvq;
+
+		hw->cvq = cvq;
 	}
 
 	/* For virtio_user case (that is when dev->pci_dev is NULL), we use
@@ -502,23 +506,45 @@ fail_q_alloc:
 }
 
 static int
-virtio_dev_cq_queue_setup(struct rte_eth_dev *dev, uint16_t vtpci_queue_idx,
-		uint32_t socket_id)
+virtio_alloc_queues(struct rte_eth_dev *dev)
 {
-	struct virtnet_ctl *cvq;
-	int ret;
 	struct virtio_hw *hw = dev->data->dev_private;
+	uint16_t nr_vq = hw->max_queue_pairs * 2;
+	uint16_t i;
+	int ret;
 
-	PMD_INIT_FUNC_TRACE();
-	ret = virtio_dev_queue_setup(dev, VTNET_CQ, VTNET_SQ_CQ_QUEUE_IDX,
-			vtpci_queue_idx, 0, socket_id, (void **)&cvq);
-	if (ret < 0) {
-		PMD_INIT_LOG(ERR, "control vq initialization failed");
-		return ret;
+	if (vtpci_with_feature(hw, VIRTIO_NET_F_CTRL_VQ))
+		nr_vq += 1;
+
+	hw->vqs = rte_zmalloc(NULL, sizeof(struct virtqueue *) * nr_vq, 0);
+	if (!hw->vqs) {
+		PMD_INIT_LOG(ERR, "failed to allocate vqs");
+		return -ENOMEM;
 	}
 
-	hw->cvq = cvq;
+	for (i = 0; i < nr_vq; i++) {
+		ret = virtio_init_queue(dev, i);
+		if (ret < 0)
+			goto cleanup;
+	}
+
 	return 0;
+
+cleanup:
+	/*
+	 * ctrl queue is the last queue; if we go here, it means the ctrl
+	 * queue is not allocated, that we can do no cleanup for it here.
+	 */
+	while (i > 0) {
+		i--;
+		if (i % 2 == 0)
+			virtio_dev_rx_queue_release(&hw->vqs[i]->rxq);
+		else
+			virtio_dev_tx_queue_release(&hw->vqs[i]->txq);
+	}
+	rte_free(hw->vqs);
+
+	return ret;
 }
 
 static void
@@ -1141,6 +1167,7 @@ virtio_init_device(struct rte_eth_dev *eth_dev, uint64_t req_features)
 	struct virtio_net_config *config;
 	struct virtio_net_config local_config;
 	struct rte_pci_device *pci_dev = eth_dev->pci_dev;
+	int ret;
 
 	/* Reset the device although not necessary at startup */
 	vtpci_reset(hw);
@@ -1221,6 +1248,10 @@ virtio_init_device(struct rte_eth_dev *eth_dev, uint64_t req_features)
 		PMD_INIT_LOG(DEBUG, "config->max_virtqueue_pairs=1");
 		hw->max_queue_pairs = 1;
 	}
+
+	ret = virtio_alloc_queues(eth_dev);
+	if (ret < 0)
+		return ret;
 
 	if (pci_dev)
 		PMD_INIT_LOG(DEBUG, "port %d vendorID=0x%x deviceID=0x%x",
@@ -1390,15 +1421,9 @@ virtio_dev_configure(struct rte_eth_dev *dev)
 		return -ENOTSUP;
 	}
 
-	/* Setup and start control queue */
-	if (vtpci_with_feature(hw, VIRTIO_NET_F_CTRL_VQ)) {
-		ret = virtio_dev_cq_queue_setup(dev,
-			hw->max_queue_pairs * 2,
-			SOCKET_ID_ANY);
-		if (ret < 0)
-			return ret;
+	/* start control queue */
+	if (vtpci_with_feature(hw, VIRTIO_NET_F_CTRL_VQ))
 		virtio_dev_cq_start(dev);
-	}
 
 	hw->vlan_strip = rxmode->hw_vlan_strip;
 
