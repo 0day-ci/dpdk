@@ -179,7 +179,7 @@ int bnxt_alloc_vnic_attributes(struct bnxt *bp)
 				HW_HASH_INDEX_SIZE * sizeof(*vnic->rss_table) +
 				HW_HASH_KEY_SIZE);
 	uint16_t max_vnics;
-	int i;
+	uint16_t i;
 
 	if (BNXT_PF(bp)) {
 		struct bnxt_pf_info *pf = &bp->pf;
@@ -197,7 +197,7 @@ int bnxt_alloc_vnic_attributes(struct bnxt *bp)
 	mz = rte_memzone_lookup(mz_name);
 	if (!mz) {
 		mz = rte_memzone_reserve(mz_name,
-					 entry_length * max_vnics,
+					 (uint32_t) entry_length * max_vnics,
 					 SOCKET_ID_ANY,
 					 RTE_MEMZONE_2MB |
 					 RTE_MEMZONE_SIZE_HINT_ONLY);
@@ -210,10 +210,11 @@ int bnxt_alloc_vnic_attributes(struct bnxt *bp)
 
 		/* Allocate rss table and hash key */
 		vnic->rss_table =
-			(void *)((char *)mz->addr + (entry_length * i));
+		(void *)((char *)mz->addr + ((uint32_t) entry_length * i));
 		memset(vnic->rss_table, -1, entry_length);
 
-		vnic->rss_table_dma_addr = mz->phys_addr + (entry_length * i);
+		vnic->rss_table_dma_addr =
+			mz->phys_addr + ((uint32_t) entry_length * i);
 		vnic->rss_hash_key = (void *)((char *)vnic->rss_table +
 			     HW_HASH_INDEX_SIZE * sizeof(*vnic->rss_table));
 
