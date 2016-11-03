@@ -131,6 +131,15 @@ New Features
   The GCC 4.9 ``-march`` option supports the Intel processor code names.
   The config option ``RTE_MACHINE`` can be used to pass code names to the compiler as ``-march`` flag.
 
+* **Updated the enic driver.**
+
+  The following changes were made to enic:
+
+  * Use interrupt for link status checking instead of polling
+  * More flow director modes on UCS Blade with firmware version >= 2.0(13e)
+  * Full support for MTU update
+  * Support for rte_eth_rx_queue_count function
+  * Several bug fixes
 
 Resolved Issues
 ---------------
@@ -153,6 +162,11 @@ EAL
 Drivers
 ~~~~~~~
 
+* **enic: Fixed several flow director issues **
+
+* **enic: Fixed inadvertent setting of L4 checksum ptype on ICMP packets
+
+* **enic: Fixed high driver overhead when servicing Rx queues beyond the first
 
 Libraries
 ~~~~~~~~~
