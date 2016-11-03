@@ -177,7 +177,7 @@ parse_key_string(const char *key_str, uint8_t *key)
 		pt_end = strchr(pt_start, ':');
 
 		if (pt_end == NULL)
-			strncpy(sub_str, pt_start, strlen(pt_start));
+			strncpy(sub_str, pt_start, strlen(sub_str) - 1);
 		else {
 			if (pt_end - pt_start > 2)
 				return 0;
