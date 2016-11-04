@@ -370,7 +370,7 @@ static struct rte_timer power_timers[RTE_MAX_LCORE];
 
 static inline uint32_t power_idle_heuristic(uint32_t zero_rx_packet_count);
 static inline enum freq_scale_hint_t power_freq_scaleup_heuristic( \
-			unsigned lcore_id, uint8_t port_id, uint16_t queue_id);
+			unsigned lcore_id, uint32_t rx_queue_count);
 
 /* exit signal handler */
 static void
@@ -705,9 +705,7 @@ power_idle_heuristic(uint32_t zero_rx_packet_count)
 }
 
 static inline enum freq_scale_hint_t
-power_freq_scaleup_heuristic(unsigned lcore_id,
-			     uint8_t port_id,
-			     uint16_t queue_id)
+power_freq_scaleup_heuristic(unsigned lcore_id, uint32_t rx_queue_count)
 {
 /**
  * HW Rx queue size is 128 by default, Rx burst read at maximum 32 entries
@@ -720,15 +718,12 @@ power_freq_scaleup_heuristic(unsigned lcore_id,
 #define FREQ_UP_TREND2_ACC   100
 #define FREQ_UP_THRESHOLD    10000
 
-	if (likely(rte_eth_rx_descriptor_done(port_id, queue_id,
-			FREQ_GEAR3_RX_PACKET_THRESHOLD) > 0)) {
+	if (likely(rx_queue_count > FREQ_GEAR3_RX_PACKET_THRESHOLD)) {
 		stats[lcore_id].trend = 0;
 		return FREQ_HIGHEST;
-	} else if (likely(rte_eth_rx_descriptor_done(port_id, queue_id,
-			FREQ_GEAR2_RX_PACKET_THRESHOLD) > 0))
+	} else if (likely(rx_queue_count > FREQ_GEAR2_RX_PACKET_THRESHOLD))
 		stats[lcore_id].trend += FREQ_UP_TREND2_ACC;
-	else if (likely(rte_eth_rx_descriptor_done(port_id, queue_id,
-			FREQ_GEAR1_RX_PACKET_THRESHOLD) > 0))
+	else if (likely(rx_queue_count > FREQ_GEAR1_RX_PACKET_THRESHOLD))
 		stats[lcore_id].trend += FREQ_UP_TREND1_ACC;
 
 	if (likely(stats[lcore_id].trend > FREQ_UP_THRESHOLD)) {
@@ -833,6 +828,7 @@ main_loop(__attribute__((unused)) void *dummy)
 	enum freq_scale_hint_t lcore_scaleup_hint;
 	uint32_t lcore_rx_idle_count = 0;
 	uint32_t lcore_idle_hint = 0;
+	uint32_t rx_ring_length;
 	int intr_en = 0;
 
 	const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S * BURST_TX_DRAIN_US;
@@ -923,6 +919,18 @@ start_rx:
 				rx_queue->zero_rx_packet_count = 0;
 
 				/**
+				 * get available descriptor number via
+				 * MMIO read is costly, so only do it when
+				 * recent poll returns maximum number.
+				 */
+				if (nb_rx >= MAX_PKT_BURST)
+					rx_ring_length =
+						rte_eth_rx_queue_count(portid,
+								queueid);
+				else
+					rx_ring_length = 0;
+
+				/**
 				 * do not scale up frequency immediately as
 				 * user to kernel space communication is costly
 				 * which might impact packet I/O for received
@@ -930,7 +938,7 @@ start_rx:
 				 */
 				rx_queue->freq_up_hint =
 					power_freq_scaleup_heuristic(lcore_id,
-							portid, queueid);
+							rx_ring_length);
 			}
 
 			/* Prefetch first packets */
