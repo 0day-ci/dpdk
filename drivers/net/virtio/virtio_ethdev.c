@@ -1141,6 +1141,22 @@ rx_func_get(struct rte_eth_dev *eth_dev)
 		eth_dev->rx_pkt_burst = &virtio_recv_pkts;
 }
 
+static inline int
+rx_offload_enabled(struct virtio_hw *hw)
+{
+	return vtpci_with_feature(hw, VIRTIO_NET_F_GUEST_CSUM) ||
+		vtpci_with_feature(hw, VIRTIO_NET_F_GUEST_TSO4) ||
+		vtpci_with_feature(hw, VIRTIO_NET_F_GUEST_TSO6);
+}
+
+static inline int
+tx_offload_enabled(struct virtio_hw *hw)
+{
+	return vtpci_with_feature(hw, VIRTIO_NET_F_CSUM) ||
+		vtpci_with_feature(hw, VIRTIO_NET_F_HOST_TSO4) ||
+		vtpci_with_feature(hw, VIRTIO_NET_F_HOST_TSO6);
+}
+
 /* reset device and renegotiate features if needed */
 static int
 virtio_init_device(struct rte_eth_dev *eth_dev, uint64_t req_features)
@@ -1160,6 +1176,9 @@ virtio_init_device(struct rte_eth_dev *eth_dev, uint64_t req_features)
 	vtpci_set_status(hw, VIRTIO_CONFIG_STATUS_DRIVER);
 	if (virtio_negotiate_features(hw, req_features) < 0)
 		return -1;
+
+	hw->tx_offload = tx_offload_enabled(hw);
+	hw->rx_offload = rx_offload_enabled(hw);
 
 	/* If host does not support status then disable LSC */
 	if (!vtpci_with_feature(hw, VIRTIO_NET_F_STATUS))
