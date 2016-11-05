@@ -1494,10 +1494,8 @@ virtio_dev_start(struct rte_eth_dev *dev)
 	 *vhost backend will have no chance to be waked up
 	 */
 	nb_queues = RTE_MAX(dev->data->nb_rx_queues, dev->data->nb_tx_queues);
-	if (nb_queues > 1) {
-		if (virtio_set_multiple_queues(dev, nb_queues) != 0)
-			return -EINVAL;
-	}
+	if (virtio_set_multiple_queues(dev, nb_queues) != 0)
+		return -EINVAL;
 
 	PMD_INIT_LOG(DEBUG, "nb_queues=%d", nb_queues);
 
