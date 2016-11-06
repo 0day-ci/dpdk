@@ -56,10 +56,10 @@ static const struct reg_info ixgbe_regs_general[] = {
 };
 
 static const struct reg_info ixgbevf_regs_general[] = {
-	{IXGBE_CTRL, 1, 1, "IXGBE_CTRL"},
-	{IXGBE_STATUS, 1, 1, "IXGBE_STATUS"},
+	{IXGBE_VFCTRL, 1, 1, "IXGBE_VFCTRL"},
+	{IXGBE_VFSTATUS, 1, 1, "IXGBE_VFSTATUS"},
 	{IXGBE_VFLINKS, 1, 1, "IXGBE_VFLINKS"},
-	{IXGBE_FRTIMER, 1, 1, "IXGBE_FRTIMER"},
+	{IXGBE_VFFRTIMER, 1, 1, "IXGBE_VFFRTIMER"},
 	{IXGBE_VFMAILBOX, 1, 1, "IXGBE_VFMAILBOX"},
 	{IXGBE_VFMBMEM, 16, 4, "IXGBE_VFMBMEM"},
 	{IXGBE_VFRXMEMWRAP, 1, 1, "IXGBE_VFRXMEMWRAP"},
