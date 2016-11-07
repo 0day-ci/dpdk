@@ -78,6 +78,10 @@
 #ifdef RTE_LIBRTE_PDUMP
 #include <rte_pdump.h>
 #endif
+#include <rte_metrics.h>
+#ifdef RTE_LIBRTE_LATENCY_STATS
+#include <rte_latencystats.h>
+#endif
 
 #include "testpmd.h"
 
@@ -2070,6 +2074,9 @@ signal_handler(int signum)
 		/* uninitialize packet capture framework */
 		rte_pdump_uninit();
 #endif
+#ifdef RTE_LIBRTE_LATENCY_STATS
+		rte_latencystats_uninit();
+#endif
 		force_quit();
 		/* exit with the expected status */
 		signal(signum, SIG_DFL);
@@ -2127,6 +2134,9 @@ main(int argc, char** argv)
 	/* set all ports to promiscuous mode by default */
 	FOREACH_PORT(port_id, ports)
 		rte_eth_promiscuous_enable(port_id);
+#ifdef RTE_LIBRTE_LATENCY_STATS
+	rte_latencystats_init(1, NULL);
+#endif
 
 #ifdef RTE_LIBRTE_CMDLINE
 	if (interactive == 1) {

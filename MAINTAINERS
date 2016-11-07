@@ -702,3 +702,7 @@ F: examples/tep_termination/
 F: examples/vmdq/
 F: examples/vmdq_dcb/
 F: doc/guides/sample_app_ug/vmdq_dcb_forwarding.rst
+
+Latency Stats
+M: Reshma Pattan <reshma.pattan@intel.com>
+F: lib/librte_latencystats/

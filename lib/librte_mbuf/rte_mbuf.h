@@ -493,6 +493,9 @@ struct rte_mbuf {
 
 	/** Timesync flags for use with IEEE1588. */
 	uint16_t timesync;
+
+	/** Timestamp for measuring latency. */
+	uint64_t timestamp;
 } __rte_cache_aligned;
 
 /**
