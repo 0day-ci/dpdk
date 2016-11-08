@@ -39,4 +39,4 @@ Tool User Guides
     pdump
     pmdinfo
     devbind
-
+    testpmd/index

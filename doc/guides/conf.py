@@ -106,7 +106,7 @@ class CustomLatexFormatter(LatexFormatter):
 PygmentsBridge.latex_formatter = CustomLatexFormatter
 
 # Configuration for man pages
-man_pages = [("testpmd_app_ug/run_app", "testpmd",
+man_pages = [("tools/testpmd/run_app", "testpmd",
               "tests for dpdk pmds", "", 1),
              ("tools/pdump", "dpdk-pdump",
               "enable packet capture on dpdk ports", "", 1),

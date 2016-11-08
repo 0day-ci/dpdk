@@ -614,7 +614,7 @@ F: app/test/virtual_pmd.h
 Driver testing tool
 M: Pablo de Lara <pablo.de.lara.guarch@intel.com>
 F: app/test-pmd/
-F: doc/guides/testpmd_app_ug/
+F: doc/guides/tools/testpmd/
 
 Dump tool
 M: Maryam Tahhan <maryam.tahhan@intel.com>

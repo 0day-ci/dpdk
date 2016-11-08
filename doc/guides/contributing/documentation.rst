@@ -31,7 +31,6 @@ The main directories that contain files related to documentation are shown below
        |-- prog_guide
        |-- sample_app_ug
        |-- guidelines
-       |-- testpmd_app_ug
        |-- rel_notes
        |-- nics
        |-- xen

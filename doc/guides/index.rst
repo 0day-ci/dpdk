@@ -42,7 +42,6 @@ DPDK documentation
    cryptodevs/index
    sample_app_ug/index
    tools/index
-   testpmd_app_ug/index
    faq/index
    howto/index
    rel_notes/index
