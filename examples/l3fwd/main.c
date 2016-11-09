@@ -906,6 +906,14 @@ main(int argc, char **argv)
 			n_tx_queue = MAX_TX_QUEUE_PER_PORT;
 		printf("Creating queues: nb_rxq=%d nb_txq=%u... ",
 			nb_rx_queue, (unsigned)n_tx_queue );
+		rte_eth_dev_info_get(portid, &dev_info);
+		if (dev_info.driver_name &&
+		    strcmp(dev_info.driver_name, "net_i40e_vf") == 0) {
+			/* i40evf require that CRC stripping is enabled. */
+			port_conf.rxmode.hw_strip_crc = 1;
+		} else {
+			port_conf.rxmode.hw_strip_crc = 0;
+		}
 		ret = rte_eth_dev_configure(portid, nb_rx_queue,
 					(uint16_t)n_tx_queue, &port_conf);
 		if (ret < 0)
@@ -946,7 +954,6 @@ main(int argc, char **argv)
 			printf("txq=%u,%d,%d ", lcore_id, queueid, socketid);
 			fflush(stdout);
 
-			rte_eth_dev_info_get(portid, &dev_info);
 			txconf = &dev_info.default_txconf;
 			if (port_conf.rxmode.jumbo_frame)
 				txconf->txq_flags = 0;
