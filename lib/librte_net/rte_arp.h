@@ -40,6 +40,7 @@
 
 #include <stdint.h>
 #include <rte_ether.h>
+#include <rte_byteorder.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,22 +51,22 @@ extern "C" {
  */
 struct arp_ipv4 {
 	struct ether_addr arp_sha;  /**< sender hardware address */
-	uint32_t          arp_sip;  /**< sender IP address */
+	rte_be32_t        arp_sip;  /**< sender IP address */
 	struct ether_addr arp_tha;  /**< target hardware address */
-	uint32_t          arp_tip;  /**< target IP address */
+	rte_be32_t        arp_tip;  /**< target IP address */
 } __attribute__((__packed__));
 
 /**
  * ARP header.
  */
 struct arp_hdr {
-	uint16_t arp_hrd;    /* format of hardware address */
+	rte_be16_t arp_hrd;  /* format of hardware address */
 #define ARP_HRD_ETHER     1  /* ARP Ethernet address format */
 
-	uint16_t arp_pro;    /* format of protocol address */
-	uint8_t  arp_hln;    /* length of hardware address */
-	uint8_t  arp_pln;    /* length of protocol address */
-	uint16_t arp_op;     /* ARP opcode (command) */
+	rte_be16_t arp_pro;  /* format of protocol address */
+	uint8_t    arp_hln;  /* length of hardware address */
+	uint8_t    arp_pln;  /* length of protocol address */
+	rte_be16_t arp_op;   /* ARP opcode (command) */
 #define	ARP_OP_REQUEST    1 /* request to resolve address */
 #define	ARP_OP_REPLY      2 /* response to previous request */
 #define	ARP_OP_REVREQUEST 3 /* request proto addr given hardware */

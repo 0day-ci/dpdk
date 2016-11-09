@@ -300,7 +300,7 @@ ether_format_addr(char *buf, uint16_t size,
 struct ether_hdr {
 	struct ether_addr d_addr; /**< Destination address. */
 	struct ether_addr s_addr; /**< Source address. */
-	uint16_t ether_type;      /**< Frame type. */
+	rte_be16_t ether_type;    /**< Frame type. */
 } __attribute__((__packed__));
 
 /**
@@ -309,8 +309,8 @@ struct ether_hdr {
  * of the encapsulated frame.
  */
 struct vlan_hdr {
-	uint16_t vlan_tci; /**< Priority (3) + CFI (1) + Identifier Code (12) */
-	uint16_t eth_proto;/**< Ethernet type of encapsulated frame. */
+	rte_be16_t vlan_tci; /**< Priority (3) + CFI (1) + Identifier Code (12) */
+	rte_be16_t eth_proto;/**< Ethernet type of encapsulated frame. */
 } __attribute__((__packed__));
 
 /**
@@ -319,8 +319,8 @@ struct vlan_hdr {
  * Reserved fields (24 bits and 8 bits)
  */
 struct vxlan_hdr {
-	uint32_t vx_flags; /**< flag (8) + Reserved (24). */
-	uint32_t vx_vni;   /**< VNI (24) + Reserved (8). */
+	rte_be32_t vx_flags; /**< flag (8) + Reserved (24). */
+	rte_be32_t vx_vni;   /**< VNI (24) + Reserved (8). */
 } __attribute__((__packed__));
 
 /* Ethernet frame types */

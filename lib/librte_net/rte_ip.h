@@ -93,14 +93,14 @@ extern "C" {
 struct ipv4_hdr {
 	uint8_t  version_ihl;		/**< version and header length */
 	uint8_t  type_of_service;	/**< type of service */
-	uint16_t total_length;		/**< length of packet */
-	uint16_t packet_id;		/**< packet ID */
-	uint16_t fragment_offset;	/**< fragmentation offset */
+	rte_be16_t total_length;	/**< length of packet */
+	rte_be16_t packet_id;		/**< packet ID */
+	rte_be16_t fragment_offset;	/**< fragmentation offset */
 	uint8_t  time_to_live;		/**< time to live */
 	uint8_t  next_proto_id;		/**< protocol ID */
-	uint16_t hdr_checksum;		/**< header checksum */
-	uint32_t src_addr;		/**< source address */
-	uint32_t dst_addr;		/**< destination address */
+	rte_be16_t hdr_checksum;	/**< header checksum */
+	rte_be32_t src_addr;		/**< source address */
+	rte_be32_t dst_addr;		/**< destination address */
 } __attribute__((__packed__));
 
 /** Create IPv4 address */
@@ -340,11 +340,11 @@ static inline uint16_t
 rte_ipv4_phdr_cksum(const struct ipv4_hdr *ipv4_hdr, uint64_t ol_flags)
 {
 	struct ipv4_psd_header {
-		uint32_t src_addr; /* IP address of source host. */
-		uint32_t dst_addr; /* IP address of destination host. */
-		uint8_t  zero;     /* zero. */
-		uint8_t  proto;    /* L4 protocol type. */
-		uint16_t len;      /* L4 length. */
+		rte_be32_t src_addr; /* IP address of source host. */
+		rte_be32_t dst_addr; /* IP address of destination host. */
+		uint8_t    zero;     /* zero. */
+		uint8_t    proto;    /* L4 protocol type. */
+		rte_be16_t len;      /* L4 length. */
 	} psd_hdr;
 
 	psd_hdr.src_addr = ipv4_hdr->src_addr;
@@ -398,12 +398,12 @@ rte_ipv4_udptcp_cksum(const struct ipv4_hdr *ipv4_hdr, const void *l4_hdr)
  * IPv6 Header
  */
 struct ipv6_hdr {
-	uint32_t vtc_flow;     /**< IP version, traffic class & flow label. */
-	uint16_t payload_len;  /**< IP packet length - includes sizeof(ip_header). */
-	uint8_t  proto;        /**< Protocol, next header. */
-	uint8_t  hop_limits;   /**< Hop limits. */
-	uint8_t  src_addr[16]; /**< IP address of source host. */
-	uint8_t  dst_addr[16]; /**< IP address of destination host(s). */
+	rte_be32_t vtc_flow;     /**< IP version, traffic class & flow label. */
+	rte_be16_t payload_len;  /**< IP packet length - includes sizeof(ip_header). */
+	uint8_t    proto;        /**< Protocol, next header. */
+	uint8_t    hop_limits;   /**< Hop limits. */
+	uint8_t    src_addr[16]; /**< IP address of source host. */
+	uint8_t    dst_addr[16]; /**< IP address of destination host(s). */
 } __attribute__((__packed__));
 
 /**
@@ -427,8 +427,8 @@ rte_ipv6_phdr_cksum(const struct ipv6_hdr *ipv6_hdr, uint64_t ol_flags)
 {
 	uint32_t sum;
 	struct {
-		uint32_t len;   /* L4 length. */
-		uint32_t proto; /* L4 protocol - top 3 bytes must be zero */
+		rte_be32_t len;   /* L4 length. */
+		rte_be32_t proto; /* L4 protocol - top 3 bytes must be zero */
 	} psd_hdr;
 
 	psd_hdr.proto = (ipv6_hdr->proto << 24);

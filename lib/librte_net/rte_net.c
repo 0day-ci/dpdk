@@ -153,8 +153,8 @@ ptype_inner_l4(uint8_t proto)
 
 /* get the tunnel packet type if any, update proto and off. */
 static uint32_t
-ptype_tunnel(uint16_t *proto, const struct rte_mbuf *m,
-	uint32_t *off)
+ptype_tunnel(rte_be16_t *proto, const struct rte_mbuf *m,
+	     uint32_t *off)
 {
 	switch (*proto) {
 	case IPPROTO_GRE: {
@@ -208,8 +208,8 @@ ip4_hlen(const struct ipv4_hdr *hdr)
 
 /* parse ipv6 extended headers, update offset and return next proto */
 static uint16_t
-skip_ip6_ext(uint16_t proto, const struct rte_mbuf *m, uint32_t *off,
-	int *frag)
+skip_ip6_ext(rte_be16_t proto, const struct rte_mbuf *m, uint32_t *off,
+	     int *frag)
 {
 	struct ext_hdr {
 		uint8_t next_hdr;
@@ -261,7 +261,7 @@ uint32_t rte_net_get_ptype(const struct rte_mbuf *m,
 	struct ether_hdr eh_copy;
 	uint32_t pkt_type = RTE_PTYPE_L2_ETHER;
 	uint32_t off = 0;
-	uint16_t proto;
+	rte_be16_t proto;
 
 	if (hdr_lens == NULL)
 		hdr_lens = &local_hdr_lens;

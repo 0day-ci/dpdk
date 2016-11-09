@@ -77,6 +77,7 @@
  */
 
 #include <stdint.h>
+#include <rte_byteorder.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -86,15 +87,15 @@ extern "C" {
  * TCP Header
  */
 struct tcp_hdr {
-	uint16_t src_port;  /**< TCP source port. */
-	uint16_t dst_port;  /**< TCP destination port. */
-	uint32_t sent_seq;  /**< TX data sequence number. */
-	uint32_t recv_ack;  /**< RX data acknowledgement sequence number. */
-	uint8_t  data_off;  /**< Data offset. */
-	uint8_t  tcp_flags; /**< TCP flags */
-	uint16_t rx_win;    /**< RX flow control window. */
-	uint16_t cksum;     /**< TCP checksum. */
-	uint16_t tcp_urp;   /**< TCP urgent pointer, if any. */
+	rte_be16_t src_port;  /**< TCP source port. */
+	rte_be16_t dst_port;  /**< TCP destination port. */
+	rte_be32_t sent_seq;  /**< TX data sequence number. */
+	rte_be32_t recv_ack;  /**< RX data acknowledgement sequence number. */
+	uint8_t    data_off;  /**< Data offset. */
+	uint8_t    tcp_flags; /**< TCP flags */
+	rte_be16_t rx_win;    /**< RX flow control window. */
+	rte_be16_t cksum;     /**< TCP checksum. */
+	rte_be16_t tcp_urp;   /**< TCP urgent pointer, if any. */
 } __attribute__((__packed__));
 
 #ifdef __cplusplus
