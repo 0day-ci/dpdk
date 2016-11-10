@@ -1273,6 +1273,29 @@ rte_mempool_lookup(const char *name)
 		return NULL;
 	}
 
+	/* Sanity check : secondary may have initialised less mempools
+	 * than primary due to linker and constructor magic. Or maybe
+	 * there is a mempool corruption or bug. In any case, we can't
+	 * go on, we will segfault in an obscure way.
+	 * This does not detect the cases where the constructor order
+	 * is different between primary and secondary or where the
+	 * index points to the wrong ops. This would require more
+	 * extensive changes, and is much less likely. Jean II */
+	if (mp->ops_index >= (int32_t) rte_mempool_ops_table.num_ops) {
+		unsigned i;
+		/* Dump list of mempool ops for further investigation.
+		 * In most cases, list is empty... */
+		for (i = 0; i < rte_mempool_ops_table.num_ops; i++) {
+			RTE_LOG(ERR, EAL, "Registered mempool[%d] is %s\n",
+				i, rte_mempool_ops_table.ops[i].name);
+		}
+		/* Do not dump mempool list itself, it will segfault. */
+		rte_panic("Cannot find ops for mempool, ops_index %d, "
+			  "num_ops %d - maybe due to build process or "
+			  "linker configuration\n",
+			  mp->ops_index, rte_mempool_ops_table.num_ops);
+	}
+
 	return mp;
 }
 
