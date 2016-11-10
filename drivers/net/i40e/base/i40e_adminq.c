@@ -832,6 +832,7 @@ enum i40e_status_code i40e_asq_send_command(struct i40e_hw *hw,
 	}
 
 	val = rd32(hw, hw->aq.asq.head);
+	rte_rmb();
 	if (val >= hw->aq.num_asq_entries) {
 		i40e_debug(hw, I40E_DEBUG_AQ_MESSAGE,
 			   "AQTX: head overrun at %d\n", val);
@@ -929,8 +930,10 @@ enum i40e_status_code i40e_asq_send_command(struct i40e_hw *hw,
 	(hw->aq.asq.next_to_use)++;
 	if (hw->aq.asq.next_to_use == hw->aq.asq.count)
 		hw->aq.asq.next_to_use = 0;
-	if (!details->postpone)
+	if (!details->postpone) {
 		wr32(hw, hw->aq.asq.tail, hw->aq.asq.next_to_use);
+		rte_wmb();
+	}
 
 	/* if cmd_details are not defined or async flag is not set,
 	 * we need to wait for desc write back
