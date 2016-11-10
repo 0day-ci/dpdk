@@ -104,4 +104,6 @@ uint16_t virtio_xmit_pkts_simple(void *tx_queue, struct rte_mbuf **tx_pkts,
 
 int eth_virtio_dev_init(struct rte_eth_dev *eth_dev);
 
+extern struct rte_vdev_driver virtio_user_driver;
+
 #endif /* _VIRTIO_ETHDEV_H_ */

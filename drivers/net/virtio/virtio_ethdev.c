@@ -52,6 +52,7 @@
 #include <rte_memory.h>
 #include <rte_eal.h>
 #include <rte_dev.h>
+#include <rte_vdev.h>
 
 #include "virtio_ethdev.h"
 #include "virtio_pci.h"
@@ -1210,7 +1211,10 @@ virtio_init_device(struct rte_eth_dev *eth_dev, uint64_t req_features)
 	else
 		eth_dev->data->dev_flags |= RTE_ETH_DEV_INTR_LSC;
 
-	rte_eth_copy_pci_info(eth_dev, pci_dev);
+	if (pci_dev)
+		rte_eth_copy_pci_info(eth_dev, pci_dev);
+	else
+		eth_dev->data->drv_name = virtio_user_driver.driver.name;
 
 	rx_func_get(eth_dev);
 

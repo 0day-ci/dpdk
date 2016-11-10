@@ -473,7 +473,7 @@ virtio_user_pmd_remove(const char *name)
 	return 0;
 }
 
-static struct rte_vdev_driver virtio_user_driver = {
+struct rte_vdev_driver virtio_user_driver = {
 	.probe = virtio_user_pmd_probe,
 	.remove = virtio_user_pmd_remove,
 };
