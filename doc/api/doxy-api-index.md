@@ -140,7 +140,8 @@ There are many libraries, so their headers may be grouped by topics:
   [debug]              (@ref rte_debug.h),
   [log]                (@ref rte_log.h),
   [warnings]           (@ref rte_warnings.h),
-  [errno]              (@ref rte_errno.h)
+  [errno]              (@ref rte_errno.h),
+  [pdump]              (@ref rte_pdump.h)
 
 - **misc**:
   [EAL config]         (@ref rte_eal.h),
