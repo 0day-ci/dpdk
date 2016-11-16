@@ -1,0 +1,33 @@
+DPDK_17.02 {
+	global:
+
+	rte_event_dequeue;
+	rte_event_dequeue_burst;
+
+	rte_event_dev_close;
+	rte_event_dev_configure;
+	rte_event_dev_count;
+	rte_event_dev_get_dev_id;
+	rte_event_dev_info_get;
+	rte_event_dev_register;
+	rte_event_dev_socket_id;
+	rte_event_dev_start;
+	rte_event_dev_stop;
+
+	rte_event_enqueue;
+	rte_event_enqueue_burst;
+
+	rte_event_port_count;
+	rte_event_port_link;
+	rte_event_port_setup;
+	rte_event_port_unlink;
+
+	rte_event_queue_setup;
+	rte_event_queue_count;
+
+	rte_event_release;
+	rte_event_run;
+	rte_event_schedule;
+
+	local: *;
+};
