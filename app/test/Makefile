@@ -197,6 +197,9 @@ SRCS-$(CONFIG_RTE_LIBRTE_CRYPTODEV) += test_cryptodev_blockcipher.c
 SRCS-$(CONFIG_RTE_LIBRTE_CRYPTODEV) += test_cryptodev_perf.c
 SRCS-$(CONFIG_RTE_LIBRTE_CRYPTODEV) += test_cryptodev.c
 
+SRCS-$(CONFIG_RTE_LIBRTE_EVENTDEV) += test_eventdev_unit.c
+SRCS-$(CONFIG_RTE_LIBRTE_EVENTDEV) += test_eventdev_func.c
+
 SRCS-$(CONFIG_RTE_LIBRTE_KVARGS) += test_kvargs.c
 
 CFLAGS += -O3
