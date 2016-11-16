@@ -99,6 +99,9 @@ enum index {
 	ITEM_END,
 	ITEM_VOID,
 	ITEM_INVERT,
+	ITEM_ANY,
+	ITEM_ANY_MIN,
+	ITEM_ANY_MAX,
 
 	/* Validate/create actions. */
 	ACTIONS,
@@ -295,6 +298,14 @@ static const enum index next_item[] = {
 	ITEM_END,
 	ITEM_VOID,
 	ITEM_INVERT,
+	ITEM_ANY,
+	0,
+};
+
+static const enum index item_any[] = {
+	ITEM_ANY_MIN,
+	ITEM_ANY_MAX,
+	ITEM_NEXT,
 	0,
 };
 
@@ -578,6 +589,25 @@ static const struct token token_list[] = {
 		.priv = PRIV_ITEM(INVERT, 0),
 		.next = NEXT(NEXT_ENTRY(ITEM_NEXT)),
 		.call = parse_vc,
+	},
+	[ITEM_ANY] = {
+		.name = "any",
+		.help = "match any protocol for the current layer",
+		.priv = PRIV_ITEM(ANY, sizeof(struct rte_flow_item_any)),
+		.next = NEXT(item_any),
+		.call = parse_vc,
+	},
+	[ITEM_ANY_MIN] = {
+		.name = "min",
+		.help = "minimum number of layers covered",
+		.next = NEXT(item_any, NEXT_ENTRY(UNSIGNED), item_param),
+		.args = ARGS(ARGS_ENTRY(struct rte_flow_item_any, min)),
+	},
+	[ITEM_ANY_MAX] = {
+		.name = "max",
+		.help = "maximum number of layers covered, 0 for infinity",
+		.next = NEXT(item_any, NEXT_ENTRY(UNSIGNED), item_param),
+		.args = ARGS(ARGS_ENTRY(struct rte_flow_item_any, max)),
 	},
 	/* Validate/create actions. */
 	[ACTIONS] = {
