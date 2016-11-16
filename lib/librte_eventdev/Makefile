@@ -1,6 +1,6 @@
 #   BSD LICENSE
 #
-#   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+#   Copyright(c) 2016 Intel Corporation. All rights reserved.
 #   All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or without
@@ -31,8 +31,24 @@
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DIRS-y += net
-DIRS-$(CONFIG_RTE_LIBRTE_CRYPTODEV) += crypto
-DIRS-$(CONFIG_RTE_LIBRTE_EVENTDEV) += event
+# library name
+LIB = librte_eventdev.a
 
-include $(RTE_SDK)/mk/rte.subdir.mk
+CFLAGS += -O3
+CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR)
+
+EXPORT_MAP := rte_eventdev_version.map
+
+LIBABIVER := 1
+
+# all source are stored in SRCS-y
+SRCS-$(CONFIG_RTE_LIBRTE_EVENTDEV) := rte_eventdev.c
+
+# install this header file
+SYMLINK-$(CONFIG_RTE_LIBRTE_EVENTDEV)-include := rte_eventdev.h rte_eventdev_pmd.h rte_eventdev_ops.h
+
+# this lib depends upon:
+DEPDIRS-$(CONFIG_RTE_LIBRTE_EVENTDEV) += lib/librte_eal
+DEPDIRS-$(CONFIG_RTE_LIBRTE_EVENTDEV) += lib/librte_kvargs
+
+include $(RTE_SDK)/mk/rte.lib.mk

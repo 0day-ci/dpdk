@@ -38,6 +38,7 @@ extern "C" {
 #endif
 
 #include <sys/queue.h>
+#include <rte_eal.h>
 #include <rte_dev.h>
 
 /** Double linked list of virtual device drivers. */

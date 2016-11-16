@@ -58,6 +58,7 @@ DIRS-$(CONFIG_RTE_LIBRTE_TABLE) += librte_table
 DIRS-$(CONFIG_RTE_LIBRTE_PIPELINE) += librte_pipeline
 DIRS-$(CONFIG_RTE_LIBRTE_REORDER) += librte_reorder
 DIRS-$(CONFIG_RTE_LIBRTE_PDUMP) += librte_pdump
+DIRS-$(CONFIG_RTE_LIBRTE_EVENTDEV) += librte_eventdev
 
 ifeq ($(CONFIG_RTE_EXEC_ENV_LINUXAPP),y)
 DIRS-$(CONFIG_RTE_LIBRTE_KNI) += librte_kni

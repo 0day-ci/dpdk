@@ -1,6 +1,6 @@
 #   BSD LICENSE
 #
-#   Copyright(c) 2010-2015 Intel Corporation. All rights reserved.
+#   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
 #   All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or without
@@ -30,9 +30,5 @@
 #   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 include $(RTE_SDK)/mk/rte.vars.mk
-
-DIRS-y += net
-DIRS-$(CONFIG_RTE_LIBRTE_CRYPTODEV) += crypto
-DIRS-$(CONFIG_RTE_LIBRTE_EVENTDEV) += event
 
 include $(RTE_SDK)/mk/rte.subdir.mk
