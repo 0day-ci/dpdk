@@ -31,4 +31,6 @@
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
+DIRS-$(CONFIG_RTE_LIBRTE_PMD_EVDEV_SW) += sw
+
 include $(RTE_SDK)/mk/rte.subdir.mk
