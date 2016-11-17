@@ -71,3 +71,9 @@ Deprecation Notices
 * mempool: The functions for single/multi producer/consumer are deprecated
   and will be removed in 17.02.
   It is replaced by ``rte_mempool_generic_get/put`` functions.
+
+* kni: Remove :ref:`kni_vhost_backend-label` feature (KNI_VHOST) in 17.05 release.
+  :doc:`Vhost Library </prog_guide/vhost_lib>` is currently preferred method for
+  guest - host communication. Just for clarification, this is not to remove KNI
+  or VHOST feature, but KNI_VHOST which is a KNI feature enabled via a compile
+  time option, and disabled by default.
