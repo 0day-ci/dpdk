@@ -324,6 +324,8 @@ static int i40e_dev_queue_stats_mapping_set(struct rte_eth_dev *dev,
 					    uint16_t queue_id,
 					    uint8_t stat_idx,
 					    uint8_t is_rx);
+static void i40e_fw_version_get(struct rte_eth_dev *dev,
+				char *fw_version, int fw_length);
 static void i40e_dev_info_get(struct rte_eth_dev *dev,
 			      struct rte_eth_dev_info *dev_info);
 static int i40e_vlan_filter_set(struct rte_eth_dev *dev,
@@ -503,6 +505,7 @@ static const struct eth_dev_ops i40e_eth_dev_ops = {
 	.stats_reset                  = i40e_dev_stats_reset,
 	.xstats_reset                 = i40e_dev_stats_reset,
 	.queue_stats_mapping_set      = i40e_dev_queue_stats_mapping_set,
+	.fw_version_get               = i40e_fw_version_get,
 	.dev_infos_get                = i40e_dev_info_get,
 	.dev_supported_ptypes_get     = i40e_dev_supported_ptypes_get,
 	.vlan_filter_set              = i40e_vlan_filter_set,
@@ -2574,6 +2577,18 @@ i40e_dev_queue_stats_mapping_set(__rte_unused struct rte_eth_dev *dev,
 	PMD_INIT_FUNC_TRACE();
 
 	return -ENOSYS;
+}
+
+static void
+i40e_fw_version_get(struct rte_eth_dev *dev, char *fw_version, int fw_length)
+{
+	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+
+	snprintf(fw_version, fw_length,
+		 "%d.%d%d 0x%04x",
+		 ((hw->nvm.version >> 12) & 0xf),
+		 ((hw->nvm.version >> 4) & 0xff),
+		 (hw->nvm.version & 0xf), hw->nvm.eetrack);
 }
 
 static void
