@@ -54,6 +54,9 @@ rte_ethtool_get_drvinfo(uint8_t port_id, struct ethtool_drvinfo *drvinfo)
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
+	rte_eth_dev_fwver_get(port_id, drvinfo->fw_version,
+			      sizeof(drvinfo->fw_version));
+
 	memset(&dev_info, 0, sizeof(dev_info));
 	rte_eth_dev_info_get(port_id, &dev_info);
 
