@@ -148,6 +148,10 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ZUC)         += -lrte_pmd_zuc
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ZUC)         += -L$(LIBSSO_ZUC_PATH)/build -lsso_zuc
 endif # CONFIG_RTE_LIBRTE_CRYPTODEV
 
+ifeq ($(CONFIG_RTE_LIBRTE_EVENTDEV),y)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SKELETON_EVENTDEV) += -lrte_pmd_skeleton_event
+endif # CONFIG_RTE_LIBRTE_EVENTDEV
+
 endif # !CONFIG_RTE_BUILD_SHARED_LIBS
 
 _LDLIBS-y += --no-whole-archive
