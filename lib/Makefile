@@ -60,6 +60,7 @@ DIRS-$(CONFIG_RTE_LIBRTE_REORDER) += librte_reorder
 DIRS-$(CONFIG_RTE_LIBRTE_PDUMP) += librte_pdump
 DIRS-$(CONFIG_RTE_LIBRTE_METRICS) += librte_metrics
 DIRS-$(CONFIG_RTE_LIBRTE_BITRATE) += librte_bitratestats
+DIRS-$(CONFIG_RTE_LIBRTE_LATENCY_STATS) += librte_latencystats
 
 ifeq ($(CONFIG_RTE_EXEC_ENV_LINUXAPP),y)
 DIRS-$(CONFIG_RTE_LIBRTE_KNI) += librte_kni

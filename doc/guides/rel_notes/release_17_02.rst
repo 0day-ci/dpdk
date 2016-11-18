@@ -49,6 +49,10 @@ New Features
      Also, make sure to start the actual text at the margin.
      =========================================================
 
+* **Added latency stats library.**
+  A library that facilitates latency stats measurment of the dpdk based applications.
+  The library measures minimum, average, maximum latencies and also jitter
+  in nano seconds.
 
 Resolved Issues
 ---------------
@@ -160,6 +164,7 @@ The libraries prepended with a plus sign were incremented in this version.
      librte_jobstats.so.1
      librte_kni.so.2
      librte_kvargs.so.1
+   + librte_latencystats.so.1
      librte_lpm.so.2
      librte_mbuf.so.2
      librte_mempool.so.2
