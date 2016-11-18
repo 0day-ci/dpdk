@@ -140,6 +140,8 @@ bond_ethdev_rx_burst_8023ad(void *queue, struct rte_mbuf **bufs,
 	uint8_t collecting;  /* current slave collecting status */
 	const uint8_t promisc = internals->promiscuous_en;
 	uint8_t i, j, k;
+	int slave_qid, bond_qid = bd_rx_q->queue_id;
+	int queue_num = internals->nb_rx_queues;
 
 	rte_eth_macaddr_get(internals->port_id, &bond_mac);
 	/* Copy slave list to protect against slave up/down changes during tx
@@ -153,7 +155,9 @@ bond_ethdev_rx_burst_8023ad(void *queue, struct rte_mbuf **bufs,
 		collecting = ACTOR_STATE(&mode_8023ad_ports[slaves[i]], COLLECTING);
 
 		/* Read packets from this slave */
-		num_rx_total += rte_eth_rx_burst(slaves[i], bd_rx_q->queue_id,
+		slave_qid = queue_num ? (bond_qid + slaves[i]) % queue_num :
+				bond_qid;
+		num_rx_total += rte_eth_rx_burst(slaves[i], slave_qid,
 				&bufs[num_rx_total], nb_pkts - num_rx_total);
 
 		for (k = j; k < 2 && k < num_rx_total; k++)
