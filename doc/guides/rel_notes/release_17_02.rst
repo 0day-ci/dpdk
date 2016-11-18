@@ -34,6 +34,12 @@ New Features
 
      Refer to the previous release notes for examples.
 
+   * **Added information metric library.**
+
+     A library that allows information metrics to be added and update. It is
+     intended to provide a reporting mechanism that is independent of the
+     ethdev library.
+
      This section is a comment. do not overwrite or remove it.
      Also, make sure to start the actual text at the margin.
      =========================================================
@@ -152,6 +158,7 @@ The libraries prepended with a plus sign were incremented in this version.
      librte_mbuf.so.2
      librte_mempool.so.2
      librte_meter.so.1
+   + librte_metrics.so.1
      librte_net.so.1
      librte_pdump.so.1
      librte_pipeline.so.3

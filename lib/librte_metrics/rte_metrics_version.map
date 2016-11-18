@@ -1,0 +1,13 @@
+DPDK_17.02 {
+	global:
+
+	rte_metrics_get_names;
+	rte_metrics_get_values;
+	rte_metrics_init;
+	rte_metrics_reg_metric;
+	rte_metrics_reg_metrics;
+	rte_metrics_update_metric;
+	rte_metrics_update_metrics;
+
+	local: *;
+};
