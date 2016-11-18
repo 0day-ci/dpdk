@@ -78,6 +78,10 @@
 #ifdef RTE_LIBRTE_PDUMP
 #include <rte_pdump.h>
 #endif
+#include <rte_metrics.h>
+#ifdef RTE_LIBRTE_BITRATE
+#include <rte_bitrate.h>
+#endif
 
 #include "testpmd.h"
 
@@ -321,6 +325,9 @@ uint16_t nb_tx_queue_stats_mappings = 0;
 uint16_t nb_rx_queue_stats_mappings = 0;
 
 unsigned max_socket = 0;
+
+/* Bitrate statistics */
+struct rte_stats_bitrates_s *bitrate_data;
 
 /* Forward function declarations */
 static void map_port_queue_stats_mapping_registers(uint8_t pi, struct rte_port *port);
@@ -921,12 +928,32 @@ run_pkt_fwd_on_lcore(struct fwd_lcore *fc, packet_fwd_t pkt_fwd)
 	struct fwd_stream **fsm;
 	streamid_t nb_fs;
 	streamid_t sm_id;
+#ifdef RTE_LIBRTE_BITRATE
+	uint64_t tics_per_1sec;
+	uint64_t tics_datum;
+	uint64_t tics_current;
+	uint8_t idx_port, cnt_ports;
+#endif
 
+#ifdef RTE_LIBRTE_BITRATE
+	cnt_ports = rte_eth_dev_count();
+	tics_datum = rte_rdtsc();
+	tics_per_1sec = rte_get_timer_hz();
+#endif
 	fsm = &fwd_streams[fc->stream_idx];
 	nb_fs = fc->stream_nb;
 	do {
 		for (sm_id = 0; sm_id < nb_fs; sm_id++)
 			(*pkt_fwd)(fsm[sm_id]);
+#ifdef RTE_LIBRTE_BITRATE
+		tics_current = rte_rdtsc();
+		if (tics_current - tics_datum >= tics_per_1sec) {
+			/* Periodic bitrate calculation */
+			for (idx_port = 0; idx_port < cnt_ports; idx_port++)
+				rte_stats_bitrate_calc(bitrate_data, idx_port);
+			tics_datum = tics_current;
+		}
+#endif
 	} while (! fc->stopped);
 }
 
@@ -2132,6 +2159,15 @@ main(int argc, char** argv)
 	/* set all ports to promiscuous mode by default */
 	FOREACH_PORT(port_id, ports)
 		rte_eth_promiscuous_enable(port_id);
+
+	/* Setup bitrate stats */
+#ifdef RTE_LIBRTE_BITRATE
+	bitrate_data = rte_stats_bitrate_create();
+	if (bitrate_data == NULL)
+		rte_exit(EXIT_FAILURE, "Could not allocate bitrate data.\n");
+	rte_stats_bitrate_reg(bitrate_data);
+#endif
+
 
 #ifdef RTE_LIBRTE_CMDLINE
 	if (interactive == 1) {
