@@ -252,6 +252,7 @@ F: examples/l2fwd-crypto/
 Eventdev API - EXPERIMENTAL
 M: Jerin Jacob <jerin.jacob@caviumnetworks.com>
 F: lib/librte_eventdev/
+F: app/test/test_eventdev*
 F: drivers/event/skeleton/
 
 Networking Drivers
