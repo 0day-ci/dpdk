@@ -600,6 +600,10 @@ M: Remy Horton <remy.horton@intel.com>
 F: lib/librte_metrics/
 F: doc/guides/sample_app_ug/keep_alive.rst
 
+Bit-rate statistica
+M: Remy Horton <remy.horton@intel.com>
+F: lib/librte_bitratestats/
+
 
 Test Applications
 -----------------
