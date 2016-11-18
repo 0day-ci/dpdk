@@ -249,6 +249,9 @@ F: lib/librte_cryptodev/
 F: app/test/test_cryptodev*
 F: examples/l2fwd-crypto/
 
+Eventdev API - EXPERIMENTAL
+M: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+F: lib/librte_eventdev/
 
 Networking Drivers
 ------------------

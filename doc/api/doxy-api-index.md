@@ -40,6 +40,7 @@ There are many libraries, so their headers may be grouped by topics:
   [ethdev]             (@ref rte_ethdev.h),
   [ethctrl]            (@ref rte_eth_ctrl.h),
   [cryptodev]          (@ref rte_cryptodev.h),
+  [eventdev]           (@ref rte_eventdev.h),
   [devargs]            (@ref rte_devargs.h),
   [bond]               (@ref rte_eth_bond.h),
   [vhost]              (@ref rte_virtio_net.h),
