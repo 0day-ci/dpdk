@@ -160,6 +160,8 @@ struct rte_pci_device {
 	enum rte_kernel_driver kdrv;            /**< Kernel driver passthrough */
 };
 
+#define ETH_DEV_PCI_DEV(ptr) ((ptr)->pci_dev)
+
 /** Any PCI device identifier (vendor, device, ...) */
 #define PCI_ANY_ID (0xffff)
 #define RTE_CLASS_ANY_ID (0xffffff)
