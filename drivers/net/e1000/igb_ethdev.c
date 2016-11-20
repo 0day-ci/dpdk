@@ -672,11 +672,11 @@ igb_identify_hardware(struct rte_eth_dev *dev)
 {
 	struct e1000_hw *hw =
 		E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
-
-	hw->vendor_id = dev->pci_dev->id.vendor_id;
-	hw->device_id = dev->pci_dev->id.device_id;
-	hw->subsystem_vendor_id = dev->pci_dev->id.subsystem_vendor_id;
-	hw->subsystem_device_id = dev->pci_dev->id.subsystem_device_id;
+	struct rte_pci_device *pci_dev = ETH_DEV_PCI_DEV(dev);
+	hw->vendor_id = pci_dev->id.vendor_id;
+	hw->device_id = pci_dev->id.device_id;
+	hw->subsystem_vendor_id = pci_dev->id.subsystem_vendor_id;
+	hw->subsystem_device_id = pci_dev->id.subsystem_device_id;
 
 	e1000_set_mac_type(hw);
 
@@ -755,7 +755,7 @@ eth_igb_dev_init(struct rte_eth_dev *eth_dev)
 
 	uint32_t ctrl_ext;
 
-	pci_dev = eth_dev->pci_dev;
+	pci_dev = ETH_DEV_PCI_DEV(eth_dev);
 
 	eth_dev->dev_ops = &eth_igb_ops;
 	eth_dev->rx_pkt_burst = &eth_igb_recv_pkts;
@@ -918,7 +918,7 @@ eth_igb_dev_uninit(struct rte_eth_dev *eth_dev)
 		return -EPERM;
 
 	hw = E1000_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
-	pci_dev = eth_dev->pci_dev;
+	pci_dev = ETH_DEV_PCI_DEV(eth_dev);
 
 	if (adapter->stopped == 0)
 		eth_igb_close(eth_dev);
@@ -973,7 +973,7 @@ eth_igbvf_dev_init(struct rte_eth_dev *eth_dev)
 		return 0;
 	}
 
-	pci_dev = eth_dev->pci_dev;
+	pci_dev = ETH_DEV_PCI_DEV(eth_dev);
 
 	rte_eth_copy_pci_info(eth_dev, pci_dev);
 
@@ -1050,7 +1050,7 @@ eth_igbvf_dev_uninit(struct rte_eth_dev *eth_dev)
 {
 	struct e1000_adapter *adapter =
 		E1000_DEV_PRIVATE(eth_dev->data->dev_private);
-	struct rte_pci_device *pci_dev = eth_dev->pci_dev;
+	struct rte_pci_device *pci_dev = ETH_DEV_PCI_DEV(eth_dev);
 
 	PMD_INIT_FUNC_TRACE();
 
@@ -1217,7 +1217,8 @@ eth_igb_start(struct rte_eth_dev *dev)
 		E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct e1000_adapter *adapter =
 		E1000_DEV_PRIVATE(dev->data->dev_private);
-	struct rte_intr_handle *intr_handle = &dev->pci_dev->intr_handle;
+	struct rte_intr_handle *intr_handle =
+		&ETH_DEV_PCI_DEV(dev)->intr_handle;
 	int ret, mask;
 	uint32_t intr_vector = 0;
 	uint32_t ctrl_ext;
@@ -1429,7 +1430,8 @@ eth_igb_stop(struct rte_eth_dev *dev)
 	struct e1000_flex_filter *p_flex;
 	struct e1000_5tuple_filter *p_5tuple, *p_5tuple_next;
 	struct e1000_2tuple_filter *p_2tuple, *p_2tuple_next;
-	struct rte_intr_handle *intr_handle = &dev->pci_dev->intr_handle;
+	struct rte_intr_handle *intr_handle =
+		&ETH_DEV_PCI_DEV(dev)->intr_handle;
 
 	igb_intr_disable(hw);
 
@@ -1549,7 +1551,7 @@ eth_igb_close(struct rte_eth_dev *dev)
 
 	igb_dev_free_queues(dev);
 
-	pci_dev = dev->pci_dev;
+	pci_dev = ETH_DEV_PCI_DEV(dev);
 	if (pci_dev->intr_handle.intr_vec) {
 		rte_free(pci_dev->intr_handle.intr_vec);
 		pci_dev->intr_handle.intr_vec = NULL;
@@ -2639,6 +2641,7 @@ eth_igb_interrupt_action(struct rte_eth_dev *dev)
 		E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct e1000_interrupt *intr =
 		E1000_DEV_PRIVATE_TO_INTR(dev->data->dev_private);
+	struct rte_pci_device *pci_dev = ETH_DEV_PCI_DEV(dev);
 	uint32_t tctl, rctl;
 	struct rte_eth_link link;
 	int ret;
@@ -2649,7 +2652,7 @@ eth_igb_interrupt_action(struct rte_eth_dev *dev)
 	}
 
 	igb_intr_enable(dev);
-	rte_intr_enable(&(dev->pci_dev->intr_handle));
+	rte_intr_enable(&pci_dev->intr_handle);
 
 	if (intr->flags & E1000_FLAG_NEED_LINK_UPDATE) {
 		intr->flags &= ~E1000_FLAG_NEED_LINK_UPDATE;
@@ -2677,10 +2680,10 @@ eth_igb_interrupt_action(struct rte_eth_dev *dev)
 		}
 
 		PMD_INIT_LOG(DEBUG, "PCI Address: %04d:%02d:%02d:%d",
-			     dev->pci_dev->addr.domain,
-			     dev->pci_dev->addr.bus,
-			     dev->pci_dev->addr.devid,
-			     dev->pci_dev->addr.function);
+			     pci_dev->addr.domain,
+			     pci_dev->addr.bus,
+			     pci_dev->addr.devid,
+			     pci_dev->addr.function);
 		tctl = E1000_READ_REG(hw, E1000_TCTL);
 		rctl = E1000_READ_REG(hw, E1000_RCTL);
 		if (link.link_status) {
@@ -2770,7 +2773,7 @@ eth_igbvf_interrupt_action(struct rte_eth_dev *dev)
 	}
 
 	igbvf_intr_enable(dev);
-	rte_intr_enable(&dev->pci_dev->intr_handle);
+	rte_intr_enable(&ETH_DEV_PCI_DEV(dev)->intr_handle);
 
 	return 0;
 }
@@ -3056,7 +3059,8 @@ igbvf_dev_start(struct rte_eth_dev *dev)
 	struct e1000_adapter *adapter =
 		E1000_DEV_PRIVATE(dev->data->dev_private);
 	int ret;
-	struct rte_intr_handle *intr_handle = &dev->pci_dev->intr_handle;
+	struct rte_intr_handle *intr_handle =
+		&ETH_DEV_PCI_DEV(dev)->intr_handle;
 	uint32_t intr_vector = 0;
 
 	PMD_INIT_FUNC_TRACE();
@@ -3110,7 +3114,8 @@ igbvf_dev_start(struct rte_eth_dev *dev)
 static void
 igbvf_dev_stop(struct rte_eth_dev *dev)
 {
-	struct rte_intr_handle *intr_handle = &dev->pci_dev->intr_handle;
+	struct rte_intr_handle *intr_handle =
+		&ETH_DEV_PCI_DEV(dev)->intr_handle;
 
 	PMD_INIT_FUNC_TRACE();
 
@@ -5102,7 +5107,7 @@ eth_igb_rx_queue_intr_enable(struct rte_eth_dev *dev, uint16_t queue_id)
 	E1000_WRITE_REG(hw, E1000_EIMS, regval | mask);
 	E1000_WRITE_FLUSH(hw);
 
-	rte_intr_enable(&dev->pci_dev->intr_handle);
+	rte_intr_enable(&ETH_DEV_PCI_DEV(dev)->intr_handle);
 
 	return 0;
 }
@@ -5167,7 +5172,8 @@ eth_igb_configure_msix_intr(struct rte_eth_dev *dev)
 	uint32_t base = E1000_MISC_VEC_ID;
 	uint32_t misc_shift = 0;
 
-	struct rte_intr_handle *intr_handle = &dev->pci_dev->intr_handle;
+	struct rte_intr_handle *intr_handle =
+		&ETH_DEV_PCI_DEV(dev)->intr_handle;
 
 	/* won't configure msix register if no mapping is done
 	 * between intr vector and event fd
