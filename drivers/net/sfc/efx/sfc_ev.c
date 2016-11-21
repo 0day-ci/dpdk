@@ -213,6 +213,19 @@ sfc_ev_qpoll(struct sfc_evq *evq)
 	/* Poll-mode driver does not re-prime the event queue for interrupts */
 }
 
+void
+sfc_ev_mgmt_qpoll(struct sfc_adapter *sa)
+{
+	if (rte_spinlock_trylock(&sa->mgmt_evq_lock)) {
+		struct sfc_evq *mgmt_evq = sa->evq_info[sa->mgmt_evq_index].evq;
+
+		if (mgmt_evq->init_state == SFC_EVQ_STARTED)
+			sfc_ev_qpoll(mgmt_evq);
+
+		rte_spinlock_unlock(&sa->mgmt_evq_lock);
+	}
+}
+
 int
 sfc_ev_qprime(struct sfc_evq *evq)
 {
@@ -324,12 +337,25 @@ sfc_ev_start(struct sfc_adapter *sa)
 	if (rc != 0)
 		goto fail_ev_init;
 
+	/* Start management EVQ used for global events */
+	rte_spinlock_lock(&sa->mgmt_evq_lock);
+
+	rc = sfc_ev_qstart(sa, sa->mgmt_evq_index);
+	if (rc != 0)
+		goto fail_mgmt_evq_start;
+
+	rte_spinlock_unlock(&sa->mgmt_evq_lock);
+
 	/*
-	 * Rx/Tx event queues are started/stopped when corresponding queue
-	 * is started/stopped.
+	 * Rx/Tx event queues are started/stopped when corresponding
+	 * Rx/Tx queue is started/stopped.
 	 */
 
 	return 0;
+
+fail_mgmt_evq_start:
+	rte_spinlock_unlock(&sa->mgmt_evq_lock);
+	efx_ev_fini(sa->nic);
 
 fail_ev_init:
 	sfc_log_init(sa, "failed %d", rc);
@@ -345,8 +371,17 @@ sfc_ev_stop(struct sfc_adapter *sa)
 
 	/* Make sure that all event queues are stopped */
 	sw_index = sa->evq_count;
-	while (--sw_index >= 0)
-		sfc_ev_qstop(sa, sw_index);
+	while (--sw_index >= 0) {
+		if (sw_index == sa->mgmt_evq_index) {
+			/* Locks are required for the management EVQ */
+			rte_spinlock_lock(&sa->mgmt_evq_lock);
+			sfc_ev_qstop(sa, sa->mgmt_evq_index);
+			rte_spinlock_unlock(&sa->mgmt_evq_lock);
+		} else {
+			sfc_ev_qstop(sa, sw_index);
+		}
+	}
+
 
 	efx_ev_fini(sa->nic);
 }
@@ -444,6 +479,7 @@ sfc_ev_init(struct sfc_adapter *sa)
 
 	sa->evq_count = sfc_ev_qcount(sa);
 	sa->mgmt_evq_index = 0;
+	rte_spinlock_init(&sa->mgmt_evq_lock);
 
 	/* Allocate EVQ info array */
 	rc = ENOMEM;
@@ -459,6 +495,11 @@ sfc_ev_init(struct sfc_adapter *sa)
 			goto fail_ev_qinit_info;
 	}
 
+	rc = sfc_ev_qinit(sa, sa->mgmt_evq_index, SFC_MGMT_EVQ_ENTRIES,
+			  sa->socket_id);
+	if (rc != 0)
+		goto fail_mgmt_evq_init;
+
 	/*
 	 * Rx/Tx event queues are created/destroyed when corresponding
 	 * Rx/Tx queue is created/destroyed.
@@ -466,6 +507,7 @@ sfc_ev_init(struct sfc_adapter *sa)
 
 	return 0;
 
+fail_mgmt_evq_init:
 fail_ev_qinit_info:
 	while (sw_index-- > 0)
 		sfc_ev_qfini_info(sa, sw_index);
