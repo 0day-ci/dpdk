@@ -47,12 +47,14 @@ if [ "$1" = '-h' -o "$1" = '--help' ] ; then
 	exit
 fi
 
+selfdir=$(dirname $(readlink -e $0))
 range=${1:-origin/master..}
 
 commits=$(git log --format='%h' --reverse $range)
 headlines=$(git log --format='%s' --reverse $range)
 bodylines=$(git log --format='%b' --reverse $range)
 fixes=$(git log --format='%h %s' --reverse $range | grep -i ': *fix' | cut -d' ' -f1)
+stablefixes=$($selfdir/git-log-fixes.sh $range | sed '/(N\/A)$/d'  | cut -d' ' -f2)
 tags=$(git log --format='%b' --reverse $range | grep -i -e 'by *:' -e 'fix.*:')
 bytag='\(Reported\|Suggested\|Signed-off\|Acked\|Reviewed\|Tested\)-by:'
 
@@ -191,3 +193,10 @@ bad=$(for fixtag in $fixtags ; do
 	printf "$fixtag" | grep -v "^$good$"
 done | sed 's,^,\t,')
 [ -z "$bad" ] || printf "Wrong 'Fixes' reference:\n$bad\n"
+
+# check CC:stable for fixes
+bad=$(for fix in $stablefixes ; do
+	git log --format='%b' -1 $fix | grep -qi '^CC: *stable@dpdk.org' ||
+		git log --format='\t%s' -1 $fix
+done)
+[ -z "$bad" ] || printf "Should CC: stable@dpdk.org\n$bad\n"
