@@ -57,7 +57,8 @@
 static inline uint16_t
 dev_num_vf(struct rte_eth_dev *eth_dev)
 {
-	return eth_dev->pci_dev->max_vfs;
+	struct rte_pci_device *pci_dev = ETH_DEV_PCI_DEV(eth_dev);
+	return pci_dev->max_vfs;
 }
 
 static inline

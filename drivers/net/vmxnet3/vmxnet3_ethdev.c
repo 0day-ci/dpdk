@@ -138,7 +138,7 @@ gpa_zone_reserve(struct rte_eth_dev *dev, uint32_t size,
 	const struct rte_memzone *mz;
 
 	snprintf(z_name, sizeof(z_name), "%s_%d_%s",
-		 dev->driver->pci_drv.driver.name, dev->data->port_id, post_string);
+		 dev->data->drv_name, dev->data->port_id, post_string);
 
 	mz = rte_memzone_lookup(z_name);
 	if (!reuse) {
@@ -237,7 +237,7 @@ eth_vmxnet3_dev_init(struct rte_eth_dev *eth_dev)
 	eth_dev->dev_ops = &vmxnet3_eth_dev_ops;
 	eth_dev->rx_pkt_burst = &vmxnet3_recv_pkts;
 	eth_dev->tx_pkt_burst = &vmxnet3_xmit_pkts;
-	pci_dev = eth_dev->pci_dev;
+	pci_dev = ETH_DEV_PCI_DEV(eth_dev);
 
 	/*
 	 * for secondary processes, we don't initialize any further as primary

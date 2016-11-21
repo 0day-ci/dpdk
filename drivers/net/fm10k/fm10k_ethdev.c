@@ -59,7 +59,8 @@
 #define BIT_MASK_PER_UINT32 ((1 << CHARS_PER_UINT32) - 1)
 
 /* default 1:1 map from queue ID to interrupt vector ID */
-#define Q2V(dev, queue_id) (dev->pci_dev->intr_handle.intr_vec[queue_id])
+#define D2IH(dev) (&ETH_DEV_PCI_DEV(dev)->intr_handle)
+#define Q2V(dev, queue_id) (D2IH(dev)->intr_vec[queue_id])
 
 /* First 64 Logical ports for PF/VMDQ, second 64 for Flow director */
 #define MAX_LPORT_NUM    128
@@ -711,7 +712,7 @@ fm10k_dev_rx_init(struct rte_eth_dev *dev)
 {
 	struct fm10k_hw *hw = FM10K_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct fm10k_macvlan_filter_info *macvlan;
-	struct rte_intr_handle *intr_handle = &dev->pci_dev->intr_handle;
+	struct rte_intr_handle *intr_handle = D2IH(dev);
 	int i, ret;
 	struct fm10k_rx_queue *rxq;
 	uint64_t base_addr;
@@ -1171,7 +1172,7 @@ static void
 fm10k_dev_stop(struct rte_eth_dev *dev)
 {
 	struct fm10k_hw *hw = FM10K_DEV_PRIVATE_TO_HW(dev->data->dev_private);
-	struct rte_intr_handle *intr_handle = &dev->pci_dev->intr_handle;
+	struct rte_intr_handle *intr_handle = D2IH(dev);
 	int i;
 
 	PMD_INIT_FUNC_TRACE();
@@ -1387,6 +1388,7 @@ fm10k_dev_infos_get(struct rte_eth_dev *dev,
 	struct rte_eth_dev_info *dev_info)
 {
 	struct fm10k_hw *hw = FM10K_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct rte_pci_device *pci_dev = ETH_DEV_PCI_DEV(dev);
 
 	PMD_INIT_FUNC_TRACE();
 
@@ -1396,7 +1398,7 @@ fm10k_dev_infos_get(struct rte_eth_dev *dev,
 	dev_info->max_tx_queues      = hw->mac.max_queues;
 	dev_info->max_mac_addrs      = FM10K_MAX_MACADDR_NUM;
 	dev_info->max_hash_mac_addrs = 0;
-	dev_info->max_vfs            = dev->pci_dev->max_vfs;
+	dev_info->max_vfs            = pci_dev->max_vfs;
 	dev_info->vmdq_pool_base     = 0;
 	dev_info->vmdq_queue_base    = 0;
 	dev_info->max_vmdq_pools     = ETH_32_POOLS;
@@ -2341,7 +2343,7 @@ fm10k_dev_rx_queue_intr_enable(struct rte_eth_dev *dev, uint16_t queue_id)
 	else
 		FM10K_WRITE_REG(hw, FM10K_VFITR(Q2V(dev, queue_id)),
 			FM10K_ITR_AUTOMASK | FM10K_ITR_MASK_CLEAR);
-	rte_intr_enable(&dev->pci_dev->intr_handle);
+	rte_intr_enable(D2IH(dev));
 	return 0;
 }
 
@@ -2364,7 +2366,7 @@ static int
 fm10k_dev_rxq_interrupt_setup(struct rte_eth_dev *dev)
 {
 	struct fm10k_hw *hw = FM10K_DEV_PRIVATE_TO_HW(dev->data->dev_private);
-	struct rte_intr_handle *intr_handle = &dev->pci_dev->intr_handle;
+	struct rte_intr_handle *intr_handle = D2IH(dev);
 	uint32_t intr_vector, vec;
 	uint16_t queue_id;
 	int result = 0;
@@ -2380,7 +2382,7 @@ fm10k_dev_rxq_interrupt_setup(struct rte_eth_dev *dev)
 	intr_vector = dev->data->nb_rx_queues;
 
 	/* disable interrupt first */
-	rte_intr_disable(&dev->pci_dev->intr_handle);
+	rte_intr_disable(intr_handle);
 	if (hw->mac.type == fm10k_mac_pf)
 		fm10k_dev_disable_intr_pf(dev);
 	else
@@ -2415,7 +2417,7 @@ fm10k_dev_rxq_interrupt_setup(struct rte_eth_dev *dev)
 		fm10k_dev_enable_intr_pf(dev);
 	else
 		fm10k_dev_enable_intr_vf(dev);
-	rte_intr_enable(&dev->pci_dev->intr_handle);
+	rte_intr_enable(intr_handle);
 	hw->mac.ops.update_int_moderator(hw);
 	return result;
 }
@@ -2581,7 +2583,7 @@ fm10k_dev_interrupt_handler_pf(
 	FM10K_WRITE_REG(hw, FM10K_ITR(0), FM10K_ITR_AUTOMASK |
 					FM10K_ITR_MASK_CLEAR);
 	/* Re-enable interrupt from host side */
-	rte_intr_enable(&(dev->pci_dev->intr_handle));
+	rte_intr_enable(D2IH(dev));
 }
 
 /**
@@ -2615,7 +2617,7 @@ fm10k_dev_interrupt_handler_vf(
 	FM10K_WRITE_REG(hw, FM10K_VFITR(0), FM10K_ITR_AUTOMASK |
 					FM10K_ITR_MASK_CLEAR);
 	/* Re-enable interrupt from host side */
-	rte_intr_enable(&(dev->pci_dev->intr_handle));
+	rte_intr_enable(D2IH(dev));
 }
 
 /* Mailbox message handler in VF */
@@ -2827,6 +2829,7 @@ static int
 eth_fm10k_dev_init(struct rte_eth_dev *dev)
 {
 	struct fm10k_hw *hw = FM10K_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct rte_pci_device *pci_dev = ETH_DEV_PCI_DEV(dev);
 	int diag, i;
 	struct fm10k_macvlan_filter_info *macvlan;
 
@@ -2840,18 +2843,18 @@ eth_fm10k_dev_init(struct rte_eth_dev *dev)
 	if (rte_eal_process_type() != RTE_PROC_PRIMARY)
 		return 0;
 
-	rte_eth_copy_pci_info(dev, dev->pci_dev);
+	rte_eth_copy_pci_info(dev, pci_dev);
 
 	macvlan = FM10K_DEV_PRIVATE_TO_MACVLAN(dev->data->dev_private);
 	memset(macvlan, 0, sizeof(*macvlan));
 	/* Vendor and Device ID need to be set before init of shared code */
 	memset(hw, 0, sizeof(*hw));
-	hw->device_id = dev->pci_dev->id.device_id;
-	hw->vendor_id = dev->pci_dev->id.vendor_id;
-	hw->subsystem_device_id = dev->pci_dev->id.subsystem_device_id;
-	hw->subsystem_vendor_id = dev->pci_dev->id.subsystem_vendor_id;
+	hw->device_id = pci_dev->id.device_id;
+	hw->vendor_id = pci_dev->id.vendor_id;
+	hw->subsystem_device_id = pci_dev->id.subsystem_device_id;
+	hw->subsystem_vendor_id = pci_dev->id.subsystem_vendor_id;
 	hw->revision_id = 0;
-	hw->hw_addr = (void *)dev->pci_dev->mem_resource[0].addr;
+	hw->hw_addr = (void *)pci_dev->mem_resource[0].addr;
 	if (hw->hw_addr == NULL) {
 		PMD_INIT_LOG(ERR, "Bad mem resource."
 			" Try to blacklist unused devices.");
@@ -2921,20 +2924,20 @@ eth_fm10k_dev_init(struct rte_eth_dev *dev)
 	/*PF/VF has different interrupt handling mechanism */
 	if (hw->mac.type == fm10k_mac_pf) {
 		/* register callback func to eal lib */
-		rte_intr_callback_register(&(dev->pci_dev->intr_handle),
+		rte_intr_callback_register(D2IH(dev),
 			fm10k_dev_interrupt_handler_pf, (void *)dev);
 
 		/* enable MISC interrupt */
 		fm10k_dev_enable_intr_pf(dev);
 	} else { /* VF */
-		rte_intr_callback_register(&(dev->pci_dev->intr_handle),
+		rte_intr_callback_register(D2IH(dev),
 			fm10k_dev_interrupt_handler_vf, (void *)dev);
 
 		fm10k_dev_enable_intr_vf(dev);
 	}
 
 	/* Enable intr after callback registered */
-	rte_intr_enable(&(dev->pci_dev->intr_handle));
+	rte_intr_enable(D2IH(dev));
 
 	hw->mac.ops.update_int_moderator(hw);
 
@@ -3004,7 +3007,7 @@ static int
 eth_fm10k_dev_uninit(struct rte_eth_dev *dev)
 {
 	struct fm10k_hw *hw = FM10K_DEV_PRIVATE_TO_HW(dev->data->dev_private);
-
+	struct rte_intr_handle *intr_handle = D2IH(dev);
 	PMD_INIT_FUNC_TRACE();
 
 	/* only uninitialize in the primary process */
@@ -3019,7 +3022,7 @@ eth_fm10k_dev_uninit(struct rte_eth_dev *dev)
 	dev->tx_pkt_burst = NULL;
 
 	/* disable uio/vfio intr */
-	rte_intr_disable(&(dev->pci_dev->intr_handle));
+	rte_intr_disable(intr_handle);
 
 	/*PF/VF has different interrupt handling mechanism */
 	if (hw->mac.type == fm10k_mac_pf) {
@@ -3027,13 +3030,13 @@ eth_fm10k_dev_uninit(struct rte_eth_dev *dev)
 		fm10k_dev_disable_intr_pf(dev);
 
 		/* unregister callback func to eal lib */
-		rte_intr_callback_unregister(&(dev->pci_dev->intr_handle),
+		rte_intr_callback_unregister(intr_handle,
 			fm10k_dev_interrupt_handler_pf, (void *)dev);
 	} else {
 		/* disable interrupt */
 		fm10k_dev_disable_intr_vf(dev);
 
-		rte_intr_callback_unregister(&(dev->pci_dev->intr_handle),
+		rte_intr_callback_unregister(intr_handle,
 			fm10k_dev_interrupt_handler_vf, (void *)dev);
 	}
 

@@ -671,6 +671,10 @@ i40e_get_vsi_from_adapter(struct i40e_adapter *adapter)
 #define I40E_VF_TO_HW(vf) \
 	(&(((struct i40e_vf *)vf)->adapter->hw))
 
+/* ETH_DEV_TO_INTR_HANDLE */
+#define ETH_DEV_TO_INTR_HANDLE(ptr) \
+	(&(ETH_DEV_PCI_DEV(ptr)->intr_handle))
+
 static inline void
 i40e_init_adminq_parameter(struct i40e_hw *hw)
 {

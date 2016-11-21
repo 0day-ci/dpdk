@@ -1005,7 +1005,7 @@ static int eth_cxgbe_dev_init(struct rte_eth_dev *eth_dev)
 	if (rte_eal_process_type() != RTE_PROC_PRIMARY)
 		return 0;
 
-	pci_dev = eth_dev->pci_dev;
+	pci_dev = ETH_DEV_PCI_DEV(eth_dev);
 
 	snprintf(name, sizeof(name), "cxgbeadapter%d", eth_dev->data->port_id);
 	adapter = rte_zmalloc(name, sizeof(*adapter), 0);
