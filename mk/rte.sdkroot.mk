@@ -117,10 +117,6 @@ depdirs depgraph:
 gcov gcovclean:
 	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkgcov.mk $@
 
-.PHONY: examples examples_clean
-examples examples_clean:
-	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkexamples.mk $@
-
 # all other build targets
 %:
 	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkconfig.mk checkconfig
