@@ -45,6 +45,8 @@ sfc_dev_infos_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *dev_info)
 	struct sfc_adapter *sa = dev->data->dev_private;
 
 	sfc_log_init(sa, "entry");
+
+	dev_info->max_rx_pktlen = EFX_MAC_PDU_MAX;
 }
 
 static int
