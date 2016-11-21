@@ -1644,6 +1644,12 @@ struct rte_eth_dev {
 	uint8_t attached; /**< Flag indicating the port is attached */
 } __rte_cache_aligned;
 
+/**
+ * @internal
+ * Helper for drivers that need to convert from rte_eth_dev to rte_pci_device.
+ */
+#define ETH_DEV_PCI_DEV(ptr) ((ptr)->pci_dev)
+
 struct rte_eth_dev_sriov {
 	uint8_t active;               /**< SRIOV is active with 16, 32 or 64 pools */
 	uint8_t nb_q_per_pool;        /**< rx queue number per pool */
