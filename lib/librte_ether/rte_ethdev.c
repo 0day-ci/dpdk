@@ -258,6 +258,7 @@ rte_eth_dev_pci_probe(struct rte_pci_driver *pci_drv,
 			rte_panic("Cannot allocate memzone for private port data\n");
 	}
 	eth_dev->pci_dev = pci_dev;
+	eth_dev->intr_handle = &pci_dev->intr_handle;
 	eth_dev->driver = eth_drv;
 	eth_dev->data->rx_mbuf_alloc_failed = 0;
 
@@ -2543,7 +2544,13 @@ rte_eth_dev_rx_intr_ctl(uint8_t port_id, int epfd, int op, void *data)
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
 	dev = &rte_eth_devices[port_id];
-	intr_handle = &dev->pci_dev->intr_handle;
+
+	if (!dev->intr_handle) {
+		RTE_PMD_DEBUG_TRACE("RX Intr handle unset\n");
+		return -ENOTSUP;
+	}
+
+	intr_handle = dev->intr_handle;
 	if (!intr_handle->intr_vec) {
 		RTE_PMD_DEBUG_TRACE("RX Intr vector unset\n");
 		return -EPERM;
@@ -2603,7 +2610,12 @@ rte_eth_dev_rx_intr_ctl_q(uint8_t port_id, uint16_t queue_id,
 		return -EINVAL;
 	}
 
-	intr_handle = &dev->pci_dev->intr_handle;
+	if (!dev->intr_handle) {
+		RTE_PMD_DEBUG_TRACE("RX Intr handle unset\n");
+		return -ENOTSUP;
+	}
+
+	intr_handle = dev->intr_handle;
 	if (!intr_handle->intr_vec) {
 		RTE_PMD_DEBUG_TRACE("RX Intr vector unset\n");
 		return -EPERM;
@@ -3204,6 +3216,8 @@ rte_eth_copy_pci_info(struct rte_eth_dev *eth_dev, struct rte_pci_device *pci_de
 				eth_dev, pci_dev);
 		return;
 	}
+
+	eth_dev->intr_handle = &pci_dev->intr_handle;
 
 	eth_dev->data->dev_flags = 0;
 	if (pci_dev->driver->drv_flags & RTE_PCI_DRV_INTR_LSC)
