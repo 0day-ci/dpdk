@@ -142,9 +142,27 @@ static boolean_t
 sfc_ev_tx(void *arg, uint32_t label, uint32_t id)
 {
 	struct sfc_evq *evq = arg;
+	struct sfc_txq *txq;
+	unsigned int stop;
+	unsigned int delta;
 
-	sfc_err(evq->sa, "EVQ %u unexpected Tx event", evq->evq_index);
-	return B_TRUE;
+	txq = evq->txq;
+
+	SFC_ASSERT(txq != NULL);
+	SFC_ASSERT(txq->evq == evq);
+
+	if (unlikely((txq->state & SFC_TXQ_STARTED) == 0))
+		goto done;
+
+	stop = (id + 1) & txq->ptr_mask;
+	id = txq->pending & txq->ptr_mask;
+
+	delta = (stop >= id) ? (stop - id) : (txq->ptr_mask + 1 - id + stop);
+
+	txq->pending += delta;
+
+done:
+	return B_FALSE;
 }
 
 static boolean_t
