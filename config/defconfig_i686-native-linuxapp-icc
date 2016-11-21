@@ -67,6 +67,11 @@ CONFIG_RTE_LIBRTE_PMD_AESNI_GCM=n
 CONFIG_RTE_LIBRTE_PMD_KASUMI=n
 
 #
+# Solarflare PMD is not supported on 32-bit
+#
+CONFIG_RTE_LIBRTE_SFC_EFX_PMD=n
+
+#
 # ZUC PMD is not supported on 32-bit
 #
 CONFIG_RTE_LIBRTE_PMD_ZUC=n
