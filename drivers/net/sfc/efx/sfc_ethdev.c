@@ -37,9 +37,16 @@
 #include "sfc_kvargs.h"
 
 
+static void
+sfc_dev_infos_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *dev_info)
+{
+	struct sfc_adapter *sa = dev->data->dev_private;
+
+	sfc_log_init(sa, "entry");
+}
+
 static const struct eth_dev_ops sfc_eth_dev_ops = {
-	/* Just dummy init to avoid build-time warning */
-	.dev_configure			= NULL,
+	.dev_infos_get			= sfc_dev_infos_get,
 };
 
 static int
