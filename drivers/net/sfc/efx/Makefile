@@ -33,6 +33,8 @@ include $(RTE_SDK)/mk/rte.vars.mk
 #
 LIB = librte_pmd_sfc_efx.a
 
+CFLAGS += -I$(SRCDIR)/base/
+CFLAGS += -I$(SRCDIR)
 CFLAGS += -O3
 
 # Enable basic warnings but disable some which are accepted
@@ -60,6 +62,17 @@ CFLAGS += -Wstrict-prototypes
 CFLAGS += -Wundef
 CFLAGS += -Wwrite-strings
 
+# Extra CFLAGS for base driver files
+CFLAGS_BASE_DRIVER += -Wno-unused-variable
+CFLAGS_BASE_DRIVER += -Wno-unused-but-set-variable
+
+#
+# List of base driver object files for which
+# special CFLAGS above should be applied
+#
+BASE_DRIVER_OBJS=$(patsubst %.c,%.o,$(notdir $(wildcard $(SRCDIR)/base/*.c)))
+$(foreach obj, $(BASE_DRIVER_OBJS), $(eval CFLAGS+=$(CFLAGS_BASE_DRIVER)))
+
 EXPORT_MAP := rte_pmd_sfc_efx_version.map
 
 LIBABIVER := 1
@@ -70,6 +83,47 @@ LIBABIVER := 1
 SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += sfc_ethdev.c
 SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += sfc_kvargs.c
 
+VPATH += $(SRCDIR)/base
+
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_bootcfg.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_crc32.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_ev.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_filter.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_hash.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_intr.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_lic.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_mac.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_mcdi.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_mon.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_nic.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_nvram.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_phy.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_port.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_rx.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_sram.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_tx.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += efx_vpd.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += mcdi_mon.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += siena_mac.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += siena_mcdi.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += siena_nic.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += siena_nvram.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += siena_phy.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += siena_sram.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += siena_vpd.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_ev.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_filter.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_intr.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_mac.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_mcdi.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_nic.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_nvram.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_phy.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_rx.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_tx.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += ef10_vpd.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += hunt_nic.c
+SRCS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += medford_nic.c
 
 # this lib depends upon:
 DEPDIRS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD) += lib/librte_eal
