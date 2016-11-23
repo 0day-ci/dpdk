@@ -561,9 +561,6 @@ rte_eal_init(int argc, char **argv)
 	if (rte_eal_timer_init() < 0)
 		rte_panic("Cannot init HPET or TSC timers\n");
 
-	if (rte_eal_pci_init() < 0)
-		rte_panic("Cannot init PCI\n");
-
 	eal_check_mem_on_local_socket();
 
 	if (eal_plugins_init() < 0)

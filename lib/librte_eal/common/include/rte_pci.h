@@ -386,20 +386,13 @@ RTE_PMD_EXPORT_NAME(nm, __COUNTER__)
 void rte_eal_pci_unregister(struct rte_pci_driver *driver);
 
 /**
- * Scan the content of the PCI bus, and the devices in the devices
- * list
- *
- * @return
- *  0 on success, negative on error
- */
-int rte_eal_pci_scan(void);
-
-/**
- * Probe the PCI bus for registered drivers.
+ * Scan the PCI bus for devices and match them to their driver.
  *
  * Scan the content of the PCI bus, and call the probe() function for
- * all registered drivers that have a matching entry in its id_table
- * for discovered devices.
+ * all registered drivers that have a matching entry in their id_table.
+ * If a device already has a driver loaded, probe will not be called.
+ * If a previously discovered device is no longer present on the system,
+ * the associated driver's remove() callback will be called.
  *
  * @return
  *   - 0 on success.
