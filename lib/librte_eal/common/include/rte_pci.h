@@ -358,6 +358,34 @@ rte_eal_compare_pci_addr(const struct rte_pci_addr *addr,
 }
 
 /**
+ * Register a PCI driver.
+ *
+ * @param driver
+ *   A pointer to a rte_pci_driver structure describing the driver
+ *   to be registered.
+ */
+void rte_eal_pci_register(struct rte_pci_driver *driver);
+
+/** Statically register a PCI driver at start up */
+#define RTE_PMD_REGISTER_PCI(nm, pci_drv) \
+RTE_INIT(pciinitfn_ ##nm); \
+static void pciinitfn_ ##nm(void) \
+{\
+	(pci_drv).driver.name = RTE_STR(nm);\
+	rte_eal_pci_register(&pci_drv); \
+} \
+RTE_PMD_EXPORT_NAME(nm, __COUNTER__)
+
+/**
+ * Unregister a PCI driver.
+ *
+ * @param driver
+ *   A pointer to a rte_pci_driver structure describing the driver
+ *   to be unregistered.
+ */
+void rte_eal_pci_unregister(struct rte_pci_driver *driver);
+
+/**
  * Scan the content of the PCI bus, and the devices in the devices
  * list
  *
@@ -474,34 +502,6 @@ int rte_eal_pci_detach(const struct rte_pci_addr *addr);
  *   A pointer to a file for output
  */
 void rte_eal_pci_dump(FILE *f);
-
-/**
- * Register a PCI driver.
- *
- * @param driver
- *   A pointer to a rte_pci_driver structure describing the driver
- *   to be registered.
- */
-void rte_eal_pci_register(struct rte_pci_driver *driver);
-
-/** Helper for PCI device registration from driver (eth, crypto) instance */
-#define RTE_PMD_REGISTER_PCI(nm, pci_drv) \
-RTE_INIT(pciinitfn_ ##nm); \
-static void pciinitfn_ ##nm(void) \
-{\
-	(pci_drv).driver.name = RTE_STR(nm);\
-	rte_eal_pci_register(&pci_drv); \
-} \
-RTE_PMD_EXPORT_NAME(nm, __COUNTER__)
-
-/**
- * Unregister a PCI driver.
- *
- * @param driver
- *   A pointer to a rte_pci_driver structure describing the driver
- *   to be unregistered.
- */
-void rte_eal_pci_unregister(struct rte_pci_driver *driver);
 
 /**
  * Read PCI config space.
