@@ -1459,6 +1459,7 @@ i40evf_dev_init(struct rte_eth_dev *eth_dev)
 	}
 
 	rte_eth_copy_pci_info(eth_dev, eth_dev->pci_dev);
+	eth_dev->data->dev_flags = RTE_ETH_DEV_DETACHABLE;
 
 	hw->vendor_id = eth_dev->pci_dev->id.vendor_id;
 	hw->device_id = eth_dev->pci_dev->id.device_id;
@@ -1528,7 +1529,7 @@ i40evf_dev_uninit(struct rte_eth_dev *eth_dev)
 static struct eth_driver rte_i40evf_pmd = {
 	.pci_drv = {
 		.id_table = pci_id_i40evf_map,
-		.drv_flags = RTE_PCI_DRV_NEED_MAPPING | RTE_PCI_DRV_DETACHABLE,
+		.drv_flags = RTE_PCI_DRV_NEED_MAPPING,
 		.probe = rte_eth_dev_pci_probe,
 		.remove = rte_eth_dev_pci_remove,
 	},

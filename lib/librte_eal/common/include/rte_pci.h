@@ -212,8 +212,6 @@ struct rte_pci_driver {
 #define RTE_PCI_DRV_FORCE_UNBIND 0x0004
 /** Device driver supports link state interrupt */
 #define RTE_PCI_DRV_INTR_LSC	0x0008
-/** Device driver supports detaching capability */
-#define RTE_PCI_DRV_DETACHABLE	0x0010
 
 /**
  * A structure describing a PCI mapping.
