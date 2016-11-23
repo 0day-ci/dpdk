@@ -228,59 +228,36 @@ rte_eal_pci_probe_one_driver(struct rte_pci_driver *dr, struct rte_pci_device *d
 	return 1;
 }
 
-/*
- * If vendor/device ID match, call the remove() function of the
- * driver.
- */
 static int
-rte_eal_pci_detach_dev(struct rte_pci_driver *dr,
-		struct rte_pci_device *dev)
+rte_eal_pci_remove_driver(struct rte_pci_device *dev)
 {
-	const struct rte_pci_id *id_table;
+	struct rte_pci_driver *driver;
+	struct rte_pci_addr *loc;
 
-	if ((dr == NULL) || (dev == NULL))
-		return -EINVAL;
+	loc = &dev->addr;
+	driver = dev->driver;
 
-	for (id_table = dr->id_table; id_table->vendor_id != 0; id_table++) {
-
-		/* check if device's identifiers match the driver's ones */
-		if (id_table->vendor_id != dev->id.vendor_id &&
-				id_table->vendor_id != PCI_ANY_ID)
-			continue;
-		if (id_table->device_id != dev->id.device_id &&
-				id_table->device_id != PCI_ANY_ID)
-			continue;
-		if (id_table->subsystem_vendor_id != dev->id.subsystem_vendor_id &&
-				id_table->subsystem_vendor_id != PCI_ANY_ID)
-			continue;
-		if (id_table->subsystem_device_id != dev->id.subsystem_device_id &&
-				id_table->subsystem_device_id != PCI_ANY_ID)
-			continue;
-
-		struct rte_pci_addr *loc = &dev->addr;
-
-		RTE_LOG(DEBUG, EAL, "PCI device "PCI_PRI_FMT" on NUMA socket %i\n",
-				loc->domain, loc->bus, loc->devid,
-				loc->function, dev->device.numa_node);
-
-		RTE_LOG(DEBUG, EAL, "  remove driver: %x:%x %s\n", dev->id.vendor_id,
-				dev->id.device_id, dr->driver.name);
-
-		if (dr->remove && (dr->remove(dev) < 0))
-			return -1;	/* negative value is an error */
-
-		/* clear driver structure */
-		dev->driver = NULL;
-
-		if (dr->drv_flags & RTE_PCI_DRV_NEED_MAPPING)
-			/* unmap resources for devices that use igb_uio */
-			rte_eal_pci_unmap_device(dev);
-
+	if (driver == NULL)
 		return 0;
-	}
 
-	/* return positive value if driver doesn't support this device */
-	return 1;
+	RTE_LOG(DEBUG, EAL, "PCI device "PCI_PRI_FMT" on NUMA socket %i\n",
+			loc->domain, loc->bus, loc->devid,
+			loc->function, dev->device.numa_node);
+
+	RTE_LOG(DEBUG, EAL, "  remove driver: %x:%x %s\n", dev->id.vendor_id,
+			dev->id.device_id, driver->driver.name);
+
+	if (driver->remove && (driver->remove(dev) < 0))
+		return -1;	/* negative value is an error */
+
+	/* clear driver structure */
+	dev->driver = NULL;
+
+	if (driver->drv_flags & RTE_PCI_DRV_NEED_MAPPING)
+		/* unmap resources for devices that use igb_uio */
+		rte_eal_pci_unmap_device(dev);
+
+	return 0;
 }
 
 /*
@@ -315,38 +292,11 @@ pci_probe_all_drivers(struct rte_pci_device *dev)
 }
 
 /*
- * If vendor/device ID match, call the remove() function of all
- * registered driver for the given device. Return -1 if initialization
- * failed, return 1 if no driver is found for this device.
- */
-static int
-pci_detach_all_drivers(struct rte_pci_device *dev)
-{
-	struct rte_pci_driver *dr = NULL;
-	int rc = 0;
-
-	if (dev == NULL)
-		return -1;
-
-	TAILQ_FOREACH(dr, &pci_driver_list, next) {
-		rc = rte_eal_pci_detach_dev(dr, dev);
-		if (rc < 0)
-			/* negative value is an error */
-			return -1;
-		if (rc > 0)
-			/* positive value means driver doesn't support it */
-			continue;
-		return 0;
-	}
-	return 1;
-}
-
-/*
  * Find the pci device specified by pci address, then invoke probe function of
  * the driver of the devive.
  */
 int
-rte_eal_pci_probe_one(const struct rte_pci_addr *addr)
+rte_eal_pci_attach_driver(const struct rte_pci_addr *addr)
 {
 	struct rte_pci_device *dev = NULL;
 	int ret = 0;
@@ -382,10 +332,9 @@ err_return:
  * Detach device specified by its pci address.
  */
 int
-rte_eal_pci_detach(const struct rte_pci_addr *addr)
+rte_eal_pci_detach_driver(const struct rte_pci_addr *addr)
 {
 	struct rte_pci_device *dev = NULL;
-	int ret = 0;
 
 	if (addr == NULL)
 		return -1;
@@ -394,17 +343,17 @@ rte_eal_pci_detach(const struct rte_pci_addr *addr)
 		if (rte_eal_compare_pci_addr(&dev->addr, addr))
 			continue;
 
-		ret = pci_detach_all_drivers(dev);
-		if (ret < 0)
-			goto err_return;
+		if (dev->driver == NULL) {
+			/* The device at that address does not have a driver loaded */
+			return 0;
+		}
 
-		TAILQ_REMOVE(&pci_device_list, dev, next);
-		free(dev);
+		if (rte_eal_pci_remove_driver(dev) < 0)
+			return -1;
+
 		return 0;
 	}
-	return -1;
 
-err_return:
 	RTE_LOG(WARNING, EAL, "Requested device " PCI_PRI_FMT
 			" cannot be used\n", dev->addr.domain, dev->addr.bus,
 			dev->addr.devid, dev->addr.function);
