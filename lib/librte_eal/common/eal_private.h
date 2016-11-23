@@ -108,18 +108,14 @@ int rte_eal_timer_init(void);
  */
 int rte_eal_log_init(const char *id, int facility);
 
-/**
- * Init the PCI infrastructure
- *
- * This function is private to EAL.
- *
- * @return
- *   0 on success, negative on error
- */
-int rte_eal_pci_init(void);
-
 struct rte_pci_driver;
 struct rte_pci_device;
+
+/* Scan the PCI bus for devices
+ *
+ * This function is private to EAL.
+ */
+int pci_scan(void);
 
 /**
  * Update a pci device object by asking the kernel for the latest information.

@@ -361,7 +361,7 @@ skipdev:
  * list. Call pci_scan_one() for each pci entry found.
  */
 int
-rte_eal_pci_scan(void)
+pci_scan(void)
 {
 	int fd;
 	unsigned dev_count = 0;
@@ -666,19 +666,4 @@ rte_eal_pci_ioport_unmap(struct rte_pci_ioport *p)
 	}
 
 	return ret;
-}
-
-/* Init the PCI EAL subsystem */
-int
-rte_eal_pci_init(void)
-{
-	/* for debug purposes, PCI can be disabled */
-	if (internal_config.no_pci)
-		return 0;
-
-	if (rte_eal_pci_scan() < 0) {
-		RTE_LOG(ERR, EAL, "%s(): Cannot scan PCI bus\n", __func__);
-		return -1;
-	}
-	return 0;
 }

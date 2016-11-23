@@ -802,9 +802,6 @@ rte_eal_init(int argc, char **argv)
 	if (rte_eal_log_init(logid, internal_config.syslog_facility) < 0)
 		rte_panic("Cannot init logs\n");
 
-	if (rte_eal_pci_init() < 0)
-		rte_panic("Cannot init PCI\n");
-
 #ifdef VFIO_PRESENT
 	if (rte_eal_vfio_setup() < 0)
 		rte_panic("Cannot init VFIO\n");

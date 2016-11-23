@@ -81,6 +81,7 @@
 #include <rte_devargs.h>
 
 #include "eal_private.h"
+#include "eal_internal_cfg.h"
 
 struct pci_driver_list pci_driver_list =
 	TAILQ_HEAD_INITIALIZER(pci_driver_list);
@@ -422,6 +423,11 @@ rte_eal_pci_probe(void)
 	struct rte_devargs *devargs;
 	int probe_all = 0;
 	int ret = 0;
+
+	if (internal_config.no_pci)
+		return 0;
+
+	pci_scan();
 
 	if (rte_eal_devargs_type_count(RTE_DEVTYPE_WHITELISTED_PCI) == 0)
 		probe_all = 1;

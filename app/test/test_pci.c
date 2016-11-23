@@ -180,7 +180,7 @@ test_pci_setup(void)
 		TAILQ_INSERT_TAIL(&real_pci_device_list, dev, next);
 	}
 
-	ret = rte_eal_pci_scan();
+	ret = rte_eal_pci_probe();
 	TEST_ASSERT_SUCCESS(ret, "failed to scan PCI bus");
 	rte_eal_pci_dump(stdout);
 
