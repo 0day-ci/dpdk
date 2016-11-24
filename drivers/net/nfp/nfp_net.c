@@ -1084,12 +1084,6 @@ nfp_net_rx_queue_count(struct rte_eth_dev *dev, uint16_t queue_idx)
 	uint32_t count;
 
 	rxq = (struct nfp_net_rxq *)dev->data->rx_queues[queue_idx];
-
-	if (rxq == NULL) {
-		PMD_INIT_LOG(ERR, "Bad queue: %u\n", queue_idx);
-		return 0;
-	}
-
 	idx = rxq->rd_p % rxq->rx_count;
 	rxds = &rxq->rxds[idx];
 
