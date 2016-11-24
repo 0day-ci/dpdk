@@ -221,6 +221,8 @@ struct ixgbe_tx_queue {
 	uint16_t            tx_free_thresh;
 	/** Number of TX descriptors to use before RS bit is set. */
 	uint16_t            tx_rs_thresh;
+	/** Number of TX descriptors divided by tx_rs_thresh. */
+	uint16_t            tx_rs_thresh_div;
 	/** Number of TX descriptors used since RS bit was set. */
 	uint16_t            nb_tx_used;
 	/** Index to last TX descriptor to have been cleaned. */

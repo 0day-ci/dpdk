@@ -553,6 +553,7 @@ static const struct eth_dev_ops ixgbe_eth_dev_ops = {
 	.rx_queue_intr_disable = ixgbe_dev_rx_queue_intr_disable,
 	.rx_queue_release     = ixgbe_dev_rx_queue_release,
 	.rx_queue_count       = ixgbe_dev_rx_queue_count,
+	.tx_queue_count       = ixgbe_dev_tx_queue_count,
 	.rx_descriptor_done   = ixgbe_dev_rx_descriptor_done,
 	.tx_queue_setup       = ixgbe_dev_tx_queue_setup,
 	.tx_queue_release     = ixgbe_dev_tx_queue_release,

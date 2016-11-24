@@ -2437,6 +2437,7 @@ ixgbe_dev_tx_queue_setup(struct rte_eth_dev *dev,
 
 	txq->nb_tx_desc = nb_desc;
 	txq->tx_rs_thresh = tx_rs_thresh;
+	txq->tx_rs_thresh_div = nb_desc / tx_rs_thresh;
 	txq->tx_free_thresh = tx_free_thresh;
 	txq->pthresh = tx_conf->tx_thresh.pthresh;
 	txq->hthresh = tx_conf->tx_thresh.hthresh;
@@ -2904,6 +2905,62 @@ ixgbe_dev_rx_queue_count(struct rte_eth_dev *dev, uint16_t rx_queue_id)
 	} while (interval >= resolution);
 
 	return offset;
+}
+
+uint32_t
+ixgbe_dev_tx_queue_count(struct rte_eth_dev *dev, uint16_t tx_queue_id)
+{
+	struct ixgbe_tx_queue *txq;
+	uint32_t status;
+	int32_t offset, interval, idx = 0;
+	int32_t max_offset, used_desc;
+
+	txq = dev->data->tx_queues[tx_queue_id];
+
+	/* if DD on next threshold desc is not set, assume used packets
+	 * are pending.
+	 */
+	status = txq->tx_ring[txq->tx_next_dd].wb.status;
+	if (!(status & rte_cpu_to_le_32(IXGBE_ADVTXD_STAT_DD)))
+		return txq->nb_tx_desc - txq->nb_tx_free - 1;
+
+	/* browse DD bits between tail starting from tx_next_dd: we have
+	 * to be careful since DD bits are only set every tx_rs_thresh
+	 * descriptor.
+	 */
+	interval = txq->tx_rs_thresh_div >> 1;
+	offset = interval * txq->tx_rs_thresh;
+
+	/* don't go beyond tail */
+	max_offset = txq->tx_tail - txq->tx_next_dd;
+	if (max_offset < 0)
+		max_offset += txq->nb_tx_desc;
+
+	do {
+		interval >>= 1;
+
+		if (offset >= max_offset) {
+			offset -= (interval * txq->tx_rs_thresh);
+			continue;
+		}
+
+		idx = txq->tx_next_dd + offset;
+		if (idx >= txq->nb_tx_desc)
+			idx -= txq->nb_tx_desc;
+
+		status = txq->tx_ring[idx].wb.status;
+		if (status & rte_cpu_to_le_32(IXGBE_ADVTXD_STAT_DD))
+			offset += (interval * txq->tx_rs_thresh);
+		else
+			offset -= (interval * txq->tx_rs_thresh);
+	} while (interval > 0);
+
+	/* idx is now the index of the head */
+	used_desc = txq->tx_tail - idx;
+	if (used_desc < 0)
+		used_desc += txq->nb_tx_desc;
+
+	return used_desc;
 }
 
 int

@@ -348,7 +348,9 @@ int  ixgbe_dev_tx_queue_setup(struct rte_eth_dev *dev, uint16_t tx_queue_id,
 		const struct rte_eth_txconf *tx_conf);
 
 uint32_t ixgbe_dev_rx_queue_count(struct rte_eth_dev *dev,
-		uint16_t rx_queue_id);
+				  uint16_t rx_queue_id);
+uint32_t ixgbe_dev_tx_queue_count(struct rte_eth_dev *dev,
+				  uint16_t tx_queue_id);
 
 int ixgbe_dev_rx_descriptor_done(void *rx_queue, uint16_t offset);
 int ixgbevf_dev_rx_descriptor_done(void *rx_queue, uint16_t offset);
