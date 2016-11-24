@@ -1432,6 +1432,57 @@ eth_em_rx_queue_count(struct rte_eth_dev *dev, uint16_t rx_queue_id)
 	return offset;
 }
 
+uint32_t
+eth_em_tx_queue_count(struct rte_eth_dev *dev, uint16_t tx_queue_id)
+{
+	volatile uint8_t *status;
+	struct em_tx_queue *txq;
+	int32_t offset, interval, idx, resolution;
+
+	txq = dev->data->tx_queues[tx_queue_id];
+
+	/* check if ring empty */
+	idx = txq->tx_tail - 1;
+	if (idx < 0)
+		idx += txq->nb_tx_desc;
+	status = &txq->tx_ring[idx].upper.fields.status;
+	if (*status & E1000_TXD_STAT_DD)
+		return 0;
+
+	/* check if ring full */
+	idx = txq->tx_tail + 1;
+	if (idx >= txq->nb_tx_desc)
+		idx -= txq->nb_tx_desc;
+	status = &txq->tx_ring[idx].upper.fields.status;
+	if (!(*status & E1000_TXD_STAT_DD))
+		return txq->nb_tx_desc;
+
+	/* decrease the precision if ring is large */
+	if (txq->nb_tx_desc <= 256)
+		resolution = 4;
+	else
+		resolution = 16;
+
+	/* use a binary search */
+	offset = txq->nb_tx_desc >> 1;
+	interval = offset;
+
+	do {
+		idx = txq->tx_tail + offset;
+		if (idx >= txq->nb_tx_desc)
+			idx -= txq->nb_tx_desc;
+
+		interval >>= 1;
+		status = &txq->tx_ring[idx].upper.fields.status;
+		if (*status & E1000_TXD_STAT_DD)
+			offset += interval;
+		else
+			offset -= interval;
+	} while (interval >= resolution);
+
+	return txq->nb_tx_desc - offset;
+}
+
 int
 eth_em_rx_descriptor_done(void *rx_queue, uint16_t offset)
 {
