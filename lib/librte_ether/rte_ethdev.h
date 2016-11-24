@@ -1147,6 +1147,10 @@ typedef uint32_t (*eth_rx_queue_count_t)(struct rte_eth_dev *dev,
 					 uint16_t rx_queue_id);
 /**< @internal Get number of used descriptors on a receive queue. */
 
+typedef uint32_t (*eth_tx_queue_count_t)(struct rte_eth_dev *dev,
+					 uint16_t tx_queue_id);
+/**< @internal Get number of used descriptors on a transmit queue */
+
 typedef int (*eth_rx_descriptor_done_t)(void *rxq, uint16_t offset);
 /**< @internal Check DD bit of specific RX descriptor */
 
@@ -1461,6 +1465,8 @@ struct eth_dev_ops {
 	eth_queue_release_t        rx_queue_release;/**< Release RX queue.*/
 	eth_rx_queue_count_t       rx_queue_count;
 	/**< Get the number of used RX descriptors. */
+	eth_tx_queue_count_t       tx_queue_count;
+	/**< Get the number of used TX descriptors. */
 	eth_rx_descriptor_done_t   rx_descriptor_done;  /**< Check rxd DD bit */
 	/**< Enable Rx queue interrupt. */
 	eth_rx_enable_intr_t       rx_queue_intr_enable;
@@ -2707,6 +2713,31 @@ rte_eth_rx_queue_count(uint8_t port_id, uint16_t queue_id)
 		return -EINVAL;
 
 	return (*dev->dev_ops->rx_queue_count)(dev, queue_id);
+}
+
+/**
+ * Get the number of used descriptors of a tx queue
+ *
+ * @param port_id
+ *  The port identifier of the Ethernet device.
+ * @param queue_id
+ *  The queue id on the specific port.
+ * @return
+ *  - number of free descriptors if positive or zero
+ *  - (-EINVAL) if *port_id* or *queue_id* is invalid.
+ *  - (-ENOTSUP) if the device does not support this function
+ */
+static inline int
+rte_eth_tx_queue_count(uint8_t port_id, uint16_t queue_id)
+{
+	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->tx_queue_count, -ENOTSUP);
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
+	if (queue_id >= dev->data->nb_tx_queues)
+		return -EINVAL;
+
+	return (*dev->dev_ops->tx_queue_count)(dev, queue_id);
 }
 
 /**
