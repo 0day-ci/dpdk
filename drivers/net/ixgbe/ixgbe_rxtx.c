@@ -2852,25 +2852,58 @@ ixgbe_dev_rx_queue_setup(struct rte_eth_dev *dev,
 uint32_t
 ixgbe_dev_rx_queue_count(struct rte_eth_dev *dev, uint16_t rx_queue_id)
 {
-#define IXGBE_RXQ_SCAN_INTERVAL 4
-	volatile union ixgbe_adv_rx_desc *rxdp;
+	volatile uint32_t *status;
 	struct ixgbe_rx_queue *rxq;
-	uint32_t desc = 0;
+	uint32_t offset, interval, nb_hold, resolution;
+	int32_t idx;
 
 	rxq = dev->data->rx_queues[rx_queue_id];
-	rxdp = &(rxq->rx_ring[rxq->rx_tail]);
 
-	while ((desc < rxq->nb_rx_desc) &&
-		(rxdp->wb.upper.status_error &
-			rte_cpu_to_le_32(IXGBE_RXDADV_STAT_DD))) {
-		desc += IXGBE_RXQ_SCAN_INTERVAL;
-		rxdp += IXGBE_RXQ_SCAN_INTERVAL;
-		if (rxq->rx_tail + desc >= rxq->nb_rx_desc)
-			rxdp = &(rxq->rx_ring[rxq->rx_tail +
-				desc - rxq->nb_rx_desc]);
-	}
+	/* check if ring empty */
+	idx = rxq->rx_tail;
+	status = &rxq->rx_ring[idx].wb.upper.status_error;
+	if (!(*status & rte_cpu_to_le_32(IXGBE_RXDADV_STAT_DD)))
+		return 0;
 
-	return desc;
+	/* decrease the precision if ring is large */
+	if (rxq->nb_rx_desc <= 256)
+		resolution = 4;
+	else
+		resolution = 16;
+
+	/* check if ring full */
+#ifdef RTE_IXGBE_INC_VECTOR
+	if (rxq->rx_using_sse)
+		nb_hold = rxq->rxrearm_nb;
+	else
+#endif
+		nb_hold = rxq->nb_rx_hold;
+
+	idx = rxq->rx_tail - nb_hold - resolution;
+	if (idx < 0)
+		idx += rxq->nb_rx_desc;
+	status = &rxq->rx_ring[idx].wb.upper.status_error;
+	if (*status & rte_cpu_to_le_32(IXGBE_RXDADV_STAT_DD))
+		return rxq->nb_rx_desc;
+
+	/* use a binary search */
+	interval = (rxq->nb_rx_desc - nb_hold) >> 1;
+	offset = interval;
+
+	do {
+		idx = rxq->rx_tail + offset;
+		if (idx >= rxq->nb_rx_desc)
+			idx -= rxq->nb_rx_desc;
+
+		interval >>= 1;
+		status = &rxq->rx_ring[idx].wb.upper.status_error;
+		if (*status & rte_cpu_to_le_32(IXGBE_RXDADV_STAT_DD))
+			offset += interval;
+		else
+			offset -= interval;
+	} while (interval >= resolution);
+
+	return offset;
 }
 
 int
