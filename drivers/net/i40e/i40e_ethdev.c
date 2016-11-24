@@ -9694,6 +9694,7 @@ static int i40e_get_eeprom(struct rte_eth_dev *dev,
 static void i40e_set_default_mac_addr(struct rte_eth_dev *dev,
 				      struct ether_addr *mac_addr)
 {
+	struct i40e_vsi *vsi = I40E_DEV_PRIVATE_TO_MAIN_VSI(dev->data->dev_private);
 	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 
 	if (!is_valid_assigned_ether_addr(mac_addr)) {
@@ -9701,8 +9702,33 @@ static void i40e_set_default_mac_addr(struct rte_eth_dev *dev,
 		return;
 	}
 
-	/* Flags: 0x3 updates port address */
-	i40e_aq_mac_address_write(hw, 0x3, mac_addr->addr_bytes, NULL);
+	i40e_aq_mac_address_write(hw, I40E_AQC_WRITE_TYPE_LAA_WOL, mac_addr->addr_bytes, NULL);
+
+	if (!memcmp(&dev->data->mac_addrs[0].addr_bytes, hw->mac.addr, ETH_ADDR_LEN)) {
+		struct i40e_aqc_remove_macvlan_element_data element;
+
+		memset(&element, 0, sizeof(element));
+		memcpy(element.mac_addr, &dev->data->mac_addrs[0].addr_bytes, ETH_ADDR_LEN);
+		element.flags = I40E_AQC_MACVLAN_DEL_PERFECT_MATCH;
+		i40e_aq_remove_macvlan(hw, vsi->seid, &element, 1, NULL);
+	} else {
+		i40e_vsi_delete_mac(vsi, &dev->data->mac_addrs[0]);
+	}
+
+	if (!memcmp(mac_addr->addr_bytes, hw->mac.addr, ETH_ADDR_LEN)) {
+		struct i40e_aqc_add_macvlan_element_data element;
+
+		memset(&element, 0, sizeof(element));
+		memcpy(element.mac_addr, hw->mac.addr, ETH_ADDR_LEN);
+		element.flags = CPU_TO_LE16(I40E_AQC_MACVLAN_ADD_PERFECT_MATCH);
+		i40e_aq_add_macvlan(hw, vsi->seid, &element, 1, NULL);
+	} else {
+		struct i40e_mac_filter_info filter;
+
+		memcpy(&filter.mac_addr, mac_addr, ETH_ADDR_LEN);
+		filter.filter_type = RTE_MAC_PERFECT_MATCH;
+		i40e_vsi_add_mac(vsi, &filter);
+	}
 }
 
 static int
