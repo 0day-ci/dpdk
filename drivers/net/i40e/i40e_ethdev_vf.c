@@ -158,6 +158,7 @@ i40evf_dev_rx_queue_intr_disable(struct rte_eth_dev *dev, uint16_t queue_id);
 static void i40evf_handle_pf_event(__rte_unused struct rte_eth_dev *dev,
 				   uint8_t *msg,
 				   uint16_t msglen);
+static int i40evf_dev_mtu_set(struct rte_eth_dev *dev, uint16_t);
 
 /* Default hash key buffer for RSS */
 static uint32_t rss_key_default[I40E_VFQF_HKEY_MAX_INDEX + 1];
@@ -225,6 +226,7 @@ static const struct eth_dev_ops i40evf_eth_dev_ops = {
 	.reta_query           = i40evf_dev_rss_reta_query,
 	.rss_hash_update      = i40evf_dev_rss_hash_update,
 	.rss_hash_conf_get    = i40evf_dev_rss_hash_conf_get,
+	.mtu_set              = i40evf_dev_mtu_set,
 };
 
 /*
@@ -2634,4 +2636,35 @@ i40evf_dev_rss_hash_conf_get(struct rte_eth_dev *dev,
 	rss_conf->rss_hf = i40e_parse_hena(hena);
 
 	return 0;
+}
+
+static int
+i40evf_dev_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
+{
+	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct rte_eth_dev_data *dev_data = dev->data;
+	uint32_t frame_size = mtu + ETHER_HDR_LEN
+			      + ETHER_CRC_LEN + I40E_VLAN_TAG_SIZE;
+	int ret = 0;
+
+	/* check if mtu is within the allowed range */
+	if ((mtu < ETHER_MIN_MTU) || (frame_size > I40E_FRAME_SIZE_MAX))
+		return -EINVAL;
+
+	/* mtu setting is forbidden if port is started */
+	if (dev_data->dev_started) {
+		PMD_DRV_LOG(ERR,
+			    "port %d must be stopped before configuration\n",
+			    dev_data->port_id);
+		return -EBUSY;
+	}
+
+	if (frame_size > ETHER_MAX_LEN)
+		dev_data->dev_conf.rxmode.jumbo_frame = 1;
+	else
+		dev_data->dev_conf.rxmode.jumbo_frame = 0;
+
+	dev_data->dev_conf.rxmode.max_rx_pkt_len = frame_size;
+
+	return ret;
 }
