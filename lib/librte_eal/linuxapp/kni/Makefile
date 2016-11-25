@@ -44,8 +44,12 @@ MODULE_CFLAGS += -I$(RTE_OUTPUT)/include -I$(SRCDIR)/ethtool/ixgbe -I$(SRCDIR)/e
 MODULE_CFLAGS += -include $(RTE_OUTPUT)/include/rte_config.h
 MODULE_CFLAGS += -Wall -Werror
 
-ifeq ($(shell lsb_release -si 2>/dev/null),Ubuntu)
-MODULE_CFLAGS += -DUBUNTU_RELEASE_CODE=$(shell lsb_release -sr | tr -d .)
+ifneq ($(wildcard /etc/lsb-release),)
+include /etc/lsb-release
+endif
+
+ifeq ($(DISTRIB_ID),Ubuntu)
+MODULE_CFLAGS += -DUBUNTU_RELEASE_CODE=$(subst .,,$(DISTRIB_ID))
 UBUNTU_KERNEL_CODE := $(shell echo `grep UTS_RELEASE $(RTE_KERNELDIR)/include/generated/utsrelease.h \
 	 | cut -d '"' -f2 | cut -d- -f1,2 | tr .- ,`,1)
 MODULE_CFLAGS += -D"UBUNTU_KERNEL_CODE=UBUNTU_KERNEL_VERSION($(UBUNTU_KERNEL_CODE))"
