@@ -30,10 +30,124 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/queue.h>
+
 #include <rte_ethdev.h>
 #include <rte_flow.h>
 #include <rte_flow_driver.h>
+#include <rte_malloc.h>
+
 #include "mlx5.h"
+
+struct rte_flow {
+	LIST_ENTRY(rte_flow) next;
+};
+
+/**
+ * Validate a flow supported by the NIC.
+ *
+ * @param priv
+ *   Pointer to private structure.
+ * @param[in] attr
+ *   Flow rule attributes.
+ * @param[in] pattern
+ *   Pattern specification (list terminated by the END pattern item).
+ * @param[in] actions
+ *   Associated actions (list terminated by the END action).
+ * @param[out] error
+ *   Perform verbose error reporting if not NULL.
+ *
+ * @return
+ *   0 on success, a negative errno value otherwise and rte_errno is set.
+ */
+static int
+priv_flow_validate(struct priv *priv,
+		   const struct rte_flow_attr *attr,
+		   const struct rte_flow_item items[],
+		   const struct rte_flow_action actions[],
+		   struct rte_flow_error *error)
+{
+	(void)priv;
+	const struct rte_flow_item *ilast = NULL;
+	const struct rte_flow_action *alast = NULL;
+
+	if (attr->group) {
+		rte_flow_error_set(error, ENOTSUP,
+				   RTE_FLOW_ERROR_TYPE_ATTR_GROUP,
+				   NULL,
+				   "groups are not supported");
+		return -rte_errno;
+	}
+	if (attr->priority) {
+		rte_flow_error_set(error, ENOTSUP,
+				   RTE_FLOW_ERROR_TYPE_ATTR_PRIORITY,
+				   NULL,
+				   "priorities are not supported");
+		return -rte_errno;
+	}
+	if (attr->egress) {
+		rte_flow_error_set(error, ENOTSUP,
+				   RTE_FLOW_ERROR_TYPE_ATTR_EGRESS,
+				   NULL,
+				   "egress is not supported");
+		return -rte_errno;
+	}
+	if (!attr->ingress) {
+		rte_flow_error_set(error, ENOTSUP,
+				   RTE_FLOW_ERROR_TYPE_ATTR_INGRESS,
+				   NULL,
+				   "only ingress is supported");
+		return -rte_errno;
+	}
+	for (; items->type != RTE_FLOW_ITEM_TYPE_END; ++items) {
+		if (items->type == RTE_FLOW_ITEM_TYPE_VOID) {
+			continue;
+		} else if (items->type == RTE_FLOW_ITEM_TYPE_ETH) {
+			if (ilast)
+				goto exit_item_not_supported;
+			ilast = items;
+		} else if ((items->type == RTE_FLOW_ITEM_TYPE_IPV4) ||
+			   (items->type == RTE_FLOW_ITEM_TYPE_IPV6)) {
+			if (!ilast)
+				goto exit_item_not_supported;
+			else if (ilast->type != RTE_FLOW_ITEM_TYPE_ETH)
+				goto exit_item_not_supported;
+			ilast = items;
+		} else if ((items->type == RTE_FLOW_ITEM_TYPE_UDP) ||
+			   (items->type == RTE_FLOW_ITEM_TYPE_TCP)) {
+			if (!ilast)
+				goto exit_item_not_supported;
+			else if ((ilast->type != RTE_FLOW_ITEM_TYPE_IPV4) &&
+				 (ilast->type != RTE_FLOW_ITEM_TYPE_IPV6))
+				goto exit_item_not_supported;
+			ilast = items;
+		} else {
+			goto exit_item_not_supported;
+		}
+	}
+	for (; actions->type != RTE_FLOW_ACTION_TYPE_END; ++actions) {
+		if (actions->type == RTE_FLOW_ACTION_TYPE_VOID) {
+			continue;
+		} else if ((actions->type == RTE_FLOW_ACTION_TYPE_QUEUE) ||
+			   (actions->type == RTE_FLOW_ACTION_TYPE_DROP)) {
+			if (alast &&
+			    alast->type != actions->type)
+				goto exit_action_not_supported;
+			alast = actions;
+		} else {
+			goto exit_action_not_supported;
+		}
+	}
+	return 0;
+exit_item_not_supported:
+	rte_flow_error_set(error, ENOTSUP, RTE_FLOW_ERROR_TYPE_ITEM,
+			   items, "item not supported");
+	return -rte_errno;
+exit_action_not_supported:
+	rte_flow_error_set(error, ENOTSUP, RTE_FLOW_ERROR_TYPE_ACTION,
+			   actions, "action not supported");
+	return -rte_errno;
+}
 
 /**
  * Validate a flow supported by the NIC.
@@ -48,15 +162,13 @@ mlx5_flow_validate(struct rte_eth_dev *dev,
 		   const struct rte_flow_action actions[],
 		   struct rte_flow_error *error)
 {
-	(void)dev;
-	(void)attr;
-	(void)items;
-	(void)actions;
-	(void)error;
-	rte_flow_error_set(error, ENOTSUP,
-			   RTE_FLOW_ERROR_TYPE_NONE,
-			   NULL, "not implemented yet");
-	return -rte_errno;
+	struct priv *priv = dev->data->dev_private;
+	int ret;
+
+	priv_lock(priv);
+	ret = priv_flow_validate(priv, attr, items, actions, error);
+	priv_unlock(priv);
+	return ret;
 }
 
 /**
@@ -72,15 +184,35 @@ mlx5_flow_create(struct rte_eth_dev *dev,
 		 const struct rte_flow_action actions[],
 		 struct rte_flow_error *error)
 {
-	(void)dev;
-	(void)attr;
-	(void)items;
-	(void)actions;
-	(void)error;
-	rte_flow_error_set(error, ENOTSUP,
-			   RTE_FLOW_ERROR_TYPE_NONE,
-			   NULL, "not implemented yet");
-	return NULL;
+	struct priv *priv = dev->data->dev_private;
+	struct rte_flow *flow;
+
+	priv_lock(priv);
+	if (priv_flow_validate(priv, attr, items, actions, error)) {
+		priv_unlock(priv);
+		return NULL;
+	}
+	flow = rte_malloc(__func__, sizeof(struct rte_flow), 0);
+	LIST_INSERT_HEAD(&priv->flows, flow, next);
+	priv_unlock(priv);
+	return flow;
+}
+
+/**
+ * Destroy a flow.
+ *
+ * @param  priv
+ *   Pointer to private structure.
+ * @param[in] flow
+ *   Pointer to the flow to destroy.
+ */
+static void
+priv_flow_destroy(struct priv *priv,
+		  struct rte_flow *flow)
+{
+	(void)priv;
+	LIST_REMOVE(flow, next);
+	rte_free(flow);
 }
 
 /**
@@ -94,13 +226,13 @@ mlx5_flow_destroy(struct rte_eth_dev *dev,
 		  struct rte_flow *flow,
 		  struct rte_flow_error *error)
 {
-	(void)dev;
-	(void)flow;
+	struct priv *priv = dev->data->dev_private;
+
 	(void)error;
-	rte_flow_error_set(error, ENOTSUP,
-			   RTE_FLOW_ERROR_TYPE_NONE,
-			   NULL, "not implemented yet");
-	return -rte_errno;
+	priv_lock(priv);
+	priv_flow_destroy(priv, flow);
+	priv_unlock(priv);
+	return 0;
 }
 
 /**
@@ -113,10 +245,16 @@ int
 mlx5_flow_flush(struct rte_eth_dev *dev,
 		struct rte_flow_error *error)
 {
-	(void)dev;
+	struct priv *priv = dev->data->dev_private;
+
 	(void)error;
-	rte_flow_error_set(error, ENOTSUP,
-			   RTE_FLOW_ERROR_TYPE_NONE,
-			   NULL, "not implemented yet");
-	return -rte_errno;
+	priv_lock(priv);
+	while (!LIST_EMPTY(&priv->flows)) {
+		struct rte_flow *flow;
+
+		flow = LIST_FIRST(&priv->flows);
+		priv_flow_destroy(priv, flow);
+	}
+	priv_unlock(priv);
+	return 0;
 }

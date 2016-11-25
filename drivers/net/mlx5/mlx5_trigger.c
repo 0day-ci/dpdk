@@ -90,6 +90,7 @@ mlx5_dev_start(struct rte_eth_dev *dev)
 	if (dev->data->dev_conf.fdir_conf.mode != RTE_FDIR_MODE_NONE)
 		priv_fdir_enable(priv);
 	priv_dev_interrupt_handler_install(priv, dev);
+	LIST_INIT(&priv->flows);
 	priv_unlock(priv);
 	return -err;
 }
