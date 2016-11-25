@@ -9709,6 +9709,7 @@ static int
 i40e_dev_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 {
 	struct i40e_pf *pf = I40E_DEV_PRIVATE_TO_PF(dev->data->dev_private);
+	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct rte_eth_dev_data *dev_data = pf->dev_data;
 	uint32_t frame_size = mtu + ETHER_HDR_LEN
 			      + ETHER_CRC_LEN + I40E_VLAN_TAG_SIZE;
@@ -9732,6 +9733,7 @@ i40e_dev_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 		dev_data->dev_conf.rxmode.jumbo_frame = 0;
 
 	dev_data->dev_conf.rxmode.max_rx_pkt_len = frame_size;
+	i40e_aq_set_mac_config(hw, frame_size, TRUE, 0, NULL);
 
 	return ret;
 }
