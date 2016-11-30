@@ -182,6 +182,8 @@ extern "C" {
 #include <rte_pci.h>
 #include <rte_dev.h>
 #include <rte_devargs.h>
+#include <rte_meter.h>
+#include <rte_red.h>
 #include "rte_ether.h"
 #include "rte_eth_ctrl.h"
 #include "rte_dev_info.h"
@@ -1038,6 +1040,152 @@ TAILQ_HEAD(rte_eth_dev_cb_list, rte_eth_dev_callback);
 /**< l2 tunnel forwarding mask */
 #define ETH_L2_TUNNEL_FORWARDING_MASK   0x00000008
 
+/**
+ * Scheduler configuration
+ */
+
+/**< Max number of shapers per node */
+#define RTE_ETH_SCHED_SHAPERS_PER_NODE                     4
+/**< Invalid shaper ID */
+#define RTE_ETH_SCHED_SHAPER_ID_NONE                       UINT32_MAX
+/**< Max number of WRED contexts per node */
+#define RTE_ETH_SCHED_WRED_CONTEXTS_PER_NODE               4
+/**< Invalid WRED context ID */
+#define RTE_ETH_SCHED_WRED_CONTEXT_ID_NONE                 UINT32_MAX
+/**< Invalid node ID */
+#define RTE_ETH_SCHED_NODE_NULL                            UINT32_MAX
+
+/**
+  * Congestion management (CMAN) mode
+  *
+  * This is used for controlling the admission of packets into a packet queue or
+  * group of packet queues on congestion. On request of writing a new packet
+  * into the current queue while the queue is full, the *tail drop* algorithm
+  * drops the new packet while leaving the queue unmodified, as opposed to *head
+  * drop* algorithm, which drops the packet at the head of the queue (the oldest
+  * packet waiting in the queue) and admits the new packet at the tail of the
+  * queue.
+  *
+  * The *Random Early Detection (RED)* algorithm works by proactively dropping
+  * more and more input packets as the queue occupancy builds up. When the queue
+  * is full or almost full, RED effectively works as *tail drop*. The *Weighted
+  * RED* algorithm uses a separate set of RED thresholds per packet color.
+  */
+enum rte_eth_sched_cman_mode {
+	RTE_ETH_SCHED_CMAN_TAIL_DROP = 0, /**< Tail drop */
+	RTE_ETH_SCHED_CMAN_HEAD_DROP, /**< Head drop */
+	RTE_ETH_SCHED_CMAN_WRED, /**< Weighted Random Early Detection (WRED) */
+};
+
+/**
+  * WRED profile
+  */
+struct rte_eth_sched_wred_params {
+	/**< One set of RED parameters per packet color */
+	struct rte_red_params red_params[e_RTE_METER_COLORS];
+};
+
+/**
+  * Shaper (rate limiter) profile
+  *
+  * Multiple shaper instances can share the same shaper profile. Each node can
+  * have multiple shapers enabled (up to RTE_ETH_SCHED_SHAPERS_PER_NODE). Each
+  * shaper can be private to a node (only one node using it) or shared (multiple
+  * nodes use the same shaper instance).
+  */
+struct rte_eth_sched_shaper_params {
+	uint64_t rate; /**< Token bucket rate (bytes per second) */
+	uint64_t size; /**< Token bucket size (bytes) */
+};
+
+/**
+  * Node parameters
+  *
+  * Each scheduler hierarchy node has multiple inputs (children nodes of the
+  * current parent node) and a single output (which is input to its parent
+  * node). The current node arbitrates its inputs using Strict Priority (SP)
+  * and Weighted Fair Queuing (WFQ) algorithms to schedule input packets on its
+  * output while observing its shaping/rate limiting constraints.  Algorithms
+  * such as Weighted Round Robin (WRR), byte-level WRR, Deficit WRR (DWRR), etc
+  * are considered approximations of the ideal WFQ and are assimilated to WFQ,
+  * although an associated implementation-dependent trade-off on accuracy,
+  * performance and resource usage might exist.
+  *
+  * Children nodes with different priorities are scheduled using the SP
+  * algorithm, based on their priority, with zero (0) as the highest priority.
+  * Children with same priority are scheduled using the WFQ algorithm, based on
+  * their weight, which is relative to the sum of the weights of all siblings
+  * with same priority, with one (1) as the lowest weight.
+  */
+struct rte_eth_sched_node_params {
+	/**< Child node priority (used by SP). The highest priority is zero. */
+	uint32_t priority;
+	/**< Child node weight (used by WFQ), relative to some of weights of all
+	     siblings with same priority). The lowest weight is one. */
+	uint32_t weight;
+	/**< Set of shaper instances enabled for current node. Each node shaper
+	     can be disabled by setting it to RTE_ETH_SCHED_SHAPER_ID_NONE. */
+	uint32_t shaper_id[RTE_ETH_SCHED_SHAPERS_PER_NODE];
+	/**< Set to zero if current node is not a hierarchy leaf node, set to a
+	     non-zero value otherwise. A leaf node is a hierarchy node that does
+	     not have any children. A leaf node has to be connected to a valid
+	     packet queue. */
+	int is_leaf;
+	/**< Parameters valid for leaf nodes only */
+	struct {
+		/**< Packet queue ID */
+		uint64_t queue_id;
+		/**< Congestion management mode */
+		enum rte_eth_sched_cman_mode cman;
+		/**< Set of WRED contexts enabled for current leaf node. Each
+		     leaf node WRED context can be disabled by setting it to
+		     RTE_ETH_SCHED_WRED_CONTEXT_ID_NONE. Only valid when
+		     congestion management for current leaf node is set to WRED. */
+		uint32_t wred_context_id[RTE_ETH_SCHED_WRED_CONTEXTS_PER_NODE];
+	} leaf;
+};
+
+/**
+  * Node statistics counter type
+  */
+enum rte_eth_sched_stats_counter {
+	/**< Number of packets scheduled from current node. */
+	RTE_ETH_SCHED_STATS_COUNTER_N_PKTS = 1<< 0,
+	/**< Number of bytes scheduled from current node. */
+	RTE_ETH_SCHED_STATS_COUNTER_N_BYTES = 1 << 1,
+	RTE_ETH_SCHED_STATS_COUNTER_N_PKTS_DROPPED = 1 << 2,
+	RTE_ETH_SCHED_STATS_COUNTER_N_BYTES_DROPPED = 1 << 3,
+	/**< Number of packets currently waiting in the packet queue of current
+	     leaf node. */
+	RTE_ETH_SCHED_STATS_COUNTER_N_PKTS_QUEUED = 1 << 4,
+	/**< Number of bytes currently waiting in the packet queue of current
+	     leaf node. */
+	RTE_ETH_SCHED_STATS_COUNTER_N_BYTES_QUEUED = 1 << 5,
+};
+
+/**
+  * Node statistics counters
+  */
+struct rte_eth_sched_node_stats {
+	/**< Number of packets scheduled from current node. */
+	uint64_t n_pkts;
+	/**< Number of bytes scheduled from current node. */
+	uint64_t n_bytes;
+	/**< Statistics counters for leaf nodes only */
+	struct {
+		/**< Number of packets dropped by current leaf node. */
+		uint64_t n_pkts_dropped;
+		/**< Number of bytes dropped by current leaf node. */
+		uint64_t n_bytes_dropped;
+		/**< Number of packets currently waiting in the packet queue of
+		     current leaf node. */
+		uint64_t n_pkts_queued;
+		/**< Number of bytes currently waiting in the packet queue of
+		     current leaf node. */
+		uint64_t n_bytes_queued;
+	} leaf;
+};
+
 /*
  * Definitions of all functions exported by an Ethernet driver through the
  * the generic structure of type *eth_dev_ops* supplied in the *rte_eth_dev*
@@ -1421,6 +1569,120 @@ typedef int (*eth_get_dcb_info)(struct rte_eth_dev *dev,
 				 struct rte_eth_dcb_info *dcb_info);
 /**< @internal Get dcb information on an Ethernet device */
 
+typedef int (*eth_sched_wred_profile_add_t)(struct rte_eth_dev *dev,
+	uint32_t wred_profile_id,
+	struct rte_eth_sched_wred_params *profile);
+/**< @internal Scheduler WRED profile add */
+
+typedef int (*eth_sched_wred_profile_delete_t)(struct rte_eth_dev *dev,
+	uint32_t wred_profile_id);
+/**< @internal Scheduler WRED profile delete */
+
+typedef int (*eth_sched_wred_context_add_t)(struct rte_eth_dev *dev,
+	uint32_t wred_context_id,
+	uint32_t wred_profile_id);
+/**< @internal Scheduler WRED context add */
+
+typedef int (*eth_sched_wred_context_delete_t)(struct rte_eth_dev *dev,
+	uint32_t wred_context_id);
+/**< @internal Scheduler WRED context delete */
+
+typedef int (*eth_sched_shaper_profile_add_t)(struct rte_eth_dev *dev,
+	uint32_t shaper_profile_id,
+	struct rte_eth_sched_shaper_params *profile);
+/**< @internal Scheduler shaper profile add */
+
+typedef int (*eth_sched_shaper_profile_delete_t)(struct rte_eth_dev *dev,
+	uint32_t shaper_profile_id);
+/**< @internal Scheduler shaper profile delete */
+
+typedef int (*eth_sched_shaper_add_t)(struct rte_eth_dev *dev,
+	uint32_t shaper_id,
+	uint32_t shaper_profile_id);
+/**< @internal Scheduler shaper instance add */
+
+typedef int (*eth_sched_shaper_delete_t)(struct rte_eth_dev *dev,
+	uint32_t shaper_id);
+/**< @internal Scheduler shaper instance delete */
+
+typedef int (*eth_sched_node_add_t)(struct rte_eth_dev *dev,
+	uint32_t node_id,
+	uint32_t parent_node_id,
+	struct rte_eth_sched_node_params *params);
+/**< @internal Scheduler node add */
+
+typedef int (*eth_sched_node_delete_t)(struct rte_eth_dev *dev,
+	uint32_t node_id);
+/**< @internal Scheduler node delete */
+
+typedef int (*eth_sched_hierarchy_set_t)(struct rte_eth_dev *dev,
+	int clear_on_fail);
+/**< @internal Scheduler hierarchy set */
+
+typedef int (*eth_sched_node_priority_set_t)(struct rte_eth_dev *dev,
+	uint32_t node_id,
+	uint32_t priority);
+/**< @internal Scheduler node priority set */
+
+typedef int (*eth_sched_node_weight_set_t)(struct rte_eth_dev *dev,
+	uint32_t node_id,
+	uint32_t weight);
+/**< @internal Scheduler node weight set */
+
+typedef int (*eth_sched_node_shaper_set_t)(struct rte_eth_dev *dev,
+	uint32_t node_id,
+	uint32_t shaper_pos,
+	uint32_t shaper_id);
+/**< @internal Scheduler node shaper set */
+
+typedef int (*eth_sched_node_queue_set_t)(struct rte_eth_dev *dev,
+	uint32_t node_id,
+	uint32_t queue_id);
+/**< @internal Scheduler node queue set */
+
+typedef int (*eth_sched_node_cman_set_t)(struct rte_eth_dev *dev,
+	uint32_t node_id,
+	enum rte_eth_sched_cman_mode cman);
+/**< @internal Scheduler node congestion management mode set */
+
+typedef int (*eth_sched_node_wred_context_set_t)(struct rte_eth_dev *dev,
+	uint32_t node_id,
+	uint32_t wred_context_pos,
+	uint32_t wred_context_id);
+/**< @internal Scheduler node WRED context set */
+
+typedef int (*eth_sched_stats_get_enabled_t)(struct rte_eth_dev *dev,
+	uint64_t *nonleaf_node_capability_stats_mask,
+	uint64_t *nonleaf_node_enabled_stats_mask,
+	uint64_t *leaf_node_capability_stats_mask,
+	uint64_t *leaf_node_enabled_stats_mask);
+/**< @internal Scheduler get set of stats counters enabled for all nodes */
+
+typedef int (*eth_sched_stats_enable_t)(struct rte_eth_dev *dev,
+	uint64_t nonleaf_node_enabled_stats_mask,
+	uint64_t leaf_node_enabled_stats_mask);
+/**< @internal Scheduler enable selected stats counters for all nodes */
+
+typedef int (*eth_sched_node_stats_get_enabled_t)(struct rte_eth_dev *dev,
+	uint32_t node_id,
+	uint64_t *capability_stats_mask,
+	uint64_t *enabled_stats_mask);
+/**< @internal Scheduler get set of stats counters enabled for specific node */
+
+typedef int (*eth_sched_node_stats_enable_t)(struct rte_eth_dev *dev,
+	uint32_t node_id,
+	uint64_t enabled_stats_mask);
+/**< @internal Scheduler enable selected stats counters for specific node */
+
+typedef int (*eth_sched_node_stats_read_t)(struct rte_eth_dev *dev,
+	uint32_t node_id,
+	struct rte_eth_sched_node_stats *stats,
+	int clear);
+/**< @internal Scheduler read stats counters for specific node */
+
+typedef int (*eth_sched_run_t)(struct rte_eth_dev *dev);
+/**< @internal Scheduler run */
+
 /**
  * @internal A structure containing the functions exported by an Ethernet driver.
  */
@@ -1547,6 +1809,53 @@ struct eth_dev_ops {
 	eth_l2_tunnel_eth_type_conf_t l2_tunnel_eth_type_conf;
 	/** Enable/disable l2 tunnel offload functions */
 	eth_l2_tunnel_offload_set_t l2_tunnel_offload_set;
+
+	/** Scheduler WRED profile add */
+	eth_sched_wred_profile_add_t sched_wred_profile_add;
+	/** Scheduler WRED profile delete */
+	eth_sched_wred_profile_delete_t sched_wred_profile_delete;
+	/** Scheduler WRED context add */
+	eth_sched_wred_context_add_t sched_wred_context_add;
+	/** Scheduler WRED context delete */
+	eth_sched_wred_context_delete_t sched_wred_context_delete;
+	/** Scheduler shaper profile add */
+	eth_sched_shaper_profile_add_t sched_shaper_profile_add;
+	/** Scheduler shaper profile delete */
+	eth_sched_shaper_profile_delete_t sched_shaper_profile_delete;
+	/** Scheduler shaper instance add */
+	eth_sched_shaper_add_t sched_shaper_add;
+	/** Scheduler shaper instance delete */
+	eth_sched_shaper_delete_t sched_shaper_delete;
+	/** Scheduler node add */
+	eth_sched_node_add_t sched_node_add;
+	/** Scheduler node delete */
+	eth_sched_node_delete_t sched_node_delete;
+	/** Scheduler hierarchy set */
+	eth_sched_hierarchy_set_t sched_hierarchy_set;
+	/** Scheduler node priority set */
+	eth_sched_node_priority_set_t sched_node_priority_set;
+	/** Scheduler node weight set */
+	eth_sched_node_weight_set_t sched_node_weight_set;
+	/** Scheduler node shaper set */
+	eth_sched_node_shaper_set_t sched_node_shaper_set;
+	/** Scheduler node queue set */
+	eth_sched_node_queue_set_t sched_node_queue_set;
+	/** Scheduler node congestion management mode set */
+	eth_sched_node_cman_set_t sched_node_cman_set;
+	/** Scheduler node WRED context set */
+	eth_sched_node_wred_context_set_t sched_node_wred_context_set;
+	/** Scheduler get statistics counter type enabled for all nodes */
+	eth_sched_stats_get_enabled_t sched_stats_get_enabled;
+	/** Scheduler enable selected statistics counters for all nodes */
+	eth_sched_stats_enable_t sched_stats_enable;
+	/** Scheduler get statistics counter type enabled for current node */
+	eth_sched_node_stats_get_enabled_t sched_node_stats_get_enabled;
+	/** Scheduler enable selected statistics counters for current node */
+	eth_sched_node_stats_enable_t sched_node_stats_enable;
+	/** Scheduler read statistics counters for current node */
+	eth_sched_node_stats_read_t sched_node_stats_read;
+	/** Scheduler run */
+	eth_sched_run_t sched_run;
 };
 
 /**
@@ -4334,6 +4643,491 @@ rte_eth_dev_l2_tunnel_offload_set(uint8_t port_id,
 				  struct rte_eth_l2_tunnel_conf *l2_tunnel,
 				  uint32_t mask,
 				  uint8_t en);
+
+/**
+ * Scheduler WRED profile add
+ *
+ * Create a new WRED profile with ID set to *wred_profile_id*. The new profile
+ * is used to create one or several WRED contexts.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param wred_profile_id
+ *   WRED profile ID for the new profile. Needs to be unused.
+ * @param profile
+ *   WRED profile parameters. Needs to be pre-allocated and valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_wred_profile_add(uint8_t port_id,
+	uint32_t wred_profile_id,
+	struct rte_eth_sched_wred_params *profile);
+
+/**
+ * Scheduler WRED profile delete
+ *
+ * Delete an existing WRED profile. This operation fails when there is currently
+ * at least one user (i.e. WRED context) of this WRED profile.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param wred_profile_id
+ *   WRED profile ID. Needs to be the valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_wred_profile_delete(uint8_t port_id,
+	uint32_t wred_profile_id);
+
+/**
+ * Scheduler WRED context add or update
+ *
+ * When *wred_context_id* is invalid, a new WRED context with this ID is created
+ * by using the WRED profile identified by *wred_profile_id*.
+ *
+ * When *wred_context_id* is valid, this WRED context is no longer using the
+ * profile previously assigned to it and is updated to use the profile
+ * identified by *wred_profile_id*.
+ *
+ * A valid WRED context is assigned to one or several scheduler hierarchy leaf
+ * nodes configured to use WRED as the congestion management mode.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param wred_context_id
+ *   WRED context ID
+ * @param wred_profile_id
+ *   WRED profile ID. Needs to be the valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_wred_context_add(uint8_t port_id,
+	uint32_t wred_context_id,
+	uint32_t wred_profile_id);
+
+/**
+ * Scheduler WRED context delete
+ *
+ * Delete an existing WRED context. This operation fails when there is currently
+ * at least one user (i.e. scheduler hierarchy leaf node) of this WRED context.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param wred_context_id
+ *   WRED context ID. Needs to be the valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_wred_context_delete(uint8_t port_id,
+	uint32_t wred_context_id);
+
+/**
+ * Scheduler shaper profile add
+ *
+ * Create a new shaper profile with ID set to *shaper_profile_id*. The new
+ * shaper profile is used to create one or several shapers.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param shaper_profile_id
+ *   Shaper profile ID for the new profile. Needs to be unused.
+ * @param profile
+ *   Shaper profile parameters. Needs to be pre-allocated and valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_shaper_profile_add(uint8_t port_id,
+	uint32_t shaper_profile_id,
+	struct rte_eth_sched_shaper_params *profile);
+
+/**
+ * Scheduler shaper profile delete
+ *
+ * Delete an existing shaper profile. This operation fails when there is
+ * currently at least one user (i.e. shaper) of this shaper profile.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param shaper_profile_id
+ *   Shaper profile ID. Needs to be the valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+/* no users (shapers) using this profile */
+int rte_eth_sched_shaper_profile_delete(uint8_t port_id,
+	uint32_t shaper_profile_id);
+
+/**
+ * Scheduler shaper add or update
+ *
+ * When *shaper_id* is not a valid shaper ID, a new shaper with this ID is
+ * created using the shaper profile identified by *shaper_profile_id*.
+ *
+ * When *shaper_id* is a valid shaper ID, this shaper is no longer using the
+ * shaper profile previously assigned to it and is updated to use the shaper
+ * profile identified by *shaper_profile_id*.
+ *
+ * A valid shaper is assigned to one or several scheduler hierarchy nodes.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param shaper_id
+ *   Shaper ID
+ * @param shaper_profile_id
+ *   Shaper profile ID. Needs to be the valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_shaper_add(uint8_t port_id,
+	uint32_t shaper_id,
+	uint32_t shaper_profile_id);
+
+/**
+ * Scheduler shaper delete
+ *
+ * Delete an existing shaper. This operation fails when there is currently at
+ * least one user (i.e. scheduler hierarchy node) of this shaper.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param shaper_id
+ *   Shaper ID. Needs to be the valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_shaper_delete(uint8_t port_id,
+	uint32_t shaper_id);
+
+/**
+ * Scheduler node add or remap
+ *
+ * When *node_id* is not a valid node ID, a new node with this ID is created and
+ * connected as child to the existing node identified by *parent_node_id*.
+ *
+ * When *node_id* is a valid node ID, this node is disconnected from its current
+ * parent and connected as child to another existing node identified by
+ * *parent_node_id *.
+ *
+ * This function can be called during port initialization phase (before the
+ * Ethernet port is started) for building the scheduler start-up hierarchy.
+ * Subject to the specific Ethernet port supporting on-the-fly scheduler
+ * hierarchy updates, this function can also be called during run-time (after
+ * the Ethernet port is started).
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID
+ * @param parent_node_id
+ *   Parent node ID. Needs to be the valid.
+ * @param params
+ *   Node parameters. Needs to be pre-allocated and valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_add(uint8_t port_id,
+	uint32_t node_id,
+	uint32_t parent_node_id,
+	struct rte_eth_sched_node_params *params);
+
+/**
+ * Scheduler node delete
+ *
+ * Delete an existing node. This operation fails when this node currently has at
+ * least one user (i.e. child node).
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID. Needs to be valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_delete(uint8_t port_id,
+	uint32_t node_id);
+
+/**
+ * Scheduler hierarchy set
+ *
+ * This function is called during the port initialization phase (before the
+ * Ethernet port is started) to freeze the scheduler start-up hierarchy.
+ *
+ * This function fails when the currently configured scheduler hierarchy is not
+ * supported by the Ethernet port, in which case the user can abort or try out
+ * another hierarchy configuration (e.g. a hierarchy with less leaf nodes),
+ * which can be build from scratch (when *clear_on_fail* is enabled) or by
+ * modifying the existing hierarchy configuration (when *clear_on_fail* is
+ * disabled).
+ *
+ * Note that, even when the configured scheduler hierarchy is supported (so this
+ * function is successful), the Ethernet port start might still fail due to e.g.
+ * not enough memory being available in the system, etc.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param clear_on_fail
+ *   On function call failure, hierarchy is cleared when this parameter is
+ *   non-zero and preserved when this parameter is equal to zero.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_hierarchy_set(uint8_t port_id,
+	int clear_on_fail);
+
+/**
+ * Scheduler node priority set
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID. Needs to be valid.
+ * @param priority
+ *   Node priority. The highest node priority is zero. Used by the SP algorithm
+ *   running on the parent of the current node for scheduling this child node.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_priority_set(uint8_t port_id,
+	uint32_t node_id,
+	uint32_t priority);
+
+/**
+ * Scheduler node weight set
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID. Needs to be valid.
+ * @param weight
+ *   Node weight. The node weight is relative to the weight sum of all siblings
+ *   that have the same priority. The lowest weight is zero. Used by the WFQ
+ *   algorithm running on the parent of the current node for scheduling this
+ *   child node.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_weight_set(uint8_t port_id,
+	uint32_t node_id,
+	uint32_t weight);
+
+/**
+ * Scheduler node shaper set
+ * 
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID. Needs to be valid.
+ * @param shaper_pos
+ *   Position in the shaper array of the current node
+ *   (0 .. RTE_ETH_SCHED_SHAPERS_PER_NODE-1).
+ * @param shaper_id
+ *   Shaper ID. Needs to be either valid shaper ID or set to
+ *   RTE_ETH_SCHED_SHAPER_ID_NONE in order to invalidate the shaper on position
+ *   *shaper_pos* within the current node.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_shaper_set(uint8_t port_id,
+	uint32_t node_id,
+	uint32_t shaper_pos,
+	uint32_t shaper_id);
+
+/**
+ * Scheduler node queue set
+ * 
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID. Needs to be valid.
+ * @param queue_id
+ *   Queue ID. Needs to be valid.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_queue_set(uint8_t port_id,
+	uint32_t node_id,
+	uint32_t queue_id);
+
+/**
+ * Scheduler node congestion management mode set
+ * 
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID. Needs to be valid leaf node ID.
+ * @param cman
+ *   Congestion management mode.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_cman_set(uint8_t port_id,
+	uint32_t node_id,
+	enum rte_eth_sched_cman_mode cman);
+
+/**
+ * Scheduler node WRED context set
+ * 
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID. Needs to be valid leaf node ID that has WRED selected as the
+ *   congestion management mode.
+ * @param wred_context_pos
+ *   Position in the WRED context array of the current leaf node
+ *   (0 .. RTE_ETH_SCHED_WRED_CONTEXTS_PER_NODE-1)
+ * @param wred_context_id
+ *   WRED context ID. Needs to be either valid WRED context ID or set to
+ *   RTE_ETH_SCHED_WRED_CONTEXT_ID_NONE in order to invalidate the WRED context
+ *   on position *wred_context_pos* within the current leaf node.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_wred_context_set(uint8_t port_id,
+	uint32_t node_id,
+	uint32_t wred_context_pos,
+	uint32_t wred_context_id);
+
+/**
+ * Scheduler get statistics counter types enabled for all nodes
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param nonleaf_node_capability_stats_mask
+ *   Statistics counter types available per node for all non-leaf nodes. Needs
+ *   to be pre-allocated.
+ * @param nonleaf_node_enabled_stats_mask
+ *   Statistics counter types currently enabled per node for each non-leaf node.
+ *   This is a subset of *nonleaf_node_capability_stats_mask*. Needs to be
+ *   pre-allocated.
+ * @param leaf_node_capability_stats_mask
+ *   Statistics counter types available per node for all leaf nodes. Needs to
+ *   be pre-allocated.
+ * @param leaf_node_enabled_stats_mask
+ *   Statistics counter types currently enabled for each leaf node. This is
+ *   a subset of *leaf_node_capability_stats_mask*. Needs to be pre-allocated.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_stats_get_enabled(uint8_t port_id,
+	uint64_t *nonleaf_node_capability_stats_mask,
+	uint64_t *nonleaf_node_enabled_stats_mask,
+	uint64_t *leaf_node_capability_stats_mask,
+	uint64_t *leaf_node_enabled_stats_mask);
+
+/**
+ * Scheduler enable selected statistics counters for all nodes
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param nonleaf_node_enabled_stats_mask
+ *   Statistics counter types to be enabled per node for each non-leaf node.
+ *   This needs to be a subset of the statistics counter types available per
+ *   node for all non-leaf nodes. Any statistics counter type not included in
+ *   this set is to be disabled for all non-leaf nodes.
+ * @param leaf_node_enabled_stats_mask
+ *   Statistics counter types to be enabled per node for each leaf node. This
+ *   needs to be a subset of the statistics counter types available per node for
+ *   all leaf nodes. Any statistics counter type not included in this set is to
+ *   be disabled for all leaf nodes.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_stats_enable(uint8_t port_id,
+	uint64_t nonleaf_node_enabled_stats_mask,
+	uint64_t leaf_node_enabled_stats_mask);
+
+/**
+ * Scheduler get statistics counter types enabled for current node
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID. Needs to be valid.
+ * @param capability_stats_mask
+ *   Statistics counter types available for the current node. Needs to be pre-allocated.
+ * @param enabled_stats_mask
+ *   Statistics counter types currently enabled for the current node. This is
+ *   a subset of *capability_stats_mask*. Needs to be pre-allocated.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_stats_get_enabled(uint8_t port_id,
+	uint32_t node_id,
+	uint64_t *capability_stats_mask,
+	uint64_t *enabled_stats_mask);
+
+/**
+ * Scheduler enable selected statistics counters for current node
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID. Needs to be valid.
+ * @param enabled_stats_mask
+ *   Statistics counter types to be enabled for the current node. This needs to
+ *   be a subset of the statistics counter types available for the current node.
+ *   Any statistics counter type not included in this set is to be disabled for
+ *   the current node.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_stats_enable(uint8_t port_id,
+	uint32_t node_id,
+	uint64_t enabled_stats_mask);
+
+/**
+ * Scheduler node statistics counters read
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param node_id
+ *   Node ID. Needs to be valid.
+ * @param stats
+ *   When non-NULL, it contains the current value for the statistics counters
+ *   enabled for the current node.
+ * @param clear
+ *   When this parameter has a non-zero value, the statistics counters are
+ *   cleared (i.e. set to zero) immediately after they have been read, otherwise
+ *   the statistics counters are left untouched.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+int rte_eth_sched_node_stats_read(uint8_t port_id,
+	uint32_t node_id,
+	struct rte_eth_sched_node_stats *stats,
+	int clear);
+
+/**
+ * Scheduler run
+ *
+ * The packet enqueue side of the scheduler hierarchy is typically done through
+ * the Ethernet device TX function. For HW implementations, the packet dequeue
+ * side is typically done by the Ethernet device without any SW intervention,
+ * therefore this functions should not do anything.
+ *
+ * However, for poll-mode SW or mixed HW-SW implementations, the SW intervention
+ * is likely to be required for running the packet dequeue side of the scheduler
+ * hierarchy. Other potential task performed by this function is periodic flush
+ * of any packet enqueue-side buffers used by the burst-mode implementations.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @return
+ *   0 on success, non-zero error code otherwise.
+ */
+static inline int
+rte_eth_sched_run(uint8_t port_id)
+{
+	struct rte_eth_dev *dev;
+
+#ifdef RTE_LIBRTE_ETHDEV_DEBUG
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, 0);
+#endif
+
+	dev = &rte_eth_devices[port_id];
+
+	return (dev->dev_ops->sched_run)? dev->dev_ops->sched_run(dev) : 0;
+}
 
 /**
 * Get the port id from pci adrress or device name
