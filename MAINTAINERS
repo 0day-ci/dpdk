@@ -364,7 +364,7 @@ M: Sony Chacko <sony.chacko@qlogic.com>
 F: drivers/net/qede/
 F: doc/guides/nics/qede.rst
 
-RedHat virtio
+Virtio PMD and vhost lib
 M: Yuanhan Liu <yuanhan.liu@linux.intel.com>
 T: git://dpdk.org/next/dpdk-next-virtio
 F: drivers/net/virtio/
