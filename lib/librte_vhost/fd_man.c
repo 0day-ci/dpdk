@@ -35,15 +35,39 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
-#include <sys/select.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <poll.h>
 #include <unistd.h>
 
 #include <rte_common.h>
+#include <rte_malloc.h>
 #include <rte_log.h>
 
 #include "fd_man.h"
+
+#define FDPOLLERR (POLLERR | POLLHUP | POLLNVAL)
+
+
+/**
+ * Adjusts the highest index populated in the array of fds
+ * @return
+ *   Index of highest position populated + 1.
+ */
+static int
+fdset_adjust_num(struct fdset *pfdset)
+{
+	int idx;
+
+	for (idx = pfdset->num - 1;
+	     idx >= 0 && pfdset->fd[idx].fd == -1;
+	     idx--)
+		;
+
+	pfdset->num = idx + 1;
+
+	return pfdset->num;
+}
 
 /**
  * Returns the index in the fdset for a given fd.
@@ -56,72 +80,62 @@ fdset_find_fd(struct fdset *pfdset, int fd)
 {
 	int i;
 
-	if (pfdset == NULL)
-		return -1;
-
-	for (i = 0; i < MAX_FDS && pfdset->fd[i].fd != fd; i++)
+	for (i = 0; i < pfdset->num && pfdset->fd[i].fd != fd; i++)
 		;
 
-	return i ==  MAX_FDS ? -1 : i;
+	return i == pfdset->num ? -1 : i;
 }
 
 static int
 fdset_find_free_slot(struct fdset *pfdset)
 {
-	return fdset_find_fd(pfdset, -1);
+	if (pfdset->num < MAX_FDS)
+		return pfdset->num;
+	else
+		return fdset_find_fd(pfdset, -1);
 }
 
-static int
-fdset_add_fd(struct fdset  *pfdset, int idx, int fd,
+static void
+fdset_add_fd(struct fdset *pfdset, int idx, int fd,
 	fd_cb rcb, fd_cb wcb, void *dat)
 {
 	struct fdentry *pfdentry;
-
-	if (pfdset == NULL || idx >= MAX_FDS || fd >= FD_SETSIZE)
-		return -1;
 
 	pfdentry = &pfdset->fd[idx];
 	pfdentry->fd = fd;
 	pfdentry->rcb = rcb;
 	pfdentry->wcb = wcb;
 	pfdentry->dat = dat;
-
-	return 0;
 }
 
 /**
- * Fill the read/write fd_set with the fds in the fdset.
+ * Compact the fdset and fill the read/write fds with the fds in the fdset.
  * @return
- *  the maximum fds filled in the read/write fd_set.
+ *  the number of fds filled in the read/write fds.
  */
 static int
-fdset_fill(fd_set *rfset, fd_set *wfset, struct fdset *pfdset)
+fdset_fill(struct pollfd *rwfds, struct fdset *pfdset)
 {
 	struct fdentry *pfdentry;
-	int i, maxfds = -1;
-	int num = MAX_FDS;
+	int i;
+	int num;
 
-	if (pfdset == NULL)
-		return -1;
-
-	for (i = 0; i < num; i++) {
+	for (i = 0, num = pfdset->num; i < num; i++) {
 		pfdentry = &pfdset->fd[i];
-		if (pfdentry->fd != -1) {
-			int added = 0;
-			if (pfdentry->rcb && rfset) {
-				FD_SET(pfdentry->fd, rfset);
-				added = 1;
-			}
-			if (pfdentry->wcb && wfset) {
-				FD_SET(pfdentry->fd, wfset);
-				added = 1;
-			}
-			if (added)
-				maxfds = pfdentry->fd < maxfds ?
-					maxfds : pfdentry->fd;
+
+		if (pfdentry->fd < 0) {
+			/* Hole in the list. Move the last one here */
+
+			*pfdentry = pfdset->fd[num - 1];
+			pfdset->fd[num - 1].fd = -1;
+			num = fdset_adjust_num(pfdset);
 		}
+		rwfds[i].fd = pfdentry->fd;
+		rwfds[i].events = pfdentry->rcb ? POLLIN : 0;
+		rwfds[i].events |= pfdentry->wcb ? POLLOUT : 0;
 	}
-	return maxfds;
+
+	return i;
 }
 
 void
@@ -131,6 +145,8 @@ fdset_init(struct fdset *pfdset)
 
 	if (pfdset == NULL)
 		return;
+
+	pthread_mutex_init(&pfdset->fd_mutex, NULL);
 
 	for (i = 0; i < MAX_FDS; i++) {
 		pfdset->fd[i].fd = -1;
@@ -152,14 +168,15 @@ fdset_add(struct fdset *pfdset, int fd, fd_cb rcb, fd_cb wcb, void *dat)
 
 	pthread_mutex_lock(&pfdset->fd_mutex);
 
-	/* Find a free slot in the list. */
 	i = fdset_find_free_slot(pfdset);
-	if (i == -1 || fdset_add_fd(pfdset, i, fd, rcb, wcb, dat) < 0) {
+	if (i == -1) {
 		pthread_mutex_unlock(&pfdset->fd_mutex);
 		return -2;
 	}
 
-	pfdset->num++;
+	fdset_add_fd(pfdset, i, fd, rcb, wcb, dat);
+	if (i == pfdset->num)
+		pfdset->num++;
 
 	pthread_mutex_unlock(&pfdset->fd_mutex);
 
@@ -189,7 +206,7 @@ fdset_del(struct fdset *pfdset, int fd)
 			pfdset->fd[i].fd = -1;
 			pfdset->fd[i].rcb = pfdset->fd[i].wcb = NULL;
 			pfdset->fd[i].dat = NULL;
-			pfdset->num--;
+			(void) fdset_adjust_num(pfdset);
 			i = -1;
 		}
 		pthread_mutex_unlock(&pfdset->fd_mutex);
@@ -211,11 +228,11 @@ fdset_del_slot(struct fdset *pfdset, int index)
 
 	pfdset->fd[index].fd = -1;
 	pfdset->fd[index].rcb = pfdset->fd[index].wcb = NULL;
-	pfdset->fd[index].dat = NULL;
-	pfdset->num--;
+	(void) fdset_adjust_num(pfdset);
 
 	pthread_mutex_unlock(&pfdset->fd_mutex);
 }
+
 
 /**
  * This functions runs in infinite blocking loop until there is no fd in
@@ -229,44 +246,48 @@ fdset_del_slot(struct fdset *pfdset, int index)
 void
 fdset_event_dispatch(struct fdset *pfdset)
 {
-	fd_set rfds, wfds;
-	int i, maxfds;
+	int i;
 	struct fdentry *pfdentry;
-	int num = MAX_FDS;
+	int numfds;
 	fd_cb rcb, wcb;
 	void *dat;
 	int fd;
 	int remove1, remove2;
 	int ret;
+	int handled;
 
 	if (pfdset == NULL)
 		return;
 
+	struct pollfd * const rwfds =
+		rte_malloc("struct pollfd", MAX_FDS * sizeof(*rwfds), 0);
+
 	while (1) {
-		struct timeval tv;
-		tv.tv_sec = 1;
-		tv.tv_usec = 0;
-		FD_ZERO(&rfds);
-		FD_ZERO(&wfds);
 		pthread_mutex_lock(&pfdset->fd_mutex);
 
-		maxfds = fdset_fill(&rfds, &wfds, pfdset);
+		numfds = fdset_fill(rwfds, pfdset);
 
 		pthread_mutex_unlock(&pfdset->fd_mutex);
 
 		/*
-		 * When select is blocked, other threads might unregister
+		 * When poll is blocked, other threads might unregister
 		 * listenfds from and register new listenfds into fdset.
-		 * When select returns, the entries for listenfds in the fdset
+		 * When poll returns, the entries for listenfds in the fdset
 		 * might have been updated. It is ok if there is unwanted call
 		 * for new listenfds.
 		 */
-		ret = select(maxfds + 1, &rfds, &wfds, NULL, &tv);
+		ret = poll(rwfds, numfds, 1000 /* millisecs */);
+
 		if (ret <= 0)
 			continue;
 
-		for (i = 0; i < num; i++) {
+		for (i = handled = 0; i < numfds && handled < ret; i++) {
+			if (!rwfds[i].revents)
+				continue;
+
+			handled++;
 			remove1 = remove2 = 0;
+
 			pthread_mutex_lock(&pfdset->fd_mutex);
 			pfdentry = &pfdset->fd[i];
 			fd = pfdentry->fd;
@@ -275,9 +296,12 @@ fdset_event_dispatch(struct fdset *pfdset)
 			dat = pfdentry->dat;
 			pfdentry->busy = 1;
 			pthread_mutex_unlock(&pfdset->fd_mutex);
-			if (fd >= 0 && FD_ISSET(fd, &rfds) && rcb)
+
+			if (fd >= 0 && rcb &&
+			    rwfds[i].revents & (POLLIN | FDPOLLERR))
 				rcb(fd, dat, &remove1);
-			if (fd >= 0 && FD_ISSET(fd, &wfds) && wcb)
+			if (fd >= 0 && wcb &&
+			    rwfds[i].revents & (POLLOUT | FDPOLLERR))
 				wcb(fd, dat, &remove2);
 			pfdentry->busy = 0;
 			/*
