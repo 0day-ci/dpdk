@@ -35,6 +35,7 @@ F: scripts/test-build.sh
 Stable Branches
 ---------------
 T: git://dpdk.org/dpdk-stable
+M: stable@dpdk.org
 
 Security Issues
 ---------------
