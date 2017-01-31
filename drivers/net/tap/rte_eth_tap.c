@@ -405,6 +405,63 @@ tap_link_update(struct rte_eth_dev *dev __rte_unused,
 	return 0;
 }
 
+static int tap_link_set(struct pmd_internals *pmd, int state)
+{
+	struct ifreq ifr;
+	int err, s;
+
+	/*
+	 * An AF_INET/DGRAM socket is needed for
+	 * SIOCGIFFLAGS/SIOCSIFFLAGS, using fd won't work.
+	 */
+	s = socket(AF_INET, SOCK_DGRAM, 0);
+	if (s < 0) {
+		RTE_LOG(ERR, PMD,
+			"Unable to get a socket to set flags: %s\n",
+			strerror(errno));
+		return -1;
+	}
+	memset(&ifr, 0, sizeof(ifr));
+	strncpy(ifr.ifr_name, pmd->name, IFNAMSIZ);
+	err = ioctl(s, SIOCGIFFLAGS, &ifr);
+	if (err < 0) {
+		RTE_LOG(ERR, PMD, "Unable to get tap netdevice flags: %s\n",
+			strerror(errno));
+		close(s);
+		return -1;
+	}
+	if (state == ETH_LINK_UP)
+		ifr.ifr_flags |= IFF_UP | IFF_NOARP;
+	else
+		ifr.ifr_flags &= ~(IFF_UP | IFF_NOARP);
+	err = ioctl(s, SIOCSIFFLAGS, &ifr);
+	if (err < 0) {
+		RTE_LOG(ERR, PMD, "Unable to set flags %s: %s\n",
+			state == ETH_LINK_UP ? "UP" : "DOWN", strerror(errno));
+		close(s);
+		return -1;
+	}
+	close(s);
+
+	return 0;
+}
+
+static int
+tap_link_set_down(struct rte_eth_dev *dev)
+{
+	struct pmd_internals *pmd = dev->data->dev_private;
+
+	return tap_link_set(pmd, ETH_LINK_DOWN);
+}
+
+static int
+tap_link_set_up(struct rte_eth_dev *dev)
+{
+	struct pmd_internals *pmd = dev->data->dev_private;
+
+	return tap_link_set(pmd, ETH_LINK_UP);
+}
+
 static int
 tap_setup_queue(struct rte_eth_dev *dev,
 		struct pmd_internals *internals,
@@ -532,6 +589,8 @@ static const struct eth_dev_ops ops = {
 	.rx_queue_release       = tap_rx_queue_release,
 	.tx_queue_release       = tap_tx_queue_release,
 	.link_update            = tap_link_update,
+	.dev_set_link_up        = tap_link_set_up,
+	.dev_set_link_down      = tap_link_set_down,
 	.stats_get              = tap_stats_get,
 	.stats_reset            = tap_stats_reset,
 };
