@@ -46,6 +46,7 @@
 #include <netinet/in.h>
 #include <linux/ethtool.h>
 #include <linux/sockios.h>
+#include <linux/version.h>
 #include <fcntl.h>
 
 /* DPDK headers don't like -pedantic. */
@@ -695,7 +696,7 @@ mlx5_link_update_unlocked_gset(struct rte_eth_dev *dev, int wait_to_complete)
 
 /**
  * Retrieve physical link information (unlocked version using new ioctl from
- * Linux 4.5).
+ * Linux 4.9).
  *
  * @param dev
  *   Pointer to Ethernet device structure.
@@ -705,7 +706,7 @@ mlx5_link_update_unlocked_gset(struct rte_eth_dev *dev, int wait_to_complete)
 static int
 mlx5_link_update_unlocked_gs(struct rte_eth_dev *dev, int wait_to_complete)
 {
-#ifdef ETHTOOL_GLINKSETTINGS
+#if KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE
 	struct priv *priv = mlx5_get_priv(dev);
 	struct ethtool_link_settings edata = {
 		.cmd = ETHTOOL_GLINKSETTINGS,
@@ -755,25 +756,18 @@ mlx5_link_update_unlocked_gs(struct rte_eth_dev *dev, int wait_to_complete)
 		  ETHTOOL_LINK_MODE_56000baseSR4_Full_BIT |
 		  ETHTOOL_LINK_MODE_56000baseLR4_Full_BIT))
 		priv->link_speed_capa |= ETH_LINK_SPEED_56G;
-	/* Link speeds available in kernel v4.6. */
-#ifdef HAVE_ETHTOOL_LINK_MODE_25G
 	if (sc & (ETHTOOL_LINK_MODE_25000baseCR_Full_BIT |
 		  ETHTOOL_LINK_MODE_25000baseKR_Full_BIT |
 		  ETHTOOL_LINK_MODE_25000baseSR_Full_BIT))
 		priv->link_speed_capa |= ETH_LINK_SPEED_25G;
-#endif
-#ifdef HAVE_ETHTOOL_LINK_MODE_50G
 	if (sc & (ETHTOOL_LINK_MODE_50000baseCR2_Full_BIT |
 		  ETHTOOL_LINK_MODE_50000baseKR2_Full_BIT))
 		priv->link_speed_capa |= ETH_LINK_SPEED_50G;
-#endif
-#ifdef HAVE_ETHTOOL_LINK_MODE_100G
 	if (sc & (ETHTOOL_LINK_MODE_100000baseKR4_Full_BIT |
 		  ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT |
 		  ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT |
 		  ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT))
 		priv->link_speed_capa |= ETH_LINK_SPEED_100G;
-#endif
 	dev_link.link_duplex = ((edata.duplex == DUPLEX_HALF) ?
 				ETH_LINK_HALF_DUPLEX : ETH_LINK_FULL_DUPLEX);
 	dev_link.link_autoneg = !(dev->data->dev_conf.link_speeds &
