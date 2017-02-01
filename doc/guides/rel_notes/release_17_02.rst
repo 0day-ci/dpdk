@@ -161,6 +161,12 @@ New Features
   See the :ref:`Virtio Interrupt Mode <virtio_interrupt_mode>` documentation
   for more information.
 
+* **Updated the enic driver.**
+
+  * Set new Rx checksum flags in mbufs to indicate unknown, good or bad.
+  * Fix set/remove of MAC addresses. Allow up to 64 addresses per device.
+  * Enable TSO on outer headers.
+
 * **Added ARMv8 crypto PMD.**
 
   A new crypto PMD has been added, which provides combined mode cryptografic
