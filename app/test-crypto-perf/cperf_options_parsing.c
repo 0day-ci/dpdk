@@ -335,6 +335,11 @@ parse_cipher_algo(struct cperf_options *opts, const char *arg)
 		},
 		{
 			rte_crypto_cipher_algorithm_strings
+			[RTE_CRYPTO_CIPHER_AES_DOCSISBPI],
+			RTE_CRYPTO_CIPHER_AES_DOCSISBPI
+		},
+		{
+			rte_crypto_cipher_algorithm_strings
 			[RTE_CRYPTO_CIPHER_AES_ECB],
 			RTE_CRYPTO_CIPHER_AES_ECB
 		},
