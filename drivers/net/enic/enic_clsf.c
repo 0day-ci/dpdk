@@ -315,8 +315,10 @@ copy_fltr_v2(struct filter_v2 *fltr, struct rte_eth_fdir_input *input,
 					input->flow.ipv6_flow.dst_ip[i];
 		}
 		if (input->flow.ipv6_flow.tc) {
-			ipv6_mask.vtc_flow = masks->ipv6_mask.tc << 16);
-			ipv6_val.vtc_flow = input->flow.ipv6_flow.tc << 16;
+			ipv6_mask.vtc_flow = rte_be_to_cpu_32((uint32_t)
+					     masks->ipv6_mask.tc << 20);
+			ipv6_val.vtc_flow = rte_be_to_cpu_32((uint32_t)
+					    input->flow.ipv6_flow.tc << 20);
 		}
 		if (input->flow.ipv6_flow.hop_limits) {
 			ipv6_mask.hop_limits = masks->ipv6_mask.hop_limits;
