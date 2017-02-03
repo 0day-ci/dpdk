@@ -38,6 +38,14 @@ New Features
      Also, make sure to start the actual text at the margin.
      =========================================================
 
+* **Added information metric library.**
+
+  A library that allows information metrics to be added and updated
+  by producers, typically other libraries, for later retrieval by
+  consumers such as applications. It is intended to provide a
+  reporting mechanism that is independent of other libraries such
+  as ethdev.
+
 * **Added generic EAL API for I/O device memory read/write operations.**
 
   This API introduces 8-bit, 16-bit, 32bit, 64bit I/O device
@@ -355,6 +363,7 @@ The libraries prepended with a plus sign were incremented in this version.
      librte_mbuf.so.2
      librte_mempool.so.2
      librte_meter.so.1
+   + librte_metrics.so.1
      librte_net.so.1
      librte_pdump.so.1
      librte_pipeline.so.3

@@ -62,6 +62,7 @@ Programmer's Guide
     packet_classif_access_ctrl
     packet_framework
     vhost_lib
+    metrics_lib
     port_hotplug_framework
     source_org
     dev_kit_build_system
