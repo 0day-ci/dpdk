@@ -638,3 +638,8 @@ CONFIG_RTE_APP_CRYPTO_PERF=y
 # Compile the bitrate statistics library
 #
 CONFIG_RTE_LIBRTE_BITRATE=y
+
+#
+# Compile the latency statistics library
+#
+CONFIG_RTE_LIBRTE_LATENCY_STATS=y

@@ -51,6 +51,7 @@ DIRS-$(CONFIG_RTE_LIBRTE_IP_FRAG) += librte_ip_frag
 DIRS-$(CONFIG_RTE_LIBRTE_JOBSTATS) += librte_jobstats
 DIRS-$(CONFIG_RTE_LIBRTE_METRICS) += librte_metrics
 DIRS-$(CONFIG_RTE_LIBRTE_BITRATE) += librte_bitratestats
+DIRS-$(CONFIG_RTE_LIBRTE_LATENCY_STATS) += librte_latencystats
 DIRS-$(CONFIG_RTE_LIBRTE_POWER) += librte_power
 DIRS-$(CONFIG_RTE_LIBRTE_METER) += librte_meter
 DIRS-$(CONFIG_RTE_LIBRTE_SCHED) += librte_sched

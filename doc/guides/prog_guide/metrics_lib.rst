@@ -199,8 +199,8 @@ statistics can be obtained by querying the metrics library.
 Initialization
 ~~~~~~~~~~~~~~
 
-Before it is used the bit-rate statistics library has to be initialised
-by calling ``rte_stats_bitrate_create()``, which will return a bit-rate
+Before the library can be used, it has to be initialised by calling
+``rte_stats_bitrate_create()``, which will return a bit-rate
 calculation object. Since the bit-rate library uses the metrics library
 to report the calculated statistics, the bit-rate library then needs to
 register the calculated statistics with the metrics library. This is
@@ -241,3 +241,57 @@ desired, this function should be called once a second.
 	    }
         /* ... */
     }
+
+
+Latency statistics library
+--------------------------
+
+The latency statistics library calculates the latency of packet
+processing by a DPDK application, reporting the minimum, average,
+and maximum nano-seconds that packet processing takes, as well as
+the jitter in processing delay. These statistics are then reported
+via the metrics library using the following names:
+
+    - ``min_latency_ns``: Minimum processing latency (nano-seconds)
+    - ``avg_latency_ns``:  Average  processing latency (nano-seconds)
+    - ``mac_latency_ns``:  Maximum  processing latency (nano-seconds)
+    - ``jitter_ns``: Variance in processing latency (nano-seconds)
+
+Once initialised and clocked at the appropriate frequency, these
+statistics can be obtained by querying the metrics library.
+
+Initialization
+~~~~~~~~~~~~~~
+
+Before the library can be used, it has to be initialised by calling
+``rte_latencystats_init()``.
+
+.. code-block:: c
+
+    lcoreid_t latencystats_lcore_id = -1;
+
+    int ret = rte_latencystats_init(1, NULL);
+    if (ret)
+        rte_exit(EXIT_FAILURE, "Could not allocate latency data.\n");
+
+
+Triggering statistic updates
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``rte_latencystats_update()`` function needs to be called
+periodically so that latency statistics can be updated.
+
+.. code-block:: c
+
+    if (latencystats_lcore_id == rte_lcore_id())
+        rte_latencystats_update();
+
+Library shutdown
+~~~~~~~~~~~~~~~~
+
+When finished, ``rte_latencystats_uninit()`` needs to be called to
+de-initialise the latency library.
+
+.. code-block:: c
+
+    rte_latencystats_uninit();

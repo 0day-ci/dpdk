@@ -640,6 +640,10 @@ Bit-rate statistica
 M: Remy Horton <remy.horton@intel.com>
 F: lib/librte_bitratestats/
 
+Latency Stats
+M: Reshma Pattan <reshma.pattan@intel.com>
+F: lib/librte_latencystats/
+
 
 Test Applications
 -----------------
