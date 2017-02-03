@@ -1,7 +1,7 @@
 /*
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2017 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -57,6 +57,7 @@
 #include <rte_atomic.h>
 #include <rte_branch_prediction.h>
 #include <rte_string_fns.h>
+#include <rte_metrics.h>
 
 /* Maximum long option length for option parsing. */
 #define MAX_LONG_OPT_SZ 64
@@ -68,6 +69,8 @@ static uint32_t enabled_port_mask;
 static uint32_t enable_stats;
 /**< Enable xstats. */
 static uint32_t enable_xstats;
+/**< Enable metrics. */
+static uint32_t enable_metrics;
 /**< Enable stats reset. */
 static uint32_t reset_stats;
 /**< Enable xstats reset. */
@@ -84,6 +87,8 @@ proc_info_usage(const char *prgname)
 		"  -p PORTMASK: hexadecimal bitmask of ports to retrieve stats for\n"
 		"  --stats: to display port statistics, enabled by default\n"
 		"  --xstats: to display extended port statistics, disabled by "
+			"default\n"
+		"  --metrics: to display derived metrics of the ports, disabled by "
 			"default\n"
 		"  --stats-reset: to reset port statistics\n"
 		"  --xstats-reset: to reset port extended statistics\n",
@@ -127,6 +132,7 @@ proc_info_parse_args(int argc, char **argv)
 		{"stats", 0, NULL, 0},
 		{"stats-reset", 0, NULL, 0},
 		{"xstats", 0, NULL, 0},
+		{"metrics", 0, NULL, 0},
 		{"xstats-reset", 0, NULL, 0},
 		{NULL, 0, 0, 0}
 	};
@@ -159,6 +165,10 @@ proc_info_parse_args(int argc, char **argv)
 			else if (!strncmp(long_option[option_index].name, "xstats",
 					MAX_LONG_OPT_SZ))
 				enable_xstats = 1;
+			else if (!strncmp(long_option[option_index].name,
+					"metrics",
+					MAX_LONG_OPT_SZ))
+				enable_metrics = 1;
 			/* Reset stats */
 			if (!strncmp(long_option[option_index].name, "stats-reset",
 					MAX_LONG_OPT_SZ))
@@ -301,6 +311,67 @@ nic_xstats_clear(uint8_t port_id)
 	printf("\n  NIC extended statistics for port %d cleared\n", port_id);
 }
 
+static void
+metrics_display(int port_id)
+{
+	struct rte_metric_value *metrics;
+	struct rte_metric_name *names;
+	int len, ret;
+	static const char *nic_stats_border = "########################";
+
+	len = rte_metrics_get_names(NULL, 0);
+	if (len < 0) {
+		printf("Cannot get metrics count\n");
+		return;
+	}
+	if (len == 0) {
+		printf("No metrics to display (none have been registered)\n");
+		return;
+	}
+
+	metrics = rte_malloc("proc_info_metrics",
+		sizeof(struct rte_metric_value) * len, 0);
+	if (metrics == NULL) {
+		printf("Cannot allocate memory for metrics\n");
+		return;
+	}
+
+	names =  rte_malloc(NULL, sizeof(struct rte_metric_name) * len, 0);
+	if (names == NULL) {
+		printf("Cannot allocate memory for metrcis names\n");
+		rte_free(metrics);
+		return;
+	}
+
+	if (len != rte_metrics_get_names(names, len)) {
+		printf("Cannot get metrics names\n");
+		rte_free(metrics);
+		rte_free(names);
+		return;
+	}
+
+	if (port_id == RTE_METRICS_GLOBAL)
+		printf("###### Non port specific metrics  #########\n");
+	else
+		printf("###### metrics for port %-2d #########\n", port_id);
+	printf("%s############################\n", nic_stats_border);
+	ret = rte_metrics_get_values(port_id, metrics, len);
+	if (ret < 0 || ret > len) {
+		printf("Cannot get metrics values\n");
+		rte_free(metrics);
+		rte_free(names);
+		return;
+	}
+
+	int i;
+	for (i = 0; i < len; i++)
+		printf("%s: %"PRIu64"\n", names[i].name, metrics[i].value);
+
+	printf("%s############################\n", nic_stats_border);
+	rte_free(metrics);
+	rte_free(names);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -360,8 +431,14 @@ main(int argc, char **argv)
 				nic_stats_clear(i);
 			else if (reset_xstats)
 				nic_xstats_clear(i);
+			else if (enable_metrics)
+				metrics_display(i);
 		}
 	}
+
+	/* print port independent stats */
+	if (enable_metrics)
+		metrics_display(RTE_METRICS_GLOBAL);
 
 	return 0;
 }
