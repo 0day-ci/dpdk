@@ -435,9 +435,9 @@ rte_cryptodev_count_devtype(enum rte_cryptodev_type type);
  * @return
  *   Returns number of attached crypto device.
  */
-int
+uint8_t
 rte_cryptodev_devices_get(const char *dev_name, uint8_t *devices,
-		uint8_t nb_devices);
+		const uint8_t nb_devices);
 /*
  * Return the NUMA socket to which a device is connected
  *
