@@ -73,11 +73,22 @@
 #include "e1000_ethdev.h"
 
 /* Bit Mask to indicate what bits required for building TX context */
+#ifdef RTE_LIBRTE_IEEE1588
 #define IGB_TX_OFFLOAD_MASK (			 \
 		PKT_TX_VLAN_PKT |		 \
 		PKT_TX_IP_CKSUM |		 \
+		PKT_TX_IPV4 |			 \
+		PKT_TX_L4_MASK |		 \
+		PKT_TX_IEEE1588_TMST |		 \
+		PKT_TX_TCP_SEG)
+#else
+#define IGB_TX_OFFLOAD_MASK (			 \
+		PKT_TX_VLAN_PKT |		 \
+		PKT_TX_IPV4 |			 \
+		PKT_TX_IP_CKSUM |		 \
 		PKT_TX_L4_MASK |		 \
 		PKT_TX_TCP_SEG)
+#endif
 
 #define IGB_TX_OFFLOAD_NOTSUP_MASK \
 		(PKT_TX_OFFLOAD_MASK ^ IGB_TX_OFFLOAD_MASK)
