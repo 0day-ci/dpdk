@@ -177,10 +177,11 @@ extern "C" {
  */
 #define PKT_RX_LRO           (1ULL << 16)
 
-/* add new RX flags here */
+/* add new RX flags here, and update __PKT_RX_NEXT */
+#define __PKT_RX_NEXT        (1ULL << 17)
 
-/* add new TX flags here */
-
+/* add new TX flags here, and update __PKT_TX_NEXT */
+#define __PKT_TX_NEXT        (1ULL << 43)
 /**
  * Offload the MACsec. This flag must be set by the application to enable
  * this offload feature for a packet to be transmitted.
@@ -283,6 +284,12 @@ extern "C" {
 #define PKT_TX_OUTER_IPV4   (1ULL << 59)
 
 /**
+ * Bitmask of all supported packet Rx offload features flags,
+ * which can be set for packet.
+ **/
+#define PKT_RX_OFFLOAD_MASK (__PKT_RX_NEXT - 1)
+
+/**
  * Packet outer header is IPv6. This flag must be set when using any
  * outer offload feature (L4 checksum) to tell the NIC that the outer
  * header of the tunneled packet is an IPv6 packet.
@@ -293,14 +300,7 @@ extern "C" {
  * Bitmask of all supported packet Tx offload features flags,
  * which can be set for packet.
  */
-#define PKT_TX_OFFLOAD_MASK (    \
-		PKT_TX_IP_CKSUM |        \
-		PKT_TX_L4_MASK |         \
-		PKT_TX_OUTER_IP_CKSUM |  \
-		PKT_TX_TCP_SEG |         \
-		PKT_TX_QINQ_PKT |        \
-		PKT_TX_VLAN_PKT |        \
-		PKT_TX_TUNNEL_MASK)
+#define PKT_TX_OFFLOAD_MASK ((~(__PKT_TX_NEXT - 1)) & 0x1fffffffffffffff)
 
 #define __RESERVED           (1ULL << 61) /**< reserved for future mbuf use */
 
