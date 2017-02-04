@@ -628,16 +628,25 @@ ixgbe_fdir_configure(struct rte_eth_dev *dev)
 		hw->mac.type != ixgbe_mac_X540 &&
 		hw->mac.type != ixgbe_mac_X550 &&
 		hw->mac.type != ixgbe_mac_X550EM_x &&
-		hw->mac.type != ixgbe_mac_X550EM_a)
+		hw->mac.type != ixgbe_mac_X550EM_a) {
+		PMD_INIT_LOG(err, "Only when ixgbe MAC type is 82599EB or X540 or X550 "
+			"or X550EM_x or X550EM_a, a filter mode can be supported. "
+			"Current MAC type = %d", (int)(hw->mac.type));
 		return -ENOSYS;
+	}
 
 	/* x550 supports mac-vlan and tunnel mode but other NICs not */
 	if (hw->mac.type != ixgbe_mac_X550 &&
 	    hw->mac.type != ixgbe_mac_X550EM_x &&
 	    hw->mac.type != ixgbe_mac_X550EM_a &&
 	    mode != RTE_FDIR_MODE_SIGNATURE &&
-	    mode != RTE_FDIR_MODE_PERFECT)
+	    mode != RTE_FDIR_MODE_PERFECT) {
+		PMD_INIT_LOG(err, "If ixgbe MAC type is not X550 or X550EM_x or "
+			"X550EM_a, the filter mode must be signature or perfect, other mode "
+			"is not supported ! Current MAC type = %d filter mode = %d",
+			(int)(hw->mac.type), (int)mode);
 		return -ENOSYS;
+	}
 
 	err = configure_fdir_flags(&dev->data->dev_conf.fdir_conf, &fdirctrl);
 	if (err)
