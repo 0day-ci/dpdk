@@ -81,13 +81,28 @@
 #include "ixgbe_rxtx.h"
 
 /* Bit Mask to indicate what bits required for building TX context */
+#ifdef RTE_LIBRTE_IEEE1588
 #define IXGBE_TX_OFFLOAD_MASK (			 \
 		PKT_TX_VLAN_PKT |		 \
 		PKT_TX_IP_CKSUM |		 \
+		PKT_TX_IPV4 |			 \
+		PKT_TX_L4_MASK |		 \
+		PKT_TX_IEEE1588_TMST |		 \
+		PKT_TX_TCP_SEG |		 \
+		PKT_TX_MACSEC |			 \
+		PKT_TX_OUTER_IP_CKSUM |		 \
+		PKT_TX_OUTER_IPV4)
+#else
+#define IXGBE_TX_OFFLOAD_MASK (			 \
+		PKT_TX_VLAN_PKT |		 \
+		PKT_TX_IP_CKSUM |		 \
+		PKT_TX_IPV4 |			 \
 		PKT_TX_L4_MASK |		 \
 		PKT_TX_TCP_SEG |		 \
 		PKT_TX_MACSEC |			 \
-		PKT_TX_OUTER_IP_CKSUM)
+		PKT_TX_OUTER_IP_CKSUM |		 \
+		PKT_TX_OUTER_IPV4)
+#endif
 
 #define IXGBE_TX_OFFLOAD_NOTSUP_MASK \
 		(PKT_TX_OFFLOAD_MASK ^ IXGBE_TX_OFFLOAD_MASK)
