@@ -55,6 +55,12 @@ Deprecation Notices
   and will be removed in 17.02.
   It is replaced by ``rte_mempool_generic_get/put`` functions.
 
+* lib: distributor library API will be changed to incorporate a burst-
+  oriented API. This will include a change to ``rte_distributor_create``
+  to specify which type of instance to create (single or burst), and
+  additional calls for ``rte_poll_pkt_burst`` and ``rte_return_pkt_burst``,
+  among others.
+
 * ethdev: the legacy filter API, including
   ``rte_eth_dev_filter_supported()``, ``rte_eth_dev_filter_ctrl()`` as well
   as filter types MACVLAN, ETHERTYPE, FLEXIBLE, SYN, NTUPLE, TUNNEL, FDIR,
