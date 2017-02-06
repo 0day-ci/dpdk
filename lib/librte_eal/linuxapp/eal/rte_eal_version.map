@@ -190,5 +190,6 @@ DPDK_17.02 {
 	rte_log_dump;
 	rte_log_register;
 	rte_log_set_level;
+	rte_log_set_level_regexp;
 
 } DPDK_16.11;
