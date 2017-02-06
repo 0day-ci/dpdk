@@ -187,6 +187,7 @@ DPDK_17.02 {
 	rte_bus_register;
 	rte_bus_scan;
 	rte_bus_unregister;
+	rte_log_dump;
 	rte_log_register;
 	rte_log_set_level;
 
