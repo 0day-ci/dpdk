@@ -40,6 +40,7 @@
 #include <inttypes.h>
 #include <assert.h>
 
+#include <rte_eal.h>
 #include <rte_string_fns.h>
 #include <rte_pci.h>
 #include <rte_ether.h>
@@ -418,6 +419,9 @@ static int i40e_sw_tunnel_filter_insert(struct i40e_pf *pf,
 static void i40e_ethertype_filter_restore(struct i40e_pf *pf);
 static void i40e_tunnel_filter_restore(struct i40e_pf *pf);
 static void i40e_filter_restore(struct i40e_pf *pf);
+
+int i40e_logtype_init;
+int i40e_logtype_driver;
 
 static const struct rte_pci_id pci_id_i40e_map[] = {
 	{ RTE_PCI_DEVICE(I40E_INTEL_VENDOR_ID, I40E_DEV_ID_SFP_XL710) },
@@ -5788,7 +5792,6 @@ i40e_dev_interrupt_handler(struct rte_intr_handle *intr_handle,
 		PMD_DRV_LOG(INFO, "No interrupt event");
 		goto done;
 	}
-#ifdef RTE_LIBRTE_I40E_DEBUG_DRIVER
 	if (icr0 & I40E_PFINT_ICR0_ECC_ERR_MASK)
 		PMD_DRV_LOG(ERR, "ICR0: unrecoverable ECC error");
 	if (icr0 & I40E_PFINT_ICR0_MAL_DETECT_MASK)
@@ -5803,7 +5806,6 @@ i40e_dev_interrupt_handler(struct rte_intr_handle *intr_handle,
 		PMD_DRV_LOG(ERR, "ICR0: HMC error");
 	if (icr0 & I40E_PFINT_ICR0_PE_CRITERR_MASK)
 		PMD_DRV_LOG(ERR, "ICR0: protocol engine critical error");
-#endif /* RTE_LIBRTE_I40E_DEBUG_DRIVER */
 
 	if (icr0 & I40E_PFINT_ICR0_VFLR_MASK) {
 		PMD_DRV_LOG(INFO, "ICR0: VF reset detected");
@@ -11186,4 +11188,16 @@ rte_pmd_i40e_reset_vf_stats(uint8_t port,
 	i40e_update_vsi_stats(vsi);
 
 	return 0;
+}
+
+RTE_INIT(i40e_init_log);
+static void
+i40e_init_log(void)
+{
+	i40e_logtype_init = rte_log_register("pmd.i40e.init");
+	if (i40e_logtype_init >= 0)
+		rte_log_set_level(i40e_logtype_init, RTE_LOG_NOTICE);
+	i40e_logtype_driver = rte_log_register("pmd.i40e.driver");
+	if (i40e_logtype_driver >= 0)
+		rte_log_set_level(i40e_logtype_driver, RTE_LOG_NOTICE);
 }
