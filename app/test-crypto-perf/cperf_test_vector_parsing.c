@@ -240,7 +240,7 @@ parse_entry(char *entry, struct cperf_test_vector *vector,
 
 	/* get values for key */
 	token = strtok(NULL, CPERF_ENTRY_DELIMITER);
-	if (token == NULL) {
+	if (key_token == NULL || token == NULL) {
 		printf("Expected 'key = values' but was '%.40s'..\n",
 			key_token);
 		return -1;
