@@ -143,13 +143,10 @@ struct rte_memzone; /* forward declaration, so as not to require memzone.h */
 struct rte_ring_ht_ptr {
 	volatile uint32_t head;  /**< Prod/consumer head. */
 	volatile uint32_t tail;  /**< Prod/consumer tail. */
-	uint32_t size;           /**< Size of ring. */
-	uint32_t mask;           /**< Mask (size-1) of ring. */
 	union {
 		uint32_t sp_enqueue; /**< True, if single producer. */
 		uint32_t sc_dequeue; /**< True, if single consumer. */
 	};
-	uint32_t watermark;      /**< Max items before EDQUOT in producer. */
 };
 
 /**
@@ -169,9 +166,12 @@ struct rte_ring {
 	 * next time the ABI changes
 	 */
 	char name[RTE_MEMZONE_NAMESIZE];    /**< Name of the ring. */
-	int flags;                       /**< Flags supplied at creation. */
+	int flags;               /**< Flags supplied at creation. */
 	const struct rte_memzone *memzone;
 			/**< Memzone, if any, containing the rte_ring */
+	uint32_t size;           /**< Size of ring. */
+	uint32_t mask;           /**< Mask (size-1) of ring. */
+	uint32_t watermark;      /**< Max items before EDQUOT in producer. */
 
 	/** Ring producer status. */
 	struct rte_ring_ht_ptr prod __rte_aligned(RTE_CACHE_LINE_SIZE * 2);
@@ -350,7 +350,7 @@ void rte_ring_dump(FILE *f, const struct rte_ring *r);
  * Placed here since identical code needed in both
  * single and multi producer enqueue functions */
 #define ENQUEUE_PTRS() do { \
-	const uint32_t size = r->prod.size; \
+	const uint32_t size = r->size; \
 	uint32_t idx = prod_head & mask; \
 	if (likely(idx + n < size)) { \
 		for (i = 0; i < (n & ((~(unsigned)0x3))); i+=4, idx+=4) { \
@@ -377,7 +377,7 @@ void rte_ring_dump(FILE *f, const struct rte_ring *r);
  * single and multi consumer dequeue functions */
 #define DEQUEUE_PTRS() do { \
 	uint32_t idx = cons_head & mask; \
-	const uint32_t size = r->cons.size; \
+	const uint32_t size = r->size; \
 	if (likely(idx + n < size)) { \
 		for (i = 0; i < (n & (~(unsigned)0x3)); i+=4, idx+=4) {\
 			obj_table[i] = r->ring[idx]; \
@@ -432,7 +432,7 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	const unsigned max = n;
 	int success;
 	unsigned i, rep = 0;
-	uint32_t mask = r->prod.mask;
+	uint32_t mask = r->mask;
 	int ret;
 
 	/* Avoid the unnecessary cmpset operation below, which is also
@@ -480,7 +480,7 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	rte_smp_wmb();
 
 	/* if we exceed the watermark */
-	if (unlikely(((mask + 1) - free_entries + n) > r->prod.watermark)) {
+	if (unlikely(((mask + 1) - free_entries + n) > r->watermark)) {
 		ret = (behavior == RTE_RING_QUEUE_FIXED) ? -EDQUOT :
 				(int)(n | RTE_RING_QUOT_EXCEED);
 		__RING_STAT_ADD(r, enq_quota, n);
@@ -539,7 +539,7 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	uint32_t prod_head, cons_tail;
 	uint32_t prod_next, free_entries;
 	unsigned i;
-	uint32_t mask = r->prod.mask;
+	uint32_t mask = r->mask;
 	int ret;
 
 	prod_head = r->prod.head;
@@ -575,7 +575,7 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	rte_smp_wmb();
 
 	/* if we exceed the watermark */
-	if (unlikely(((mask + 1) - free_entries + n) > r->prod.watermark)) {
+	if (unlikely(((mask + 1) - free_entries + n) > r->watermark)) {
 		ret = (behavior == RTE_RING_QUEUE_FIXED) ? -EDQUOT :
 			(int)(n | RTE_RING_QUOT_EXCEED);
 		__RING_STAT_ADD(r, enq_quota, n);
@@ -625,7 +625,7 @@ __rte_ring_mc_do_dequeue(struct rte_ring *r, void **obj_table,
 	const unsigned max = n;
 	int success;
 	unsigned i, rep = 0;
-	uint32_t mask = r->prod.mask;
+	uint32_t mask = r->mask;
 
 	/* Avoid the unnecessary cmpset operation below, which is also
 	 * potentially harmful when n equals 0. */
@@ -722,7 +722,7 @@ __rte_ring_sc_do_dequeue(struct rte_ring *r, void **obj_table,
 	uint32_t cons_head, prod_tail;
 	uint32_t cons_next, entries;
 	unsigned i;
-	uint32_t mask = r->prod.mask;
+	uint32_t mask = r->mask;
 
 	cons_head = r->cons.head;
 	prod_tail = r->prod.tail;
@@ -1051,7 +1051,7 @@ rte_ring_full(const struct rte_ring *r)
 {
 	uint32_t prod_tail = r->prod.tail;
 	uint32_t cons_tail = r->cons.tail;
-	return ((cons_tail - prod_tail - 1) & r->prod.mask) == 0;
+	return ((cons_tail - prod_tail - 1) & r->mask) == 0;
 }
 
 /**
@@ -1084,7 +1084,7 @@ rte_ring_count(const struct rte_ring *r)
 {
 	uint32_t prod_tail = r->prod.tail;
 	uint32_t cons_tail = r->cons.tail;
-	return (prod_tail - cons_tail) & r->prod.mask;
+	return (prod_tail - cons_tail) & r->mask;
 }
 
 /**
@@ -1100,7 +1100,7 @@ rte_ring_free_count(const struct rte_ring *r)
 {
 	uint32_t prod_tail = r->prod.tail;
 	uint32_t cons_tail = r->cons.tail;
-	return (cons_tail - prod_tail - 1) & r->prod.mask;
+	return (cons_tail - prod_tail - 1) & r->mask;
 }
 
 /**
@@ -1114,7 +1114,7 @@ rte_ring_free_count(const struct rte_ring *r)
 static inline unsigned int
 rte_ring_get_size(struct rte_ring *r)
 {
-	return r->prod.size;
+	return r->size;
 }
 
 /**
