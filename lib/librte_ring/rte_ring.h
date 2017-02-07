@@ -148,7 +148,6 @@ struct rte_ring {
 			/**< Memzone, if any, containing the rte_ring */
 	uint32_t size;           /**< Size of ring. */
 	uint32_t mask;           /**< Mask (size-1) of ring. */
-	uint32_t watermark;      /**< Max items before EDQUOT in producer. */
 
 	/** Ring producer status. */
 	struct rte_ring_ht_ptr prod __rte_aligned(RTE_CACHE_LINE_SIZE * 2);
@@ -269,26 +268,6 @@ struct rte_ring *rte_ring_create(const char *name, unsigned count,
 void rte_ring_free(struct rte_ring *r);
 
 /**
- * Change the high water mark.
- *
- * If *count* is 0, water marking is disabled. Otherwise, it is set to the
- * *count* value. The *count* value must be greater than 0 and less
- * than the ring size.
- *
- * This function can be called at any time (not necessarily at
- * initialization).
- *
- * @param r
- *   A pointer to the ring structure.
- * @param count
- *   The new water mark value.
- * @return
- *   - 0: Success; water mark changed.
- *   - -EINVAL: Invalid water mark value.
- */
-int rte_ring_set_water_mark(struct rte_ring *r, unsigned count);
-
-/**
  * Dump the status of the ring to a file.
  *
  * @param f
@@ -369,8 +348,6 @@ void rte_ring_dump(FILE *f, const struct rte_ring *r);
  *   Depend on the behavior value
  *   if behavior = RTE_RING_QUEUE_FIXED
  *   - 0: Success; objects enqueue.
- *   - -EDQUOT: Quota exceeded. The objects have been enqueued, but the
- *     high water mark is exceeded.
  *   - -ENOBUFS: Not enough room in the ring to enqueue, no object is enqueued.
  *   if behavior = RTE_RING_QUEUE_VARIABLE
  *   - n: Actual number of objects enqueued.
@@ -385,7 +362,6 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	int success;
 	unsigned int i;
 	uint32_t mask = r->mask;
-	int ret;
 
 	/* Avoid the unnecessary cmpset operation below, which is also
 	 * potentially harmful when n equals 0. */
@@ -426,13 +402,6 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	ENQUEUE_PTRS();
 	rte_smp_wmb();
 
-	/* if we exceed the watermark */
-	if (unlikely(((mask + 1) - free_entries + n) > r->watermark))
-		ret = (behavior == RTE_RING_QUEUE_FIXED) ? -EDQUOT :
-				(int)(n | RTE_RING_QUOT_EXCEED);
-	else
-		ret = (behavior == RTE_RING_QUEUE_FIXED) ? 0 : n;
-
 	/*
 	 * If there are other enqueues in progress that preceded us,
 	 * we need to wait for them to complete
@@ -441,7 +410,7 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 		rte_pause();
 
 	r->prod.tail = prod_next;
-	return ret;
+	return (behavior == RTE_RING_QUEUE_FIXED) ? 0 : n;
 }
 
 /**
@@ -460,8 +429,6 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
  *   Depend on the behavior value
  *   if behavior = RTE_RING_QUEUE_FIXED
  *   - 0: Success; objects enqueue.
- *   - -EDQUOT: Quota exceeded. The objects have been enqueued, but the
- *     high water mark is exceeded.
  *   - -ENOBUFS: Not enough room in the ring to enqueue, no object is enqueued.
  *   if behavior = RTE_RING_QUEUE_VARIABLE
  *   - n: Actual number of objects enqueued.
@@ -474,7 +441,6 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	uint32_t prod_next, free_entries;
 	unsigned int i;
 	uint32_t mask = r->mask;
-	int ret;
 
 	prod_head = r->prod.head;
 	cons_tail = r->cons.tail;
@@ -503,15 +469,8 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	ENQUEUE_PTRS();
 	rte_smp_wmb();
 
-	/* if we exceed the watermark */
-	if (unlikely(((mask + 1) - free_entries + n) > r->watermark))
-		ret = (behavior == RTE_RING_QUEUE_FIXED) ? -EDQUOT :
-			(int)(n | RTE_RING_QUOT_EXCEED);
-	else
-		ret = (behavior == RTE_RING_QUEUE_FIXED) ? 0 : n;
-
 	r->prod.tail = prod_next;
-	return ret;
+	return (behavior == RTE_RING_QUEUE_FIXED) ? 0 : n;
 }
 
 /**
@@ -677,8 +636,6 @@ __rte_ring_sc_do_dequeue(struct rte_ring *r, void **obj_table,
  *   The number of objects to add in the ring from the obj_table.
  * @return
  *   - 0: Success; objects enqueue.
- *   - -EDQUOT: Quota exceeded. The objects have been enqueued, but the
- *     high water mark is exceeded.
  *   - -ENOBUFS: Not enough room in the ring to enqueue, no object is enqueued.
  */
 static inline int __attribute__((always_inline))
@@ -699,8 +656,6 @@ rte_ring_mp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
  *   The number of objects to add in the ring from the obj_table.
  * @return
  *   - 0: Success; objects enqueued.
- *   - -EDQUOT: Quota exceeded. The objects have been enqueued, but the
- *     high water mark is exceeded.
  *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
  */
 static inline int __attribute__((always_inline))
@@ -725,8 +680,6 @@ rte_ring_sp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
  *   The number of objects to add in the ring from the obj_table.
  * @return
  *   - 0: Success; objects enqueued.
- *   - -EDQUOT: Quota exceeded. The objects have been enqueued, but the
- *     high water mark is exceeded.
  *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
  */
 static inline int __attribute__((always_inline))
@@ -751,8 +704,6 @@ rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
  *   A pointer to the object to be added.
  * @return
  *   - 0: Success; objects enqueued.
- *   - -EDQUOT: Quota exceeded. The objects have been enqueued, but the
- *     high water mark is exceeded.
  *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
  */
 static inline int __attribute__((always_inline))
@@ -770,8 +721,6 @@ rte_ring_mp_enqueue(struct rte_ring *r, void *obj)
  *   A pointer to the object to be added.
  * @return
  *   - 0: Success; objects enqueued.
- *   - -EDQUOT: Quota exceeded. The objects have been enqueued, but the
- *     high water mark is exceeded.
  *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
  */
 static inline int __attribute__((always_inline))
@@ -793,8 +742,6 @@ rte_ring_sp_enqueue(struct rte_ring *r, void *obj)
  *   A pointer to the object to be added.
  * @return
  *   - 0: Success; objects enqueued.
- *   - -EDQUOT: Quota exceeded. The objects have been enqueued, but the
- *     high water mark is exceeded.
  *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
  */
 static inline int __attribute__((always_inline))
