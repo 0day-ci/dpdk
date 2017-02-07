@@ -42,9 +42,11 @@ LIBABIVER := 1
 
 # all source are stored in SRCS-y
 SRCS-$(CONFIG_RTE_LIBRTE_RING) := rte_ring.c
+SRCS-$(CONFIG_RTE_LIBRTE_RING) += rte_event_ring.c
 
 # install includes
 SYMLINK-$(CONFIG_RTE_LIBRTE_RING)-include := rte_ring.h
+SYMLINK-$(CONFIG_RTE_LIBRTE_RING)-include += rte_event_ring.h
 
 DEPDIRS-$(CONFIG_RTE_LIBRTE_RING) += lib/librte_eal
 

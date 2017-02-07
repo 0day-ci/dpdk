@@ -96,6 +96,7 @@ SRCS-y += test_memory.c
 SRCS-y += test_memzone.c
 
 SRCS-y += test_ring.c
+SRCS-y += test_event_ring.c
 SRCS-y += test_ring_perf.c
 SRCS-y += test_pmd_perf.c
 
