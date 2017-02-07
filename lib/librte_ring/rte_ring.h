@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2017 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -139,6 +139,19 @@ struct rte_ring_debug_stats {
 
 struct rte_memzone; /* forward declaration, so as not to require memzone.h */
 
+/* structure to hold a pair of head/tail values and other metadata */
+struct rte_ring_ht_ptr {
+	volatile uint32_t head;  /**< Prod/consumer head. */
+	volatile uint32_t tail;  /**< Prod/consumer tail. */
+	uint32_t size;           /**< Size of ring. */
+	uint32_t mask;           /**< Mask (size-1) of ring. */
+	union {
+		uint32_t sp_enqueue; /**< True, if single producer. */
+		uint32_t sc_dequeue; /**< True, if single consumer. */
+	};
+	uint32_t watermark;      /**< Max items before EDQUOT in producer. */
+};
+
 /**
  * An RTE ring structure.
  *
@@ -161,23 +174,10 @@ struct rte_ring {
 			/**< Memzone, if any, containing the rte_ring */
 
 	/** Ring producer status. */
-	struct prod {
-		uint32_t watermark;      /**< Maximum items before EDQUOT. */
-		uint32_t sp_enqueue;     /**< True, if single producer. */
-		uint32_t size;           /**< Size of ring. */
-		uint32_t mask;           /**< Mask (size-1) of ring. */
-		volatile uint32_t head;  /**< Producer head. */
-		volatile uint32_t tail;  /**< Producer tail. */
-	} prod __rte_aligned(RTE_CACHE_LINE_SIZE * 2);
+	struct rte_ring_ht_ptr prod __rte_aligned(RTE_CACHE_LINE_SIZE * 2);
 
 	/** Ring consumer status. */
-	struct cons {
-		uint32_t sc_dequeue;     /**< True, if single consumer. */
-		uint32_t size;           /**< Size of the ring. */
-		uint32_t mask;           /**< Mask (size-1) of ring. */
-		volatile uint32_t head;  /**< Consumer head. */
-		volatile uint32_t tail;  /**< Consumer tail. */
-	} cons __rte_aligned(RTE_CACHE_LINE_SIZE * 2);
+	struct rte_ring_ht_ptr cons __rte_aligned(RTE_CACHE_LINE_SIZE * 2);
 
 #ifdef RTE_LIBRTE_RING_DEBUG
 	struct rte_ring_debug_stats stats[RTE_MAX_LCORE];
