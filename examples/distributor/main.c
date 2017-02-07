@@ -330,7 +330,7 @@ lcore_tx(struct rte_ring *in_r)
 
 			struct rte_mbuf *bufs[BURST_SIZE];
 			const uint16_t nb_rx = rte_ring_dequeue_burst(in_r,
-					(void *)bufs, BURST_SIZE);
+					(void *)bufs, BURST_SIZE, NULL);
 			app_stats.tx.dequeue_pkts += nb_rx;
 
 			/* if we get no traffic, flush anything we have */
