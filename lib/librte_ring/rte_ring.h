@@ -337,6 +337,19 @@ void rte_ring_dump(FILE *f, const struct rte_ring *r);
 	} \
 } while (0)
 
+static inline __attribute__((always_inline)) void
+update_tail(struct rte_ring_ht_ptr *ht_ptr, uint32_t old_val, uint32_t new_val)
+{
+	/*
+	 * If there are other enqueues/dequeues in progress that preceded us,
+	 * we need to wait for them to complete
+	 */
+	while (unlikely(ht_ptr->tail != old_val))
+		rte_pause();
+
+	ht_ptr->tail = new_val;
+}
+
 /**
  * @internal This function updates the producer head for enqueue
  *
@@ -434,15 +447,7 @@ __rte_ring_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	ENQUEUE_PTRS();
 	rte_smp_wmb();
 
-	/*
-	 * If there are other enqueues in progress that preceded us,
-	 * we need to wait for them to complete
-	 */
-	while (unlikely(r->prod.tail != prod_head))
-		rte_pause();
-
-	r->prod.tail = prod_next;
-
+	update_tail(&r->prod, prod_head, prod_next);
 end:
 	if (free_space != NULL)
 		*free_space = free_entries - n;
@@ -545,14 +550,7 @@ __rte_ring_do_dequeue(struct rte_ring *r, void **obj_table,
 	DEQUEUE_PTRS();
 	rte_smp_rmb();
 
-	/*
-	 * If there are other enqueues in progress that preceded us,
-	 * we need to wait for them to complete
-	 */
-	while (unlikely(r->cons.tail != cons_head))
-		rte_pause();
-
-	r->cons.tail = cons_next;
+	update_tail(&r->cons, cons_head, cons_next);
 
 end:
 	if (available != NULL)
