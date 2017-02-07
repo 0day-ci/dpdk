@@ -168,7 +168,7 @@ struct rte_ring {
 		uint32_t mask;           /**< Mask (size-1) of ring. */
 		volatile uint32_t head;  /**< Producer head. */
 		volatile uint32_t tail;  /**< Producer tail. */
-	} prod __rte_cache_aligned;
+	} prod __rte_aligned(RTE_CACHE_LINE_SIZE * 2);
 
 	/** Ring consumer status. */
 	struct cons {
@@ -177,11 +177,7 @@ struct rte_ring {
 		uint32_t mask;           /**< Mask (size-1) of ring. */
 		volatile uint32_t head;  /**< Consumer head. */
 		volatile uint32_t tail;  /**< Consumer tail. */
-#ifdef RTE_RING_SPLIT_PROD_CONS
-	} cons __rte_cache_aligned;
-#else
-	} cons;
-#endif
+	} cons __rte_aligned(RTE_CACHE_LINE_SIZE * 2);
 
 #ifdef RTE_LIBRTE_RING_DEBUG
 	struct rte_ring_debug_stats stats[RTE_MAX_LCORE];
