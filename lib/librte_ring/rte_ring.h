@@ -352,7 +352,7 @@ void rte_ring_dump(FILE *f, const struct rte_ring *r);
  *   if behavior = RTE_RING_QUEUE_VARIABLE
  *   - n: Actual number of objects enqueued.
  */
-static inline int __attribute__((always_inline))
+static inline unsigned int __attribute__((always_inline))
 __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 			 unsigned n, enum rte_ring_queue_behavior behavior)
 {
@@ -384,7 +384,7 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 		/* check that we have enough room in ring */
 		if (unlikely(n > free_entries)) {
 			if (behavior == RTE_RING_QUEUE_FIXED)
-				return -ENOBUFS;
+				return 0;
 			else {
 				/* No free entry available */
 				if (unlikely(free_entries == 0))
@@ -410,7 +410,7 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 		rte_pause();
 
 	r->prod.tail = prod_next;
-	return (behavior == RTE_RING_QUEUE_FIXED) ? 0 : n;
+	return n;
 }
 
 /**
@@ -433,7 +433,7 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
  *   if behavior = RTE_RING_QUEUE_VARIABLE
  *   - n: Actual number of objects enqueued.
  */
-static inline int __attribute__((always_inline))
+static inline unsigned int __attribute__((always_inline))
 __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 			 unsigned n, enum rte_ring_queue_behavior behavior)
 {
@@ -453,7 +453,7 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	/* check that we have enough room in ring */
 	if (unlikely(n > free_entries)) {
 		if (behavior == RTE_RING_QUEUE_FIXED)
-			return -ENOBUFS;
+			return 0;
 		else {
 			/* No free entry available */
 			if (unlikely(free_entries == 0))
@@ -470,7 +470,7 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	rte_smp_wmb();
 
 	r->prod.tail = prod_next;
-	return (behavior == RTE_RING_QUEUE_FIXED) ? 0 : n;
+	return n;
 }
 
 /**
@@ -500,7 +500,7 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
  *   - n: Actual number of objects dequeued.
  */
 
-static inline int __attribute__((always_inline))
+static inline unsigned int __attribute__((always_inline))
 __rte_ring_mc_do_dequeue(struct rte_ring *r, void **obj_table,
 		 unsigned n, enum rte_ring_queue_behavior behavior)
 {
@@ -532,7 +532,7 @@ __rte_ring_mc_do_dequeue(struct rte_ring *r, void **obj_table,
 		/* Set the actual entries for dequeue */
 		if (n > entries) {
 			if (behavior == RTE_RING_QUEUE_FIXED)
-				return -ENOENT;
+				return 0;
 			else {
 				if (unlikely(entries == 0))
 					return 0;
@@ -558,7 +558,7 @@ __rte_ring_mc_do_dequeue(struct rte_ring *r, void **obj_table,
 
 	r->cons.tail = cons_next;
 
-	return behavior == RTE_RING_QUEUE_FIXED ? 0 : n;
+	return n;
 }
 
 /**
@@ -584,7 +584,7 @@ __rte_ring_mc_do_dequeue(struct rte_ring *r, void **obj_table,
  *   if behavior = RTE_RING_QUEUE_VARIABLE
  *   - n: Actual number of objects dequeued.
  */
-static inline int __attribute__((always_inline))
+static inline unsigned int __attribute__((always_inline))
 __rte_ring_sc_do_dequeue(struct rte_ring *r, void **obj_table,
 		 unsigned n, enum rte_ring_queue_behavior behavior)
 {
@@ -603,7 +603,7 @@ __rte_ring_sc_do_dequeue(struct rte_ring *r, void **obj_table,
 
 	if (n > entries) {
 		if (behavior == RTE_RING_QUEUE_FIXED)
-			return -ENOENT;
+			return 0;
 		else {
 			if (unlikely(entries == 0))
 				return 0;
@@ -619,7 +619,7 @@ __rte_ring_sc_do_dequeue(struct rte_ring *r, void **obj_table,
 	rte_smp_rmb();
 
 	r->cons.tail = cons_next;
-	return behavior == RTE_RING_QUEUE_FIXED ? 0 : n;
+	return n;
 }
 
 /**
@@ -635,10 +635,9 @@ __rte_ring_sc_do_dequeue(struct rte_ring *r, void **obj_table,
  * @param n
  *   The number of objects to add in the ring from the obj_table.
  * @return
- *   - 0: Success; objects enqueue.
- *   - -ENOBUFS: Not enough room in the ring to enqueue, no object is enqueued.
+ *   The number of objects enqueued, either 0 or n
  */
-static inline int __attribute__((always_inline))
+static inline unsigned int __attribute__((always_inline))
 rte_ring_mp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
 			 unsigned n)
 {
@@ -655,10 +654,9 @@ rte_ring_mp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
  * @param n
  *   The number of objects to add in the ring from the obj_table.
  * @return
- *   - 0: Success; objects enqueued.
- *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
+ *   The number of objects enqueued, either 0 or n
  */
-static inline int __attribute__((always_inline))
+static inline unsigned int __attribute__((always_inline))
 rte_ring_sp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
 			 unsigned n)
 {
@@ -679,10 +677,9 @@ rte_ring_sp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
  * @param n
  *   The number of objects to add in the ring from the obj_table.
  * @return
- *   - 0: Success; objects enqueued.
- *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
+ *   The number of objects enqueued, either 0 or n
  */
-static inline int __attribute__((always_inline))
+static inline unsigned int __attribute__((always_inline))
 rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
 		      unsigned n)
 {
@@ -709,7 +706,7 @@ rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
 static inline int __attribute__((always_inline))
 rte_ring_mp_enqueue(struct rte_ring *r, void *obj)
 {
-	return rte_ring_mp_enqueue_bulk(r, &obj, 1);
+	return rte_ring_mp_enqueue_bulk(r, &obj, 1) ? 0 : -ENOBUFS;
 }
 
 /**
@@ -726,7 +723,7 @@ rte_ring_mp_enqueue(struct rte_ring *r, void *obj)
 static inline int __attribute__((always_inline))
 rte_ring_sp_enqueue(struct rte_ring *r, void *obj)
 {
-	return rte_ring_sp_enqueue_bulk(r, &obj, 1);
+	return rte_ring_sp_enqueue_bulk(r, &obj, 1) ? 0 : -ENOBUFS;
 }
 
 /**
@@ -747,10 +744,7 @@ rte_ring_sp_enqueue(struct rte_ring *r, void *obj)
 static inline int __attribute__((always_inline))
 rte_ring_enqueue(struct rte_ring *r, void *obj)
 {
-	if (r->prod.sp_enqueue)
-		return rte_ring_sp_enqueue(r, obj);
-	else
-		return rte_ring_mp_enqueue(r, obj);
+	return rte_ring_enqueue_bulk(r, &obj, 1) ? 0 : -ENOBUFS;
 }
 
 /**
@@ -766,11 +760,9 @@ rte_ring_enqueue(struct rte_ring *r, void *obj)
  * @param n
  *   The number of objects to dequeue from the ring to the obj_table.
  * @return
- *   - 0: Success; objects dequeued.
- *   - -ENOENT: Not enough entries in the ring to dequeue; no object is
- *     dequeued.
+ *   The number of objects dequeued, either 0 or n
  */
-static inline int __attribute__((always_inline))
+static inline unsigned int __attribute__((always_inline))
 rte_ring_mc_dequeue_bulk(struct rte_ring *r, void **obj_table, unsigned n)
 {
 	return __rte_ring_mc_do_dequeue(r, obj_table, n, RTE_RING_QUEUE_FIXED);
@@ -787,11 +779,9 @@ rte_ring_mc_dequeue_bulk(struct rte_ring *r, void **obj_table, unsigned n)
  *   The number of objects to dequeue from the ring to the obj_table,
  *   must be strictly positive.
  * @return
- *   - 0: Success; objects dequeued.
- *   - -ENOENT: Not enough entries in the ring to dequeue; no object is
- *     dequeued.
+ *   The number of objects dequeued, either 0 or n
  */
-static inline int __attribute__((always_inline))
+static inline unsigned int __attribute__((always_inline))
 rte_ring_sc_dequeue_bulk(struct rte_ring *r, void **obj_table, unsigned n)
 {
 	return __rte_ring_sc_do_dequeue(r, obj_table, n, RTE_RING_QUEUE_FIXED);
@@ -811,11 +801,9 @@ rte_ring_sc_dequeue_bulk(struct rte_ring *r, void **obj_table, unsigned n)
  * @param n
  *   The number of objects to dequeue from the ring to the obj_table.
  * @return
- *   - 0: Success; objects dequeued.
- *   - -ENOENT: Not enough entries in the ring to dequeue, no object is
- *     dequeued.
+ *   The number of objects dequeued, either 0 or n
  */
-static inline int __attribute__((always_inline))
+static inline unsigned int __attribute__((always_inline))
 rte_ring_dequeue_bulk(struct rte_ring *r, void **obj_table, unsigned n)
 {
 	if (r->cons.sc_dequeue)
@@ -842,7 +830,7 @@ rte_ring_dequeue_bulk(struct rte_ring *r, void **obj_table, unsigned n)
 static inline int __attribute__((always_inline))
 rte_ring_mc_dequeue(struct rte_ring *r, void **obj_p)
 {
-	return rte_ring_mc_dequeue_bulk(r, obj_p, 1);
+	return rte_ring_mc_dequeue_bulk(r, obj_p, 1)  ? 0 : -ENOBUFS;
 }
 
 /**
@@ -860,7 +848,7 @@ rte_ring_mc_dequeue(struct rte_ring *r, void **obj_p)
 static inline int __attribute__((always_inline))
 rte_ring_sc_dequeue(struct rte_ring *r, void **obj_p)
 {
-	return rte_ring_sc_dequeue_bulk(r, obj_p, 1);
+	return rte_ring_sc_dequeue_bulk(r, obj_p, 1) ? 0 : -ENOBUFS;
 }
 
 /**
@@ -882,10 +870,7 @@ rte_ring_sc_dequeue(struct rte_ring *r, void **obj_p)
 static inline int __attribute__((always_inline))
 rte_ring_dequeue(struct rte_ring *r, void **obj_p)
 {
-	if (r->cons.sc_dequeue)
-		return rte_ring_sc_dequeue(r, obj_p);
-	else
-		return rte_ring_mc_dequeue(r, obj_p);
+	return rte_ring_dequeue_bulk(r, obj_p, 1) ? 0 : -ENOBUFS;
 }
 
 /**
