@@ -101,7 +101,7 @@ EAL_REGISTER_TAILQ(rte_ring_tailq)
 
 /* return the size of memory occupied by a ring */
 ssize_t
-rte_ring_get_memsize(unsigned count)
+rte_ring_get_memsize(unsigned int count, size_t obj_size)
 {
 	ssize_t sz;
 
@@ -113,7 +113,7 @@ rte_ring_get_memsize(unsigned count)
 		return -EINVAL;
 	}
 
-	sz = sizeof(struct rte_ring) + count * sizeof(void *);
+	sz = sizeof(struct rte_ring) + (count * obj_size);
 	sz = RTE_ALIGN(sz, RTE_CACHE_LINE_SIZE);
 	return sz;
 }
@@ -164,7 +164,7 @@ rte_ring_create(const char *name, unsigned count, int socket_id,
 
 	ring_list = RTE_TAILQ_CAST(rte_ring_tailq.head, rte_ring_list);
 
-	ring_size = rte_ring_get_memsize(count);
+	ring_size = rte_ring_get_memsize(count, sizeof(void *));
 	if (ring_size < 0) {
 		rte_errno = ring_size;
 		return NULL;

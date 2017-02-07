@@ -177,11 +177,14 @@ struct rte_ring {
  *
  * @param count
  *   The number of elements in the ring (must be a power of 2).
+ * @param obj_size
+ *   The size of the objects to be stored in the ring, normally for
+ *   rte_rings this should be sizeof(void *)
  * @return
  *   - The memory size needed for the ring on success.
  *   - -EINVAL if count is not a power of 2.
  */
-ssize_t rte_ring_get_memsize(unsigned count);
+ssize_t rte_ring_get_memsize(unsigned int count, size_t obj_size);
 
 /**
  * Initialize a ring structure.
