@@ -67,6 +67,7 @@ struct ether_fc_frame {
 
 int *quota;
 unsigned int *low_watermark;
+unsigned int *high_watermark;
 
 uint8_t port_pairs[RTE_MAX_ETHPORTS];
 
@@ -157,6 +158,7 @@ receive_stage(__attribute__((unused)) void *args)
     uint16_t nb_rx_pkts;
 
     unsigned int lcore_id;
+    unsigned int free;
 
     struct rte_mbuf *pkts[MAX_PKT_QUOTA];
     struct rte_ring *ring;
@@ -186,13 +188,13 @@ receive_stage(__attribute__((unused)) void *args)
 
             /* Enqueue received packets on the RX ring */
             nb_rx_pkts = rte_eth_rx_burst(port_id, 0, pkts, (uint16_t) *quota);
-            ret = rte_ring_enqueue_bulk(ring, (void *) pkts, nb_rx_pkts);
-            if (ret == -EDQUOT) {
+            ret = rte_ring_enqueue_bulk(ring, (void *) pkts, nb_rx_pkts, &free);
+            if (RING_SIZE - free > *high_watermark) {
                 ring_state[port_id] = RING_OVERLOADED;
                 send_pause_frame(port_id, 1337);
             }
 
-            else if (ret == -ENOBUFS) {
+            else if (ret == 0) {
 
                 /* Return  mbufs to the pool, effectively dropping packets */
                 for (i = 0; i < nb_rx_pkts; i++)
@@ -246,7 +248,7 @@ pipeline_stage(__attribute__((unused)) void *args)
                 continue;
 
             /* Enqueue them on tx */
-            ret = rte_ring_enqueue_bulk(tx, pkts, nb_dq_pkts);
+            ret = rte_ring_enqueue_bulk(tx, pkts, nb_dq_pkts, NULL);
             if (ret == -EDQUOT)
                 ring_state[port_id] = RING_OVERLOADED;
 
