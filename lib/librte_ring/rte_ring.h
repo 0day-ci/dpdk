@@ -154,11 +154,7 @@ struct rte_ring {
 
 	/** Ring consumer status. */
 	struct rte_ring_ht_ptr cons __rte_aligned(RTE_CACHE_LINE_SIZE * 2);
-
-	void *ring[] __rte_cache_aligned;   /**< Memory space of ring starts here.
-	                                     * not volatile so need to be careful
-	                                     * about compiler re-ordering */
-};
+} __rte_cache_aligned;
 
 #define RING_F_SP_ENQ 0x0001 /**< The default enqueue is "single-producer". */
 #define RING_F_SC_DEQ 0x0002 /**< The default dequeue is "single-consumer". */
@@ -286,54 +282,62 @@ void rte_ring_dump(FILE *f, const struct rte_ring *r);
 /* the actual enqueue of pointers on the ring.
  * Placed here since identical code needed in both
  * single and multi producer enqueue functions */
-#define ENQUEUE_PTRS() do { \
+#define ENQUEUE_PTRS(r, obj_table, n, prod_head, obj_type) do { \
 	unsigned int i; \
-	const uint32_t size = r->size; \
-	uint32_t idx = prod_head & r->mask; \
+	const uint32_t size = (r)->size; \
+	uint32_t idx = prod_head & (r)->mask; \
+	obj_type *ring = (void *)&(r)[1]; \
 	if (likely(idx + n < size)) { \
 		for (i = 0; i < (n & ((~(unsigned)0x3))); i+=4, idx+=4) { \
-			r->ring[idx] = obj_table[i]; \
-			r->ring[idx+1] = obj_table[i+1]; \
-			r->ring[idx+2] = obj_table[i+2]; \
-			r->ring[idx+3] = obj_table[i+3]; \
+			ring[idx] = obj_table[i]; \
+			ring[idx+1] = obj_table[i+1]; \
+			ring[idx+2] = obj_table[i+2]; \
+			ring[idx+3] = obj_table[i+3]; \
 		} \
 		switch (n & 0x3) { \
-			case 3: r->ring[idx++] = obj_table[i++]; \
-			case 2: r->ring[idx++] = obj_table[i++]; \
-			case 1: r->ring[idx++] = obj_table[i++]; \
+		case 3: \
+			ring[idx++] = obj_table[i++]; /* fallthrough */ \
+		case 2: \
+			ring[idx++] = obj_table[i++]; /* fallthrough */ \
+		case 1: \
+			ring[idx++] = obj_table[i++]; \
 		} \
 	} else { \
 		for (i = 0; idx < size; i++, idx++)\
-			r->ring[idx] = obj_table[i]; \
+			ring[idx] = obj_table[i]; \
 		for (idx = 0; i < n; i++, idx++) \
-			r->ring[idx] = obj_table[i]; \
+			ring[idx] = obj_table[i]; \
 	} \
-} while(0)
+} while (0)
 
 /* the actual copy of pointers on the ring to obj_table.
  * Placed here since identical code needed in both
  * single and multi consumer dequeue functions */
-#define DEQUEUE_PTRS() do { \
+#define DEQUEUE_PTRS(r, obj_table, n, cons_head, obj_type) do { \
 	unsigned int i; \
-	uint32_t idx = cons_head & r->mask; \
-	const uint32_t size = r->size; \
+	uint32_t idx = cons_head & (r)->mask; \
+	const uint32_t size = (r)->size; \
+	obj_type *ring = (void *)&(r)[1]; \
 	if (likely(idx + n < size)) { \
 		for (i = 0; i < (n & (~(unsigned)0x3)); i+=4, idx+=4) {\
-			obj_table[i] = r->ring[idx]; \
-			obj_table[i+1] = r->ring[idx+1]; \
-			obj_table[i+2] = r->ring[idx+2]; \
-			obj_table[i+3] = r->ring[idx+3]; \
+			obj_table[i] = ring[idx]; \
+			obj_table[i+1] = ring[idx+1]; \
+			obj_table[i+2] = ring[idx+2]; \
+			obj_table[i+3] = ring[idx+3]; \
 		} \
 		switch (n & 0x3) { \
-			case 3: obj_table[i++] = r->ring[idx++]; \
-			case 2: obj_table[i++] = r->ring[idx++]; \
-			case 1: obj_table[i++] = r->ring[idx++]; \
+		case 3: \
+			obj_table[i++] = ring[idx++]; /* fallthrough */ \
+		case 2: \
+			obj_table[i++] = ring[idx++]; /* fallthrough */ \
+		case 1: \
+			obj_table[i++] = ring[idx++]; \
 		} \
 	} else { \
 		for (i = 0; idx < size; i++, idx++) \
-			obj_table[i] = r->ring[idx]; \
+			obj_table[i] = ring[idx]; \
 		for (idx = 0; i < n; i++, idx++) \
-			obj_table[i] = r->ring[idx]; \
+			obj_table[i] = ring[idx]; \
 	} \
 } while (0)
 
@@ -444,7 +448,7 @@ __rte_ring_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	if (n == 0)
 		goto end;
 
-	ENQUEUE_PTRS();
+	ENQUEUE_PTRS(r, obj_table, n, prod_head, void *);
 	rte_smp_wmb();
 
 	update_tail(&r->prod, prod_head, prod_next);
@@ -547,7 +551,7 @@ __rte_ring_do_dequeue(struct rte_ring *r, void **obj_table,
 	if (n == 0)
 		goto end;
 
-	DEQUEUE_PTRS();
+	DEQUEUE_PTRS(r, obj_table, n, cons_head, void *);
 	rte_smp_rmb();
 
 	update_tail(&r->cons, cons_head, cons_next);
