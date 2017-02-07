@@ -238,7 +238,8 @@ lcore_rx(struct lcore_params *p)
 			continue;
 		}
 
-		uint16_t sent = rte_ring_enqueue_burst(r, (void *)bufs, nb_ret);
+		uint16_t sent = rte_ring_enqueue_burst(r, (void *)bufs,
+				nb_ret, NULL);
 		app_stats.rx.enqueued_pkts += sent;
 		if (unlikely(sent < nb_ret)) {
 			RTE_LOG_DP(DEBUG, DISTRAPP,

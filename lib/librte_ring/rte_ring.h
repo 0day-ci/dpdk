@@ -354,19 +354,15 @@ void rte_ring_dump(FILE *f, const struct rte_ring *r);
  */
 static inline unsigned int __attribute__((always_inline))
 __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
-			 unsigned n, enum rte_ring_queue_behavior behavior)
+			 unsigned int n, enum rte_ring_queue_behavior behavior,
+			 unsigned int *free_space)
 {
 	uint32_t prod_head, prod_next;
 	uint32_t cons_tail, free_entries;
-	const unsigned max = n;
+	const unsigned int max = n;
 	int success;
 	unsigned int i;
 	uint32_t mask = r->mask;
-
-	/* Avoid the unnecessary cmpset operation below, which is also
-	 * potentially harmful when n equals 0. */
-	if (n == 0)
-		return 0;
 
 	/* move prod.head atomically */
 	do {
@@ -382,16 +378,12 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 		free_entries = (mask + cons_tail - prod_head);
 
 		/* check that we have enough room in ring */
-		if (unlikely(n > free_entries)) {
-			if (behavior == RTE_RING_QUEUE_FIXED)
-				return 0;
-			else {
-				/* No free entry available */
-				if (unlikely(free_entries == 0))
-					return 0;
-				n = free_entries;
-			}
-		}
+		if (unlikely(n > free_entries))
+			n = (behavior == RTE_RING_QUEUE_FIXED) ?
+					0 : free_entries;
+
+		if (n == 0)
+			goto end;
 
 		prod_next = prod_head + n;
 		success = rte_atomic32_cmpset(&r->prod.head, prod_head,
@@ -410,6 +402,9 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 		rte_pause();
 
 	r->prod.tail = prod_next;
+end:
+	if (free_space != NULL)
+		*free_space = free_entries - n;
 	return n;
 }
 
@@ -435,7 +430,8 @@ __rte_ring_mp_do_enqueue(struct rte_ring *r, void * const *obj_table,
  */
 static inline unsigned int __attribute__((always_inline))
 __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
-			 unsigned n, enum rte_ring_queue_behavior behavior)
+			 unsigned int n, enum rte_ring_queue_behavior behavior,
+			 unsigned int *free_space)
 {
 	uint32_t prod_head, cons_tail;
 	uint32_t prod_next, free_entries;
@@ -451,16 +447,12 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	free_entries = mask + cons_tail - prod_head;
 
 	/* check that we have enough room in ring */
-	if (unlikely(n > free_entries)) {
-		if (behavior == RTE_RING_QUEUE_FIXED)
-			return 0;
-		else {
-			/* No free entry available */
-			if (unlikely(free_entries == 0))
-				return 0;
-			n = free_entries;
-		}
-	}
+	if (unlikely(n > free_entries))
+		n = (behavior == RTE_RING_QUEUE_FIXED) ? 0 : free_entries;
+
+	if (n == 0)
+		goto end;
+
 
 	prod_next = prod_head + n;
 	r->prod.head = prod_next;
@@ -470,6 +462,9 @@ __rte_ring_sp_do_enqueue(struct rte_ring *r, void * const *obj_table,
 	rte_smp_wmb();
 
 	r->prod.tail = prod_next;
+end:
+	if (free_space != NULL)
+		*free_space = free_entries - n;
 	return n;
 }
 
@@ -639,9 +634,10 @@ __rte_ring_sc_do_dequeue(struct rte_ring *r, void **obj_table,
  */
 static inline unsigned int __attribute__((always_inline))
 rte_ring_mp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
-			 unsigned n)
+			 unsigned int n, unsigned int *free_space)
 {
-	return __rte_ring_mp_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_FIXED);
+	return __rte_ring_mp_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
+			free_space);
 }
 
 /**
@@ -658,9 +654,10 @@ rte_ring_mp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
  */
 static inline unsigned int __attribute__((always_inline))
 rte_ring_sp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
-			 unsigned n)
+			 unsigned int n, unsigned int *free_space)
 {
-	return __rte_ring_sp_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_FIXED);
+	return __rte_ring_sp_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_FIXED,
+			free_space);
 }
 
 /**
@@ -681,12 +678,12 @@ rte_ring_sp_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
  */
 static inline unsigned int __attribute__((always_inline))
 rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
-		      unsigned n)
+		      unsigned int n, unsigned int *free_space)
 {
 	if (r->prod.sp_enqueue)
-		return rte_ring_sp_enqueue_bulk(r, obj_table, n);
+		return rte_ring_sp_enqueue_bulk(r, obj_table, n, free_space);
 	else
-		return rte_ring_mp_enqueue_bulk(r, obj_table, n);
+		return rte_ring_mp_enqueue_bulk(r, obj_table, n, free_space);
 }
 
 /**
@@ -706,7 +703,7 @@ rte_ring_enqueue_bulk(struct rte_ring *r, void * const *obj_table,
 static inline int __attribute__((always_inline))
 rte_ring_mp_enqueue(struct rte_ring *r, void *obj)
 {
-	return rte_ring_mp_enqueue_bulk(r, &obj, 1) ? 0 : -ENOBUFS;
+	return rte_ring_mp_enqueue_bulk(r, &obj, 1, NULL) ? 0 : -ENOBUFS;
 }
 
 /**
@@ -723,7 +720,7 @@ rte_ring_mp_enqueue(struct rte_ring *r, void *obj)
 static inline int __attribute__((always_inline))
 rte_ring_sp_enqueue(struct rte_ring *r, void *obj)
 {
-	return rte_ring_sp_enqueue_bulk(r, &obj, 1) ? 0 : -ENOBUFS;
+	return rte_ring_sp_enqueue_bulk(r, &obj, 1, NULL) ? 0 : -ENOBUFS;
 }
 
 /**
@@ -744,7 +741,7 @@ rte_ring_sp_enqueue(struct rte_ring *r, void *obj)
 static inline int __attribute__((always_inline))
 rte_ring_enqueue(struct rte_ring *r, void *obj)
 {
-	return rte_ring_enqueue_bulk(r, &obj, 1) ? 0 : -ENOBUFS;
+	return rte_ring_enqueue_bulk(r, &obj, 1, NULL) ? 0 : -ENOBUFS;
 }
 
 /**
@@ -990,9 +987,10 @@ struct rte_ring *rte_ring_lookup(const char *name);
  */
 static inline unsigned __attribute__((always_inline))
 rte_ring_mp_enqueue_burst(struct rte_ring *r, void * const *obj_table,
-			 unsigned n)
+			 unsigned int n, unsigned int *free_space)
 {
-	return __rte_ring_mp_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_VARIABLE);
+	return __rte_ring_mp_do_enqueue(r, obj_table, n,
+			RTE_RING_QUEUE_VARIABLE, free_space);
 }
 
 /**
@@ -1009,9 +1007,10 @@ rte_ring_mp_enqueue_burst(struct rte_ring *r, void * const *obj_table,
  */
 static inline unsigned __attribute__((always_inline))
 rte_ring_sp_enqueue_burst(struct rte_ring *r, void * const *obj_table,
-			 unsigned n)
+			 unsigned int n, unsigned int *free_space)
 {
-	return __rte_ring_sp_do_enqueue(r, obj_table, n, RTE_RING_QUEUE_VARIABLE);
+	return __rte_ring_sp_do_enqueue(r, obj_table, n,
+			RTE_RING_QUEUE_VARIABLE, free_space);
 }
 
 /**
@@ -1032,12 +1031,12 @@ rte_ring_sp_enqueue_burst(struct rte_ring *r, void * const *obj_table,
  */
 static inline unsigned __attribute__((always_inline))
 rte_ring_enqueue_burst(struct rte_ring *r, void * const *obj_table,
-		      unsigned n)
+		      unsigned int n, unsigned int *free_space)
 {
 	if (r->prod.sp_enqueue)
-		return rte_ring_sp_enqueue_burst(r, obj_table, n);
+		return rte_ring_sp_enqueue_burst(r, obj_table, n, free_space);
 	else
-		return rte_ring_mp_enqueue_burst(r, obj_table, n);
+		return rte_ring_mp_enqueue_burst(r, obj_table, n, free_space);
 }
 
 /**
