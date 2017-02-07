@@ -264,7 +264,7 @@ main(int argc, char **argv)
 
 	void *ctx[RTE_MAX_LCORE] = { };
 
-	int nb_cryptodevs;
+	int nb_cryptodevs = 0;
 	uint8_t cdev_id, i;
 	uint8_t enabled_cdevs[RTE_CRYPTO_MAX_DEVS] = { 0 };
 
