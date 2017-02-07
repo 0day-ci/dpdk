@@ -185,8 +185,11 @@ As in the case of l3fwd, set configure port_conf.rxmode.hw_ip_checksum=0 to enab
 In addition, for improved performance, use -bsz "(32,32),(64,64),(32,32)" in load_balancer to avoid using the default burst size of 144.
 
 
+Limitations or Known issues
+---------------------------
+
 Malicious Driver Detection not Supported
-----------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Intel x550 series NICs support a feature called MDD (Malicious
 Driver Detection) which checks the behavior of the VF driver.
@@ -207,7 +210,7 @@ it by default.)
 
 
 Statistics
-----------
+~~~~~~~~~~
 
 The statistics of ixgbe hardware must be polled regularly in order for it to
 remain consistent. Running a DPDK application without polling the statistics will
@@ -229,6 +232,15 @@ be calculated as follows:
   max_read_interval = ~4 mins 48 sec.
 
 In order to ensure valid results, it is recommended to poll every 4 minutes.
+
+MTU setting
+~~~~~~~~~~~
+
+Although user can set MTU separately on PF and VF ports, ixgbe only supports
+one global MTU per physical port.
+So when user sets different MTUs on PF and VF ports in one physical port, the
+real MTU for all these PF and VF ports is the biggest one.
+This behavior is leveraged from kernel driver.
 
 
 Supported Chipsets and NICs
