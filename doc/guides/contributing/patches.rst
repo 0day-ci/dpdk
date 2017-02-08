@@ -225,13 +225,9 @@ Here are some guidelines for the body of a commit message:
 
 * Use correct capitalization, punctuation and spelling.
 
-In addition to the ``Signed-off-by:`` name the commit messages can also have one or more of the following:
-
-* ``Reported-by:`` The reporter of the issue.
-* ``Tested-by:`` The tester of the change.
-* ``Reviewed-by:`` The reviewer of the change.
-* ``Suggested-by:`` The person who suggested the change.
-* ``Acked-by:`` When a previous version of the patch was acked and the ack is still relevant.
+In addition to the ``Signed-off-by:`` name the commit messages can also have
+tags for who reported, suggested, tested etc, the patch being posted. Please
+refer to section `Tested, Acked and Reviewed by`_.
 
 
 Creating Patches
@@ -427,9 +423,64 @@ The options ``--annotate`` and ``confirm = always`` are recommended for checking
 The Review Process
 ------------------
 
-The more work you put into the previous steps the easier it will be to get a patch accepted.
+Patches are reviewed by the community, relying on the experience and
+collaboration of the community to double-check each others work.
+There are a number of ways to say you have double-checked a patch on the
+mailing list.
 
-The general cycle for patch review and acceptance is:
+Tested, Acked and Reviewed by
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To state that you have interacted with a patch on the mailing list,
+one replies to the email with a tag. The commonly used tags are:
+
+ * Reviewed-by:
+ * Acked-by:
+ * Tested-by:
+ * Reported-by:
+ * Suggested-by:
+
+All of these tags should be used as follows:
+
+.. code-block:: console
+
+        tag-here: Name Surname <email@address.com>
+
+Each of these tags has a specific meaning. In general, the DPDK community
+generally follows the kernel usage of the tags. A short summary of the meanings
+of each tag here for reference:
+
+.. _statement: https://www.kernel.org/doc/html/latest/process/submitting-patches.html#reviewer-s-statement-of-oversight
+
+``Reviewed-by:`` is a strong statement_ that the patch is an
+appropriate modification without any remaining serious technical issues.
+Reviewers known to understand the subject area and to perform thorough reviews
+will normally increase the likelihood of your patch getting merged.
+
+``Acked-by:`` is a record that the a person named was not directly involved in
+the preparation of a patch but wishes to signify and record their
+acceptance and approval of it.
+
+``Tested-by:`` indicates that the patch has been successfully tested (in some
+environment) by the person named.
+
+``Reported-by:`` gives credit to people who find bugs and report them and it
+hopefully inspires them to help us again in the future. Please note that if the
+bug was reported in private, then ask for permission first before using the
+Reported-by tag.
+
+``Suggested-by:`` indicates that the patch idea is suggested by the person named
+and ensures credit to the person for the idea.  Please note that this tag should
+not be added without the reporter’s permission, especially if the idea was not
+posted in a public forum.
+
+
+
+Steps to getting your patch merged
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The more work you put into the previous steps the easier it will be to get a
+patch accepted. The general cycle for patch review and acceptance is:
 
 #. Submit the patch.
 
