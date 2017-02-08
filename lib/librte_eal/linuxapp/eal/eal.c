@@ -767,8 +767,11 @@ rte_eal_init(int argc, char **argv)
 	/* set log level as early as possible */
 	rte_set_log_level(internal_config.log_level);
 
-	if (rte_eal_cpu_init() < 0)
-		rte_panic("Cannot detect lcores\n");
+	if (rte_eal_cpu_init() < 0) {
+		RTE_LOG(ERR, EAL, "Cannot detect lcores\n");
+		rte_errno = ENOTSUP;
+		return -1;
+	}
 
 	fctret = eal_parse_args(argc, argv);
 	if (fctret < 0)
