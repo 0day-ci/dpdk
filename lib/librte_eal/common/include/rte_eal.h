@@ -159,7 +159,32 @@ int rte_eal_iopl_init(void);
  *     function call and should not be further interpreted by the
  *     application.  The EAL does not take any ownership of the memory used
  *     for either the argv array, or its members.
- *   - On failure, a negative error value.
+ *   - On failure, -1 and rte_errno is set to a value indicating the cause
+ *     for failure.
+ *
+ *   The error codes returned via rte_errno:
+ *     EACCES indicates a permissions issue.
+ *
+ *     EAGAIN indicates either a bus or system resource was not available,
+ *            try again.
+ *
+ *     EALREADY indicates that the rte_eal_init function has already been
+ *              called, and cannot be called again.
+ *
+ *     EFAULT indicates the tailq configuration name was not found in
+ *            memory configuration.
+ *
+ *     EINVAL indicates invalid parameters were passed as argv/argc.
+ *
+ *     EIO indicates failure to setup the logging handlers.  This is usually
+ *         caused by an out-of-memory condition.
+ *
+ *     ENODEV indicates memory setup issues.
+ *
+ *     ENOTSUP indicates that the EAL cannot initialize on this system.
+ *
+ *     EUNATCH indicates that the PCI bus is either not present, or is not
+ *             readable by the eal.
  */
 int rte_eal_init(int argc, char **argv);
 
