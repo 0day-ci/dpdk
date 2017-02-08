@@ -834,8 +834,12 @@ rte_eal_init(int argc, char **argv)
 	}
 
 #ifdef VFIO_PRESENT
-	if (rte_eal_vfio_setup() < 0)
-		rte_panic("Cannot init VFIO\n");
+	if (rte_eal_vfio_setup() < 0) {
+		RTE_LOG(ERR, EAL, "Cannot init VFIO\n");
+		rte_errno = EAGAIN;
+		rte_atomic32_clear(&run_once);
+		return -1;
+	}
 #endif
 
 	if (rte_eal_memory_init() < 0)
