@@ -826,8 +826,12 @@ rte_eal_init(int argc, char **argv)
 		return -1;
 	}
 
-	if (rte_eal_pci_init() < 0)
-		rte_panic("Cannot init PCI\n");
+	if (rte_eal_pci_init() < 0) {
+		RTE_LOG(ERR, EAL, "Cannot init PCI\n");
+		rte_errno = EUNATCH;
+		rte_atomic32_clear(&run_once);
+		return -1;
+	}
 
 #ifdef VFIO_PRESENT
 	if (rte_eal_vfio_setup() < 0)
