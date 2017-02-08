@@ -91,6 +91,11 @@ mlx5_dev_start(struct rte_eth_dev *dev)
 		priv_fdir_enable(priv);
 	priv_dev_interrupt_handler_install(priv, dev);
 	err = priv_flow_start(priv);
+	if (dev->data->dev_conf.intr_conf.rxq) {
+		err = priv_intr_efd_enable(priv);
+		if (!err)
+			err = priv_create_intr_vec(priv);
+	}
 	priv_xstats_init(priv);
 	priv_unlock(priv);
 	return -err;
@@ -124,6 +129,10 @@ mlx5_dev_stop(struct rte_eth_dev *dev)
 	priv_fdir_disable(priv);
 	priv_flow_stop(priv);
 	priv_dev_interrupt_handler_uninstall(priv, dev);
+	if (priv->dev->data->dev_conf.intr_conf.rxq) {
+		priv_destroy_intr_vec(priv);
+		priv_intr_efd_disable(priv);
+	}
 	priv->started = 0;
 	priv_unlock(priv);
 }
