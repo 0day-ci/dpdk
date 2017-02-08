@@ -61,6 +61,7 @@
 #include <rte_launch.h>
 #include <rte_eal.h>
 #include <rte_eal_memconfig.h>
+#include <rte_errno.h>
 #include <rte_per_lcore.h>
 #include <rte_lcore.h>
 #include <rte_log.h>
@@ -863,8 +864,11 @@ rte_eal_init(int argc, char **argv)
 		return -1;
 	}
 
-	if (rte_eal_alarm_init() < 0)
-		rte_panic("Cannot init interrupt-handling thread\n");
+	if (rte_eal_alarm_init() < 0) {
+		RTE_LOG(ERR, EAL, "Cannot init interrupt-handling thread\n");
+		/* rte_eal_alarm_init sets rte_errno on failure. */
+		return -1;
+	}
 
 	if (rte_eal_timer_init() < 0)
 		rte_panic("Cannot init HPET or TSC timers\n");
