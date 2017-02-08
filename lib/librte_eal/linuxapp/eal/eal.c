@@ -935,8 +935,11 @@ rte_eal_init(int argc, char **argv)
 	rte_eal_mp_wait_lcore();
 
 	/* Probe all the buses and devices/drivers on them */
-	if (rte_bus_probe())
-		rte_panic("Cannot probe devices\n");
+	if (rte_bus_probe()) {
+		RTE_LOG(ERR, EAL, "Cannot probe devices\n");
+		rte_errno = ENOTSUP;
+		return -1;
+	}
 
 	/* Probe & Initialize PCI devices */
 	if (rte_eal_pci_probe()) {
