@@ -39,13 +39,14 @@ const struct cperf_test cperf_testmap[] = {
 };
 
 static int
-cperf_initialize_cryptodev(struct cperf_options *opts, uint8_t *enabled_cdevs)
+cperf_initialize_cryptodev(struct cperf_options *opts, uint8_t *enabled_cdevs,
+		uint8_t enabled_cdevs_dim)
 {
 	uint8_t cdev_id, enabled_cdev_count = 0, nb_lcores;
 	int ret;
 
 	enabled_cdev_count = rte_cryptodev_devices_get(opts->device_type,
-			enabled_cdevs, RTE_DIM(enabled_cdevs));
+			enabled_cdevs, enabled_cdevs_dim);
 	if (enabled_cdev_count == 0) {
 		printf("No crypto devices type %s available\n",
 				opts->device_type);
@@ -296,7 +297,8 @@ main(int argc, char **argv)
 	if (!opts.silent)
 		cperf_options_dump(&opts);
 
-	nb_cryptodevs = cperf_initialize_cryptodev(&opts, enabled_cdevs);
+	nb_cryptodevs = cperf_initialize_cryptodev(&opts, enabled_cdevs,
+			RTE_CRYPTO_MAX_DEVS);
 	if (nb_cryptodevs < 1) {
 		RTE_LOG(ERR, USER1, "Failed to initialise requested crypto "
 				"device type\n");
