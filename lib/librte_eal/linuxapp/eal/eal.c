@@ -946,7 +946,7 @@ rte_eal_init(int argc, char **argv)
 	}
 
 	if (rte_eal_dev_init() < 0)
-		rte_panic("Cannot init pmd devices\n");
+		RTE_LOG(ERR, EAL, "Cannot init pmd devices\n");
 
 	rte_eal_mcfg_complete();
 
