@@ -69,6 +69,7 @@
 #include <sys/queue.h>
 #include <sys/mman.h>
 
+#include <rte_errno.h>
 #include <rte_interrupts.h>
 #include <rte_log.h>
 #include <rte_pci.h>
@@ -416,6 +417,7 @@ rte_eal_pci_probe(void)
 	struct rte_pci_device *dev = NULL;
 	struct rte_devargs *devargs;
 	int probe_all = 0;
+	int ret_1 = 0;
 	int ret = 0;
 
 	if (rte_eal_devargs_type_count(RTE_DEVTYPE_WHITELISTED_PCI) == 0)
@@ -430,17 +432,20 @@ rte_eal_pci_probe(void)
 
 		/* probe all or only whitelisted devices */
 		if (probe_all)
-			ret = pci_probe_all_drivers(dev);
+			ret_1 = pci_probe_all_drivers(dev);
 		else if (devargs != NULL &&
 			devargs->type == RTE_DEVTYPE_WHITELISTED_PCI)
-			ret = pci_probe_all_drivers(dev);
-		if (ret < 0)
-			rte_exit(EXIT_FAILURE, "Requested device " PCI_PRI_FMT
+			ret_1 = pci_probe_all_drivers(dev);
+		if (ret_1 < 0) {
+			RTE_LOG(ERR, EAL, "Requested device " PCI_PRI_FMT
 				 " cannot be used\n", dev->addr.domain, dev->addr.bus,
 				 dev->addr.devid, dev->addr.function);
+			rte_errno = errno;
+			ret = 1;
+		}
 	}
 
-	return 0;
+	return -ret;
 }
 
 /* dump one device */
