@@ -94,9 +94,10 @@ The following are the EAL command-line options that can be used in conjunction
 with the ``dpdk-test-crypto-perf`` applcation.
 See the DPDK Getting Started Guides for more information on these options.
 
-*   ``-c <COREMASK>``
+*   ``-c <COREMASK>`` or ``-l <CORELIST>``
 
-        Set the hexadecimal bitmask of the cores to run on.
+        Set the hexadecimal bitmask of the cores to run on. The corelist is a
+        list cores to use.
 
 *   ``-w <PCI>``
 
