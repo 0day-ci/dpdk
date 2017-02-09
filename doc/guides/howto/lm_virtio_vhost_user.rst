@@ -326,7 +326,7 @@ vm_virtio_vhost_user.sh
    # Socket Path
    SOCKET_PATH="/root/dpdk/host_scripts/usvhost"
 
-   taskset -c 2-7 $KVM_PATH \
+   taskset -l 2-7 $KVM_PATH \
     -enable-kvm \
     -m $MEM \
     -smp $VCPUS_NR \
@@ -402,7 +402,7 @@ vm_virtio_vhost_user_migrate.sh
    # Socket Path
    SOCKET_PATH="/root/dpdk/host_scripts/usvhost"
 
-   taskset -c 2-7 $KVM_PATH \
+   taskset -l 2-7 $KVM_PATH \
     -enable-kvm \
     -m $MEM \
     -smp $VCPUS_NR \
@@ -466,4 +466,4 @@ run_testpmd_in_vm.sh
    # test system has 8 cpus (0-7), use cpus 2-7 for VM
 
    /root/dpdk/x86_64-default-linuxapp-gcc/app/testpmd \
-   -c 3f -n 4 --socket-mem 350 -- --burst=64 --i --disable-hw-vlan-filter
+   -l 0-5 -n 4 --socket-mem 350 -- --burst=64 --i --disable-hw-vlan-filter
