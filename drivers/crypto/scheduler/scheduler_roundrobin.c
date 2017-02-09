@@ -62,6 +62,11 @@ schedule_enqueue(void *qp_ctx, struct rte_crypto_op **ops, uint16_t nb_ops)
 		rte_prefetch0(ops[i]->sym->session);
 
 	for (i = 0; (i < (nb_ops - 8)) && (nb_ops > 8); i += 4) {
+		rte_prefetch0(ops[i + 4]->sym->session);
+		rte_prefetch0(ops[i + 5]->sym->session);
+		rte_prefetch0(ops[i + 6]->sym->session);
+		rte_prefetch0(ops[i + 7]->sym->session);
+
 		sess0 = (struct scheduler_session *)
 				ops[i]->sym->session->_private;
 		sess1 = (struct scheduler_session *)
@@ -80,11 +85,6 @@ schedule_enqueue(void *qp_ctx, struct rte_crypto_op **ops, uint16_t nb_ops)
 		ops[i + 1]->sym->session = sess1->sessions[slave_idx];
 		ops[i + 2]->sym->session = sess2->sessions[slave_idx];
 		ops[i + 3]->sym->session = sess3->sessions[slave_idx];
-
-		rte_prefetch0(ops[i + 4]->sym->session);
-		rte_prefetch0(ops[i + 5]->sym->session);
-		rte_prefetch0(ops[i + 6]->sym->session);
-		rte_prefetch0(ops[i + 7]->sym->session);
 	}
 
 	for (; i < nb_ops; i++) {
@@ -350,7 +350,6 @@ static int
 scheduler_start(struct rte_cryptodev *dev)
 {
 	struct scheduler_ctx *sched_ctx = dev->data->dev_private;
-
 	uint16_t i;
 
 	for (i = 0; i < dev->data->nb_queue_pairs; i++) {
@@ -358,14 +357,13 @@ scheduler_start(struct rte_cryptodev *dev)
 		struct rr_scheduler_qp_ctx *rr_qp_ctx =
 				qp_ctx->private_qp_ctx;
 		uint32_t j;
-		uint16_t qp_id = rr_qp_ctx->slaves[0].qp_id;
 
 		memset(rr_qp_ctx->slaves, 0, MAX_SLAVES_NUM *
 				sizeof(struct scheduler_slave));
 		for (j = 0; j < sched_ctx->nb_slaves; j++) {
 			rr_qp_ctx->slaves[j].dev_id =
-					sched_ctx->slaves[i].dev_id;
-			rr_qp_ctx->slaves[j].qp_id = qp_id;
+					sched_ctx->slaves[j].dev_id;
+			rr_qp_ctx->slaves[j].qp_id = i;
 		}
 
 		rr_qp_ctx->nb_slaves = sched_ctx->nb_slaves;
