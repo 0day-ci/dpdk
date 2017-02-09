@@ -155,6 +155,9 @@ static uint32_t enabled_port_mask = 0;
 
 static int rx_queue_per_lcore = 1;
 
+/* Parse packet type using rx callback and disabled by default */
+static int parse_ptype;
+
 struct mbuf_table {
 	uint32_t len;
 	uint32_t head;
@@ -541,13 +544,15 @@ print_usage(const char *prgname)
 {
 	printf("%s [EAL options] -- -p PORTMASK [-q NQ]"
 		"  [--max-pkt-len PKTLEN]"
-		"  [--maxflows=<flows>]  [--flowttl=<ttl>[(s|ms)]]\n"
+		"  [--maxflows=<flows>]  [--flowttl=<ttl>[(s|ms)]]"
+		"  [--parse-ptype]\n"
 		"  -p PORTMASK: hexadecimal bitmask of ports to configure\n"
 		"  -q NQ: number of RX queues per lcore\n"
 		"  --maxflows=<flows>: optional, maximum number of flows "
 		"supported\n"
 		"  --flowttl=<ttl>[(s|ms)]: optional, maximum TTL for each "
-		"flow\n",
+		"flow\n"
+		"  --parse-ptype: Set to use software to analyze packet type\n",
 		prgname);
 }
 
@@ -636,6 +641,7 @@ parse_nqueue(const char *q_arg)
 	return n;
 }
 
+#define CMD_LINE_OPT_PARSE_PTYPE "parse-ptype"
 /* Parse the argument given in the command line of the application */
 static int
 parse_args(int argc, char **argv)
@@ -648,6 +654,7 @@ parse_args(int argc, char **argv)
 		{"max-pkt-len", 1, 0, 0},
 		{"maxflows", 1, 0, 0},
 		{"flowttl", 1, 0, 0},
+		{CMD_LINE_OPT_PARSE_PTYPE, 0, 0, 0},
 		{NULL, 0, 0, 0}
 	};
 
@@ -706,6 +713,13 @@ parse_args(int argc, char **argv)
 				}
 			}
 
+			if (!strncmp(lgopts[option_index].name,
+					CMD_LINE_OPT_PARSE_PTYPE,
+					sizeof(CMD_LINE_OPT_PARSE_PTYPE))) {
+				printf("soft parse-ptype is enabled\n");
+				parse_ptype = 1;
+			}
+
 			break;
 
 		default:
@@ -728,6 +742,74 @@ print_ethaddr(const char *name, const struct ether_addr *eth_addr)
 	char buf[ETHER_ADDR_FMT_SIZE];
 	ether_format_addr(buf, ETHER_ADDR_FMT_SIZE, eth_addr);
 	printf("%s%s", name, buf);
+}
+
+static inline void
+parse_ptype_one(struct rte_mbuf *m)
+{
+	struct ether_hdr *eth_hdr;
+	uint32_t packet_type = RTE_PTYPE_UNKNOWN;
+	uint16_t ether_type;
+
+	eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
+	ether_type = eth_hdr->ether_type;
+	if (ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4))
+		packet_type |= RTE_PTYPE_L3_IPV4_EXT_UNKNOWN;
+	else if (ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv6))
+		packet_type |= RTE_PTYPE_L3_IPV6_EXT_UNKNOWN;
+
+	m->packet_type = packet_type;
+}
+
+static uint16_t
+cb_parse_ptype(uint8_t port __rte_unused, uint16_t queue __rte_unused,
+		struct rte_mbuf *pkts[], uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused,
+		void *user_param __rte_unused)
+{
+	unsigned int i;
+
+	for (i = 0; i < nb_pkts; ++i)
+		parse_ptype_one(pkts[i]);
+
+	return nb_pkts;
+}
+
+static int
+add_cb_parse_ptype(uint8_t portid, uint16_t queueid)
+{
+	printf("Port %d: softly parse packet type info\n", portid);
+	if (rte_eth_add_rx_callback(portid, queueid, cb_parse_ptype, NULL))
+		return 0;
+
+	printf("Failed to add rx callback: port=%d\n", portid);
+	return -1;
+}
+
+static int check_ptype(uint8_t portid)
+{
+	int i, ret;
+	int ptype_l3_ipv4 = 0;
+	int ptype_l3_ipv6 = 0;
+	uint32_t ptype_mask = RTE_PTYPE_L3_MASK;
+
+	ret = rte_eth_dev_get_supported_ptypes(portid, ptype_mask, NULL, 0);
+	if (ret <= 0)
+		return 0;
+
+	uint32_t ptypes[ret];
+	ret = rte_eth_dev_get_supported_ptypes(portid, ptype_mask, ptypes, ret);
+	for (i = 0; i < ret; ++i) {
+		if (ptypes[i] & RTE_PTYPE_L3_IPV4)
+			ptype_l3_ipv4 = 1;
+		if (ptypes[i] & RTE_PTYPE_L3_IPV6)
+			ptype_l3_ipv6 = 1;
+	}
+
+	if (ptype_l3_ipv4 && ptype_l3_ipv6)
+		return 1;
+
+	return 0;
 }
 
 /* Check the link status of all ports in up to 9s, and print them finally */
@@ -1116,6 +1198,14 @@ main(int argc, char **argv)
 		rte_eth_macaddr_get(portid, &ports_eth_addr[portid]);
 		print_ethaddr(" Address:", &ports_eth_addr[portid]);
 		printf("\n");
+
+		if (parse_ptype) {
+			if (add_cb_parse_ptype(portid, queueid) < 0)
+				rte_exit(EXIT_FAILURE,
+					"Fail to add ptype cb\n");
+		} else if (!check_ptype(portid))
+			rte_exit(EXIT_FAILURE,
+				"PMD can not provide needed ptypes\n");
 
 		/* init one TX queue per couple (lcore,port) */
 		queueid = 0;
