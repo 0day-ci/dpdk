@@ -446,7 +446,77 @@ rte_eal_pci_scan(void)
 	DIR *dir;
 	char dirname[PATH_MAX];
 	struct rte_pci_addr addr;
+	struct rte_pci_device *dev, *tmp;
 
+	/* Search the device list for devices that are no longer present
+	 * on the system and remove them.
+	 */
+	TAILQ_FOREACH_SAFE(dev, &pci_device_list, next, tmp) {
+		int found = 0;
+
+		dir = opendir(pci_get_sysfs_path());
+		if (dir == NULL) {
+			RTE_LOG(ERR, EAL, "%s(): opendir failed: %s\n",
+				__func__, strerror(errno));
+			return -1;
+		}
+
+		while ((e = readdir(dir)) != NULL) {
+			if (e->d_name[0] == '.')
+				continue;
+
+			if (parse_pci_addr_format(e->d_name, sizeof(e->d_name),
+						  &addr) != 0)
+				continue;
+
+			if (rte_eal_compare_pci_addr(&addr, &dev->addr) == 0) {
+				found = 1;
+				break;
+			}
+		}
+
+		if (!found) {
+
+			RTE_LOG(DEBUG, EAL,
+				"PCI device "PCI_PRI_FMT" was removed.\n",
+				addr.domain, addr.bus, addr.devid,
+				addr.function);
+
+			if (dev->driver) {
+				/* A driver was loaded against this device.
+				 * Unload it.
+				 */
+				RTE_LOG(DEBUG, EAL,
+					"  Unload driver: %x:%x %s\n",
+					dev->id.vendor_id, dev->id.device_id,
+					dev->driver->driver.name);
+
+				if (dev->driver->remove) {
+					/* It doesn't matter what remove
+					 * returns - we're removing the
+					 * device either way.
+					 */
+					dev->driver->remove(dev);
+				}
+
+				/* clear driver structure */
+				dev->driver = NULL;
+
+				if (dev->driver->drv_flags &
+				    RTE_PCI_DRV_NEED_MAPPING)
+					rte_eal_pci_unmap_device(dev);
+			}
+
+			TAILQ_REMOVE(&pci_device_list, dev, next);
+			free(dev);
+		}
+
+		closedir(dir);
+	}
+
+	/* Search sysfs for all PCI devices and add them to the
+	 * device list
+	 */
 	dir = opendir(pci_get_sysfs_path());
 	if (dir == NULL) {
 		RTE_LOG(ERR, EAL, "%s(): opendir failed: %s\n",
