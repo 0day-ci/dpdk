@@ -5770,7 +5770,7 @@ i40e_dev_handle_aq_msg(struct rte_eth_dev *dev)
  *  void
  */
 static void
-i40e_dev_interrupt_handler(struct rte_intr_handle *intr_handle,
+i40e_dev_interrupt_handler(__rte_unused struct rte_intr_handle *intr_handle,
 			   void *param)
 {
 	struct rte_eth_dev *dev = (struct rte_eth_dev *)param;
@@ -5817,7 +5817,7 @@ i40e_dev_interrupt_handler(struct rte_intr_handle *intr_handle,
 done:
 	/* Enable interrupt */
 	i40e_pf_enable_irq0(hw);
-	rte_intr_enable(intr_handle);
+	rte_intr_enable(dev->intr_handle);
 }
 
 static int
