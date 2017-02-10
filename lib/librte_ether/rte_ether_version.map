@@ -159,5 +159,35 @@ DPDK_17.05 {
 	global:
 
 	rte_eth_dev_capability_control;
+	rte_scheddev_capabilities_get;
+	rte_scheddev_node_capabilities_get;
+	rte_scheddev_wred_profile_add;
+	rte_scheddev_wred_profile_delete;
+	rte_scheddev_shared_wred_context_add_update;
+	rte_scheddev_shared_wred_context_delete;
+	rte_scheddev_shaper_profile_add;
+	rte_scheddev_shaper_profile_delete;
+	rte_scheddev_shared_shaper_add_update;
+	rte_scheddev_shared_shaper_delete;
+	rte_scheddev_node_add;
+	rte_scheddev_node_delete;
+	rte_scheddev_node_suspend;
+	rte_scheddev_node_resume;
+	rte_scheddev_hierarchy_set;
+	rte_scheddev_node_parent_update;
+	rte_scheddev_node_shaper_update;
+	rte_scheddev_node_shared_shaper_update;
+	rte_scheddev_node_scheduling_mode_update;
+	rte_scheddev_node_cman_update;
+	rte_scheddev_node_wred_context_update;
+	rte_scheddev_node_shared_wred_context_update;
+	rte_scheddev_mark_vlan_dei;
+	rte_scheddev_mark_ip_ecn;
+	rte_scheddev_mark_ip_dscp;
+	rte_scheddev_stats_get_enabled;
+	rte_scheddev_stats_enable;
+	rte_scheddev_node_stats_get_enabled;
+	rte_scheddev_node_stats_enable;
+	rte_scheddev_node_stats_read;
 
 } DPDK_17.02;
