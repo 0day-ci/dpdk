@@ -62,3 +62,7 @@ Deprecation Notices
   PMDs that implement the latter.
   Target release for removal of the legacy API will be defined once most
   PMDs have switched to rte_flow.
+
+* ABI changes are planned for 17.05 in the ``rte_cryptodev_ops`` structure.
+  The field ``cryptodev_configure_t`` function prototype will be added a
+  parameter of a struct rte_cryptodev_config type pointer.
