@@ -38,8 +38,6 @@
  * 32 bits tx flags, high 16 bits for L2TAG1 (VLAN),
  * low 16 bits for others.
  */
-#define I40E_TX_FLAG_L2TAG1_SHIFT 16
-#define I40E_TX_FLAG_L2TAG1_MASK  0xffff0000
 #define I40E_TX_FLAG_CSUM         ((uint32_t)(1 << 0))
 #define I40E_TX_FLAG_INSERT_VLAN  ((uint32_t)(1 << 1))
 #define I40E_TX_FLAG_TSYN         ((uint32_t)(1 << 2))
