@@ -2802,6 +2802,19 @@ rte_eth_dev_filter_ctrl(uint8_t port_id, enum rte_filter_type filter_type,
 	return (*dev->dev_ops->filter_ctrl)(dev, filter_type, filter_op, arg);
 }
 
+int
+rte_eth_dev_capability_control(uint8_t port_id, enum rte_eth_capability cap,
+	void *arg)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->cap_ctrl, -ENOTSUP);
+	return (*dev->dev_ops->cap_ctrl)(dev, cap, arg);
+}
+
 void *
 rte_eth_add_rx_callback(uint8_t port_id, uint16_t queue_id,
 		rte_rx_callback_fn fn, void *user_param)

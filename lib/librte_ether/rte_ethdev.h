@@ -1073,6 +1073,12 @@ TAILQ_HEAD(rte_eth_dev_cb_list, rte_eth_dev_callback);
  * structure associated with an Ethernet device.
  */
 
+enum rte_eth_capability {
+	RTE_ETH_CAPABILITY_FLOW = 0, /**< Flow */
+	RTE_ETH_CAPABILITY_SCHED, /**< Hierarchical Scheduler */
+	RTE_ETH_CAPABILITY_MAX
+};
+
 typedef int  (*eth_dev_configure_t)(struct rte_eth_dev *dev);
 /**< @internal Ethernet device configuration. */
 
@@ -1427,6 +1433,10 @@ typedef int (*eth_filter_ctrl_t)(struct rte_eth_dev *dev,
 				 void *arg);
 /**< @internal Take operations to assigned filter type on an Ethernet device */
 
+typedef int (*eth_capability_control_t)(struct rte_eth_dev *dev,
+	enum rte_eth_capability cap, void *arg);
+/**< @internal Take capability operations on an Ethernet device */
+
 typedef int (*eth_get_dcb_info)(struct rte_eth_dev *dev,
 				 struct rte_eth_dcb_info *dcb_info);
 /**< @internal Get dcb information on an Ethernet device */
@@ -1548,6 +1558,8 @@ struct eth_dev_ops {
 	eth_timesync_adjust_time   timesync_adjust_time; /** Adjust the device clock. */
 	eth_timesync_read_time     timesync_read_time; /** Get the device clock time. */
 	eth_timesync_write_time    timesync_write_time; /** Set the device clock time. */
+
+	eth_capability_control_t   cap_ctrl; /**< capability control. */
 };
 
 /**
@@ -3888,6 +3900,23 @@ int rte_eth_dev_filter_supported(uint8_t port_id, enum rte_filter_type filter_ty
  */
 int rte_eth_dev_filter_ctrl(uint8_t port_id, enum rte_filter_type filter_type,
 			enum rte_filter_op filter_op, void *arg);
+
+/**
+ * Take capability operations on an Ethernet device.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param cap
+ *   The capability of the Ethernet device
+ * @param arg
+ *   A pointer to arguments defined specifically for the operation.
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP) if hardware doesn't support.
+ *   - (-ENODEV) if *port_id* invalid.
+ */
+int rte_eth_dev_capability_control(uint8_t port_id,
+	enum rte_eth_capability cap, void *arg);
 
 /**
  * Get DCB information on an Ethernet device.
