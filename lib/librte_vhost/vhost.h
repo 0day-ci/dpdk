@@ -110,9 +110,13 @@ struct vhost_virtqueue {
 	uint16_t                shadow_used_idx;
 } __rte_cache_aligned;
 
-/* Old kernels have no such macro defined */
+/* Old kernels have no such macros defined */
 #ifndef VIRTIO_NET_F_GUEST_ANNOUNCE
  #define VIRTIO_NET_F_GUEST_ANNOUNCE 21
+#endif
+
+#ifndef VIRTIO_NET_F_MTU
+ #define VIRTIO_NET_F_MTU 3
 #endif
 
 
