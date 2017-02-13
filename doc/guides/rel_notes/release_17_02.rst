@@ -237,6 +237,16 @@ Resolved Issues
 EAL
 ~~~
 
+* **Added support for representing buses in EAL**
+
+  A new structure ``rte_bus`` is introduced in EAL. This allows for devices to
+  be represented by buses they are connected to. A new bus can be added to
+  DPDK by extending the ``rte_bus`` structure and implementing the scan and
+  probe functions. Once a new bus is registered using provided APIs, new
+  devices can be detected and initialized using bus scan and probe callbacks.
+
+  With this change, devices other than PCI or VDEV type can also be represented
+  in DPDK framework.
 
 Drivers
 ~~~~~~~
