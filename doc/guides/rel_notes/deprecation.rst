@@ -62,3 +62,9 @@ Deprecation Notices
   PMDs that implement the latter.
   Target release for removal of the legacy API will be defined once most
   PMDs have switched to rte_flow.
+
+* Some vfio APIs are planned to be exported outside librte_eal in 17.05.
+  vfio APIs like ``vfio_setup_device``, ``vfio_get_group_fd`` can be used by
+  subsystem other than EAL/PCI. For that, these need to be exported symbols.
+  Such APIs are planned to be renamed according to ``rte_*`` naming convention
+  and exported from librte_eal.
