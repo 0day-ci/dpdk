@@ -62,3 +62,6 @@ Deprecation Notices
   PMDs that implement the latter.
   Target release for removal of the legacy API will be defined once most
   PMDs have switched to rte_flow.
+
+* The architecture TILE-Gx and the associated mpipe driver are not
+  maintained and will be removed in 17.05.
