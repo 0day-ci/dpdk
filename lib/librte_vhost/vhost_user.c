@@ -691,14 +691,18 @@ vhost_user_set_vring_kick(struct virtio_net *dev, struct VhostUserMsg *pmsg)
 		close(vq->kickfd);
 	vq->kickfd = file.fd;
 
-	if (virtio_is_ready(dev) && !(dev->flags & VIRTIO_DEV_RUNNING)) {
-		if (dev->dequeue_zero_copy) {
-			RTE_LOG(INFO, VHOST_CONFIG,
-				"dequeue zero copy is enabled\n");
-		}
+	if (virtio_is_ready(dev)) {
+		dev->flags |= VIRTIO_DEV_READY;
 
-		if (notify_ops->new_device(dev->vid) == 0)
-			dev->flags |= VIRTIO_DEV_RUNNING;
+		if (!(dev->flags & VIRTIO_DEV_RUNNING)) {
+			if (dev->dequeue_zero_copy) {
+				RTE_LOG(INFO, VHOST_CONFIG,
+						"dequeue zero copy is enabled\n");
+			}
+
+			if (notify_ops->new_device(dev->vid) == 0)
+				dev->flags |= VIRTIO_DEV_RUNNING;
+		}
 	}
 }
 
@@ -732,6 +736,8 @@ vhost_user_get_vring_base(struct virtio_net *dev,
 		dev->flags &= ~VIRTIO_DEV_RUNNING;
 		notify_ops->destroy_device(dev->vid);
 	}
+
+	dev->flags &= ~VIRTIO_DEV_READY;
 
 	/* Here we are safe to get the last used index */
 	state->num = vq->last_used_idx;
