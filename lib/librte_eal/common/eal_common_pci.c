@@ -351,7 +351,7 @@ rte_eal_pci_probe_one(const struct rte_pci_addr *addr)
 	/* update current pci device in global list, kernel bindings might have
 	 * changed since last time we looked at it.
 	 */
-	if (pci_update_device(addr) < 0)
+	if (rte_eal_pci_update_device(addr) < 0)
 		goto err_return;
 
 	TAILQ_FOREACH(dev, &pci_device_list, next) {

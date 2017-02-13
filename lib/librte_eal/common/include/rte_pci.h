@@ -442,6 +442,20 @@ void *pci_map_resource(void *requested_addr, int fd, off_t offset,
 void pci_unmap_resource(void *requested_addr, size_t size);
 
 /**
+ * Update the PCI device in global list
+ *
+ * Update the driver of pci device  and add it in global list,
+ * kernel bindings might have changed since last time we looked at it.
+ *
+ * @param addr
+ *	The PCI Bus-Device-Function address to update.
+ * @return
+ *   - 0 on success.
+ *   - Negative on error.
+ */
+int rte_eal_pci_update_device(const struct rte_pci_addr *addr);
+
+/**
  * Probe the single PCI device.
  *
  * Scan the content of the PCI bus, and find the pci device specified by pci

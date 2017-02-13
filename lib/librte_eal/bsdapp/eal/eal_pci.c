@@ -398,7 +398,7 @@ error:
 }
 
 int
-pci_update_device(const struct rte_pci_addr *addr)
+rte_eal_pci_update_device(const struct rte_pci_addr *addr)
 {
 	int fd;
 	struct pci_conf matches[2];

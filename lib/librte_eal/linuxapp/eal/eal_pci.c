@@ -378,7 +378,7 @@ pci_scan_one(const char *dirname, const struct rte_pci_addr *addr)
 }
 
 int
-pci_update_device(const struct rte_pci_addr *addr)
+rte_eal_pci_update_device(const struct rte_pci_addr *addr)
 {
 	char filename[PATH_MAX];
 
