@@ -575,6 +575,8 @@ new_device(int vid)
 	for (i = 0; i < rte_vhost_get_queue_num(vid) * VIRTIO_QNUM; i++)
 		rte_vhost_enable_guest_notification(vid, i, 0);
 
+	rte_vhost_mtu_get(vid, &eth_dev->data->mtu);
+
 	eth_dev->data->dev_link.link_status = ETH_LINK_UP;
 
 	rte_atomic32_set(&internal->dev_attached, 1);
@@ -966,6 +968,21 @@ eth_link_update(struct rte_eth_dev *dev __rte_unused,
 	return 0;
 }
 
+static int
+eth_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
+{
+	if (dev->data->dev_link.link_status != ETH_LINK_UP)
+		return -EAGAIN;
+
+	if (!dev->data->mtu)
+		return -ENOTSUP;
+
+	if (dev->data->mtu != mtu)
+		return -EINVAL;
+
+	return 0;
+}
+
 /**
  * Disable features in feature_mask. Returns 0 on success.
  */
@@ -1002,6 +1019,7 @@ static const struct eth_dev_ops ops = {
 	.rx_queue_release = eth_queue_release,
 	.tx_queue_release = eth_queue_release,
 	.link_update = eth_link_update,
+	.mtu_set = eth_mtu_set,
 	.stats_get = eth_stats_get,
 	.stats_reset = eth_stats_reset,
 	.xstats_reset = vhost_dev_xstats_reset,
