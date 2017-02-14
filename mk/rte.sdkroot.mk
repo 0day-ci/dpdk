@@ -92,8 +92,8 @@ default: all
 config showconfigs showversion showversionum:
 	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkconfig.mk $@
 
-.PHONY: test fast_test ring_test mempool_test perf_test coverage
-test fast_test ring_test mempool_test perf_test coverage:
+.PHONY: test_run fast_test ring_test mempool_test perf_test coverage
+test_run fast_test ring_test mempool_test perf_test coverage:
 	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdktest.mk $@
 
 .PHONY: install
@@ -120,6 +120,11 @@ gcov gcovclean:
 .PHONY: examples examples_clean
 examples examples_clean:
 	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkexamples.mk $@
+
+.PHONY: test
+test:
+	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkconfig.mk checkconfig
+	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkbuild.mk $@
 
 # all other build targets
 %:

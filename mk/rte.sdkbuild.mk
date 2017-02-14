@@ -73,8 +73,8 @@ clean: $(CLEANDIRS)
 	@echo Clean complete
 
 .SECONDEXPANSION:
-.PHONY: $(ROOTDIRS-y)
-$(ROOTDIRS-y):
+.PHONY: $(ROOTDIRS-y) test
+$(ROOTDIRS-y) test:
 	@[ -d $(BUILDDIR)/$@ ] || mkdir -p $(BUILDDIR)/$@
 	@echo "== Build $@"
 	$(Q)$(MAKE) S=$@ -f $(RTE_SRCDIR)/$@/Makefile -C $(BUILDDIR)/$@ all
