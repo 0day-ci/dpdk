@@ -56,3 +56,8 @@ Deprecation Notices
   to specify which type of instance to create (single or burst), and
   additional calls for ``rte_distributor_poll_pkt_burst`` and
   ``rte_distributor_return_pkt_burst``, among others.
+
+* cryptodev: A new parameter ``max_nb_sessions_per_qp`` will be added to
+  ``rte_cryptodev_info.sym``. Some drivers may support limited number of
+  sessions per queue_pair. With this new parameter application will know
+  how many sessions can be mapped to each queue_pair of a device.
