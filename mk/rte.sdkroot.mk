@@ -92,8 +92,8 @@ default: all
 config showconfigs showversion showversionum:
 	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkconfig.mk $@
 
-.PHONY: test test-run fast_test ring_test mempool_test perf_test coverage
-test test-run fast_test ring_test mempool_test perf_test coverage:
+.PHONY: test test-run test-fast test-ring test-mempool test-perf coverage
+test test-run test-fast test-ring test-mempool test-perf coverage:
 	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdktest.mk $@
 
 test: test-build
