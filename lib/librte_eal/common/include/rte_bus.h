@@ -50,6 +50,7 @@ extern "C" {
 #include <stdio.h>
 #include <sys/queue.h>
 
+#include <rte_eal.h>
 #include <rte_log.h>
 #include <rte_dev.h>
 
@@ -145,7 +146,21 @@ void rte_bus_dump(FILE *f);
  * The constructor has higher priority than PMD constructors.
  */
 #define RTE_REGISTER_BUS(nm, bus) \
-static void __attribute__((constructor(101), used)) businitfn_ ##nm(void) \
+RTE_EAL_INIT(businitfn_ ##nm); \
+static void businitfn_ ##nm(void) \
+{\
+	(bus).name = RTE_STR(nm);\
+	rte_bus_register(&bus); \
+}
+
+/**
+ * Helper for late Bus registration.
+ * The constructor still has higher priority than PMD constructors but has
+ * lower priority than RTE_REGISTER_BUS.
+ */
+#define RTE_REGISTER_BUS_LATE(nm, bus) \
+RTE_POST_EAL_INIT(businitfn_ ##nm); \
+static void businitfn_ ##nm(void) \
 {\
 	(bus).name = RTE_STR(nm);\
 	rte_bus_register(&bus); \
