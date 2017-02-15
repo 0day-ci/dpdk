@@ -96,6 +96,13 @@ config showconfigs showversion showversionum:
 test fast_test ring_test mempool_test perf_test coverage:
 	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdktest.mk $@
 
+test: test-build
+
+.PHONY: test-buid
+test-build:
+	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkconfig.mk checkconfig
+	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkbuild.mk test
+
 .PHONY: install
 install:
 	$(Q)$(MAKE) -f $(RTE_SDK)/mk/rte.sdkinstall.mk pre_install
