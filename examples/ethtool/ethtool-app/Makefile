@@ -50,5 +50,8 @@ CFLAGS += $(WERROR_FLAGS)
 LDLIBS += -L$(subst ethtool-app,lib,$(RTE_OUTPUT))/lib
 LDLIBS += -lrte_ethtool
 
+ifeq ($(CONFIG_RTE_LIBRTE_IXGBE_PMD),y)
+LDLIBS += -lrte_pmd_ixgbe
+endif
 
 include $(RTE_SDK)/mk/rte.extapp.mk
