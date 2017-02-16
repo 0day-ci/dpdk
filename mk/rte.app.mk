@@ -159,6 +159,9 @@ ifeq ($(CONFIG_RTE_BUILD_SHARED_LIB),n)
 # The static libraries do not know their dependencies.
 # So linking with static library requires explicit dependencies.
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EAL)            += -lrt
+ifeq ($(CONFIG_RTE_LIBRTE_EAL_NUMA_AWARE_HUGEPAGES),y)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_EAL)            += -lnuma
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_SCHED)          += -lm
 _LDLIBS-$(CONFIG_RTE_LIBRTE_SCHED)          += -lrt
 _LDLIBS-$(CONFIG_RTE_LIBRTE_METER)          += -lm

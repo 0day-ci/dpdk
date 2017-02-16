@@ -82,6 +82,9 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <setjmp.h>
+#ifdef RTE_LIBRTE_EAL_NUMA_AWARE_HUGEPAGES
+#include <numaif.h>
+#endif
 
 #include <rte_log.h>
 #include <rte_memory.h>
@@ -359,6 +362,21 @@ static int huge_wrap_sigsetjmp(void)
 	return sigsetjmp(huge_jmpenv, 1);
 }
 
+#ifdef RTE_LIBRTE_EAL_NUMA_AWARE_HUGEPAGES
+#ifndef ULONG_SIZE
+#define ULONG_SIZE sizeof(unsigned long)
+#endif
+#ifndef ULONG_BITS
+#define ULONG_BITS (ULONG_SIZE * CHAR_BIT)
+#endif
+#ifndef DIV_ROUND_UP
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+#endif
+#ifndef BITS_TO_LONGS
+#define BITS_TO_LONGS(nr) DIV_ROUND_UP(nr, ULONG_SIZE)
+#endif
+#endif
+
 /*
  * Mmap all hugepages of hugepage table: it first open a file in
  * hugetlbfs, then mmap() hugepage_sz data in it. If orig is set, the
@@ -375,10 +393,48 @@ map_all_hugepages(struct hugepage_file *hugepg_tbl,
 	void *virtaddr;
 	void *vma_addr = NULL;
 	size_t vma_len = 0;
+#ifdef RTE_LIBRTE_EAL_NUMA_AWARE_HUGEPAGES
+	unsigned long nodemask[BITS_TO_LONGS(RTE_MAX_NUMA_NODES)] = {0UL};
+	unsigned long maxnode = 0;
+	int node_id = -1;
+
+	for (i = 0; i < RTE_MAX_NUMA_NODES; i++)
+		if (internal_config.socket_mem[i])
+			maxnode = i + 1;
+#endif
 
 	for (i = 0; i < hpi->num_pages[0]; i++) {
 		uint64_t hugepage_sz = hpi->hugepage_sz;
 
+#ifdef RTE_LIBRTE_EAL_NUMA_AWARE_HUGEPAGES
+		if (maxnode) {
+			node_id = (node_id + 1) % RTE_MAX_NUMA_NODES;
+			while (!internal_config.socket_mem[node_id])
+				node_id = (node_id + 1) % RTE_MAX_NUMA_NODES;
+
+			nodemask[node_id / ULONG_BITS] =
+						1UL << (node_id % ULONG_BITS);
+
+			RTE_LOG(DEBUG, EAL,
+				"Setting policy MPOL_PREFERRED for socket %d\n",
+				node_id);
+			/*
+			 * Due to old linux kernel bug (feature?) we have to
+			 * increase maxnode by 1. It will be unconditionally
+			 * decreased back to normal value inside the syscall
+			 * handler.
+			 */
+			if (set_mempolicy(MPOL_PREFERRED,
+					  nodemask, maxnode + 1) < 0) {
+				RTE_LOG(ERR, EAL,
+					"Failed to set policy MPOL_PREFERRED: "
+					"%s\n", strerror(errno));
+				return i;
+			}
+
+			nodemask[node_id / ULONG_BITS] = 0UL;
+		}
+#endif
 		if (orig) {
 			hugepg_tbl[i].file_id = i;
 			hugepg_tbl[i].size = hugepage_sz;
@@ -489,6 +545,10 @@ map_all_hugepages(struct hugepage_file *hugepg_tbl,
 		vma_len -= hugepage_sz;
 	}
 
+#ifdef RTE_LIBRTE_EAL_NUMA_AWARE_HUGEPAGES
+	if (maxnode && set_mempolicy(MPOL_DEFAULT, NULL, 0) < 0)
+		RTE_LOG(ERR, EAL, "Failed to set mempolicy MPOL_DEFAULT\n");
+#endif
 	return i;
 }
 
@@ -573,6 +633,11 @@ find_numasocket(struct hugepage_file *hugepg_tbl, struct hugepage_info *hpi)
 			if (hugepg_tbl[i].orig_va == va) {
 				hugepg_tbl[i].socket_id = socket_id;
 				hp_count++;
+#ifdef RTE_LIBRTE_EAL_NUMA_AWARE_HUGEPAGES
+				RTE_LOG(DEBUG, EAL,
+					"Hugepage %s is on socket %d\n",
+					hugepg_tbl[i].filepath, socket_id);
+#endif
 			}
 		}
 	}

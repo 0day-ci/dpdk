@@ -35,4 +35,8 @@ DIRS-y += common
 DIRS-$(CONFIG_RTE_EXEC_ENV_LINUXAPP) += linuxapp
 DIRS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) += bsdapp
 
+ifeq ($(CONFIG_RTE_LIBRTE_EAL_NUMA_AWARE_HUGEPAGES),y)
+LDLIBS += -lnuma
+endif
+
 include $(RTE_SDK)/mk/rte.subdir.mk
