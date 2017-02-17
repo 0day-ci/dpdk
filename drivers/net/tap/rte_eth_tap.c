@@ -297,7 +297,7 @@ tap_link_set_flags(struct pmd_internals *pmd, short flags, int add)
 		return -1;
 	}
 	memset(&ifr, 0, sizeof(ifr));
-	strncpy(ifr.ifr_name, pmd->name, IFNAMSIZ);
+	strncpy(ifr.ifr_name, pmd->name, IFNAMSIZ-1);
 	err = ioctl(s, SIOCGIFFLAGS, &ifr);
 	if (err < 0) {
 		RTE_LOG(WARNING, PMD, "Unable to get %s device flags: %s\n",
