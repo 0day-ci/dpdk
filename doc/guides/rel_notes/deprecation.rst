@@ -119,10 +119,6 @@ Deprecation Notices
   or VHOST feature, but KNI_VHOST which is a KNI feature enabled via a compile
   time option, and disabled by default.
 
-* ABI changes are planned for 17.05 in the ``rte_cryptodev_ops`` structure.
-  A pointer to a rte_cryptodev_config structure will be added to the
-  function prototype ``cryptodev_configure_t``, as a new parameter.
-
 * cryptodev: A new parameter ``max_nb_sessions_per_qp`` will be added to
   ``rte_cryptodev_info.sym``. Some drivers may support limited number of
   sessions per queue_pair. With this new parameter application will know
