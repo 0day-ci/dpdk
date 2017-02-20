@@ -44,7 +44,8 @@
 struct scheduler_init_params {
 	struct rte_crypto_vdev_init_params def_p;
 	uint32_t nb_slaves;
-	uint8_t slaves[MAX_SLAVES_NUM];
+	char slave_names[MAX_SLAVES_NUM]
+			[RTE_CRYPTODEV_SCHEDULER_NAME_MAX_LEN];
 };
 
 #define RTE_CRYPTODEV_VDEV_NAME				("name")
@@ -88,37 +89,13 @@ scheduler_dequeue_burst(void *queue_pair, struct rte_crypto_op **ops,
 }
 
 static int
-attach_init_slaves(uint8_t scheduler_id,
-		const uint8_t *slaves, const uint8_t nb_slaves)
-{
-	uint8_t i;
-
-	for (i = 0; i < nb_slaves; i++) {
-		struct rte_cryptodev *dev =
-				rte_cryptodev_pmd_get_dev(slaves[i]);
-		int status = rte_cryptodev_scheduler_slave_attach(
-				scheduler_id, slaves[i]);
-
-		if (status < 0 || !dev) {
-			CS_LOG_ERR("Failed to attach slave cryptodev "
-					"%u.\n", slaves[i]);
-			return status;
-		}
-
-		RTE_LOG(INFO, PMD, "  Attached slave cryptodev %s\n",
-				dev->data->name);
-	}
-
-	return 0;
-}
-
-static int
 cryptodev_scheduler_create(const char *name,
 	struct scheduler_init_params *init_params)
 {
 	char crypto_dev_name[RTE_CRYPTODEV_NAME_MAX_LEN] = {0};
 	struct rte_cryptodev *dev;
 	struct scheduler_ctx *sched_ctx;
+	uint32_t i;
 
 	if (init_params->def_p.name[0] == '\0') {
 		int ret = rte_cryptodev_pmd_create_dev_name(
@@ -153,8 +130,52 @@ cryptodev_scheduler_create(const char *name,
 	sched_ctx->max_nb_queue_pairs =
 			init_params->def_p.max_nb_queue_pairs;
 
-	return attach_init_slaves(dev->data->dev_id, init_params->slaves,
-			init_params->nb_slaves);
+	for (i = 0; i < init_params->nb_slaves; i++) {
+		struct rte_cryptodev *slave_dev =
+				rte_cryptodev_pmd_get_named_dev(
+					init_params->slave_names[i]);
+
+		/* if the slave dev exists in the system, attach it */
+		if (slave_dev) {
+			int ret = rte_cryptodev_scheduler_slave_attach(
+				dev->data->dev_id,
+				slave_dev->data->dev_id);
+
+			if (ret < 0)
+				return ret;
+
+			CS_LOG_INFO("Scheduler %s attached slave %s\n",
+					dev->data->name,
+					init_params->slave_names[i]);
+
+			continue;
+		}
+
+		/* if the slave dev yet to exist, record it and attach
+		 * later
+		 */
+		sched_ctx->init_slave_names[sched_ctx->nb_init_slaves] =
+			rte_zmalloc_socket(
+				NULL,
+				RTE_CRYPTODEV_SCHEDULER_NAME_MAX_LEN, 0,
+				SOCKET_ID_ANY);
+
+		if (!sched_ctx->init_slave_names[
+				sched_ctx->nb_init_slaves]) {
+			CS_LOG_ERR("driver %s: Insufficient memory",
+					name);
+			return -ENOMEM;
+		}
+
+		strncpy(sched_ctx->init_slave_names[
+					sched_ctx->nb_init_slaves],
+				init_params->slave_names[i],
+				RTE_CRYPTODEV_SCHEDULER_NAME_MAX_LEN - 1);
+
+		sched_ctx->nb_init_slaves++;
+	}
+
+	return 0;
 }
 
 static int
@@ -243,21 +264,14 @@ parse_slave_arg(const char *key __rte_unused,
 		const char *value, void *extra_args)
 {
 	struct scheduler_init_params *param = extra_args;
-	struct rte_cryptodev *dev =
-			rte_cryptodev_pmd_get_named_dev(value);
-
-	if (!dev) {
-		RTE_LOG(ERR, PMD, "Invalid slave name %s.\n", value);
-		return -1;
-	}
 
 	if (param->nb_slaves >= MAX_SLAVES_NUM - 1) {
 		CS_LOG_ERR("Too many slaves.\n");
 		return -1;
 	}
 
-	param->slaves[param->nb_slaves] = dev->data->dev_id;
-	param->nb_slaves++;
+	strncpy(param->slave_names[param->nb_slaves++], value,
+			RTE_CRYPTODEV_SCHEDULER_NAME_MAX_LEN - 1);
 
 	return 0;
 }
@@ -332,7 +346,7 @@ cryptodev_scheduler_probe(const char *name, const char *input_args)
 			""
 		},
 		.nb_slaves = 0,
-		.slaves = {0}
+		.slave_names = { {0} }
 	};
 
 	scheduler_parse_init_params(&init_params, input_args);

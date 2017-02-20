@@ -93,6 +93,9 @@ struct scheduler_ctx {
 
 	char name[RTE_CRYPTODEV_SCHEDULER_NAME_MAX_LEN];
 	char description[RTE_CRYPTODEV_SCHEDULER_DESC_MAX_LEN];
+
+	char *init_slave_names[MAX_SLAVES_NUM];
+	int nb_init_slaves;
 } __rte_cache_aligned;
 
 struct scheduler_qp_ctx {
@@ -108,6 +111,12 @@ struct scheduler_qp_ctx {
 struct scheduler_session {
 	struct rte_cryptodev_sym_session *sessions[MAX_SLAVES_NUM];
 };
+
+/** internal function, attaching the slaves predefined
+ *  by scheduler's EAL options
+ */
+int
+scheduler_attach_init_slave(struct rte_cryptodev *dev);
 
 /** device specific operations function pointer structure */
 extern struct rte_cryptodev_ops *rte_crypto_scheduler_pmd_ops;
