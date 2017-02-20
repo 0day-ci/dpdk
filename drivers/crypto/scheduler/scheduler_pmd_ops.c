@@ -94,11 +94,14 @@ update_reorder_buff(struct rte_cryptodev *dev, uint16_t qp_id)
 			CS_LOG_ERR("failed to create reorder buffer");
 			return -ENOMEM;
 		}
+
+		qp_ctx->nb_empty_bufs = buff_size;
 	} else {
 		if (qp_ctx->reorder_buf) {
 			rte_reorder_free(qp_ctx->reorder_buf);
 			qp_ctx->reorder_buf = NULL;
 		}
+		qp_ctx->nb_empty_bufs = 0;
 	}
 
 	return 0;

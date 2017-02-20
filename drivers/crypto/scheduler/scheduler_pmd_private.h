@@ -102,6 +102,7 @@ struct scheduler_qp_ctx {
 	rte_cryptodev_scheduler_burst_dequeue_t schedule_dequeue;
 
 	struct rte_reorder_buffer *reorder_buf;
+	uint32_t nb_empty_bufs;
 	uint32_t seqn;
 } __rte_cache_aligned;
 
@@ -111,5 +112,122 @@ struct scheduler_session {
 
 /** device specific operations function pointer structure */
 extern struct rte_cryptodev_ops *rte_crypto_scheduler_pmd_ops;
+
+static inline void
+scheduler_reorder_prepare(void *qp, struct rte_crypto_op **ops,
+		uint16_t nb_ops)
+{
+	struct scheduler_qp_ctx *qp_ctx = (struct scheduler_qp_ctx *)qp;
+	uint16_t i;
+
+	if (unlikely(nb_ops == 0))
+		return;
+
+	for (i = 0; i < nb_ops && i < 4; i++)
+		rte_prefetch0(ops[i]->sym->m_src);
+
+	for (i = 0; (i < (nb_ops - 8)) && (nb_ops > 8); i += 4) {
+		rte_prefetch0(ops[i + 4]->sym->m_src);
+		rte_prefetch0(ops[i + 5]->sym->m_src);
+		rte_prefetch0(ops[i + 6]->sym->m_src);
+		rte_prefetch0(ops[i + 7]->sym->m_src);
+
+		ops[i]->sym->m_src->seqn = qp_ctx->seqn++;
+		ops[i + 1]->sym->m_src->seqn = qp_ctx->seqn++;
+		ops[i + 2]->sym->m_src->seqn = qp_ctx->seqn++;
+		ops[i + 3]->sym->m_src->seqn = qp_ctx->seqn++;
+	}
+
+	for (; i < nb_ops; i++)
+		ops[i]->sym->m_src->seqn = qp_ctx->seqn++;
+}
+
+static inline void
+scheduler_reorder_revert(void *qp, uint16_t nb_revert_ops)
+{
+	struct scheduler_qp_ctx *qp_ctx = (struct scheduler_qp_ctx *)qp;
+
+	qp_ctx->seqn -= nb_revert_ops;
+}
+
+static inline uint16_t
+scheduler_reorder_drain(void *qp, struct rte_crypto_op **ops,
+		uint16_t nb_ops, uint16_t nb_drain_ops)
+{
+	struct scheduler_qp_ctx *qp_ctx = (struct scheduler_qp_ctx *)qp;
+	struct rte_reorder_buffer *reorder_buff = qp_ctx->reorder_buf;
+	struct rte_mbuf *mbuf0, *mbuf1, *mbuf2, *mbuf3;
+	struct rte_mbuf *reorder_mbufs[nb_ops];
+	uint16_t nb_drained_mbufs, i;
+
+	for (i = 0; i < nb_ops && i < 4; i++)
+		rte_prefetch0(ops[i]->sym->m_src);
+
+	for (i = 0; (i < (nb_ops - 8)) && (nb_ops > 8);
+			i += 4) {
+		rte_prefetch0(ops[i + 4]->sym->m_src);
+		rte_prefetch0(ops[i + 5]->sym->m_src);
+		rte_prefetch0(ops[i + 6]->sym->m_src);
+		rte_prefetch0(ops[i + 7]->sym->m_src);
+
+		mbuf0 = ops[i]->sym->m_src;
+		mbuf1 = ops[i + 1]->sym->m_src;
+		mbuf2 = ops[i + 2]->sym->m_src;
+		mbuf3 = ops[i + 3]->sym->m_src;
+
+		mbuf0->userdata = ops[i];
+		mbuf1->userdata = ops[i + 1];
+		mbuf2->userdata = ops[i + 2];
+		mbuf3->userdata = ops[i + 3];
+
+		rte_reorder_insert(reorder_buff, mbuf0);
+		rte_reorder_insert(reorder_buff, mbuf1);
+		rte_reorder_insert(reorder_buff, mbuf2);
+		rte_reorder_insert(reorder_buff, mbuf3);
+	}
+
+	for (; i < nb_ops; i++) {
+		mbuf0 = ops[i]->sym->m_src;
+		mbuf0->userdata = ops[i];
+		rte_reorder_insert(reorder_buff, mbuf0);
+	}
+
+	nb_drained_mbufs = rte_reorder_drain(reorder_buff, reorder_mbufs,
+			nb_drain_ops);
+	for (i = 0; i < nb_drained_mbufs && i < 4; i++)
+		rte_prefetch0(reorder_mbufs[i]);
+
+	for (i = 0; (i < (nb_drained_mbufs - 8)) && (nb_drained_mbufs > 8);
+			i += 4) {
+		ops[i] = *(struct rte_crypto_op **)
+				reorder_mbufs[i]->userdata;
+		ops[i + 1] = *(struct rte_crypto_op **)
+				reorder_mbufs[i + 1]->userdata;
+		ops[i + 2] = *(struct rte_crypto_op **)
+				reorder_mbufs[i + 2]->userdata;
+		ops[i + 3] = *(struct rte_crypto_op **)
+				reorder_mbufs[i + 3]->userdata;
+
+		reorder_mbufs[i]->userdata = NULL;
+		reorder_mbufs[i + 1]->userdata = NULL;
+		reorder_mbufs[i + 2]->userdata = NULL;
+		reorder_mbufs[i + 3]->userdata = NULL;
+
+		rte_prefetch0(reorder_mbufs[i + 4]);
+		rte_prefetch0(reorder_mbufs[i + 5]);
+		rte_prefetch0(reorder_mbufs[i + 6]);
+		rte_prefetch0(reorder_mbufs[i + 7]);
+	}
+
+	for (; i < nb_drained_mbufs; i++) {
+		ops[i] = *(struct rte_crypto_op **)
+			reorder_mbufs[i]->userdata;
+		reorder_mbufs[i]->userdata = NULL;
+	}
+
+	qp_ctx->nb_empty_bufs -= (nb_ops - nb_drained_mbufs);
+
+	return nb_drained_mbufs;
+}
 
 #endif /* _SCHEDULER_PMD_PRIVATE_H */
