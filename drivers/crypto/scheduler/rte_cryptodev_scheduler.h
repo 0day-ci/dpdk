@@ -40,6 +40,9 @@
 extern "C" {
 #endif
 
+/* round-robin scheduling mode */
+#define SCHEDULER_MODE_ROUND_ROBIN		(round-robin)
+
 /**
  * Crypto scheduler PMD operation modes
  */
