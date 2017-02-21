@@ -53,6 +53,9 @@ typedef int (*rte_cryptodev_scheduler_config_queue_pair)(
 typedef int (*rte_cryptodev_scheduler_create_private_ctx)(
 		struct rte_cryptodev *dev);
 
+typedef int (*rte_cryptodev_scheduler_config_option)(
+		struct rte_cryptodev *dev, void *option, uint32_t is_set);
+
 struct rte_cryptodev_scheduler_ops {
 	rte_cryptodev_scheduler_slave_attach_t slave_attach;
 	rte_cryptodev_scheduler_slave_attach_t slave_detach;
@@ -63,6 +66,8 @@ struct rte_cryptodev_scheduler_ops {
 	rte_cryptodev_scheduler_config_queue_pair config_queue_pair;
 
 	rte_cryptodev_scheduler_create_private_ctx create_private_ctx;
+
+	rte_cryptodev_scheduler_config_option option_config;
 };
 
 #ifdef __cplusplus

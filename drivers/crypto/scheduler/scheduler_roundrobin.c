@@ -415,13 +415,21 @@ scheduler_create_private_ctx(__rte_unused struct rte_cryptodev *dev)
 	return 0;
 }
 
+static int
+scheduler_option(__rte_unused struct rte_cryptodev *dev,
+		__rte_unused void *option, __rte_unused uint32_t is_set)
+{
+	return 0;
+}
+
 struct rte_cryptodev_scheduler_ops scheduler_rr_ops = {
 	slave_attach,
 	slave_detach,
 	scheduler_start,
 	scheduler_stop,
 	scheduler_config_qp,
-	scheduler_create_private_ctx
+	scheduler_create_private_ctx,
+	scheduler_option
 };
 
 struct rte_cryptodev_scheduler scheduler = {

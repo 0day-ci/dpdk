@@ -469,3 +469,60 @@ rte_cryptodev_scheduler_load_user_scheduler(uint8_t scheduler_id,
 
 	return 0;
 }
+
+int
+rte_cryptodev_scheduler_option_set(uint8_t scheduler_id, void *option)
+{
+	struct rte_cryptodev *dev = rte_cryptodev_pmd_get_dev(scheduler_id);
+	struct scheduler_ctx *sched_ctx;
+
+	if (!dev) {
+		CS_LOG_ERR("Operation not supported");
+		return -ENOTSUP;
+	}
+
+	if (!option) {
+		CS_LOG_ERR("Invalid option parameter");
+		return -EINVAL;
+	}
+
+	if (dev->dev_type != RTE_CRYPTODEV_SCHEDULER_PMD) {
+		CS_LOG_ERR("Operation not supported");
+		return -ENOTSUP;
+	}
+
+	if (dev->data->dev_started) {
+		CS_LOG_ERR("Illegal operation");
+		return -EBUSY;
+	}
+
+	sched_ctx = dev->data->dev_private;
+
+	return (*sched_ctx->ops.option_config)(dev, option, 1);
+}
+
+int
+rte_cryptodev_scheduler_option_get(uint8_t scheduler_id, void *option)
+{
+	struct rte_cryptodev *dev = rte_cryptodev_pmd_get_dev(scheduler_id);
+	struct scheduler_ctx *sched_ctx;
+
+	if (!dev) {
+		CS_LOG_ERR("Operation not supported");
+		return -ENOTSUP;
+	}
+
+	if (!option) {
+		CS_LOG_ERR("Invalid option parameter");
+		return -EINVAL;
+	}
+
+	if (dev->dev_type != RTE_CRYPTODEV_SCHEDULER_PMD) {
+		CS_LOG_ERR("Operation not supported");
+		return -ENOTSUP;
+	}
+
+	sched_ctx = dev->data->dev_private;
+
+	return (*sched_ctx->ops.option_config)(dev, option, 0);
+}

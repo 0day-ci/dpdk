@@ -143,6 +143,33 @@ rte_cryptodev_scheduler_ordering_set(uint8_t scheduler_id,
 int
 rte_cryptodev_scheduler_ordering_get(uint8_t scheduler_id);
 
+/**
+ * Set the mode specific option
+ *
+ * @param	dev_id		The target scheduler device ID
+ *		option		The mode specific option
+ *
+ * @return
+ *	0 if successful
+ *	negative integer if otherwise.
+ */
+int
+rte_cryptodev_scheduler_option_set(uint8_t scheduler_id, void *option);
+
+/**
+ * Get the mode specific option
+ *
+ * @param	dev_id		The target scheduler device ID
+ *		option		The mode specific option to be written
+ *
+ * @return
+ *	0 if successful
+ *	negative integer if otherwise.
+ */
+int
+rte_cryptodev_scheduler_option_get(uint8_t scheduler_id, void *option);
+
+
 typedef uint16_t (*rte_cryptodev_scheduler_burst_enqueue_t)(void *qp_ctx,
 		struct rte_crypto_op **ops, uint16_t nb_ops);
 
