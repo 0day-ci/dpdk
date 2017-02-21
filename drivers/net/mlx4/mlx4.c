@@ -82,12 +82,14 @@
 #include <rte_log.h>
 #include <rte_alarm.h>
 #include <rte_memory.h>
+#include <rte_flow.h>
 
 /* Generated configuration header. */
 #include "mlx4_autoconf.h"
 
-/* PMD header. */
+/* PMD headers. */
 #include "mlx4.h"
+#include "mlx4_flow.h"
 
 /* Convenience macros for accessing mbuf fields. */
 #define NEXT(m) ((m)->next)
@@ -2351,6 +2353,7 @@ rxq_add_flow(struct rxq *rxq, unsigned int mac_index, unsigned int vlan_index)
 	assert(((uint8_t *)attr + sizeof(*attr)) == (uint8_t *)spec);
 	*attr = (struct ibv_flow_attr){
 		.type = IBV_FLOW_ATTR_NORMAL,
+		.priority = 3,
 		.num_of_specs = 1,
 		.port = priv->port,
 		.flags = 0
@@ -3936,6 +3939,7 @@ mlx4_dev_start(struct rte_eth_dev *dev)
 {
 	struct priv *priv = dev->data->dev_private;
 	unsigned int i = 0;
+	unsigned int err = 0;
 	unsigned int r;
 	struct rxq *rxq;
 
@@ -3985,8 +3989,9 @@ mlx4_dev_start(struct rte_eth_dev *dev)
 		return -ret;
 	} while ((--r) && ((rxq = (*priv->rxqs)[++i]), i));
 	priv_dev_interrupt_handler_install(priv, dev);
+	err = mlx4_priv_flow_start(priv);
 	priv_unlock(priv);
-	return 0;
+	return -err;
 }
 
 /**
@@ -4021,6 +4026,7 @@ mlx4_dev_stop(struct rte_eth_dev *dev)
 		rxq = (*priv->rxqs)[0];
 		r = priv->rxqs_n;
 	}
+	mlx4_priv_flow_stop(priv);
 	/* Iterate only once when RSS is enabled. */
 	do {
 		/* Ignore nonexistent RX queues. */
@@ -5022,6 +5028,55 @@ mlx4_vlan_filter_set(struct rte_eth_dev *dev, uint16_t vlan_id, int on)
 	return -ret;
 }
 
+const struct rte_flow_ops mlx4_flow_ops = {
+	.validate = mlx4_flow_validate,
+	.create = mlx4_flow_create,
+	.destroy = mlx4_flow_destroy,
+	.flush = mlx4_flow_flush,
+	.query = NULL,
+};
+
+/**
+ * Manage filter operations.
+ *
+ * @param dev
+ *   Pointer to Ethernet device structure.
+ * @param filter_type
+ *   Filter type.
+ * @param filter_op
+ *   Operation to perform.
+ * @param arg
+ *   Pointer to operation-specific structure.
+ *
+ * @return
+ *   0 on success, negative errno value on failure.
+ */
+static int
+mlx4_dev_filter_ctrl(struct rte_eth_dev *dev,
+		     enum rte_filter_type filter_type,
+		     enum rte_filter_op filter_op,
+		     void *arg)
+{
+	int ret = EINVAL;
+
+	switch (filter_type) {
+	case RTE_ETH_FILTER_GENERIC:
+		if (filter_op != RTE_ETH_FILTER_GET)
+			return -EINVAL;
+		*(const void **)arg = &mlx4_flow_ops;
+		return 0;
+	case RTE_ETH_FILTER_FDIR:
+		DEBUG("%p: filter type FDIR is not supported by this PMD",
+		      (void *)dev);
+		break;
+	default:
+		ERROR("%p: filter type (%d) not supported",
+		      (void *)dev, filter_type);
+		break;
+	}
+	return -ret;
+}
+
 static const struct eth_dev_ops mlx4_dev_ops = {
 	.dev_configure = mlx4_dev_configure,
 	.dev_start = mlx4_dev_start,
@@ -5056,6 +5111,7 @@ static const struct eth_dev_ops mlx4_dev_ops = {
 	.mac_addr_add = mlx4_mac_addr_add,
 	.mac_addr_set = mlx4_mac_addr_set,
 	.mtu_set = mlx4_dev_set_mtu,
+	.filter_ctrl = mlx4_dev_filter_ctrl,
 };
 
 /**
