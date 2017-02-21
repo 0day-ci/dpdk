@@ -39,7 +39,7 @@
 #include <rte_cycles.h>
 #include <rte_common.h>
 #include <rte_mbuf.h>
-#include <rte_distributor.h>
+#include <rte_distributor_v20.h>
 
 #define ITER_POWER 20 /* log 2 of how many iterations we do when timing. */
 #define BURST 32
