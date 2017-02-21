@@ -130,17 +130,17 @@ static int
 handle_work(void *arg)
 {
 	struct rte_mbuf *pkt = NULL;
-	struct rte_distributor *d = arg;
+	struct rte_distributor_v20 *d = arg;
 	unsigned count = 0;
 	unsigned id = __sync_fetch_and_add(&worker_idx, 1);
 
-	pkt = rte_distributor_get_pkt(d, id, NULL);
+	pkt = rte_distributor_get_pkt_v20(d, id, NULL);
 	while (!quit) {
 		worker_stats[id].handled_packets++, count++;
-		pkt = rte_distributor_get_pkt(d, id, pkt);
+		pkt = rte_distributor_get_pkt_v20(d, id, pkt);
 	}
 	worker_stats[id].handled_packets++, count++;
-	rte_distributor_return_pkt(d, id, pkt);
+	rte_distributor_return_pkt_v20(d, id, pkt);
 	return 0;
 }
 
@@ -149,7 +149,7 @@ handle_work(void *arg)
  * threads and finally how long per packet the processing took.
  */
 static inline int
-perf_test(struct rte_distributor *d, struct rte_mempool *p)
+perf_test(struct rte_distributor_v20 *d, struct rte_mempool *p)
 {
 	unsigned i;
 	uint64_t start, end;
@@ -166,12 +166,12 @@ perf_test(struct rte_distributor *d, struct rte_mempool *p)
 
 	start = rte_rdtsc();
 	for (i = 0; i < (1<<ITER_POWER); i++)
-		rte_distributor_process(d, bufs, BURST);
+		rte_distributor_process_v20(d, bufs, BURST);
 	end = rte_rdtsc();
 
 	do {
 		usleep(100);
-		rte_distributor_process(d, NULL, 0);
+		rte_distributor_process_v20(d, NULL, 0);
 	} while (total_packet_count() < (BURST << ITER_POWER));
 
 	printf("=== Performance test of distributor ===\n");
@@ -192,7 +192,7 @@ perf_test(struct rte_distributor *d, struct rte_mempool *p)
 
 /* Useful function which ensures that all worker functions terminate */
 static void
-quit_workers(struct rte_distributor *d, struct rte_mempool *p)
+quit_workers(struct rte_distributor_v20 *d, struct rte_mempool *p)
 {
 	const unsigned num_workers = rte_lcore_count() - 1;
 	unsigned i;
@@ -202,11 +202,11 @@ quit_workers(struct rte_distributor *d, struct rte_mempool *p)
 	quit = 1;
 	for (i = 0; i < num_workers; i++)
 		bufs[i]->hash.usr = i << 1;
-	rte_distributor_process(d, bufs, num_workers);
+	rte_distributor_process_v20(d, bufs, num_workers);
 
 	rte_mempool_put_bulk(p, (void *)bufs, num_workers);
 
-	rte_distributor_process(d, NULL, 0);
+	rte_distributor_process_v20(d, NULL, 0);
 	rte_eal_mp_wait_lcore();
 	quit = 0;
 	worker_idx = 0;
@@ -215,7 +215,7 @@ quit_workers(struct rte_distributor *d, struct rte_mempool *p)
 static int
 test_distributor_perf(void)
 {
-	static struct rte_distributor *d;
+	static struct rte_distributor_v20 *d;
 	static struct rte_mempool *p;
 
 	if (rte_lcore_count() < 2) {
@@ -227,15 +227,15 @@ test_distributor_perf(void)
 	time_cache_line_switch();
 
 	if (d == NULL) {
-		d = rte_distributor_create("Test_perf", rte_socket_id(),
+		d = rte_distributor_create_v20("Test_perf", rte_socket_id(),
 				rte_lcore_count() - 1);
 		if (d == NULL) {
 			printf("Error creating distributor\n");
 			return -1;
 		}
 	} else {
-		rte_distributor_flush(d);
-		rte_distributor_clear_returns(d);
+		rte_distributor_flush_v20(d);
+		rte_distributor_clear_returns_v20(d);
 	}
 
 	const unsigned nb_bufs = (511 * rte_lcore_count()) < BIG_BATCH ?

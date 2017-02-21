@@ -160,13 +160,13 @@ port_init(uint8_t port, struct rte_mempool *mbuf_pool)
 
 struct lcore_params {
 	unsigned worker_id;
-	struct rte_distributor *d;
+	struct rte_distributor_v20 *d;
 	struct rte_ring *r;
 	struct rte_mempool *mem_pool;
 };
 
 static int
-quit_workers(struct rte_distributor *d, struct rte_mempool *p)
+quit_workers(struct rte_distributor_v20 *d, struct rte_mempool *p)
 {
 	const unsigned num_workers = rte_lcore_count() - 2;
 	unsigned i;
@@ -180,7 +180,7 @@ quit_workers(struct rte_distributor *d, struct rte_mempool *p)
 	for (i = 0; i < num_workers; i++)
 		bufs[i]->hash.rss = i << 1;
 
-	rte_distributor_process(d, bufs, num_workers);
+	rte_distributor_process_v20(d, bufs, num_workers);
 	rte_mempool_put_bulk(p, (void *)bufs, num_workers);
 
 	return 0;
@@ -189,7 +189,7 @@ quit_workers(struct rte_distributor *d, struct rte_mempool *p)
 static int
 lcore_rx(struct lcore_params *p)
 {
-	struct rte_distributor *d = p->d;
+	struct rte_distributor_v20 *d = p->d;
 	struct rte_mempool *mem_pool = p->mem_pool;
 	struct rte_ring *r = p->r;
 	const uint8_t nb_ports = rte_eth_dev_count();
@@ -228,8 +228,8 @@ lcore_rx(struct lcore_params *p)
 		}
 		app_stats.rx.rx_pkts += nb_rx;
 
-		rte_distributor_process(d, bufs, nb_rx);
-		const uint16_t nb_ret = rte_distributor_returned_pkts(d,
+		rte_distributor_process_v20(d, bufs, nb_rx);
+		const uint16_t nb_ret = rte_distributor_returned_pkts_v20(d,
 				bufs, BURST_SIZE*2);
 		app_stats.rx.returned_pkts += nb_ret;
 		if (unlikely(nb_ret == 0)) {
@@ -249,9 +249,9 @@ lcore_rx(struct lcore_params *p)
 		if (++port == nb_ports)
 			port = 0;
 	}
-	rte_distributor_process(d, NULL, 0);
+	rte_distributor_process_v20(d, NULL, 0);
 	/* flush distributor to bring to known state */
-	rte_distributor_flush(d);
+	rte_distributor_flush_v20(d);
 	/* set worker & tx threads quit flag */
 	quit_signal = 1;
 	/*
@@ -403,7 +403,7 @@ print_stats(void)
 static int
 lcore_worker(struct lcore_params *p)
 {
-	struct rte_distributor *d = p->d;
+	struct rte_distributor_v20 *d = p->d;
 	const unsigned id = p->worker_id;
 	/*
 	 * for single port, xor_val will be zero so we won't modify the output
@@ -414,7 +414,7 @@ lcore_worker(struct lcore_params *p)
 
 	printf("\nCore %u acting as worker core.\n", rte_lcore_id());
 	while (!quit_signal) {
-		buf = rte_distributor_get_pkt(d, id, buf);
+		buf = rte_distributor_get_pkt_v20(d, id, buf);
 		buf->port ^= xor_val;
 	}
 	return 0;
@@ -496,7 +496,7 @@ int
 main(int argc, char *argv[])
 {
 	struct rte_mempool *mbuf_pool;
-	struct rte_distributor *d;
+	struct rte_distributor_v20 *d;
 	struct rte_ring *output_ring;
 	unsigned lcore_id, worker_id = 0;
 	unsigned nb_ports;
@@ -560,7 +560,7 @@ main(int argc, char *argv[])
 				"All available ports are disabled. Please set portmask.\n");
 	}
 
-	d = rte_distributor_create("PKT_DIST", rte_socket_id(),
+	d = rte_distributor_create_v20("PKT_DIST", rte_socket_id(),
 			rte_lcore_count() - 2);
 	if (d == NULL)
 		rte_exit(EXIT_FAILURE, "Cannot create distributor\n");

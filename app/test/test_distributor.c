@@ -81,17 +81,17 @@ static int
 handle_work(void *arg)
 {
 	struct rte_mbuf *pkt = NULL;
-	struct rte_distributor *d = arg;
+	struct rte_distributor_v20 *d = arg;
 	unsigned count = 0;
 	unsigned id = __sync_fetch_and_add(&worker_idx, 1);
 
-	pkt = rte_distributor_get_pkt(d, id, NULL);
+	pkt = rte_distributor_get_pkt_v20(d, id, NULL);
 	while (!quit) {
 		worker_stats[id].handled_packets++, count++;
-		pkt = rte_distributor_get_pkt(d, id, pkt);
+		pkt = rte_distributor_get_pkt_v20(d, id, pkt);
 	}
 	worker_stats[id].handled_packets++, count++;
-	rte_distributor_return_pkt(d, id, pkt);
+	rte_distributor_return_pkt_v20(d, id, pkt);
 	return 0;
 }
 
@@ -107,7 +107,7 @@ handle_work(void *arg)
  *   not necessarily in the same order (as different flows).
  */
 static int
-sanity_test(struct rte_distributor *d, struct rte_mempool *p)
+sanity_test(struct rte_distributor_v20 *d, struct rte_mempool *p)
 {
 	struct rte_mbuf *bufs[BURST];
 	unsigned i;
@@ -124,8 +124,8 @@ sanity_test(struct rte_distributor *d, struct rte_mempool *p)
 	for (i = 0; i < BURST; i++)
 		bufs[i]->hash.usr = 0;
 
-	rte_distributor_process(d, bufs, BURST);
-	rte_distributor_flush(d);
+	rte_distributor_process_v20(d, bufs, BURST);
+	rte_distributor_flush_v20(d);
 	if (total_packet_count() != BURST) {
 		printf("Line %d: Error, not all packets flushed. "
 				"Expected %u, got %u\n",
@@ -146,8 +146,8 @@ sanity_test(struct rte_distributor *d, struct rte_mempool *p)
 		for (i = 0; i < BURST; i++)
 			bufs[i]->hash.usr = (i & 1) << 8;
 
-		rte_distributor_process(d, bufs, BURST);
-		rte_distributor_flush(d);
+		rte_distributor_process_v20(d, bufs, BURST);
+		rte_distributor_flush_v20(d);
 		if (total_packet_count() != BURST) {
 			printf("Line %d: Error, not all packets flushed. "
 					"Expected %u, got %u\n",
@@ -171,8 +171,8 @@ sanity_test(struct rte_distributor *d, struct rte_mempool *p)
 	for (i = 0; i < BURST; i++)
 		bufs[i]->hash.usr = i;
 
-	rte_distributor_process(d, bufs, BURST);
-	rte_distributor_flush(d);
+	rte_distributor_process_v20(d, bufs, BURST);
+	rte_distributor_flush_v20(d);
 	if (total_packet_count() != BURST) {
 		printf("Line %d: Error, not all packets flushed. "
 				"Expected %u, got %u\n",
@@ -194,8 +194,8 @@ sanity_test(struct rte_distributor *d, struct rte_mempool *p)
 	unsigned num_returned = 0;
 
 	/* flush out any remaining packets */
-	rte_distributor_flush(d);
-	rte_distributor_clear_returns(d);
+	rte_distributor_flush_v20(d);
+	rte_distributor_clear_returns_v20(d);
 	if (rte_mempool_get_bulk(p, (void *)many_bufs, BIG_BATCH) != 0) {
 		printf("line %d: Error getting mbufs from pool\n", __LINE__);
 		return -1;
@@ -204,13 +204,13 @@ sanity_test(struct rte_distributor *d, struct rte_mempool *p)
 		many_bufs[i]->hash.usr = i << 2;
 
 	for (i = 0; i < BIG_BATCH/BURST; i++) {
-		rte_distributor_process(d, &many_bufs[i*BURST], BURST);
-		num_returned += rte_distributor_returned_pkts(d,
+		rte_distributor_process_v20(d, &many_bufs[i*BURST], BURST);
+		num_returned += rte_distributor_returned_pkts_v20(d,
 				&return_bufs[num_returned],
 				BIG_BATCH - num_returned);
 	}
-	rte_distributor_flush(d);
-	num_returned += rte_distributor_returned_pkts(d,
+	rte_distributor_flush_v20(d);
+	num_returned += rte_distributor_returned_pkts_v20(d,
 			&return_bufs[num_returned], BIG_BATCH - num_returned);
 
 	if (num_returned != BIG_BATCH) {
@@ -249,18 +249,18 @@ static int
 handle_work_with_free_mbufs(void *arg)
 {
 	struct rte_mbuf *pkt = NULL;
-	struct rte_distributor *d = arg;
+	struct rte_distributor_v20 *d = arg;
 	unsigned count = 0;
 	unsigned id = __sync_fetch_and_add(&worker_idx, 1);
 
-	pkt = rte_distributor_get_pkt(d, id, NULL);
+	pkt = rte_distributor_get_pkt_v20(d, id, NULL);
 	while (!quit) {
 		worker_stats[id].handled_packets++, count++;
 		rte_pktmbuf_free(pkt);
-		pkt = rte_distributor_get_pkt(d, id, pkt);
+		pkt = rte_distributor_get_pkt_v20(d, id, pkt);
 	}
 	worker_stats[id].handled_packets++, count++;
-	rte_distributor_return_pkt(d, id, pkt);
+	rte_distributor_return_pkt_v20(d, id, pkt);
 	return 0;
 }
 
@@ -270,7 +270,8 @@ handle_work_with_free_mbufs(void *arg)
  * library.
  */
 static int
-sanity_test_with_mbuf_alloc(struct rte_distributor *d, struct rte_mempool *p)
+sanity_test_with_mbuf_alloc(struct rte_distributor_v20 *d,
+		struct rte_mempool *p)
 {
 	unsigned i;
 	struct rte_mbuf *bufs[BURST];
@@ -280,16 +281,16 @@ sanity_test_with_mbuf_alloc(struct rte_distributor *d, struct rte_mempool *p)
 	for (i = 0; i < ((1<<ITER_POWER)); i += BURST) {
 		unsigned j;
 		while (rte_mempool_get_bulk(p, (void *)bufs, BURST) < 0)
-			rte_distributor_process(d, NULL, 0);
+			rte_distributor_process_v20(d, NULL, 0);
 		for (j = 0; j < BURST; j++) {
 			bufs[j]->hash.usr = (i+j) << 1;
 			rte_mbuf_refcnt_set(bufs[j], 1);
 		}
 
-		rte_distributor_process(d, bufs, BURST);
+		rte_distributor_process_v20(d, bufs, BURST);
 	}
 
-	rte_distributor_flush(d);
+	rte_distributor_flush_v20(d);
 	if (total_packet_count() < (1<<ITER_POWER)) {
 		printf("Line %u: Packet count is incorrect, %u, expected %u\n",
 				__LINE__, total_packet_count(),
@@ -305,20 +306,20 @@ static int
 handle_work_for_shutdown_test(void *arg)
 {
 	struct rte_mbuf *pkt = NULL;
-	struct rte_distributor *d = arg;
+	struct rte_distributor_v20 *d = arg;
 	unsigned count = 0;
 	const unsigned id = __sync_fetch_and_add(&worker_idx, 1);
 
-	pkt = rte_distributor_get_pkt(d, id, NULL);
+	pkt = rte_distributor_get_pkt_v20(d, id, NULL);
 	/* wait for quit single globally, or for worker zero, wait
 	 * for zero_quit */
 	while (!quit && !(id == 0 && zero_quit)) {
 		worker_stats[id].handled_packets++, count++;
 		rte_pktmbuf_free(pkt);
-		pkt = rte_distributor_get_pkt(d, id, NULL);
+		pkt = rte_distributor_get_pkt_v20(d, id, NULL);
 	}
 	worker_stats[id].handled_packets++, count++;
-	rte_distributor_return_pkt(d, id, pkt);
+	rte_distributor_return_pkt_v20(d, id, pkt);
 
 	if (id == 0) {
 		/* for worker zero, allow it to restart to pick up last packet
@@ -326,13 +327,13 @@ handle_work_for_shutdown_test(void *arg)
 		 */
 		while (zero_quit)
 			usleep(100);
-		pkt = rte_distributor_get_pkt(d, id, NULL);
+		pkt = rte_distributor_get_pkt_v20(d, id, NULL);
 		while (!quit) {
 			worker_stats[id].handled_packets++, count++;
 			rte_pktmbuf_free(pkt);
-			pkt = rte_distributor_get_pkt(d, id, NULL);
+			pkt = rte_distributor_get_pkt_v20(d, id, NULL);
 		}
-		rte_distributor_return_pkt(d, id, pkt);
+		rte_distributor_return_pkt_v20(d, id, pkt);
 	}
 	return 0;
 }
@@ -344,7 +345,7 @@ handle_work_for_shutdown_test(void *arg)
  * library.
  */
 static int
-sanity_test_with_worker_shutdown(struct rte_distributor *d,
+sanity_test_with_worker_shutdown(struct rte_distributor_v20 *d,
 		struct rte_mempool *p)
 {
 	struct rte_mbuf *bufs[BURST];
@@ -363,7 +364,7 @@ sanity_test_with_worker_shutdown(struct rte_distributor *d,
 	for (i = 0; i < BURST; i++)
 		bufs[i]->hash.usr = 0;
 
-	rte_distributor_process(d, bufs, BURST);
+	rte_distributor_process_v20(d, bufs, BURST);
 	/* at this point, we will have processed some packets and have a full
 	 * backlog for the other ones at worker 0.
 	 */
@@ -378,10 +379,10 @@ sanity_test_with_worker_shutdown(struct rte_distributor *d,
 
 	/* get worker zero to quit */
 	zero_quit = 1;
-	rte_distributor_process(d, bufs, BURST);
+	rte_distributor_process_v20(d, bufs, BURST);
 
 	/* flush the distributor */
-	rte_distributor_flush(d);
+	rte_distributor_flush_v20(d);
 	if (total_packet_count() != BURST * 2) {
 		printf("Line %d: Error, not all packets flushed. "
 				"Expected %u, got %u\n",
@@ -401,7 +402,7 @@ sanity_test_with_worker_shutdown(struct rte_distributor *d,
  * one worker shuts down..
  */
 static int
-test_flush_with_worker_shutdown(struct rte_distributor *d,
+test_flush_with_worker_shutdown(struct rte_distributor_v20 *d,
 		struct rte_mempool *p)
 {
 	struct rte_mbuf *bufs[BURST];
@@ -420,7 +421,7 @@ test_flush_with_worker_shutdown(struct rte_distributor *d,
 	for (i = 0; i < BURST; i++)
 		bufs[i]->hash.usr = 0;
 
-	rte_distributor_process(d, bufs, BURST);
+	rte_distributor_process_v20(d, bufs, BURST);
 	/* at this point, we will have processed some packets and have a full
 	 * backlog for the other ones at worker 0.
 	 */
@@ -429,7 +430,7 @@ test_flush_with_worker_shutdown(struct rte_distributor *d,
 	zero_quit = 1;
 
 	/* flush the distributor */
-	rte_distributor_flush(d);
+	rte_distributor_flush_v20(d);
 
 	zero_quit = 0;
 	if (total_packet_count() != BURST) {
@@ -450,10 +451,10 @@ test_flush_with_worker_shutdown(struct rte_distributor *d,
 static
 int test_error_distributor_create_name(void)
 {
-	struct rte_distributor *d = NULL;
+	struct rte_distributor_v20 *d = NULL;
 	char *name = NULL;
 
-	d = rte_distributor_create(name, rte_socket_id(),
+	d = rte_distributor_create_v20(name, rte_socket_id(),
 			rte_lcore_count() - 1);
 	if (d != NULL || rte_errno != EINVAL) {
 		printf("ERROR: No error on create() with NULL name param\n");
@@ -467,8 +468,8 @@ int test_error_distributor_create_name(void)
 static
 int test_error_distributor_create_numworkers(void)
 {
-	struct rte_distributor *d = NULL;
-	d = rte_distributor_create("test_numworkers", rte_socket_id(),
+	struct rte_distributor_v20 *d = NULL;
+	d = rte_distributor_create_v20("test_numworkers", rte_socket_id(),
 			RTE_MAX_LCORE + 10);
 	if (d != NULL || rte_errno != EINVAL) {
 		printf("ERROR: No error on create() with num_workers > MAX\n");
@@ -480,7 +481,7 @@ int test_error_distributor_create_numworkers(void)
 
 /* Useful function which ensures that all worker functions terminate */
 static void
-quit_workers(struct rte_distributor *d, struct rte_mempool *p)
+quit_workers(struct rte_distributor_v20 *d, struct rte_mempool *p)
 {
 	const unsigned num_workers = rte_lcore_count() - 1;
 	unsigned i;
@@ -491,12 +492,12 @@ quit_workers(struct rte_distributor *d, struct rte_mempool *p)
 	quit = 1;
 	for (i = 0; i < num_workers; i++)
 		bufs[i]->hash.usr = i << 1;
-	rte_distributor_process(d, bufs, num_workers);
+	rte_distributor_process_v20(d, bufs, num_workers);
 
 	rte_mempool_put_bulk(p, (void *)bufs, num_workers);
 
-	rte_distributor_process(d, NULL, 0);
-	rte_distributor_flush(d);
+	rte_distributor_process_v20(d, NULL, 0);
+	rte_distributor_flush_v20(d);
 	rte_eal_mp_wait_lcore();
 	quit = 0;
 	worker_idx = 0;
@@ -505,7 +506,7 @@ quit_workers(struct rte_distributor *d, struct rte_mempool *p)
 static int
 test_distributor(void)
 {
-	static struct rte_distributor *d;
+	static struct rte_distributor_v20 *d;
 	static struct rte_mempool *p;
 
 	if (rte_lcore_count() < 2) {
@@ -514,15 +515,16 @@ test_distributor(void)
 	}
 
 	if (d == NULL) {
-		d = rte_distributor_create("Test_distributor", rte_socket_id(),
+		d = rte_distributor_create_v20("Test_distributor",
+				rte_socket_id(),
 				rte_lcore_count() - 1);
 		if (d == NULL) {
 			printf("Error creating distributor\n");
 			return -1;
 		}
 	} else {
-		rte_distributor_flush(d);
-		rte_distributor_clear_returns(d);
+		rte_distributor_flush_v20(d);
+		rte_distributor_clear_returns_v20(d);
 	}
 
 	const unsigned nb_bufs = (511 * rte_lcore_count()) < BIG_BATCH ?
