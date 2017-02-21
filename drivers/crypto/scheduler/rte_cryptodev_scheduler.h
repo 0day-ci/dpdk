@@ -47,6 +47,7 @@ enum rte_cryptodev_scheduler_mode {
 	CDEV_SCHED_MODE_NOT_SET = 0,
 	CDEV_SCHED_MODE_USERDEFINED,
 	CDEV_SCHED_MODE_ROUNDROBIN,
+	CDEV_SCHED_MODE_PKT_SIZE_DISTRBUTE,
 
 	CDEV_SCHED_MODE_COUNT /* number of modes */
 };
@@ -158,6 +159,7 @@ struct rte_cryptodev_scheduler {
 };
 
 extern struct rte_cryptodev_scheduler *roundrobin_scheduler;
+extern struct rte_cryptodev_scheduler *packet_size_based_scheduler;
 
 #ifdef __cplusplus
 }

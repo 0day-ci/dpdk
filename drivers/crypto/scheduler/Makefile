@@ -54,6 +54,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_PMD_CRYPTO_SCHEDULER) += scheduler_pmd.c
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_CRYPTO_SCHEDULER) += scheduler_pmd_ops.c
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_CRYPTO_SCHEDULER) += rte_cryptodev_scheduler.c
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_CRYPTO_SCHEDULER) += scheduler_roundrobin.c
+SRCS-$(CONFIG_RTE_LIBRTE_PMD_CRYPTO_SCHEDULER) += scheduler_packet_size.c
 
 # library dependencies
 DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_CRYPTO_SCHEDULER) += lib/librte_cryptodev
