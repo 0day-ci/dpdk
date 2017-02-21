@@ -182,7 +182,6 @@ static inline int
 virtqueue_enqueue_recv_refill(struct virtqueue *vq, struct rte_mbuf *cookie)
 {
 	struct vq_desc_extra *dxp;
-	struct virtio_hw *hw = vq->hw;
 	struct vring_desc *start_dp;
 	uint16_t needed = 1;
 	uint16_t head_idx, idx;
@@ -203,10 +202,8 @@ virtqueue_enqueue_recv_refill(struct virtqueue *vq, struct rte_mbuf *cookie)
 
 	start_dp = vq->vq_ring.desc;
 	start_dp[idx].addr =
-		VIRTIO_MBUF_ADDR(cookie, vq) +
-		RTE_PKTMBUF_HEADROOM - hw->vtnet_hdr_size;
-	start_dp[idx].len =
-		cookie->buf_len - RTE_PKTMBUF_HEADROOM + hw->vtnet_hdr_size;
+		VIRTIO_MBUF_ADDR(cookie, vq) + RTE_PKTMBUF_HEADROOM;
+	start_dp[idx].len = cookie->buf_len - RTE_PKTMBUF_HEADROOM;
 	start_dp[idx].flags =  VRING_DESC_F_WRITE;
 	idx = start_dp[idx].next;
 	vq->vq_desc_head_idx = idx;
@@ -768,7 +765,7 @@ virtio_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 		}
 
 		rxm->port = rxvq->port_id;
-		rxm->data_off = RTE_PKTMBUF_HEADROOM;
+		rxm->data_off = RTE_PKTMBUF_HEADROOM + hdr_size;
 		rxm->ol_flags = 0;
 		rxm->vlan_tci = 0;
 
@@ -778,7 +775,7 @@ virtio_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 		rxm->data_len = (uint16_t)(len[i] - hdr_size);
 
 		hdr = (struct virtio_net_hdr *)((char *)rxm->buf_addr +
-			RTE_PKTMBUF_HEADROOM - hdr_size);
+			RTE_PKTMBUF_HEADROOM);
 
 		if (hw->vlan_strip)
 			rte_vlan_strip(rxm);
@@ -892,13 +889,13 @@ virtio_recv_mergeable_pkts(void *rx_queue,
 		}
 
 		header = (struct virtio_net_hdr_mrg_rxbuf *)((char *)rxm->buf_addr +
-			RTE_PKTMBUF_HEADROOM - hdr_size);
+			RTE_PKTMBUF_HEADROOM);
 		seg_num = header->num_buffers;
 
 		if (seg_num == 0)
 			seg_num = 1;
 
-		rxm->data_off = RTE_PKTMBUF_HEADROOM;
+		rxm->data_off = RTE_PKTMBUF_HEADROOM + hdr_size;
 		rxm->nb_segs = seg_num;
 		rxm->next = NULL;
 		rxm->ol_flags = 0;
@@ -944,7 +941,7 @@ virtio_recv_mergeable_pkts(void *rx_queue,
 			while (extra_idx < rcv_cnt) {
 				rxm = rcv_pkts[extra_idx];
 
-				rxm->data_off = RTE_PKTMBUF_HEADROOM - hdr_size;
+				rxm->data_off = RTE_PKTMBUF_HEADROOM;
 				rxm->next = NULL;
 				rxm->pkt_len = (uint32_t)(len[extra_idx]);
 				rxm->data_len = (uint16_t)(len[extra_idx]);
