@@ -63,6 +63,11 @@ struct rte_cryptodev_scheduler_ops {
 	rte_cryptodev_scheduler_config_queue_pair config_queue_pair;
 
 	rte_cryptodev_scheduler_create_private_ctx create_private_ctx;
+
+	enqueue_pkt_burst_t enqueue;
+	enqueue_pkt_burst_t enqueue_ordering;
+	dequeue_pkt_burst_t dequeue;
+	dequeue_pkt_burst_t dequeue_ordering;
 };
 
 #ifdef __cplusplus

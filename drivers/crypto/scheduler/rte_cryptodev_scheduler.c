@@ -451,6 +451,12 @@ rte_cryptodev_scheduler_load_user_scheduler(uint8_t scheduler_id,
 	sched_ctx->ops.scheduler_stop = scheduler->ops->scheduler_stop;
 	sched_ctx->ops.slave_attach = scheduler->ops->slave_attach;
 	sched_ctx->ops.slave_detach = scheduler->ops->slave_detach;
+	sched_ctx->ops.enqueue = scheduler->ops->enqueue;
+	sched_ctx->ops.dequeue = scheduler->ops->dequeue;
+	sched_ctx->ops.enqueue_ordering =
+			scheduler->ops->enqueue_ordering;
+	sched_ctx->ops.dequeue_ordering =
+			scheduler->ops->dequeue_ordering;
 
 	if (sched_ctx->private_ctx)
 		rte_free(sched_ctx->private_ctx);

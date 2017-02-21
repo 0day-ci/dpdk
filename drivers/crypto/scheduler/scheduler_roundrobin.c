@@ -372,14 +372,6 @@ scheduler_start(struct rte_cryptodev *dev)
 
 		rr_qp_ctx->last_enq_slave_idx = 0;
 		rr_qp_ctx->last_deq_slave_idx = 0;
-
-		if (sched_ctx->reordering_enabled) {
-			qp_ctx->schedule_enqueue = &schedule_enqueue_ordering;
-			qp_ctx->schedule_dequeue = &schedule_dequeue_ordering;
-		} else {
-			qp_ctx->schedule_enqueue = &schedule_enqueue;
-			qp_ctx->schedule_dequeue = &schedule_dequeue;
-		}
 	}
 
 	return 0;
@@ -421,7 +413,11 @@ struct rte_cryptodev_scheduler_ops scheduler_rr_ops = {
 	scheduler_start,
 	scheduler_stop,
 	scheduler_config_qp,
-	scheduler_create_private_ctx
+	scheduler_create_private_ctx,
+	schedule_enqueue,
+	schedule_enqueue_ordering,
+	schedule_dequeue,
+	schedule_dequeue_ordering
 };
 
 struct rte_cryptodev_scheduler scheduler = {

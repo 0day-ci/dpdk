@@ -128,6 +128,14 @@ scheduler_pmd_start(struct rte_cryptodev *dev)
 		return -1;
 	}
 
+	if (sched_ctx->reordering_enabled) {
+		dev->enqueue_burst = sched_ctx->ops.enqueue_ordering;
+		dev->dequeue_burst = sched_ctx->ops.dequeue_ordering;
+	} else {
+		dev->enqueue_burst = sched_ctx->ops.enqueue;
+		dev->dequeue_burst = sched_ctx->ops.dequeue;
+	}
+
 	if (!sched_ctx->nb_slaves) {
 		CS_LOG_ERR("No slave in the scheduler");
 		return -1;
