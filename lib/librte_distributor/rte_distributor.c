@@ -43,7 +43,6 @@
 #include <rte_compat.h>
 #include "rte_distributor_private.h"
 #include "rte_distributor.h"
-#include "rte_distributor_v1705.h"
 #include "rte_distributor_v20.h"
 
 TAILQ_HEAD(rte_dist_burst_list, rte_distributor);
@@ -103,6 +102,7 @@ rte_distributor_request_pkt(struct rte_distributor *d,
 	 */
 	*retptr64 |= RTE_DISTRIB_GET_BUF;
 }
+BIND_DEFAULT_SYMBOL(rte_distributor_request_pkt,, 17.05);
 
 int
 rte_distributor_poll_pkt(struct rte_distributor *d,
@@ -139,6 +139,7 @@ rte_distributor_poll_pkt(struct rte_distributor *d,
 
 	return count;
 }
+BIND_DEFAULT_SYMBOL(rte_distributor_poll_pkt,, 17.05);
 
 int
 rte_distributor_get_pkt(struct rte_distributor *d,
@@ -169,6 +170,7 @@ rte_distributor_get_pkt(struct rte_distributor *d,
 	}
 	return count;
 }
+BIND_DEFAULT_SYMBOL(rte_distributor_get_pkt,, 17.05);
 
 int
 rte_distributor_return_pkt(struct rte_distributor *d,
@@ -198,6 +200,7 @@ rte_distributor_return_pkt(struct rte_distributor *d,
 
 	return 0;
 }
+BIND_DEFAULT_SYMBOL(rte_distributor_return_pkt,, 17.05);
 
 /**** APIs called on distributor core ***/
 
@@ -477,6 +480,7 @@ rte_distributor_process(struct rte_distributor *d,
 
 	return num_mbufs;
 }
+BIND_DEFAULT_SYMBOL(rte_distributor_process,, 17.05);
 
 /* return to the caller, packets returned from workers */
 int
@@ -505,6 +509,7 @@ rte_distributor_returned_pkts(struct rte_distributor *d,
 
 	return retval;
 }
+BIND_DEFAULT_SYMBOL(rte_distributor_returned_pkts,, 17.05);
 
 /*
  * Return the number of packets in-flight in a distributor, i.e. packets
@@ -550,6 +555,7 @@ rte_distributor_flush(struct rte_distributor *d)
 
 	return flushed;
 }
+BIND_DEFAULT_SYMBOL(rte_distributor_flush,, 17.05);
 
 /* clears the internal returns array in the distributor */
 void
@@ -566,6 +572,7 @@ rte_distributor_clear_returns(struct rte_distributor *d)
 	for (wkr = 0; wkr < d->num_workers; wkr++)
 		d->bufs[wkr].retptr64[0] = 0;
 }
+BIND_DEFAULT_SYMBOL(rte_distributor_clear_returns,, 17.05);
 
 /* creates a distributor instance */
 struct rte_distributor *
@@ -639,3 +646,4 @@ rte_distributor_create(const char *name,
 
 	return d;
 }
+BIND_DEFAULT_SYMBOL(rte_distributor_create,, 17.05);
