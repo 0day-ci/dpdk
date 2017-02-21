@@ -40,6 +40,11 @@
 extern "C" {
 #endif
 
+/**< Maximum number of bonded devices per devices */
+#ifndef RTE_CRYPTODEV_SCHEDULER_MAX_NB_SLAVES
+#define RTE_CRYPTODEV_SCHEDULER_MAX_NB_SLAVES	(8)
+#endif
+
 /**
  * Crypto scheduler PMD operation modes
  */
@@ -142,6 +147,24 @@ rte_cryptodev_scheduler_ordering_set(uint8_t scheduler_id,
  */
 int
 rte_cryptodev_scheduler_ordering_get(uint8_t scheduler_id);
+
+/**
+ * Get the the attached slaves' count and/or ID
+ *
+ *@param	scheduler_id	The target scheduler device ID
+ *		slaves		If successful, the slaves' device
+ *				IDs will be written. This parameter
+ *				can be NULL, but otherwise please NOTE
+ *				it should be an uint8_t array of at least
+ *				RTE_CRYPTODEV_SCHEDULER_MAX_NB_SLAVES
+ *				elements.
+ *
+ * @return
+ *	non-negative number: the number of slaves attached
+ *	negative integer if error occurs.
+ */
+int
+rte_cryptodev_scheduler_slaves_get(uint8_t scheduler_id, uint8_t *slaves);
 
 typedef uint16_t (*rte_cryptodev_scheduler_burst_enqueue_t)(void *qp_ctx,
 		struct rte_crypto_op **ops, uint16_t nb_ops);
