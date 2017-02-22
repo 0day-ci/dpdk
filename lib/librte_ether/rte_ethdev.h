@@ -677,6 +677,7 @@ struct rte_eth_rxconf {
 #define ETH_TXQ_FLAGS_NOXSUMSCTP 0x0200 /**< disable SCTP checksum offload */
 #define ETH_TXQ_FLAGS_NOXSUMUDP  0x0400 /**< disable UDP checksum offload */
 #define ETH_TXQ_FLAGS_NOXSUMTCP  0x0800 /**< disable TCP checksum offload */
+#define ETH_TXQ_FLAGS_NOTSOOFFL  0x1000 /**< disable TSO offload */
 #define ETH_TXQ_FLAGS_NOOFFLOADS \
 		(ETH_TXQ_FLAGS_NOVLANOFFL | ETH_TXQ_FLAGS_NOXSUMSCTP | \
 		 ETH_TXQ_FLAGS_NOXSUMUDP  | ETH_TXQ_FLAGS_NOXSUMTCP)
