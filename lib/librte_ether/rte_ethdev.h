@@ -728,6 +728,17 @@ struct rte_eth_desc_lim {
 	uint16_t nb_mtu_seg_max;
 };
 
+struct rte_eth_tx_offload_lim {
+	/**
+	 * Max allowed size of network headers (L2+L3+L4) for TSO offload.
+	 */
+	uint32_t max_tso_headers_sz;
+	/**
+	 * Max allowed size of TCP payload for TSO offload.
+	 */
+	uint32_t max_tso_payload_sz;
+};
+
 /**
  * This enum indicates the flow control mode
  */
@@ -920,6 +931,8 @@ struct rte_eth_dev_info {
 	uint16_t max_vmdq_pools; /**< Maximum number of VMDq pools. */
 	uint32_t rx_offload_capa; /**< Device RX offload capabilities. */
 	uint32_t tx_offload_capa; /**< Device TX offload capabilities. */
+	struct rte_eth_tx_offload_lim tx_off_lim;
+	/**< Device TX offloads limits. */
 	uint16_t reta_size;
 	/**< Device redirection table size, the total number of entries. */
 	uint8_t hash_key_size; /**< Hash key size in bytes */
