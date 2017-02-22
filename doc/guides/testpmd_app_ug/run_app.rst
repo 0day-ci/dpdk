@@ -460,3 +460,7 @@ The commandline options are:
 *   ``--disable-link-check``
 
     Disable check on link status when starting/stopping ports.
+
+*   ``--disable-tso``
+
+    Disable hardware TCP segmentation offload.

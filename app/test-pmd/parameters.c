@@ -196,6 +196,7 @@ usage(char* progname)
 		" or total packet length.\n");
 	printf("  --disable-link-check: disable check on link status when "
 	       "starting/stopping ports.\n");
+	printf("  --disable-tso: disable hardware TCP segmentation offload.\n");
 }
 
 #ifdef RTE_LIBRTE_CMDLINE
@@ -561,6 +562,7 @@ launch_args_parse(int argc, char** argv)
 		{ "no-flush-rx",	0, 0, 0 },
 		{ "txpkts",			1, 0, 0 },
 		{ "disable-link-check",		0, 0, 0 },
+		{ "disable-tso",		0, 0, 0 },
 		{ 0, 0, 0, 0 },
 	};
 
@@ -978,7 +980,12 @@ launch_args_parse(int argc, char** argv)
 				no_flush_rx = 1;
 			if (!strcmp(lgopts[opt_idx].name, "disable-link-check"))
 				no_link_check = 1;
-
+			if (!strcmp(lgopts[opt_idx].name, "disable-tso")) {
+				if (txq_flags < 0)
+					txq_flags = ETH_TXQ_FLAGS_NOTSOOFFL;
+				else
+					txq_flags |= ETH_TXQ_FLAGS_NOTSOOFFL;
+			}
 			break;
 		case 'h':
 			usage(argv[0]);
