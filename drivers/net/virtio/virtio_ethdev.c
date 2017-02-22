@@ -1191,8 +1191,7 @@ virtio_negotiate_features(struct virtio_hw *hw, uint64_t req_features)
  * if link state changed.
  */
 static void
-virtio_interrupt_handler(struct rte_intr_handle *handle,
-			 void *param)
+virtio_interrupt_handler(void *param)
 {
 	struct rte_eth_dev *dev = param;
 	struct virtio_hw *hw = dev->data->dev_private;
@@ -1202,7 +1201,7 @@ virtio_interrupt_handler(struct rte_intr_handle *handle,
 	isr = vtpci_isr(hw);
 	PMD_DRV_LOG(INFO, "interrupt status = %#x", isr);
 
-	if (rte_intr_enable(handle) < 0)
+	if (rte_intr_enable(dev->intr_handle) < 0)
 		PMD_DRV_LOG(ERR, "interrupt enable failed");
 
 	if (isr & VIRTIO_PCI_ISR_CONFIG) {
