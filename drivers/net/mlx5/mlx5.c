@@ -479,6 +479,7 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 			IBV_EXP_DEVICE_ATTR_RX_HASH |
 			IBV_EXP_DEVICE_ATTR_VLAN_OFFLOADS |
 			IBV_EXP_DEVICE_ATTR_RX_PAD_END_ALIGN |
+			IBV_EXP_DEVICE_ATTR_TSO_CAPS |
 			0;
 
 		DEBUG("using port %u (%08" PRIx32 ")", port, test);
@@ -586,6 +587,13 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 			err = ENOTSUP;
 			goto port_error;
 		}
+		priv->tso = ((!priv->mps) &&
+			     (exp_device_attr.tso_caps.max_tso > 0) &&
+			     (exp_device_attr.tso_caps.supported_qpts &
+			     (1 << IBV_QPT_RAW_ETH)));
+		if (priv->tso)
+			priv->max_tso_payload_sz =
+				exp_device_attr.tso_caps.max_tso;
 		/* Allocate and register default RSS hash keys. */
 		priv->rss_conf = rte_calloc(__func__, hash_rxq_init_n,
 					    sizeof((*priv->rss_conf)[0]), 0);
