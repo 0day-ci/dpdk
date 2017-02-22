@@ -40,6 +40,12 @@ EXTLIB_BUILD ?= n
 # VPATH contains at least SRCDIR
 VPATH += $(SRCDIR)
 
+ifneq ($(CONFIG_RTE_MAJOR_ABI),)
+ifneq ($(LIBABIVER),)
+LIBABIVER := $(CONFIG_RTE_MAJOR_ABI)
+endif
+endif
+
 ifeq ($(CONFIG_RTE_BUILD_SHARED_LIB),y)
 LIB := $(patsubst %.a,%.so.$(LIBABIVER),$(LIB))
 ifeq ($(EXTLIB_BUILD),n)
@@ -156,11 +162,7 @@ $(RTE_OUTPUT)/lib/$(LIB): $(LIB)
 	@[ -d $(RTE_OUTPUT)/lib ] || mkdir -p $(RTE_OUTPUT)/lib
 	$(Q)cp -f $(LIB) $(RTE_OUTPUT)/lib
 ifeq ($(CONFIG_RTE_BUILD_SHARED_LIB),y)
-ifeq ($(CONFIG_RTE_NEXT_ABI)$(EXTLIB_BUILD),yn)
-	$(Q)ln -s -f $< $(basename $(basename $@))
-else
-	$(Q)ln -s -f $< $(basename $@)
-endif
+	$(Q)ln -s -f $< $(shell echo $@ | sed 's/\.so.*/.so/')
 endif
 
 #
