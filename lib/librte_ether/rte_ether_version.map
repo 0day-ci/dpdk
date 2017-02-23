@@ -152,5 +152,6 @@ DPDK_17.02 {
 	rte_flow_flush;
 	rte_flow_query;
 	rte_flow_validate;
+	rte_eth_dev_attach_secondary;
 
 } DPDK_16.11;
