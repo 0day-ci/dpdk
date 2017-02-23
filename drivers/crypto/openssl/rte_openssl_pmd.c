@@ -42,6 +42,8 @@
 
 #include "rte_openssl_pmd_private.h"
 
+#define DES_BLOCK_SIZE 8
+
 static int cryptodev_openssl_remove(const char *name);
 
 /*----------------------------------------------------------------------------*/
@@ -289,7 +291,13 @@ openssl_set_session_cipher_parameters(struct openssl_session *sess,
 				sess->cipher.key.data) != 0)
 			return -EINVAL;
 		break;
-
+	case RTE_CRYPTO_CIPHER_DES_DOCSISBPI:
+		sess->cipher.algo = xform->cipher.algo;
+		sess->chain_order = OPENSSL_CHAIN_CIPHER_BPI;
+		sess->cipher.ctx = EVP_CIPHER_CTX_new();
+		get_cipher_key(xform->cipher.key.data, sess->cipher.key.length,
+			sess->cipher.key.data);
+		break;
 	default:
 		sess->cipher.algo = RTE_CRYPTO_CIPHER_NULL;
 		return -EINVAL;
@@ -969,6 +977,107 @@ process_openssl_cipher_op
 		op->status = RTE_CRYPTO_OP_STATUS_ERROR;
 }
 
+/** Process cipher operation */
+static void
+process_openssl_docsis_bpi_op(struct rte_crypto_op *op,
+		struct openssl_session *sess, struct rte_mbuf *mbuf_src,
+		struct rte_mbuf *mbuf_dst)
+{
+	uint8_t *src, *dst, *iv;
+	const EVP_CIPHER *full_block_algo, *runt_frame_algo;
+	uint8_t block_size, last_block_len;
+	int srclen, status = 0;
+	int offset;
+
+	srclen = op->sym->cipher.data.length;
+	src = rte_pktmbuf_mtod_offset(mbuf_src, uint8_t *,
+			op->sym->cipher.data.offset);
+	dst = rte_pktmbuf_mtod_offset(mbuf_dst, uint8_t *,
+			op->sym->cipher.data.offset);
+
+	iv = op->sym->cipher.iv.data;
+
+	full_block_algo = EVP_des_cbc();
+	runt_frame_algo = EVP_des_cfb();
+	block_size = DES_BLOCK_SIZE;
+
+	last_block_len = srclen % block_size;
+	if (sess->cipher.direction == RTE_CRYPTO_CIPHER_OP_ENCRYPT) {
+		/* Encrypt only with CFB mode */
+		if (srclen < block_size) {
+			status = process_openssl_cipher_encrypt(mbuf_src, dst,
+					op->sym->cipher.data.offset, iv,
+					sess->cipher.key.data, srclen,
+					sess->cipher.ctx, runt_frame_algo);
+		} else {
+			srclen -= last_block_len;
+			/* Encrypt with the block aligned stream with CBC mode */
+			status = process_openssl_cipher_encrypt(mbuf_src, dst,
+					op->sym->cipher.data.offset, iv,
+					sess->cipher.key.data, srclen,
+					sess->cipher.ctx, full_block_algo);
+			if (last_block_len) {
+				/* Point at last block */
+				offset = op->sym->cipher.data.offset + srclen;
+				dst += srclen;
+				/*
+				 * IV is the last encrypted block from
+				 * the previous operation
+				 */
+				iv = dst - block_size;
+				srclen = last_block_len;
+				/* Encrypt the last frame with CFB mode */
+				status |= process_openssl_cipher_encrypt(mbuf_src,
+						dst, offset, iv,
+						sess->cipher.key.data,
+						srclen, sess->cipher.ctx,
+						runt_frame_algo);
+			}
+		}
+	} else {
+		/* Decrypt only with CFB mode */
+		if (srclen < block_size) {
+			status = process_openssl_cipher_decrypt(mbuf_src, dst,
+					op->sym->cipher.data.offset, iv,
+					sess->cipher.key.data, srclen,
+					sess->cipher.ctx,
+					runt_frame_algo);
+		} else {
+			if (last_block_len) {
+				/* Point at last block */
+				offset = op->sym->cipher.data.offset + srclen
+					- last_block_len;
+				dst += srclen - last_block_len;
+				/*
+				 * IV is the last encrypted block from
+				 * the previous operation
+				 */
+				iv = src + srclen - last_block_len - block_size;
+				/* Decrypt the last frame with CFB mode */
+				status = process_openssl_cipher_decrypt(mbuf_src,
+						dst, offset,
+						iv, sess->cipher.key.data,
+						last_block_len, sess->cipher.ctx,
+						runt_frame_algo);
+				/* Prepare parameters for CBC mode op */
+				iv = op->sym->cipher.iv.data;
+				dst += last_block_len - srclen;
+				srclen -= last_block_len;
+			}
+
+			/* Decrypt with CBC mode */
+			status |= process_openssl_cipher_decrypt(mbuf_src, dst,
+					op->sym->cipher.data.offset, iv,
+					sess->cipher.key.data, srclen,
+					sess->cipher.ctx,
+					full_block_algo);
+		}
+	}
+
+	if (status != 0)
+		op->status = RTE_CRYPTO_OP_STATUS_ERROR;
+}
+
 /** Process auth operation */
 static void
 process_openssl_auth_op
@@ -1051,6 +1160,9 @@ process_op(const struct openssl_qp *qp, struct rte_crypto_op *op,
 		break;
 	case OPENSSL_CHAIN_COMBINED:
 		process_openssl_combined_op(op, sess, msrc, mdst);
+		break;
+	case OPENSSL_CHAIN_CIPHER_BPI:
+		process_openssl_docsis_bpi_op(op, sess, msrc, mdst);
 		break;
 	default:
 		op->status = RTE_CRYPTO_OP_STATUS_ERROR;
