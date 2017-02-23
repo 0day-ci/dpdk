@@ -791,9 +791,9 @@ virtio_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 
 		VIRTIO_DUMP_PACKET(rxm, rxm->data_len);
 
-		rx_pkts[nb_rx++] = rxm;
+		rx_pkts[nb_rx] = rxm;
 
-		rxvq->stats.bytes += rx_pkts[nb_rx - 1]->pkt_len;
+		rxvq->stats.bytes += rx_pkts[nb_rx++]->pkt_len;
 		virtio_update_packet_stats(&rxvq->stats, rxm);
 	}
 
