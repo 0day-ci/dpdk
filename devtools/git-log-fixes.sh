@@ -116,5 +116,7 @@ while read id headline ; do
 	else
 		origver='N/A'
 	fi
-	printf '%s %7s %s (%s)\n' $version $id "$headline" "$origver"
+	stable="-"
+	git show $id | grep -qi 'Cc: .*stable@dpdk.org' && stable="S"
+	printf '%s %7s %s %s (%s)\n' $version $id $stable "$headline" "$origver"
 done
