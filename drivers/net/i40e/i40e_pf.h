@@ -58,6 +58,7 @@ enum i40e_virtchnl_ops_dpdk {
 						I40E_DPDK_OFFSET,
 	I40E_VIRTCHNL_OP_CFG_VLAN_PVID,
 	I40E_VIRTCHNL_OP_CONFIG_VSI_QUEUES_EXT,
+	I40E_VIRTCHNL_OP_RESET_STATS,
 };
 
 /* A structure to support extended info of a receive queue. */

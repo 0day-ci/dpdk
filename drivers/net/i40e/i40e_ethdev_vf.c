@@ -110,6 +110,7 @@ static int i40evf_dev_link_update(struct rte_eth_dev *dev,
 				  __rte_unused int wait_to_complete);
 static void i40evf_dev_stats_get(struct rte_eth_dev *dev,
 				struct rte_eth_stats *stats);
+static void i40evf_dev_stats_reset(struct rte_eth_dev *dev);
 static int i40evf_dev_xstats_get(struct rte_eth_dev *dev,
 				 struct rte_eth_xstat *xstats, unsigned n);
 static int i40evf_dev_xstats_get_names(struct rte_eth_dev *dev,
@@ -199,6 +200,7 @@ static const struct eth_dev_ops i40evf_eth_dev_ops = {
 	.allmulticast_disable = i40evf_dev_allmulticast_disable,
 	.link_update          = i40evf_dev_link_update,
 	.stats_get            = i40evf_dev_stats_get,
+	.stats_reset          = i40evf_dev_stats_reset,
 	.xstats_get           = i40evf_dev_xstats_get,
 	.xstats_get_names     = i40evf_dev_xstats_get_names,
 	.xstats_reset         = i40evf_dev_xstats_reset,
@@ -986,6 +988,27 @@ i40evf_get_statistics(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 	stats->obytes = pstats->tx_bytes;
 
 	return 0;
+}
+
+static int
+i40evf_reset_statistics(struct rte_eth_dev *dev)
+{
+	struct i40e_vf *vf = I40EVF_DEV_PRIVATE_TO_VF(dev->data->dev_private);
+	int err;
+	struct vf_cmd_info args;
+	u16 vsi_id = vf->vsi_res->vsi_id;
+
+	args.ops = (enum i40e_virtchnl_ops)I40E_VIRTCHNL_OP_RESET_STATS;
+	args.in_args = (uint8_t *)&vsi_id;
+	args.in_args_size = sizeof(vsi_id);
+	args.out_buffer = vf->aq_resp;
+	args.out_size = I40E_AQ_BUF_SZ;
+
+	err = i40evf_execute_vf_cmd(dev, &args);
+	if (err)
+		PMD_DRV_LOG(ERR, "fail to execute command CFG_VLAN_OFFLOAD");
+
+	return err;
 }
 
 static void
@@ -2307,6 +2330,17 @@ i40evf_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 {
 	if (i40evf_get_statistics(dev, stats))
 		PMD_DRV_LOG(ERR, "Get statistics failed");
+}
+
+static void
+i40evf_dev_stats_reset(struct rte_eth_dev *dev)
+{
+	struct i40e_vf *vf = I40EVF_DEV_PRIVATE_TO_VF(dev->data->dev_private);
+	/* only DPDK PF support this */
+	if (vf->version_major == I40E_DPDK_VERSION_MAJOR) {
+		if (i40evf_reset_statistics(dev))
+			PMD_DRV_LOG(ERR, "Reset statistics failed");
+	}
 }
 
 static void

@@ -1155,6 +1155,27 @@ send_msg:
 	return ret;
 }
 
+static int
+i40e_pf_host_process_cmd_reset_stats(struct i40e_pf_vf *vf,
+					bool b_op)
+{
+	vf->vsi->offset_loaded = false;
+	i40e_update_vsi_stats(vf->vsi);
+
+	if (b_op)
+		i40e_pf_host_send_msg_to_vf(vf, I40E_VIRTCHNL_OP_RESET_STATS,
+					    I40E_SUCCESS,
+					    NULL,
+					    0);
+	else
+		i40e_pf_host_send_msg_to_vf(vf, I40E_VIRTCHNL_OP_RESET_STATS,
+					    I40E_NOT_SUPPORTED,
+					    NULL,
+					    0);
+
+	return I40E_SUCCESS;
+}
+
 void
 i40e_notify_vf_link_status(struct rte_eth_dev *dev, struct i40e_pf_vf *vf)
 {
@@ -1299,6 +1320,10 @@ i40e_pf_host_handle_vf_msg(struct rte_eth_dev *dev,
 	case I40E_VIRTCHNL_OP_CFG_VLAN_PVID:
 		PMD_DRV_LOG(INFO, "OP_CFG_VLAN_PVID received");
 		i40e_pf_host_process_cmd_cfg_pvid(vf, msg, msglen, b_op);
+		break;
+	case I40E_VIRTCHNL_OP_RESET_STATS:
+		PMD_DRV_LOG(INFO, "OP_RESET_STATS received");
+		i40e_pf_host_process_cmd_reset_stats(vf, b_op);
 		break;
 	/* Don't add command supported below, which will
 	 * return an error code.
