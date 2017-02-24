@@ -1426,6 +1426,31 @@ i40e_xmit_pkts_simple(void *tx_queue,
 	return nb_tx;
 }
 
+static uint16_t
+i40e_xmit_pkts_vec_simple(void *tx_queue, struct rte_mbuf **tx_pkts,
+			  uint16_t nb_pkts)
+{
+	uint16_t nb_tx = 0;
+	struct i40e_tx_queue *txq = (struct i40e_tx_queue *)tx_queue;
+
+	if (likely(nb_pkts <= txq->tx_rs_thresh))
+		return i40e_xmit_pkts_vec(tx_queue, tx_pkts, nb_pkts);
+
+	/* transmit in chunks of at least txq->tx_rs_thresh */
+	while (nb_pkts) {
+		uint16_t ret, num;
+
+		num = (uint16_t)RTE_MIN(nb_pkts, txq->tx_rs_thresh);
+		ret = i40e_xmit_pkts_vec(tx_queue, &tx_pkts[nb_tx], num);
+		nb_tx += ret;
+		nb_pkts -= ret;
+		if (ret < num)
+			break;
+	}
+
+	return nb_tx;
+}
+
 /*********************************************************************
  *
  *  TX prep functions
@@ -2840,7 +2865,7 @@ i40e_set_tx_function(struct rte_eth_dev *dev)
 	if (ad->tx_simple_allowed) {
 		if (ad->tx_vec_allowed) {
 			PMD_INIT_LOG(DEBUG, "Vector tx finally be used.");
-			dev->tx_pkt_burst = i40e_xmit_pkts_vec;
+			dev->tx_pkt_burst = i40e_xmit_pkts_vec_simple;
 		} else {
 			PMD_INIT_LOG(DEBUG, "Simple tx finally be used.");
 			dev->tx_pkt_burst = i40e_xmit_pkts_simple;
