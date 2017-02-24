@@ -41,6 +41,9 @@ New Features
      Also, make sure to start the actual text at the margin.
      =========================================================
 
+* **Added VF max bandwidth setting on i40e.**
+
+  i40e HW supports to set the max bandwidth for a VF. Enable this capability.
 
 Resolved Issues
 ---------------
