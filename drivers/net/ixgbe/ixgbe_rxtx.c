@@ -363,6 +363,31 @@ ixgbe_xmit_pkts_simple(void *tx_queue, struct rte_mbuf **tx_pkts,
 	return nb_tx;
 }
 
+static uint16_t
+ixgbe_xmit_pkts_vec_simple(void *tx_queue, struct rte_mbuf **tx_pkts,
+			   uint16_t nb_pkts)
+{
+	uint16_t nb_tx = 0;
+	struct ixgbe_tx_queue *txq = (struct ixgbe_tx_queue *)tx_queue;
+
+	if (likely(nb_pkts <= txq->tx_rs_thresh))
+		return ixgbe_xmit_pkts_vec(tx_queue, tx_pkts, nb_pkts);
+
+	/* transmit in chunks of at least txq->tx_rs_thresh */
+	while (nb_pkts) {
+		uint16_t ret, num;
+
+		num = (uint16_t)RTE_MIN(nb_pkts, txq->tx_rs_thresh);
+		ret = ixgbe_xmit_pkts_vec(tx_queue, &tx_pkts[nb_tx], num);
+		nb_tx += ret;
+		nb_pkts -= ret;
+		if (ret < num)
+			break;
+	}
+
+	return nb_tx;
+}
+
 static inline void
 ixgbe_set_xmit_ctx(struct ixgbe_tx_queue *txq,
 		volatile struct ixgbe_adv_tx_context_desc *ctx_txd,
@@ -2355,7 +2380,7 @@ ixgbe_set_tx_function(struct rte_eth_dev *dev, struct ixgbe_tx_queue *txq)
 				(rte_eal_process_type() != RTE_PROC_PRIMARY ||
 					ixgbe_txq_vec_setup(txq) == 0)) {
 			PMD_INIT_LOG(DEBUG, "Vector tx enabled.");
-			dev->tx_pkt_burst = ixgbe_xmit_pkts_vec;
+			dev->tx_pkt_burst = ixgbe_xmit_pkts_vec_simple;
 		} else
 #endif
 		dev->tx_pkt_burst = ixgbe_xmit_pkts_simple;
