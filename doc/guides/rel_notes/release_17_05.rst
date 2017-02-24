@@ -50,6 +50,11 @@ New Features
   i40e HW supports to set the allocated bandwidth for a TC on a VF. Enable this
   capability.
 
+* **Added VF TC max bandwidth setting on i40e.**
+
+  i40e HW supports to set the max bandwidth for a TC on a VF. Enable this
+  capability.
+
 Resolved Issues
 ---------------
 
