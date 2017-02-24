@@ -2741,6 +2741,31 @@ fm10k_check_ftag(struct rte_devargs *devargs)
 	return 1;
 }
 
+static uint16_t
+fm10k_xmit_pkts_vec_simple(void *tx_queue, struct rte_mbuf **tx_pkts,
+			   uint16_t nb_pkts)
+{
+	uint16_t nb_tx = 0;
+	struct fm10k_tx_queue *txq = (struct fm10k_tx_queue *)tx_queue;
+
+	if (likely(nb_pkts <= txq->rs_thresh))
+		return fm10k_xmit_pkts_vec(tx_queue, tx_pkts, nb_pkts);
+
+	/* transmit in chunks of at least txq->rs_thresh */
+	while (nb_pkts) {
+		uint16_t ret, num;
+
+		num = (uint16_t)RTE_MIN(nb_pkts, txq->rs_thresh);
+		ret = fm10k_xmit_pkts_vec(tx_queue, &tx_pkts[nb_tx], num);
+		nb_tx += ret;
+		nb_pkts -= ret;
+		if (ret < num)
+			break;
+	}
+
+	return nb_tx;
+}
+
 static void __attribute__((cold))
 fm10k_set_tx_function(struct rte_eth_dev *dev)
 {
@@ -2766,7 +2791,7 @@ fm10k_set_tx_function(struct rte_eth_dev *dev)
 			txq = dev->data->tx_queues[i];
 			fm10k_txq_vec_setup(txq);
 		}
-		dev->tx_pkt_burst = fm10k_xmit_pkts_vec;
+		dev->tx_pkt_burst = fm10k_xmit_pkts_vec_simple;
 		dev->tx_pkt_prepare = NULL;
 	} else {
 		dev->tx_pkt_burst = fm10k_xmit_pkts;
