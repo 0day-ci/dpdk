@@ -1622,15 +1622,17 @@ rte_pmd_mpipe_probe_common(struct rte_vdev_driver *drv, const char *ifname,
 }
 
 static int
-rte_pmd_mpipe_xgbe_probe(const char *ifname, const char *params __rte_unused)
+rte_pmd_mpipe_xgbe_probe(struct rte_vdev_device *dev)
 {
-	return rte_pmd_mpipe_probe_common(&pmd_mpipe_xgbe_drv, ifname, params);
+	return rte_pmd_mpipe_probe_common(&pmd_mpipe_xgbe_drv,
+		rte_vdev_device_name(dev), rte_vdev_device_args(dev));
 }
 
 static int
-rte_pmd_mpipe_gbe_probe(const char *ifname, const char *params __rte_unused)
+rte_pmd_mpipe_gbe_probe(struct rte_vdev_device *dev)
 {
-	return rte_pmd_mpipe_probe_common(&pmd_mpipe_gbe_drv, ifname, params);
+	return rte_pmd_mpipe_probe_common(&pmd_mpipe_gbe_drv,
+		rte_vdev_device_name(dev), rte_vdev_device_args(dev));
 }
 
 static struct rte_vdev_driver pmd_mpipe_xgbe_drv = {
