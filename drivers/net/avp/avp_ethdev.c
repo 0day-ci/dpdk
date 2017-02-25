@@ -67,6 +67,9 @@ static int eth_avp_dev_init(struct rte_eth_dev *eth_dev);
 static int eth_avp_dev_uninit(struct rte_eth_dev *eth_dev);
 
 static int avp_dev_configure(struct rte_eth_dev *dev);
+static int avp_dev_start(struct rte_eth_dev *dev);
+static void avp_dev_stop(struct rte_eth_dev *dev);
+static void avp_dev_close(struct rte_eth_dev *dev);
 static void avp_dev_info_get(struct rte_eth_dev *dev,
 			     struct rte_eth_dev_info *dev_info);
 static void avp_vlan_offload_set(struct rte_eth_dev *dev, int mask);
@@ -156,6 +159,9 @@ static struct rte_pci_id pci_id_avp_map[] = {
  */
 static const struct eth_dev_ops avp_eth_dev_ops = {
 	.dev_configure       = avp_dev_configure,
+	.dev_start           = avp_dev_start,
+	.dev_stop            = avp_dev_stop,
+	.dev_close           = avp_dev_close,
 	.dev_infos_get       = avp_dev_info_get,
 	.vlan_offload_set    = avp_vlan_offload_set,
 	.stats_get           = avp_dev_stats_get,
@@ -340,6 +346,24 @@ avp_dev_process_request(struct avp_dev *avp, struct rte_avp_request *request)
 
 done:
 	return ret;
+}
+
+static int
+avp_dev_ctrl_set_link_state(struct rte_eth_dev *eth_dev, unsigned state)
+{
+	struct avp_dev *avp =
+		RTE_AVP_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
+	struct rte_avp_request request;
+	int ret;
+
+	/* setup a link state change request */
+	memset(&request, 0, sizeof(request));
+	request.req_id = RTE_AVP_REQ_CFG_NETWORK_IF;
+	request.if_up = state;
+
+	ret = avp_dev_process_request(avp, &request);
+
+	return ret == 0 ? request.result : ret;
 }
 
 static int
@@ -790,6 +814,31 @@ avp_dev_enable_interrupts(struct rte_eth_dev *eth_dev)
 	/* inform the device that all interrupts are enabled */
 	RTE_AVP_WRITE32(RTE_AVP_APP_INTERRUPTS_MASK,
 			RTE_PTR_ADD(registers, RTE_AVP_INTERRUPT_MASK_OFFSET));
+
+	return 0;
+}
+
+static int
+avp_dev_disable_interrupts(struct rte_eth_dev *eth_dev)
+{
+	struct rte_pci_device *pci_dev = AVP_DEV_TO_PCI(eth_dev);
+	void *registers = pci_dev->mem_resource[RTE_AVP_PCI_MMIO_BAR].addr;
+	int ret;
+
+	if (registers == NULL)
+		return 0;
+
+	/* inform the device that all interrupts are disabled */
+	RTE_AVP_WRITE32(RTE_AVP_NO_INTERRUPTS_MASK,
+			RTE_PTR_ADD(registers, RTE_AVP_INTERRUPT_MASK_OFFSET));
+
+	/* enable UIO interrupt handling */
+	ret = rte_intr_disable(&(pci_dev->intr_handle));
+	if (ret < 0) {
+		PMD_DRV_LOG(ERR,
+			    "Failed to enable UIO interrupts, ret=%d\n", ret);
+		return ret;
+	}
 
 	return 0;
 }
@@ -2044,6 +2093,114 @@ unlock:
 	return ret;
 }
 
+static int
+avp_dev_start(struct rte_eth_dev *eth_dev)
+{
+	struct avp_dev *avp =
+		RTE_AVP_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
+	int ret;
+
+	rte_spinlock_lock(&avp->lock);
+	if (avp->flags & RTE_AVP_F_DETACHED) {
+		PMD_DRV_LOG(ERR,
+			    "Operation not supported during "
+			    "VM live migration\n");
+		ret = -ENOTSUP;
+		goto unlock;
+	}
+
+	/* disable features that we do not support */
+	eth_dev->data->dev_conf.rxmode.hw_ip_checksum = 0;
+	eth_dev->data->dev_conf.rxmode.hw_vlan_filter = 0;
+	eth_dev->data->dev_conf.rxmode.hw_vlan_extend = 0;
+	eth_dev->data->dev_conf.rxmode.hw_strip_crc = 0;
+
+	/* update link state */
+	ret = avp_dev_ctrl_set_link_state(eth_dev, 1);
+	if (ret < 0) {
+		PMD_DRV_LOG(ERR,
+			    "Link state change failed by host, ret=%d\n", ret);
+		goto unlock;
+	}
+
+	/* remember current link state */
+	avp->flags |= RTE_AVP_F_LINKUP;
+
+	ret = 0;
+
+unlock:
+	rte_spinlock_unlock(&avp->lock);
+	return ret;
+}
+
+static void
+avp_dev_stop(struct rte_eth_dev *eth_dev)
+{
+	struct avp_dev *avp =
+		RTE_AVP_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
+	int ret;
+
+	rte_spinlock_lock(&avp->lock);
+	if (avp->flags & RTE_AVP_F_DETACHED) {
+		PMD_DRV_LOG(ERR,
+			    "Operation not supported during "
+			    "VM live migration\n");
+		goto unlock;
+	}
+
+	/* remember current link state */
+	avp->flags &= ~RTE_AVP_F_LINKUP;
+
+	/* update link state */
+	ret = avp_dev_ctrl_set_link_state(eth_dev, 0);
+	if (ret < 0) {
+		PMD_DRV_LOG(ERR,
+			    "Link state change failed by host, ret=%d\n", ret);
+		goto unlock;
+	}
+
+unlock:
+	rte_spinlock_unlock(&avp->lock);
+	return;
+}
+
+static void
+avp_dev_close(struct rte_eth_dev *eth_dev)
+{
+	struct avp_dev *avp =
+		RTE_AVP_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
+	int ret;
+
+	rte_spinlock_lock(&avp->lock);
+	if (avp->flags & RTE_AVP_F_DETACHED) {
+		PMD_DRV_LOG(ERR,
+			    "Operation not supported during "
+			    "VM live migration\n");
+		goto unlock;
+	}
+
+	/* remember current link state */
+	avp->flags &= ~RTE_AVP_F_LINKUP;
+	avp->flags &= ~RTE_AVP_F_CONFIGURED;
+
+	ret = avp_dev_disable_interrupts(eth_dev);
+	if (ret < 0) {
+		PMD_DRV_LOG(ERR, "Failed to disable interrupts\n");
+		/* continue */
+	}
+
+	/* update device state */
+	ret = avp_dev_ctrl_shutdown(eth_dev);
+	if (ret < 0) {
+		PMD_DRV_LOG(ERR, "Device shutdown failed by host, ret=%d\n",
+			    ret);
+		goto unlock;
+	}
+
+unlock:
+	rte_spinlock_unlock(&avp->lock);
+	return;
+}
 
 static int
 avp_dev_link_update(struct rte_eth_dev *eth_dev,
