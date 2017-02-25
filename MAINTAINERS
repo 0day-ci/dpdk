@@ -423,6 +423,11 @@ Null Networking PMD
 M: Tetsuya Mukawa <mtetsuyah@gmail.com>
 F: drivers/net/null/
 
+Wind River AVP PMD
+M: Allain Legacy <allain.legacy@windriver.com>
+M: Matt Peters <matt.peters@windriver.com>
+F: drivers/net/avp
+
 
 Crypto Drivers
 --------------
