@@ -103,6 +103,12 @@ static uint16_t avp_xmit_pkts(void *tx_queue,
 
 static void avp_dev_rx_queue_release(void *rxq);
 static void avp_dev_tx_queue_release(void *txq);
+
+static void avp_dev_stats_get(struct rte_eth_dev *dev,
+			      struct rte_eth_stats *stats);
+static void avp_dev_stats_reset(struct rte_eth_dev *dev);
+
+
 #define AVP_DEV_TO_PCI(eth_dev) RTE_DEV_TO_PCI((eth_dev)->device)
 
 
@@ -149,6 +155,8 @@ static const struct eth_dev_ops avp_eth_dev_ops = {
 	.dev_configure       = avp_dev_configure,
 	.dev_infos_get       = avp_dev_info_get,
 	.vlan_offload_set    = avp_vlan_offload_set,
+	.stats_get           = avp_dev_stats_get,
+	.stats_reset         = avp_dev_stats_reset,
 	.link_update         = avp_dev_link_update,
 	.rx_queue_setup      = avp_dev_rx_queue_setup,
 	.rx_queue_release    = avp_dev_rx_queue_release,
@@ -2095,6 +2103,79 @@ avp_vlan_offload_set(struct rte_eth_dev *eth_dev, int mask)
 	}
 }
 
+static void
+avp_dev_stats_get(struct rte_eth_dev *eth_dev, struct rte_eth_stats *stats)
+{
+#ifdef RTE_LIBRTE_AVP_STATS
+	struct avp_dev *avp =
+		RTE_AVP_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
+	unsigned i;
+
+	memset(stats, 0, sizeof(*stats));
+	for (i = 0; i < avp->num_rx_queues; i++) {
+		struct avp_queue *rxq = avp->dev_data->rx_queues[i];
+
+		if (rxq) {
+			stats->ipackets += rxq->packets;
+			stats->ibytes += rxq->bytes;
+			stats->ierrors += rxq->errors;
+
+			stats->q_ipackets[i] += rxq->packets;
+			stats->q_ibytes[i] += rxq->bytes;
+			stats->q_errors[i] += rxq->errors;
+		}
+	}
+
+	for (i = 0; i < avp->num_tx_queues; i++) {
+		struct avp_queue *txq = avp->dev_data->tx_queues[i];
+
+		if (txq) {
+			stats->opackets += txq->packets;
+			stats->obytes += txq->bytes;
+			stats->oerrors += txq->errors;
+
+			stats->q_opackets[i] += txq->packets;
+			stats->q_obytes[i] += txq->bytes;
+			stats->q_errors[i] += txq->errors;
+		}
+	}
+#else
+	(void)eth_dev;
+	(void)stats;
+#endif
+}
+
+static void
+avp_dev_stats_reset(struct rte_eth_dev *eth_dev)
+{
+#ifdef RTE_LIBRTE_AVP_STATS
+	struct avp_dev *avp =
+		RTE_AVP_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
+	unsigned i;
+
+	for (i = 0; i < avp->num_rx_queues; i++) {
+		struct avp_queue *rxq = avp->dev_data->rx_queues[i];
+
+		if (rxq) {
+			rxq->bytes = 0;
+			rxq->packets = 0;
+			rxq->errors = 0;
+		}
+	}
+
+	for (i = 0; i < avp->num_tx_queues; i++) {
+		struct avp_queue *txq = avp->dev_data->tx_queues[i];
+
+		if (txq) {
+			txq->bytes = 0;
+			txq->packets = 0;
+			txq->errors = 0;
+		}
+	}
+#else
+	(void)eth_dev;
+#endif
+}
 
 RTE_PMD_REGISTER_PCI(rte_avp, rte_avp_pmd.pci_drv);
 RTE_PMD_REGISTER_PCI_TABLE(rte_avp, pci_id_avp_map);
