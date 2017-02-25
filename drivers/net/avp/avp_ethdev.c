@@ -72,6 +72,9 @@ static void avp_dev_info_get(struct rte_eth_dev *dev,
 static void avp_vlan_offload_set(struct rte_eth_dev *dev, int mask);
 static int avp_dev_link_update(struct rte_eth_dev *dev,
 			       __rte_unused int wait_to_complete);
+static void avp_dev_promiscuous_enable(struct rte_eth_dev *dev);
+static void avp_dev_promiscuous_disable(struct rte_eth_dev *dev);
+
 static int avp_dev_rx_queue_setup(struct rte_eth_dev *dev,
 				  uint16_t rx_queue_id,
 				  uint16_t nb_rx_desc,
@@ -158,6 +161,8 @@ static const struct eth_dev_ops avp_eth_dev_ops = {
 	.stats_get           = avp_dev_stats_get,
 	.stats_reset         = avp_dev_stats_reset,
 	.link_update         = avp_dev_link_update,
+	.promiscuous_enable  = avp_dev_promiscuous_enable,
+	.promiscuous_disable = avp_dev_promiscuous_disable,
 	.rx_queue_setup      = avp_dev_rx_queue_setup,
 	.rx_queue_release    = avp_dev_rx_queue_release,
 	.tx_queue_setup      = avp_dev_tx_queue_setup,
@@ -2055,6 +2060,35 @@ avp_dev_link_update(struct rte_eth_dev *eth_dev,
 	return -1;
 }
 
+static void
+avp_dev_promiscuous_enable(struct rte_eth_dev *eth_dev)
+{
+	struct avp_dev *avp =
+		RTE_AVP_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
+
+	rte_spinlock_lock(&avp->lock);
+	if ((avp->flags & RTE_AVP_F_PROMISC) == 0) {
+		avp->flags |= RTE_AVP_F_PROMISC;
+		PMD_DRV_LOG(DEBUG, "Promiscuous mode enabled on %u\n",
+			    eth_dev->data->port_id);
+	}
+	rte_spinlock_unlock(&avp->lock);
+}
+
+static void
+avp_dev_promiscuous_disable(struct rte_eth_dev *eth_dev)
+{
+	struct avp_dev *avp =
+		RTE_AVP_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
+
+	rte_spinlock_lock(&avp->lock);
+	if ((avp->flags & RTE_AVP_F_PROMISC) != 0) {
+		avp->flags &= ~RTE_AVP_F_PROMISC;
+		PMD_DRV_LOG(DEBUG, "Promiscuous mode disabled on %u\n",
+			    eth_dev->data->port_id);
+	}
+	rte_spinlock_unlock(&avp->lock);
+}
 
 static void
 avp_dev_info_get(struct rte_eth_dev *eth_dev,
