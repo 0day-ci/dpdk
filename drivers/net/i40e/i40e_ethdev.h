@@ -708,6 +708,9 @@ struct i40e_adapter {
 	struct rte_timecounter systime_tc;
 	struct rte_timecounter rx_tstamp_tc;
 	struct rte_timecounter tx_tstamp_tc;
+
+	/* ptype mapping table */
+	uint32_t ptype_tbl[UINT8_MAX+1] __rte_cache_min_aligned;
 };
 
 extern const struct rte_flow_ops i40e_flow_ops;
