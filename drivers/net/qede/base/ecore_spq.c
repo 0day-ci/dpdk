@@ -402,6 +402,7 @@ void ecore_eq_free(struct ecore_hwfn *p_hwfn, struct ecore_eq *p_eq)
 		return;
 	ecore_chain_free(p_hwfn->p_dev, &p_eq->chain);
 	OSAL_FREE(p_hwfn->p_dev, p_eq);
+	p_eq = OSAL_NULL;
 }
 
 /***************************************************************************
@@ -987,4 +988,5 @@ void ecore_consq_free(struct ecore_hwfn *p_hwfn, struct ecore_consq *p_consq)
 		return;
 	ecore_chain_free(p_hwfn->p_dev, &p_consq->chain);
 	OSAL_FREE(p_hwfn->p_dev, p_consq);
+	p_consq = OSAL_NULL;
 }
