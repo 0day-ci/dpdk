@@ -101,6 +101,8 @@ enum i40e_header_split_mode {
 #define i40e_rx_desc i40e_32byte_rx_desc
 #endif
 
+#define I40E_MAX_PKT_TYPE      256
+
 struct i40e_rx_entry {
 	struct rte_mbuf *mbuf;
 };

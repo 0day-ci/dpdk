@@ -61,7 +61,6 @@
 
 #define DEFAULT_TX_RS_THRESH   32
 #define DEFAULT_TX_FREE_THRESH 32
-#define I40E_MAX_PKT_TYPE      256
 
 #define I40E_TX_MAX_BURST  32
 

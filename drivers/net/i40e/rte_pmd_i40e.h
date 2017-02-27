@@ -65,6 +65,13 @@ struct rte_pmd_i40e_mb_event_param {
 	uint16_t msglen;   /**< length of the message */
 };
 
+#define RTE_PMD_I40E_PTYPE_USER_DEFINE_MASK 0x80000000
+
+struct rte_pmd_i40e_ptype_mapping {
+	uint16_t hw_ptype; /**< hardware defined packet type*/
+	uint32_t sw_ptype; /**< software defined packet type */
+};
+
 /**
  * Notify VF when PF link status changes.
  *
@@ -331,5 +338,79 @@ int rte_pmd_i40e_get_vf_stats(uint8_t port,
  */
 int rte_pmd_i40e_reset_vf_stats(uint8_t port,
 				uint16_t vf_id);
+
+/**
+ * Update hardware defined ptype to software defined packet type
+ * mapping table.
+ *
+ * @param port
+ *    pointer to port identifier of the device.
+ * @param mapping_items
+ *    the base address of the mapping items array.
+ * @param count
+ *    number of mapping items.
+ * @param exclusive
+ *    the flag indicate different ptype mapping update method.
+ *    -(0) only overwrite refferred PTYPE mapping,
+ *	keep other PTYPEs mapping unchanged.
+ *    -(!0) overwrite referred PTYPE mapping,
+ *	set other PTYPEs maps to PTYPE_UNKNOWN.
+ */
+int rte_pmd_i40e_update_ptype_mapping(
+			uint8_t port,
+			struct rte_pmd_i40e_ptype_mapping *mapping_items,
+			uint16_t count,
+			uint8_t exclusive);
+
+/**
+ * Reset hardware defined ptype to software defined ptype
+ * mapping table to default.
+ *
+ * @param port
+ *    pointer to port identifiier of the device
+ */
+int rte_pmd_i40e_reset_ptype_mapping(uint8_t port);
+
+/**
+ * Get hardware defined ptype to software defined ptype
+ * mapping items.
+ *
+ * @param port
+ *    pointer to port identifier of the device.
+ * @param mapping_items
+ *    the base address of the array to store returned items.
+ * @param size
+ *    the size of the input array.
+ * @param count
+ *    the place to store the number of returned items.
+ * @param valid_only
+ *    -(0) return full mapping table.
+ *    -(!0) only return mapping items which packet_type != RTE_PTYPE_UNKNOWN.
+ */
+int rte_pmd_i40e_get_ptype_mapping(
+			uint8_t port,
+			struct rte_pmd_i40e_ptype_mapping *mapping_items,
+			uint16_t size,
+			uint16_t *count,
+			uint8_t valid_only);
+
+/**
+ * Replace a specific or a group of software defined ptypes
+ * with a new one
+ *
+ * @param port
+ *    pointer to port identifier of the device
+ * @param target
+ *    the packet type to be replaced
+ * @param mask
+ *    -(0) target represent a specific software defined ptype.
+ *    -(!0) target is a mask to represent a group of software defined ptypes.
+ * @param pkt_type
+ *    the new packet type to overwrite
+ */
+int rte_pmd_i40e_replace_pkt_type(uint8_t port,
+				  uint32_t target,
+				  uint8_t mask,
+				  uint32_t pkt_type);
 
 #endif /* _PMD_I40E_H_ */
