@@ -123,11 +123,13 @@ struct priv {
 	unsigned int hw_fcs_strip:1; /* FCS stripping is supported. */
 	unsigned int hw_padding:1; /* End alignment padding is supported. */
 	unsigned int sriov:1; /* This is a VF or PF with VF devices. */
-	unsigned int mps:1; /* Whether multi-packet send is supported. */
+	unsigned int mps:2; /* Multi-packet send mode (0: disabled). */
+	unsigned int mpw_hdr_dseg:1; /* Enable DSEGs in the title WQEBB */
 	unsigned int cqe_comp:1; /* Whether CQE compression is enabled. */
 	unsigned int pending_alarm:1; /* An alarm is pending. */
 	unsigned int txq_inline; /* Maximum packet size for inlining. */
 	unsigned int txqs_inline; /* Queue number threshold for inlining. */
+	unsigned int txq_max_inline_len; /* Max packet length for inlining */
 	/* RX/TX queues. */
 	unsigned int rxqs_n; /* RX queues array size. */
 	unsigned int txqs_n; /* TX queues array size. */

@@ -84,6 +84,12 @@
 /* Device parameter to enable multi-packet send WQEs. */
 #define MLX5_TXQ_MPW_EN "txq_mpw_en"
 
+/* Device parameter to configure the number of dsegs before inlined packet. */
+#define MLX5_TXQ_MPW_HDR_DSEG_EN "txq_mpw_hdr_dseg_en"
+
+/* Device parameter to limit the size of inlining packet */
+#define MLX5_TXQ_MAX_INLINE_LEN "txq_max_inline_len"
+
 /**
  * Retrieve integer value from environment variable.
  *
@@ -289,7 +295,11 @@ mlx5_args_check(const char *key, const char *val, void *opaque)
 	} else if (strcmp(MLX5_TXQS_MIN_INLINE, key) == 0) {
 		priv->txqs_inline = tmp;
 	} else if (strcmp(MLX5_TXQ_MPW_EN, key) == 0) {
-		priv->mps &= !!tmp; /* Enable MPW only if HW supports */
+		priv->mps = !!tmp ? priv->mps : MLX5_MPW_DISABLED;
+	} else if (strcmp(MLX5_TXQ_MPW_HDR_DSEG_EN, key) == 0) {
+		priv->mpw_hdr_dseg = !!tmp;
+	} else if (strcmp(MLX5_TXQ_MAX_INLINE_LEN, key) == 0) {
+		priv->txq_max_inline_len = tmp;
 	} else {
 		WARN("%s: unknown parameter", key);
 		return -EINVAL;
@@ -316,6 +326,8 @@ mlx5_args(struct priv *priv, struct rte_devargs *devargs)
 		MLX5_TXQ_INLINE,
 		MLX5_TXQS_MIN_INLINE,
 		MLX5_TXQ_MPW_EN,
+		MLX5_TXQ_MPW_HDR_DSEG_EN,
+		MLX5_TXQ_MAX_INLINE_LEN,
 		NULL,
 	};
 	struct rte_kvargs *kvlist;
@@ -424,20 +436,23 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 		 */
 		switch (pci_dev->id.device_id) {
 		case PCI_DEVICE_ID_MELLANOX_CONNECTX4LX:
+			mps = MLX5_MPW;
+			break;
 		case PCI_DEVICE_ID_MELLANOX_CONNECTX5:
 		case PCI_DEVICE_ID_MELLANOX_CONNECTX5VF:
 		case PCI_DEVICE_ID_MELLANOX_CONNECTX5EX:
 		case PCI_DEVICE_ID_MELLANOX_CONNECTX5EXVF:
-			mps = 1;
+			mps = MLX5_MPW_ENHANCED;
 			break;
 		default:
-			mps = 0;
+			mps = MLX5_MPW_DISABLED;
 		}
 		INFO("PCI information matches, using device \"%s\""
-		     " (SR-IOV: %s, MPS: %s)",
+		     " (SR-IOV: %s, %sMPS: %s)",
 		     list[i]->name,
 		     sriov ? "true" : "false",
-		     mps ? "true" : "false");
+		     mps == MLX5_MPW_ENHANCED ? "Enhanced " : "",
+		     mps != MLX5_MPW_DISABLED ? "true" : "false");
 		attr_ctx = ibv_open_device(list[i]);
 		err = errno;
 		break;
@@ -531,6 +546,12 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 		priv->pd = pd;
 		priv->mtu = ETHER_MTU;
 		priv->mps = mps; /* Enable MPW by default if supported. */
+		/* Set default values for Enhanced MPW, a.k.a MPWv2 */
+		if (mps == MLX5_MPW_ENHANCED) {
+			priv->mpw_hdr_dseg = 0;
+			priv->txqs_inline = MLX5_EMPW_MIN_TXQS;
+			priv->txq_max_inline_len = MLX5_EMPW_MAX_INLINE_LEN;
+		}
 		priv->cqe_comp = 1; /* Enable compression by default. */
 		err = mlx5_args(priv, pci_dev->device.devargs);
 		if (err) {
@@ -586,6 +607,9 @@ mlx5_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 			err = ENOTSUP;
 			goto port_error;
 		}
+		INFO("%sMPS is %s",
+		     priv->mps == MLX5_MPW_ENHANCED ? "Enhanced " : "",
+		     priv->mps != MLX5_MPW_DISABLED ? "enabled" : "disabled");
 		/* Allocate and register default RSS hash keys. */
 		priv->rss_conf = rte_calloc(__func__, hash_rxq_init_n,
 					    sizeof((*priv->rss_conf)[0]), 0);
