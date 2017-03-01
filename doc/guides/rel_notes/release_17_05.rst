@@ -41,6 +41,14 @@ New Features
      Also, make sure to start the actual text at the margin.
      =========================================================
 
+* **Updated the ixgbe base driver.**
+
+  Updated the ixgbe base driver, including the following changes:
+
+  * Add link block check for KR.
+  * Complete HW initialization even if SFP is not present.
+  * Add VF xcast promiscuous mode.
+
 
 Resolved Issues
 ---------------
