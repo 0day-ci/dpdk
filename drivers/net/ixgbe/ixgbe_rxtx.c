@@ -2950,6 +2950,61 @@ ixgbe_dev_rx_descriptor_done(void *rx_queue, uint16_t offset)
 			rte_cpu_to_le_32(IXGBE_RXDADV_STAT_DD));
 }
 
+int
+ixgbe_dev_rx_descriptor_status(struct rte_eth_dev *dev, uint16_t rx_queue_id,
+	uint16_t offset)
+{
+	volatile uint32_t *status;
+	struct ixgbe_rx_queue *rxq;
+	uint32_t nb_hold, desc;
+
+	rxq = dev->data->rx_queues[rx_queue_id];
+	if (unlikely(offset >= rxq->nb_rx_desc))
+		return -EINVAL;
+
+#ifdef RTE_IXGBE_INC_VECTOR
+	if (rxq->rx_using_sse)
+		nb_hold = rxq->rxrearm_nb;
+	else
+#endif
+		nb_hold = rxq->nb_rx_hold;
+	if (offset >= rxq->nb_rx_desc - nb_hold)
+		return RTE_ETH_RX_DESC_USED;
+
+	desc = rxq->rx_tail + offset;
+	if (desc >= rxq->nb_rx_desc)
+		desc -= rxq->nb_rx_desc;
+
+	status = &rxq->rx_ring[desc].wb.upper.status_error;
+	if (*status & rte_cpu_to_le_32(IXGBE_RXDADV_STAT_DD))
+		return RTE_ETH_RX_DESC_DONE;
+
+	return RTE_ETH_RX_DESC_AVAIL;
+}
+
+int
+ixgbe_dev_tx_descriptor_status(struct rte_eth_dev *dev, uint16_t tx_queue_id,
+	uint16_t offset)
+{
+	volatile uint32_t *status;
+	struct ixgbe_tx_queue *txq;
+	uint32_t desc;
+
+	txq = dev->data->tx_queues[tx_queue_id];
+	if (unlikely(offset >= txq->nb_tx_desc))
+		return -EINVAL;
+
+	desc = txq->tx_tail + offset;
+	/* go to next desc that has the RS bit */
+	desc = ((desc + txq->tx_rs_thresh - 1) / txq->tx_rs_thresh) *
+		txq->tx_rs_thresh;
+	status = &txq->tx_ring[desc].wb.status;
+	if (*status & rte_cpu_to_le_32(IXGBE_ADVTXD_STAT_DD))
+		return RTE_ETH_TX_DESC_DONE;
+
+	return RTE_ETH_TX_DESC_FULL;
+}
+
 void __attribute__((cold))
 ixgbe_dev_clear_queues(struct rte_eth_dev *dev)
 {
