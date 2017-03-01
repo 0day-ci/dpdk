@@ -323,6 +323,8 @@ uint16_t mlx5_tx_burst_mpw_inline(void *, struct rte_mbuf **, uint16_t);
 uint16_t mlx5_rx_burst(void *, struct rte_mbuf **, uint16_t);
 uint16_t removed_tx_burst(void *, struct rte_mbuf **, uint16_t);
 uint16_t removed_rx_burst(void *, struct rte_mbuf **, uint16_t);
+int mlx5_rx_descriptor_status(struct rte_eth_dev *, uint16_t, uint16_t);
+int mlx5_tx_descriptor_status(struct rte_eth_dev *, uint16_t, uint16_t);
 
 /* mlx5_mr.c */
 
