@@ -1179,6 +1179,14 @@ typedef uint32_t (*eth_rx_queue_count_t)(struct rte_eth_dev *dev,
 typedef int (*eth_rx_descriptor_done_t)(void *rxq, uint16_t offset);
 /**< @internal Check DD bit of specific RX descriptor */
 
+typedef int (*eth_rx_descriptor_status_t)(struct rte_eth_dev *dev,
+	uint16_t rx_queue_id, uint16_t offset);
+/**< @internal Check the status of a Rx descriptor */
+
+typedef int (*eth_tx_descriptor_status_t)(struct rte_eth_dev *dev,
+	uint16_t tx_queue_id, uint16_t offset);
+/**< @internal Check the status of a Tx descriptor */
+
 typedef int (*eth_fw_version_get_t)(struct rte_eth_dev *dev,
 				     char *fw_version, size_t fw_size);
 /**< @internal Get firmware information of an Ethernet device. */
@@ -1483,6 +1491,10 @@ struct eth_dev_ops {
 	eth_queue_release_t        rx_queue_release; /**< Release RX queue. */
 	eth_rx_queue_count_t       rx_queue_count;/**< Get Rx queue count. */
 	eth_rx_descriptor_done_t   rx_descriptor_done; /**< Check rxd DD bit. */
+	eth_rx_descriptor_status_t rx_descriptor_status;
+	/**< Check the status of a Rx descriptor. */
+	eth_tx_descriptor_status_t tx_descriptor_status;
+	/**< Check the status of a Tx descriptor. */
 	eth_rx_enable_intr_t       rx_queue_intr_enable;  /**< Enable Rx queue interrupt. */
 	eth_rx_disable_intr_t      rx_queue_intr_disable; /**< Disable Rx queue interrupt. */
 	eth_tx_queue_setup_t       tx_queue_setup;/**< Set up device TX queue. */
@@ -2766,6 +2778,80 @@ rte_eth_rx_descriptor_done(uint8_t port_id, uint16_t queue_id, uint16_t offset)
 	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->rx_descriptor_done, -ENOTSUP);
 	return (*dev->dev_ops->rx_descriptor_done)( \
 		dev->data->rx_queues[queue_id], offset);
+}
+
+#define RTE_ETH_RX_DESC_AVAIL 0 /**< Desc available for hw. */
+#define RTE_ETH_RX_DESC_DONE  1 /**< Desc done, filled by hw. */
+#define RTE_ETH_RX_DESC_USED  2 /**< Desc used by driver. */
+
+/**
+ * Check the status of a Rx descriptor in the queue
+ *
+ * @param port_id
+ *  The port identifier of the Ethernet device.
+ * @param queue_id
+ *  The Rx queue identifier on this port.
+ * @param offset
+ *  The offset of the descriptor starting from tail (0 is the next
+ *  packet to be received by the driver).
+ *
+ * @return
+ *  - (RTE_ETH_DESC_AVAIL): Descriptor is available for the hardware to
+ *    receive a packet.
+ *  - (RTE_ETH_DESC_DONE): Descriptor is done, it is filled by hw, but
+ *    not yet processed by the driver (i.e. in the receive queue).
+ *  - (RTE_ETH_DESC_USED): Descriptor is unavailable (hold by driver,
+ *    not yet returned to hw).
+ *  - (-ENODEV) if *port_id* invalid.
+ *  - (-EINVAL) bad descriptor offset.
+ *  - (-ENOTSUP) if the device does not support this function.
+ */
+static inline int
+rte_eth_rx_descriptor_status(uint8_t port_id, uint16_t queue_id,
+	uint16_t offset)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+	dev = &rte_eth_devices[port_id];
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->rx_descriptor_status, -ENOTSUP);
+
+	return (*dev->dev_ops->rx_descriptor_status)(dev, queue_id, offset);
+}
+
+#define RTE_ETH_TX_DESC_FULL 0 /**< Desc filled by pmd for hw, waiting xmit. */
+#define RTE_ETH_TX_DESC_DONE 1 /**< Desc done, packet is transmitted. */
+
+/**
+ * Check the status of a Tx descriptor in the queue.
+ *
+ * @param port_id
+ *  The port identifier of the Ethernet device.
+ * @param queue_id
+ *  The Tx queue identifier on this port.
+ * @param offset
+ *  The offset of the descriptor starting from tail (0 is the place where
+ *  the next packet will be send).
+ *
+ * @return
+ *  - (RTE_ETH_DESC_FULL) Descriptor is being processed by the hw, i.e.
+ *    in the transmit queue.
+ *  - (RTE_ETH_DESC_DONE) Hardware is done with this descriptor, it can be
+ *    reused by the driver.
+ *  - (-ENODEV) if *port_id* invalid.
+ *  - (-EINVAL) bad descriptor offset.
+ *  - (-ENOTSUP) if the device does not support this function.
+ */
+static inline int rte_eth_tx_descriptor_status(uint8_t port_id,
+	uint16_t queue_id, uint16_t offset)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+	dev = &rte_eth_devices[port_id];
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->tx_descriptor_status, -ENOTSUP);
+
+	return (*dev->dev_ops->tx_descriptor_status)(dev, queue_id, offset);
 }
 
 /**
