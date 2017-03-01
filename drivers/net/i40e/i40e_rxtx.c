@@ -100,6 +100,12 @@
 #define I40E_TX_OFFLOAD_NOTSUP_MASK \
 		(PKT_TX_OFFLOAD_MASK ^ I40E_TX_OFFLOAD_MASK)
 
+#ifdef RTE_PMD_PACKET_PREFETCH
+#define rte_packet_prefetch(p)	rte_prefetch0(p)
+#else
+#define rte_packet_prefetch(p)	do {} while (0)
+#endif
+
 static uint16_t i40e_xmit_pkts_simple(void *tx_queue,
 				      struct rte_mbuf **tx_pkts,
 				      uint16_t nb_pkts);
@@ -495,6 +501,9 @@ i40e_rx_scan_hw_ring(struct i40e_rx_queue *rxq)
 		/* Translate descriptor info to mbuf parameters */
 		for (j = 0; j < nb_dd; j++) {
 			mb = rxep[j].mbuf;
+			rte_packet_prefetch(
+				RTE_PTR_ADD(mb->buf_addr,
+						RTE_PKTMBUF_HEADROOM));
 			qword1 = rte_le_to_cpu_64(\
 				rxdp[j].wb.qword1.status_error_len);
 			pkt_len = ((qword1 & I40E_RXD_QW1_LENGTH_PBUF_MASK) >>
@@ -578,9 +587,11 @@ i40e_rx_alloc_bufs(struct i40e_rx_queue *rxq)
 
 	rxdp = &rxq->rx_ring[alloc_idx];
 	for (i = 0; i < rxq->rx_free_thresh; i++) {
-		if (likely(i < (rxq->rx_free_thresh - 1)))
+		if (likely(i < (rxq->rx_free_thresh - 1))) {
 			/* Prefetch next mbuf */
-			rte_prefetch0(rxep[i + 1].mbuf);
+			rte_packet_prefetch(rxep[i + 1].mbuf->cacheline0);
+			rte_packet_prefetch(rxep[i + 1].mbuf->cacheline1);
+		}
 
 		mb = rxep[i].mbuf;
 		rte_mbuf_refcnt_set(mb, 1);
@@ -752,7 +763,8 @@ i40e_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 				I40E_RXD_QW1_LENGTH_PBUF_SHIFT) - rxq->crc_len;
 
 		rxm->data_off = RTE_PKTMBUF_HEADROOM;
-		rte_prefetch0(RTE_PTR_ADD(rxm->buf_addr, RTE_PKTMBUF_HEADROOM));
+		rte_packet_prefetch(RTE_PTR_ADD(rxm->buf_addr,
+						RTE_PKTMBUF_HEADROOM));
 		rxm->nb_segs = 1;
 		rxm->next = NULL;
 		rxm->pkt_len = rx_packet_len;
@@ -939,7 +951,7 @@ i40e_recv_scattered_pkts(void *rx_queue,
 		first_seg->ol_flags |= pkt_flags;
 
 		/* Prefetch data of first segment, if configured to do so. */
-		rte_prefetch0(RTE_PTR_ADD(first_seg->buf_addr,
+		rte_packet_prefetch(RTE_PTR_ADD(first_seg->buf_addr,
 			first_seg->data_off));
 		rx_pkts[nb_rx++] = first_seg;
 		first_seg = NULL;
