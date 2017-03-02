@@ -212,6 +212,8 @@ sfc_flow_parse_eth(const struct rte_flow_item *item,
 		.src.addr_bytes = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
 		.type = 0xffff,
 	};
+	const uint8_t ig_mask[EFX_MAC_ADDR_LEN] =
+		{ 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 	rc = sfc_flow_parse_init(item,
 				 (const void **)&spec,
@@ -227,10 +229,22 @@ sfc_flow_parse_eth(const struct rte_flow_item *item,
 	if (spec == NULL)
 		return 0;
 
+	/*
+	 * In addition to full and empty masks of destination address,
+	 * individual/group mask is also supported
+	 */
 	if (is_same_ether_addr(&mask->dst, &supp_mask.dst)) {
 		efx_spec->efs_match_flags |= EFX_FILTER_MATCH_LOC_MAC;
 		rte_memcpy(efx_spec->efs_loc_mac, spec->dst.addr_bytes,
 			   EFX_MAC_ADDR_LEN);
+	} else if (memcmp(mask->dst.addr_bytes, ig_mask,
+			  EFX_MAC_ADDR_LEN) == 0) {
+		if (is_unicast_ether_addr(&spec->dst))
+			efx_spec->efs_match_flags |=
+				EFX_FILTER_MATCH_UNKNOWN_UCAST_DST;
+		else
+			efx_spec->efs_match_flags |=
+				EFX_FILTER_MATCH_UNKNOWN_MCAST_DST;
 	} else if (!is_zero_ether_addr(&mask->dst)) {
 		goto fail_bad_mask;
 	}
