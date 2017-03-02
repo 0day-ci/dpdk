@@ -4421,6 +4421,26 @@ int rte_eth_dev_pci_probe(struct rte_pci_driver *pci_drv,
  */
 int rte_eth_dev_pci_remove(struct rte_pci_device *pci_dev);
 
+/**
+ * Check that numbers of Rx and Tx descriptors satisfy descriptors limits from
+ * the ethernet device information, otherwise adjust them to boundaries.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param nb_rx_desc
+ *   A pointer to a uint16_t where the number of receive
+ *   descriptors stored.
+ * @param nb_tx_desc
+ *   A pointer to a uint16_t where the number of transmit
+ *   descriptors stored.
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP, -ENODEV or -EINVAL) on failure.
+ */
+int rte_eth_dev_adjust_nb_rx_tx_desc(uint8_t port_id,
+				     uint16_t *nb_rx_desc,
+				     uint16_t *nb_tx_desc);
+
 #ifdef __cplusplus
 }
 #endif
