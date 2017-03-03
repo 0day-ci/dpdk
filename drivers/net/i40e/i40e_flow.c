@@ -114,6 +114,12 @@ static int i40e_flow_parse_vxlan_filter(struct rte_eth_dev *dev,
 					const struct rte_flow_action actions[],
 					struct rte_flow_error *error,
 					union i40e_filter_t *filter);
+static int i40e_flow_parse_nvgre_filter(struct rte_eth_dev *dev,
+					const struct rte_flow_attr *attr,
+					const struct rte_flow_item pattern[],
+					const struct rte_flow_action actions[],
+					struct rte_flow_error *error,
+					union i40e_filter_t *filter);
 static int i40e_flow_destroy_ethertype_filter(struct i40e_pf *pf,
 				      struct i40e_ethertype_filter *filter);
 static int i40e_flow_destroy_tunnel_filter(struct i40e_pf *pf,
@@ -278,6 +284,40 @@ static enum rte_flow_item_type pattern_vxlan_4[] = {
 	RTE_FLOW_ITEM_TYPE_END,
 };
 
+static enum rte_flow_item_type pattern_nvgre_1[] = {
+	RTE_FLOW_ITEM_TYPE_ETH,
+	RTE_FLOW_ITEM_TYPE_IPV4,
+	RTE_FLOW_ITEM_TYPE_NVGRE,
+	RTE_FLOW_ITEM_TYPE_ETH,
+	RTE_FLOW_ITEM_TYPE_END,
+};
+
+static enum rte_flow_item_type pattern_nvgre_2[] = {
+	RTE_FLOW_ITEM_TYPE_ETH,
+	RTE_FLOW_ITEM_TYPE_IPV6,
+	RTE_FLOW_ITEM_TYPE_NVGRE,
+	RTE_FLOW_ITEM_TYPE_ETH,
+	RTE_FLOW_ITEM_TYPE_END,
+};
+
+static enum rte_flow_item_type pattern_nvgre_3[] = {
+	RTE_FLOW_ITEM_TYPE_ETH,
+	RTE_FLOW_ITEM_TYPE_IPV4,
+	RTE_FLOW_ITEM_TYPE_NVGRE,
+	RTE_FLOW_ITEM_TYPE_ETH,
+	RTE_FLOW_ITEM_TYPE_VLAN,
+	RTE_FLOW_ITEM_TYPE_END,
+};
+
+static enum rte_flow_item_type pattern_nvgre_4[] = {
+	RTE_FLOW_ITEM_TYPE_ETH,
+	RTE_FLOW_ITEM_TYPE_IPV6,
+	RTE_FLOW_ITEM_TYPE_NVGRE,
+	RTE_FLOW_ITEM_TYPE_ETH,
+	RTE_FLOW_ITEM_TYPE_VLAN,
+	RTE_FLOW_ITEM_TYPE_END,
+};
+
 static struct i40e_valid_pattern i40e_supported_patterns[] = {
 	/* Ethertype */
 	{ pattern_ethertype, i40e_flow_parse_ethertype_filter },
@@ -303,6 +343,10 @@ static struct i40e_valid_pattern i40e_supported_patterns[] = {
 	{ pattern_vxlan_2, i40e_flow_parse_vxlan_filter },
 	{ pattern_vxlan_3, i40e_flow_parse_vxlan_filter },
 	{ pattern_vxlan_4, i40e_flow_parse_vxlan_filter },
+	{ pattern_nvgre_1, i40e_flow_parse_nvgre_filter },
+	{ pattern_nvgre_2, i40e_flow_parse_nvgre_filter },
+	{ pattern_nvgre_3, i40e_flow_parse_nvgre_filter },
+	{ pattern_nvgre_4, i40e_flow_parse_nvgre_filter },
 };
 
 #define NEXT_ITEM_OF_ACTION(act, actions, index)                        \
@@ -1478,6 +1522,297 @@ i40e_flow_parse_vxlan_filter(struct rte_eth_dev *dev,
 	int ret;
 
 	ret = i40e_flow_parse_vxlan_pattern(dev, pattern,
+					    error, tunnel_filter);
+	if (ret)
+		return ret;
+
+	ret = i40e_flow_parse_tunnel_action(dev, actions, error, tunnel_filter);
+	if (ret)
+		return ret;
+
+	ret = i40e_flow_parse_attr(attr, error);
+	if (ret)
+		return ret;
+
+	cons_filter_type = RTE_ETH_FILTER_TUNNEL;
+
+	return ret;
+}
+
+/* 1. Last in item should be NULL as range is not supported.
+ * 2. Supported filter types: IMAC_IVLAN_TENID, IMAC_IVLAN,
+ *    IMAC_TENID, OMAC_TENID_IMAC and IMAC.
+ * 3. Mask of fields which need to be matched should be
+ *    filled with 1.
+ * 4. Mask of fields which needn't to be matched should be
+ *    filled with 0.
+ */
+static int
+i40e_flow_parse_nvgre_pattern(__rte_unused struct rte_eth_dev *dev,
+			      const struct rte_flow_item *pattern,
+			      struct rte_flow_error *error,
+			      struct rte_eth_tunnel_filter_conf *filter)
+{
+	const struct rte_flow_item *item = pattern;
+	const struct rte_flow_item_eth *eth_spec;
+	const struct rte_flow_item_eth *eth_mask;
+	const struct rte_flow_item_eth *o_eth_spec = NULL;
+	const struct rte_flow_item_eth *o_eth_mask = NULL;
+	const struct rte_flow_item_nvgre *nvgre_spec = NULL;
+	const struct rte_flow_item_nvgre *nvgre_mask = NULL;
+	const struct rte_flow_item_eth *i_eth_spec = NULL;
+	const struct rte_flow_item_eth *i_eth_mask = NULL;
+	const struct rte_flow_item_vlan *vlan_spec = NULL;
+	const struct rte_flow_item_vlan *vlan_mask = NULL;
+	bool is_tni_masked = 0;
+	enum rte_flow_item_type item_type;
+	bool nvgre_flag = 0;
+	uint32_t tenant_id_be = 0;
+
+	for (; item->type != RTE_FLOW_ITEM_TYPE_END; item++) {
+		if (item->last) {
+			rte_flow_error_set(error, EINVAL,
+					   RTE_FLOW_ERROR_TYPE_ITEM,
+					   item,
+					   "Not support range");
+			return -rte_errno;
+		}
+		item_type = item->type;
+		switch (item_type) {
+		case RTE_FLOW_ITEM_TYPE_ETH:
+			eth_spec = (const struct rte_flow_item_eth *)item->spec;
+			eth_mask = (const struct rte_flow_item_eth *)item->mask;
+			if ((!eth_spec && eth_mask) ||
+			    (eth_spec && !eth_mask)) {
+				rte_flow_error_set(error, EINVAL,
+						   RTE_FLOW_ERROR_TYPE_ITEM,
+						   item,
+						   "Invalid ether spec/mask");
+				return -rte_errno;
+			}
+
+			if (eth_spec && eth_mask) {
+				/* DST address of inner MAC shouldn't be masked.
+				 * SRC address of Inner MAC should be masked.
+				 */
+				if (!is_broadcast_ether_addr(&eth_mask->dst) ||
+				    !is_zero_ether_addr(&eth_mask->src) ||
+				    eth_mask->type) {
+					rte_flow_error_set(error, EINVAL,
+						   RTE_FLOW_ERROR_TYPE_ITEM,
+						   item,
+						   "Invalid ether spec/mask");
+					return -rte_errno;
+				}
+
+				if (!nvgre_flag)
+					rte_memcpy(&filter->outer_mac,
+						   &eth_spec->dst,
+						   ETHER_ADDR_LEN);
+				else
+					rte_memcpy(&filter->inner_mac,
+						   &eth_spec->dst,
+						   ETHER_ADDR_LEN);
+			}
+
+			if (!nvgre_flag) {
+				o_eth_spec = eth_spec;
+				o_eth_mask = eth_mask;
+			} else {
+				i_eth_spec = eth_spec;
+				i_eth_mask = eth_mask;
+			}
+
+			break;
+		case RTE_FLOW_ITEM_TYPE_VLAN:
+			vlan_spec =
+				(const struct rte_flow_item_vlan *)item->spec;
+			vlan_mask =
+				(const struct rte_flow_item_vlan *)item->mask;
+			if (nvgre_flag) {
+				vlan_spec =
+				(const struct rte_flow_item_vlan *)item->spec;
+				vlan_mask =
+				(const struct rte_flow_item_vlan *)item->mask;
+				if (!(vlan_spec && vlan_mask)) {
+					rte_flow_error_set(error, EINVAL,
+						   RTE_FLOW_ERROR_TYPE_ITEM,
+						   item,
+						   "Invalid vlan item");
+					return -rte_errno;
+				}
+			} else {
+				if (vlan_spec || vlan_mask)
+					rte_flow_error_set(error, EINVAL,
+						   RTE_FLOW_ERROR_TYPE_ITEM,
+						   item,
+						   "Invalid vlan item");
+				return -rte_errno;
+			}
+			break;
+		case RTE_FLOW_ITEM_TYPE_IPV4:
+			filter->ip_type = RTE_TUNNEL_IPTYPE_IPV4;
+			/* IPv4 is used to describe protocol,
+			 * spec amd mask should be NULL.
+			 */
+			if (item->spec || item->mask) {
+				rte_flow_error_set(error, EINVAL,
+						   RTE_FLOW_ERROR_TYPE_ITEM,
+						   item,
+						   "Invalid IPv4 item");
+				return -rte_errno;
+			}
+			break;
+		case RTE_FLOW_ITEM_TYPE_IPV6:
+			filter->ip_type = RTE_TUNNEL_IPTYPE_IPV6;
+			/* IPv6 is used to describe protocol,
+			 * spec amd mask should be NULL.
+			 */
+			if (item->spec || item->mask) {
+				rte_flow_error_set(error, EINVAL,
+						   RTE_FLOW_ERROR_TYPE_ITEM,
+						   item,
+						   "Invalid IPv6 item");
+				return -rte_errno;
+			}
+			break;
+		case RTE_FLOW_ITEM_TYPE_NVGRE:
+			nvgre_spec =
+				(const struct rte_flow_item_nvgre *)item->spec;
+			nvgre_mask =
+				(const struct rte_flow_item_nvgre *)item->mask;
+			/* Check if NVGRE item is used to describe protocol.
+			 * If yes, both spec and mask should be NULL.
+			 * If no, either spec or mask shouldn't be NULL.
+			 */
+			if ((!nvgre_spec && nvgre_mask) ||
+			    (nvgre_spec && !nvgre_mask)) {
+				rte_flow_error_set(error, EINVAL,
+					   RTE_FLOW_ERROR_TYPE_ITEM,
+					   item,
+					   "Invalid NVGRE item");
+				return -rte_errno;
+			}
+
+			/* Check if TNI is masked. */
+			if (nvgre_mask) {
+				is_tni_masked =
+				i40e_check_tenant_id_mask(nvgre_mask->tni);
+				if (is_tni_masked < 0) {
+					rte_flow_error_set(error, EINVAL,
+						   RTE_FLOW_ERROR_TYPE_ITEM,
+						   item,
+						   "Invalid TNI mask");
+					return -rte_errno;
+				}
+			}
+			nvgre_flag = 1;
+			break;
+		default:
+			break;
+		}
+	}
+
+	/* Check specification and mask to get the filter type */
+	if (vlan_spec && vlan_mask &&
+	    (vlan_mask->tci == rte_cpu_to_be_16(I40E_TCI_MASK))) {
+		/* If there's inner vlan */
+		filter->inner_vlan = rte_be_to_cpu_16(vlan_spec->tci)
+			& I40E_TCI_MASK;
+		if (nvgre_spec && nvgre_mask && !is_tni_masked) {
+			/* If there's nvgre */
+			rte_memcpy(((uint8_t *)&tenant_id_be + 1),
+				   nvgre_spec->tni, 3);
+			filter->tenant_id = rte_be_to_cpu_32(tenant_id_be);
+			if (!o_eth_spec && !o_eth_mask &&
+				i_eth_spec && i_eth_mask)
+				filter->filter_type =
+					RTE_TUNNEL_FILTER_IMAC_IVLAN_TENID;
+			else {
+				rte_flow_error_set(error, EINVAL,
+						   RTE_FLOW_ERROR_TYPE_ITEM,
+						   NULL,
+						   "Invalid filter type");
+				return -rte_errno;
+			}
+		} else if (!nvgre_spec && !nvgre_mask) {
+			/* If there's no nvgre */
+			if (!o_eth_spec && !o_eth_mask &&
+				i_eth_spec && i_eth_mask)
+				filter->filter_type =
+					RTE_TUNNEL_FILTER_IMAC_IVLAN;
+			else {
+				rte_flow_error_set(error, EINVAL,
+						   RTE_FLOW_ERROR_TYPE_ITEM,
+						   NULL,
+						   "Invalid filter type");
+				return -rte_errno;
+			}
+		} else {
+			rte_flow_error_set(error, EINVAL,
+					   RTE_FLOW_ERROR_TYPE_ITEM,
+					   NULL,
+					   "Invalid filter type");
+			return -rte_errno;
+		}
+	} else if ((!vlan_spec && !vlan_mask) ||
+		   (vlan_spec && vlan_mask && vlan_mask->tci == 0x0)) {
+		/* If there's no inner vlan */
+		if (nvgre_spec && nvgre_mask && !is_tni_masked) {
+			/* If there's nvgre */
+			rte_memcpy(((uint8_t *)&tenant_id_be + 1),
+				   nvgre_spec->tni, 3);
+			filter->tenant_id = rte_be_to_cpu_32(tenant_id_be);
+			if (!o_eth_spec && !o_eth_mask &&
+				i_eth_spec && i_eth_mask)
+				filter->filter_type =
+					RTE_TUNNEL_FILTER_IMAC_TENID;
+			else if (o_eth_spec && o_eth_mask &&
+				i_eth_spec && i_eth_mask)
+				filter->filter_type =
+					RTE_TUNNEL_FILTER_OMAC_TENID_IMAC;
+		} else if (!nvgre_spec && !nvgre_mask) {
+			/* If there's no nvgre */
+			if (!o_eth_spec && !o_eth_mask &&
+				i_eth_spec && i_eth_mask) {
+				filter->filter_type = ETH_TUNNEL_FILTER_IMAC;
+			} else {
+				rte_flow_error_set(error, EINVAL,
+					   RTE_FLOW_ERROR_TYPE_ITEM, NULL,
+					   "Invalid filter type");
+				return -rte_errno;
+			}
+		} else {
+			rte_flow_error_set(error, EINVAL,
+					   RTE_FLOW_ERROR_TYPE_ITEM, NULL,
+					   "Invalid filter type");
+			return -rte_errno;
+		}
+	} else {
+		rte_flow_error_set(error, EINVAL,
+				   RTE_FLOW_ERROR_TYPE_ITEM, NULL,
+				   "Not supported by tunnel filter.");
+		return -rte_errno;
+	}
+
+	filter->tunnel_type = RTE_TUNNEL_TYPE_NVGRE;
+
+	return 0;
+}
+
+static int
+i40e_flow_parse_nvgre_filter(struct rte_eth_dev *dev,
+			     const struct rte_flow_attr *attr,
+			     const struct rte_flow_item pattern[],
+			     const struct rte_flow_action actions[],
+			     struct rte_flow_error *error,
+			     union i40e_filter_t *filter)
+{
+	struct rte_eth_tunnel_filter_conf *tunnel_filter =
+		&filter->tunnel_filter;
+	int ret;
+
+	ret = i40e_flow_parse_nvgre_pattern(dev, pattern,
 					    error, tunnel_filter);
 	if (ret)
 		return ret;
