@@ -124,7 +124,8 @@
 
 #define IXGBEVF_PMD_NAME "rte_ixgbevf_pmd" /* PMD name */
 
-#define IXGBE_QUEUE_STAT_COUNTERS (sizeof(hw_stats->qprc) / sizeof(hw_stats->qprc[0]))
+#define IXGBE_QUEUE_STAT_COUNTERS (sizeof(hw_stats->qprc) \
+		/ sizeof(hw_stats->qprc[0]))
 
 #define IXGBE_HKEY_MAX_INDEX 10
 
@@ -187,12 +188,25 @@ static void ixgbe_dev_stats_get(struct rte_eth_dev *dev,
 				struct rte_eth_stats *stats);
 static int ixgbe_dev_xstats_get(struct rte_eth_dev *dev,
 				struct rte_eth_xstat *xstats, unsigned n);
+static int ixgbe_dev_xstats_get_by_group(struct rte_eth_dev *dev,
+		struct rte_eth_xstat *xstats,
+		unsigned int n, uint64_t group_mask);
 static int ixgbevf_dev_xstats_get(struct rte_eth_dev *dev,
 				  struct rte_eth_xstat *xstats, unsigned n);
 static void ixgbe_dev_stats_reset(struct rte_eth_dev *dev);
 static void ixgbe_dev_xstats_reset(struct rte_eth_dev *dev);
+static int ixgbe_xstats_get_by_name(struct rte_eth_dev *dev,
+		struct rte_eth_xstat_name *xstats_names,
+		struct rte_eth_xstat *xstat,
+		const char *name);
 static int ixgbe_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 	struct rte_eth_xstat_name *xstats_names, __rte_unused unsigned limit);
+static
+int ixgbe_dev_xstats_get_names_by_group(__rte_unused
+		struct rte_eth_dev *dev,
+		struct rte_eth_xstat_name *xstats_names,
+		unsigned int limit,
+		uint64_t group_mask);
 static int ixgbevf_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 	struct rte_eth_xstat_name *xstats_names, __rte_unused unsigned limit);
 static int ixgbe_dev_queue_stats_mapping_set(struct rte_eth_dev *eth_dev,
@@ -532,10 +546,13 @@ static const struct eth_dev_ops ixgbe_eth_dev_ops = {
 	.link_update          = ixgbe_dev_link_update,
 	.stats_get            = ixgbe_dev_stats_get,
 	.xstats_get           = ixgbe_dev_xstats_get,
+	.xstats_get_by_name   = ixgbe_xstats_get_by_name,
+	.xstats_get_by_group  = ixgbe_dev_xstats_get_by_group,
 	.stats_reset          = ixgbe_dev_stats_reset,
 	.xstats_reset         = ixgbe_dev_xstats_reset,
 	.xstats_get_names     = ixgbe_dev_xstats_get_names,
 	.queue_stats_mapping_set = ixgbe_dev_queue_stats_mapping_set,
+	.xstats_get_names_by_group = ixgbe_dev_xstats_get_names_by_group,
 	.fw_version_get       = ixgbe_fw_version_get,
 	.dev_infos_get        = ixgbe_dev_info_get,
 	.dev_supported_ptypes_get = ixgbe_dev_supported_ptypes_get,
@@ -653,87 +670,118 @@ static const struct eth_dev_ops ixgbevf_eth_dev_ops = {
 struct rte_ixgbe_xstats_name_off {
 	char name[RTE_ETH_XSTATS_NAME_SIZE];
 	unsigned offset;
+	uint64_t group_mask;
 };
 
 static const struct rte_ixgbe_xstats_name_off rte_ixgbe_stats_strings[] = {
-	{"rx_crc_errors", offsetof(struct ixgbe_hw_stats, crcerrs)},
-	{"rx_illegal_byte_errors", offsetof(struct ixgbe_hw_stats, illerrc)},
-	{"rx_error_bytes", offsetof(struct ixgbe_hw_stats, errbc)},
-	{"mac_local_errors", offsetof(struct ixgbe_hw_stats, mlfc)},
-	{"mac_remote_errors", offsetof(struct ixgbe_hw_stats, mrfc)},
-	{"rx_length_errors", offsetof(struct ixgbe_hw_stats, rlec)},
-	{"tx_xon_packets", offsetof(struct ixgbe_hw_stats, lxontxc)},
-	{"rx_xon_packets", offsetof(struct ixgbe_hw_stats, lxonrxc)},
-	{"tx_xoff_packets", offsetof(struct ixgbe_hw_stats, lxofftxc)},
-	{"rx_xoff_packets", offsetof(struct ixgbe_hw_stats, lxoffrxc)},
-	{"rx_size_64_packets", offsetof(struct ixgbe_hw_stats, prc64)},
-	{"rx_size_65_to_127_packets", offsetof(struct ixgbe_hw_stats, prc127)},
-	{"rx_size_128_to_255_packets", offsetof(struct ixgbe_hw_stats, prc255)},
-	{"rx_size_256_to_511_packets", offsetof(struct ixgbe_hw_stats, prc511)},
+	{"rx_crc_errors", offsetof(struct ixgbe_hw_stats, crcerrs),
+			RX_GROUP | ERR_GROUP},
+	{"rx_illegal_byte_errors",
+			offsetof(struct ixgbe_hw_stats, illerrc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_error_bytes", offsetof(struct ixgbe_hw_stats, errbc),
+			RX_GROUP | ERR_GROUP},
+	{"mac_local_errors", offsetof(struct ixgbe_hw_stats, mlfc), ERR_GROUP},
+	{"mac_remote_errors", offsetof(struct ixgbe_hw_stats, mrfc), ERR_GROUP},
+	{"rx_length_errors", offsetof(struct ixgbe_hw_stats, rlec),
+			RX_GROUP | ERR_GROUP},
+	{"tx_xon_packets", offsetof(struct ixgbe_hw_stats, lxontxc), TX_GROUP},
+	{"rx_xon_packets", offsetof(struct ixgbe_hw_stats, lxonrxc), RX_GROUP},
+	{"tx_xoff_packets", offsetof(struct ixgbe_hw_stats, lxofftxc),
+			TX_GROUP},
+	{"rx_xoff_packets", offsetof(struct ixgbe_hw_stats, lxoffrxc),
+			RX_GROUP},
+	{"rx_size_64_packets", offsetof(struct ixgbe_hw_stats, prc64),
+			RX_GROUP},
+	{"rx_size_65_to_127_packets",
+			offsetof(struct ixgbe_hw_stats, prc127), RX_GROUP},
+	{"rx_size_128_to_255_packets",
+			offsetof(struct ixgbe_hw_stats, prc255), RX_GROUP},
+	{"rx_size_256_to_511_packets",
+			offsetof(struct ixgbe_hw_stats, prc511), RX_GROUP},
 	{"rx_size_512_to_1023_packets", offsetof(struct ixgbe_hw_stats,
-		prc1023)},
+		prc1023), RX_GROUP},
 	{"rx_size_1024_to_max_packets", offsetof(struct ixgbe_hw_stats,
-		prc1522)},
-	{"rx_broadcast_packets", offsetof(struct ixgbe_hw_stats, bprc)},
-	{"rx_multicast_packets", offsetof(struct ixgbe_hw_stats, mprc)},
-	{"rx_fragment_errors", offsetof(struct ixgbe_hw_stats, rfc)},
-	{"rx_undersize_errors", offsetof(struct ixgbe_hw_stats, ruc)},
-	{"rx_oversize_errors", offsetof(struct ixgbe_hw_stats, roc)},
-	{"rx_jabber_errors", offsetof(struct ixgbe_hw_stats, rjc)},
-	{"rx_management_packets", offsetof(struct ixgbe_hw_stats, mngprc)},
-	{"rx_management_dropped", offsetof(struct ixgbe_hw_stats, mngpdc)},
-	{"tx_management_packets", offsetof(struct ixgbe_hw_stats, mngptc)},
-	{"rx_total_packets", offsetof(struct ixgbe_hw_stats, tpr)},
-	{"rx_total_bytes", offsetof(struct ixgbe_hw_stats, tor)},
-	{"tx_total_packets", offsetof(struct ixgbe_hw_stats, tpt)},
-	{"tx_size_64_packets", offsetof(struct ixgbe_hw_stats, ptc64)},
-	{"tx_size_65_to_127_packets", offsetof(struct ixgbe_hw_stats, ptc127)},
-	{"tx_size_128_to_255_packets", offsetof(struct ixgbe_hw_stats, ptc255)},
-	{"tx_size_256_to_511_packets", offsetof(struct ixgbe_hw_stats, ptc511)},
-	{"tx_size_512_to_1023_packets", offsetof(struct ixgbe_hw_stats,
-		ptc1023)},
+		prc1522), RX_GROUP},
+	{"rx_broadcast_packets", offsetof(struct ixgbe_hw_stats, bprc),
+			RX_GROUP},
+	{"rx_multicast_packets", offsetof(struct ixgbe_hw_stats, mprc),
+			RX_GROUP},
+	{"rx_fragment_errors", offsetof(struct ixgbe_hw_stats, rfc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_undersize_errors", offsetof(struct ixgbe_hw_stats, ruc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_oversize_errors", offsetof(struct ixgbe_hw_stats, roc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_jabber_errors", offsetof(struct ixgbe_hw_stats, rjc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_management_packets", offsetof(struct ixgbe_hw_stats, mngprc),
+			RX_GROUP},
+	{"rx_management_dropped", offsetof(struct ixgbe_hw_stats, mngpdc),
+			RX_GROUP},
+	{"tx_management_packets", offsetof(struct ixgbe_hw_stats, mngptc),
+			TX_GROUP},
+	{"rx_total_packets", offsetof(struct ixgbe_hw_stats, tpr), RX_GROUP},
+	{"rx_total_bytes", offsetof(struct ixgbe_hw_stats, tor), RX_GROUP},
+	{"tx_total_packets", offsetof(struct ixgbe_hw_stats, tpt), TX_GROUP},
+	{"tx_size_64_packets", offsetof(struct ixgbe_hw_stats, ptc64),
+			TX_GROUP},
+	{"tx_size_65_to_127_packets",
+			offsetof(struct ixgbe_hw_stats, ptc127), TX_GROUP},
+	{"tx_size_128_to_255_packets",
+			offsetof(struct ixgbe_hw_stats, ptc255), TX_GROUP},
+	{"tx_size_256_to_511_packets",
+			offsetof(struct ixgbe_hw_stats, ptc511), TX_GROUP},
+	{"tx_size_512_to_1023_packets",
+			offsetof(struct ixgbe_hw_stats,
+		ptc1023), TX_GROUP},
 	{"tx_size_1024_to_max_packets", offsetof(struct ixgbe_hw_stats,
-		ptc1522)},
-	{"tx_multicast_packets", offsetof(struct ixgbe_hw_stats, mptc)},
-	{"tx_broadcast_packets", offsetof(struct ixgbe_hw_stats, bptc)},
-	{"rx_mac_short_packet_dropped", offsetof(struct ixgbe_hw_stats, mspdc)},
-	{"rx_l3_l4_xsum_error", offsetof(struct ixgbe_hw_stats, xec)},
-
+		ptc1522), TX_GROUP},
+	{"tx_multicast_packets", offsetof(struct ixgbe_hw_stats, mptc),
+			TX_GROUP},
+	{"tx_broadcast_packets", offsetof(struct ixgbe_hw_stats, bptc),
+			TX_GROUP},
+	{"rx_mac_short_packet_dropped",
+			offsetof(struct ixgbe_hw_stats, mspdc), RX_GROUP},
+	{"rx_l3_l4_xsum_error", offsetof(struct ixgbe_hw_stats, xec),
+			RX_GROUP | ERR_GROUP},
 	{"flow_director_added_filters", offsetof(struct ixgbe_hw_stats,
-		fdirustat_add)},
+		fdirustat_add), 0},
 	{"flow_director_removed_filters", offsetof(struct ixgbe_hw_stats,
-		fdirustat_remove)},
+		fdirustat_remove), 0},
 	{"flow_director_filter_add_errors", offsetof(struct ixgbe_hw_stats,
-		fdirfstat_fadd)},
+		fdirfstat_fadd), ERR_GROUP},
 	{"flow_director_filter_remove_errors", offsetof(struct ixgbe_hw_stats,
-		fdirfstat_fremove)},
+		fdirfstat_fremove), ERR_GROUP},
 	{"flow_director_matched_filters", offsetof(struct ixgbe_hw_stats,
-		fdirmatch)},
+		fdirmatch), 0},
 	{"flow_director_missed_filters", offsetof(struct ixgbe_hw_stats,
-		fdirmiss)},
+		fdirmiss), 0},
 
-	{"rx_fcoe_crc_errors", offsetof(struct ixgbe_hw_stats, fccrc)},
-	{"rx_fcoe_dropped", offsetof(struct ixgbe_hw_stats, fcoerpdc)},
+	{"rx_fcoe_crc_errors", offsetof(struct ixgbe_hw_stats, fccrc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_fcoe_dropped", offsetof(struct ixgbe_hw_stats, fcoerpdc),
+			RX_GROUP},
 	{"rx_fcoe_mbuf_allocation_errors", offsetof(struct ixgbe_hw_stats,
-		fclast)},
-	{"rx_fcoe_packets", offsetof(struct ixgbe_hw_stats, fcoeprc)},
-	{"tx_fcoe_packets", offsetof(struct ixgbe_hw_stats, fcoeptc)},
-	{"rx_fcoe_bytes", offsetof(struct ixgbe_hw_stats, fcoedwrc)},
-	{"tx_fcoe_bytes", offsetof(struct ixgbe_hw_stats, fcoedwtc)},
+		fclast), RX_GROUP | ERR_GROUP},
+	{"rx_fcoe_packets", offsetof(struct ixgbe_hw_stats, fcoeprc), RX_GROUP},
+	{"tx_fcoe_packets", offsetof(struct ixgbe_hw_stats, fcoeptc), TX_GROUP},
+	{"rx_fcoe_bytes", offsetof(struct ixgbe_hw_stats, fcoedwrc), RX_GROUP},
+	{"tx_fcoe_bytes", offsetof(struct ixgbe_hw_stats, fcoedwtc), TX_GROUP},
 	{"rx_fcoe_no_direct_data_placement", offsetof(struct ixgbe_hw_stats,
-		fcoe_noddp)},
+		fcoe_noddp), RX_GROUP},
 	{"rx_fcoe_no_direct_data_placement_ext_buff",
-		offsetof(struct ixgbe_hw_stats, fcoe_noddp_ext_buff)},
-
+		offsetof(struct ixgbe_hw_stats, fcoe_noddp_ext_buff), RX_GROUP},
 	{"tx_flow_control_xon_packets", offsetof(struct ixgbe_hw_stats,
-		lxontxc)},
+		lxontxc), TX_GROUP},
 	{"rx_flow_control_xon_packets", offsetof(struct ixgbe_hw_stats,
-		lxonrxc)},
+		lxonrxc), RX_GROUP},
 	{"tx_flow_control_xoff_packets", offsetof(struct ixgbe_hw_stats,
-		lxofftxc)},
+		lxofftxc), TX_GROUP},
 	{"rx_flow_control_xoff_packets", offsetof(struct ixgbe_hw_stats,
-		lxoffrxc)},
-	{"rx_total_missed_packets", offsetof(struct ixgbe_hw_stats, mpctotal)},
+		lxoffrxc), RX_GROUP},
+	{"rx_total_missed_packets",
+			offsetof(struct ixgbe_hw_stats, mpctotal), RX_GROUP},
 };
 
 #define IXGBE_NB_HW_STATS (sizeof(rte_ixgbe_stats_strings) / \
@@ -742,43 +790,43 @@ static const struct rte_ixgbe_xstats_name_off rte_ixgbe_stats_strings[] = {
 /* MACsec statistics */
 static const struct rte_ixgbe_xstats_name_off rte_ixgbe_macsec_strings[] = {
 	{"out_pkts_untagged", offsetof(struct ixgbe_macsec_stats,
-		out_pkts_untagged)},
+		out_pkts_untagged), MAC_GROUP},
 	{"out_pkts_encrypted", offsetof(struct ixgbe_macsec_stats,
-		out_pkts_encrypted)},
+		out_pkts_encrypted), MAC_GROUP},
 	{"out_pkts_protected", offsetof(struct ixgbe_macsec_stats,
-		out_pkts_protected)},
+		out_pkts_protected), MAC_GROUP},
 	{"out_octets_encrypted", offsetof(struct ixgbe_macsec_stats,
-		out_octets_encrypted)},
+		out_octets_encrypted), MAC_GROUP},
 	{"out_octets_protected", offsetof(struct ixgbe_macsec_stats,
-		out_octets_protected)},
+		out_octets_protected), MAC_GROUP},
 	{"in_pkts_untagged", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_untagged)},
+		in_pkts_untagged), MAC_GROUP},
 	{"in_pkts_badtag", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_badtag)},
+		in_pkts_badtag), MAC_GROUP},
 	{"in_pkts_nosci", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_nosci)},
+		in_pkts_nosci), MAC_GROUP},
 	{"in_pkts_unknownsci", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_unknownsci)},
+		in_pkts_unknownsci), MAC_GROUP},
 	{"in_octets_decrypted", offsetof(struct ixgbe_macsec_stats,
-		in_octets_decrypted)},
+		in_octets_decrypted), MAC_GROUP},
 	{"in_octets_validated", offsetof(struct ixgbe_macsec_stats,
-		in_octets_validated)},
+		in_octets_validated), MAC_GROUP},
 	{"in_pkts_unchecked", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_unchecked)},
+		in_pkts_unchecked), MAC_GROUP},
 	{"in_pkts_delayed", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_delayed)},
+		in_pkts_delayed), MAC_GROUP},
 	{"in_pkts_late", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_late)},
+		in_pkts_late), MAC_GROUP},
 	{"in_pkts_ok", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_ok)},
+		in_pkts_ok), MAC_GROUP},
 	{"in_pkts_invalid", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_invalid)},
+		in_pkts_invalid), MAC_GROUP},
 	{"in_pkts_notvalid", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_notvalid)},
+		in_pkts_notvalid), MAC_GROUP},
 	{"in_pkts_unusedsa", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_unusedsa)},
+		in_pkts_unusedsa), MAC_GROUP},
 	{"in_pkts_notusingsa", offsetof(struct ixgbe_macsec_stats,
-		in_pkts_notusingsa)},
+		in_pkts_notusingsa), MAC_GROUP},
 };
 
 #define IXGBE_NB_MACSEC_STATS (sizeof(rte_ixgbe_macsec_strings) / \
@@ -786,10 +834,11 @@ static const struct rte_ixgbe_xstats_name_off rte_ixgbe_macsec_strings[] = {
 
 /* Per-queue statistics */
 static const struct rte_ixgbe_xstats_name_off rte_ixgbe_rxq_strings[] = {
-	{"mbuf_allocation_errors", offsetof(struct ixgbe_hw_stats, rnbc)},
-	{"dropped", offsetof(struct ixgbe_hw_stats, mpc)},
-	{"xon_packets", offsetof(struct ixgbe_hw_stats, pxonrxc)},
-	{"xoff_packets", offsetof(struct ixgbe_hw_stats, pxoffrxc)},
+	{"mbuf_allocation_errors", offsetof(struct ixgbe_hw_stats, rnbc),
+			ERR_GROUP | RXQ_GROUP},
+	{"dropped", offsetof(struct ixgbe_hw_stats, mpc), RXQ_GROUP},
+	{"xon_packets", offsetof(struct ixgbe_hw_stats, pxonrxc), RXQ_GROUP},
+	{"xoff_packets", offsetof(struct ixgbe_hw_stats, pxoffrxc), RXQ_GROUP},
 };
 
 #define IXGBE_NB_RXQ_PRIO_STATS (sizeof(rte_ixgbe_rxq_strings) / \
@@ -797,10 +846,10 @@ static const struct rte_ixgbe_xstats_name_off rte_ixgbe_rxq_strings[] = {
 #define IXGBE_NB_RXQ_PRIO_VALUES 8
 
 static const struct rte_ixgbe_xstats_name_off rte_ixgbe_txq_strings[] = {
-	{"xon_packets", offsetof(struct ixgbe_hw_stats, pxontxc)},
-	{"xoff_packets", offsetof(struct ixgbe_hw_stats, pxofftxc)},
+	{"xon_packets", offsetof(struct ixgbe_hw_stats, pxontxc), TXQ_GROUP},
+	{"xoff_packets", offsetof(struct ixgbe_hw_stats, pxofftxc), TXQ_GROUP},
 	{"xon_to_xoff_packets", offsetof(struct ixgbe_hw_stats,
-		pxon2offc)},
+		pxon2offc), TXQ_GROUP},
 };
 
 #define IXGBE_NB_TXQ_PRIO_STATS (sizeof(rte_ixgbe_txq_strings) / \
@@ -808,7 +857,8 @@ static const struct rte_ixgbe_xstats_name_off rte_ixgbe_txq_strings[] = {
 #define IXGBE_NB_TXQ_PRIO_VALUES 8
 
 static const struct rte_ixgbe_xstats_name_off rte_ixgbevf_stats_strings[] = {
-	{"rx_multicast_packets", offsetof(struct ixgbevf_hw_stats, vfmprc)},
+	{"rx_multicast_packets",
+			offsetof(struct ixgbevf_hw_stats, vfmprc), RX_GROUP},
 };
 
 #define IXGBEVF_NB_XSTATS (sizeof(rte_ixgbevf_stats_strings) /	\
@@ -2414,8 +2464,9 @@ ixgbe_dev_start(struct rte_eth_dev *dev)
 	*    - fixed speed: TODO implement
 	*/
 	if (dev->data->dev_conf.link_speeds & ETH_LINK_SPEED_FIXED) {
-		PMD_INIT_LOG(ERR, "Invalid link_speeds for port %hhu; fix speed not supported",
-			     dev->data->port_id);
+		PMD_INIT_LOG(ERR,
+				"Invalid link_speeds for port %hhu; fix speed not supported",
+				dev->data->port_id);
 		return -EINVAL;
 	}
 
@@ -3038,6 +3089,104 @@ ixgbe_xstats_calc_num(void) {
 		(IXGBE_NB_TXQ_PRIO_STATS * IXGBE_NB_TXQ_PRIO_VALUES);
 }
 
+static unsigned
+ixgbe_xstats_calc_num_by_group(uint64_t group_mask) {
+	unsigned int i;
+	unsigned int count = 0;
+
+	for (i = 0; i < IXGBE_NB_HW_STATS; i++) {
+		if (rte_ixgbe_stats_strings[i].group_mask & group_mask)
+			count++;
+	}
+	for (i = 0; i < IXGBE_NB_MACSEC_STATS; i++) {
+		if (rte_ixgbe_macsec_strings[i].group_mask & group_mask)
+			count++;
+	}
+	for (i = 0; i < IXGBE_NB_RXQ_PRIO_STATS; i++) {
+		if (rte_ixgbe_rxq_strings[i].group_mask & group_mask)
+			count += IXGBE_NB_TXQ_PRIO_VALUES;
+	}
+	for (i = 0; i < IXGBE_NB_TXQ_PRIO_STATS; i++) {
+		if (rte_ixgbe_txq_strings[i].group_mask & group_mask)
+			count += IXGBE_NB_TXQ_PRIO_VALUES;
+	}
+
+	return count;
+}
+
+static int ixgbe_xstats_get_by_name(struct rte_eth_dev *dev,
+		struct rte_eth_xstat_name *xstats_names,
+		struct rte_eth_xstat *xstat,
+		const char *name)
+{
+	struct ixgbe_hw_stats *hw_stats =
+			IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+
+	unsigned int i;
+
+
+	const unsigned int cnt_stats = ixgbe_xstats_calc_num();
+	if (xstats_names == NULL)
+		return cnt_stats;
+
+	unsigned int current = 0;
+
+	for (i = 0; i < IXGBE_NB_HW_STATS; i++) {
+		if (!strncmp(rte_ixgbe_stats_strings[i].name, name,
+				sizeof(rte_ixgbe_stats_strings[i].name))) {
+			snprintf(xstats_names[current].name,
+					sizeof(xstats_names[current].name),
+					"%s", rte_ixgbe_stats_strings[i].name);
+			xstat[current].id = current;
+			xstat[current].value =
+					*(uint64_t *)(((char *)hw_stats) +
+					rte_ixgbe_stats_strings[i].offset);
+			break;
+		};
+	}
+	for (i = 0; i < IXGBE_NB_MACSEC_STATS; i++) {
+		if (!strncmp(rte_ixgbe_macsec_strings[i].name, name,
+				sizeof(rte_ixgbe_macsec_strings[i].name))) {
+			snprintf(xstats_names[current].name,
+					sizeof(xstats_names[current].name),
+					"%s",
+					rte_ixgbe_macsec_strings[i].name);
+			xstat[current].id = current;
+			xstat[current].value =
+					*(uint64_t *)(((char *)hw_stats) +
+					rte_ixgbe_macsec_strings[i].offset);
+			break;
+		};
+	}
+	for (i = 0; i < IXGBE_NB_RXQ_PRIO_STATS; i++) {
+		if (!strncmp(rte_ixgbe_rxq_strings[i].name, name,
+				sizeof(rte_ixgbe_rxq_strings[i].name))) {
+			snprintf(xstats_names[current].name,
+					sizeof(xstats_names[current].name),
+					"%s", rte_ixgbe_rxq_strings[i].name);
+			xstat[current].id = current;
+			xstat[current].value =
+					*(uint64_t *)(((char *)hw_stats) +
+					rte_ixgbe_rxq_strings[i].offset);
+			break;
+		};
+	}
+	for (i = 0; i < IXGBE_NB_TXQ_PRIO_STATS; i++) {
+		if (!strncmp(rte_ixgbe_txq_strings[i].name, name,
+				sizeof(rte_ixgbe_txq_strings[i].name))) {
+			snprintf(xstats_names[current].name,
+					sizeof(xstats_names[current].name),
+					"%s", rte_ixgbe_txq_strings[i].name);
+			xstat[current].id = current;
+			xstat[current].value =
+					*(uint64_t *)(((char *)hw_stats) +
+					rte_ixgbe_txq_strings[i].offset);
+			break;
+		};
+	}
+	return cnt_stats;
+}
+
 static int ixgbe_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 	struct rte_eth_xstat_name *xstats_names, __rte_unused unsigned limit)
 {
@@ -3088,6 +3237,77 @@ static int ixgbe_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 					"tx_priority%u_%s", i,
 					rte_ixgbe_txq_strings[stat].name);
 				count++;
+			}
+		}
+	}
+	return cnt_stats;
+}
+
+static
+int ixgbe_dev_xstats_get_names_by_group(__rte_unused struct rte_eth_dev *dev,
+	struct rte_eth_xstat_name *xstats_names,
+	__rte_unused unsigned int limit, uint64_t group_mask)
+{
+	const unsigned int
+	cnt_stats = ixgbe_xstats_calc_num_by_group(group_mask);
+	unsigned int stat, i, count;
+
+	if (xstats_names != NULL) {
+		count = 0;
+
+		/* Note: limit >= cnt_stats checked upstream
+		 * in rte_eth_xstats_names()
+		 */
+
+		/* Extended stats from ixgbe_hw_stats */
+		for (i = 0; i < IXGBE_NB_HW_STATS; i++) {
+			if (rte_ixgbe_stats_strings[i].group_mask &
+					group_mask)	{
+				snprintf(xstats_names[count].name,
+					sizeof(xstats_names[count].name),
+					"%s",
+					rte_ixgbe_stats_strings[i].name);
+				count++;
+			}
+		}
+
+		/* MACsec Stats */
+		for (i = 0; i < IXGBE_NB_MACSEC_STATS; i++) {
+			if (rte_ixgbe_macsec_strings[i].group_mask &
+					group_mask){
+				snprintf(xstats_names[count].name,
+					sizeof(xstats_names[count].name),
+					"%s",
+					rte_ixgbe_macsec_strings[i].name);
+				count++;
+			}
+		}
+
+		/* RX Priority Stats */
+		for (stat = 0; stat < IXGBE_NB_RXQ_PRIO_STATS; stat++) {
+			for (i = 0; i < IXGBE_NB_RXQ_PRIO_VALUES; i++) {
+				if (rte_ixgbe_rxq_strings[stat].group_mask &
+					    group_mask) {
+					snprintf(xstats_names[count].name,
+					    sizeof(xstats_names[count].name),
+					    "rx_priority%u_%s", i,
+					    rte_ixgbe_rxq_strings[stat].name);
+					count++;
+				}
+			}
+		}
+
+		/* TX Priority Stats */
+		for (stat = 0; stat < IXGBE_NB_TXQ_PRIO_STATS; stat++) {
+			for (i = 0; i < IXGBE_NB_TXQ_PRIO_VALUES; i++) {
+				if (rte_ixgbe_txq_strings[stat].group_mask &
+					    group_mask) {
+					snprintf(xstats_names[count].name,
+					    sizeof(xstats_names[count].name),
+					    "tx_priority%u_%s", i,
+					    rte_ixgbe_txq_strings[stat].name);
+					count++;
+				}
 			}
 		}
 	}
@@ -3179,6 +3399,94 @@ ixgbe_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 					(sizeof(uint64_t) * i));
 			xstats[count].id = count;
 			count++;
+		}
+	}
+	return count;
+}
+
+static int
+ixgbe_dev_xstats_get_by_group(struct rte_eth_dev *dev,
+		struct rte_eth_xstat *xstats,
+		unsigned int n, uint64_t group_mask)
+{
+	struct ixgbe_hw *hw =
+			IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct ixgbe_hw_stats *hw_stats =
+			IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct ixgbe_macsec_stats *macsec_stats =
+			IXGBE_DEV_PRIVATE_TO_MACSEC_STATS(
+				dev->data->dev_private);
+	uint64_t total_missed_rx, total_qbrc, total_qprc, total_qprdc;
+	unsigned int i, stat, count = 0;
+
+	count = ixgbe_xstats_calc_num_by_group(group_mask);
+
+	if (n < count)
+		return count;
+
+	total_missed_rx = 0;
+	total_qbrc = 0;
+	total_qprc = 0;
+	total_qprdc = 0;
+
+	ixgbe_read_stats_registers(hw, hw_stats, macsec_stats, &total_missed_rx,
+			&total_qbrc, &total_qprc, &total_qprdc);
+
+	/* If this is a reset xstats is NULL, and we have cleared the
+	 * registers by reading them.
+	 */
+	if (!xstats)
+		return 0;
+
+	/* Extended stats from ixgbe_hw_stats */
+	count = 0;
+	for (i = 0; i < IXGBE_NB_HW_STATS; i++) {
+		if (rte_ixgbe_stats_strings[i].group_mask & group_mask) {
+			xstats[count].value = *(uint64_t *)(((char *)hw_stats) +
+					rte_ixgbe_stats_strings[i].offset);
+			xstats[count].id = count;
+			count++;
+		}
+	}
+
+	/* MACsec Stats */
+	for (i = 0; i < IXGBE_NB_MACSEC_STATS; i++) {
+		if (rte_ixgbe_macsec_strings[i].group_mask & group_mask) {
+			xstats[count].value =
+					*(uint64_t *)(((char *)macsec_stats) +
+					rte_ixgbe_macsec_strings[i].offset);
+			xstats[count].id = count;
+			count++;
+		}
+	}
+
+	/* RX Priority Stats */
+	for (stat = 0; stat < IXGBE_NB_RXQ_PRIO_STATS; stat++) {
+		for (i = 0; i < IXGBE_NB_RXQ_PRIO_VALUES; i++) {
+			if (rte_ixgbe_rxq_strings[stat].group_mask &
+					group_mask) {
+				xstats[count].value =
+					*(uint64_t *)(((char *)hw_stats) +
+					rte_ixgbe_rxq_strings[stat].offset +
+					(sizeof(uint64_t) * i));
+				xstats[count].id = count;
+				count++;
+			}
+		}
+	}
+
+	/* TX Priority Stats */
+	for (stat = 0; stat < IXGBE_NB_TXQ_PRIO_STATS; stat++) {
+		for (i = 0; i < IXGBE_NB_TXQ_PRIO_VALUES; i++) {
+			if (rte_ixgbe_txq_strings[stat].group_mask &
+					group_mask) {
+				xstats[count].value =
+					*(uint64_t *)(((char *)hw_stats) +
+					rte_ixgbe_txq_strings[stat].offset +
+					(sizeof(uint64_t) * i));
+				xstats[count].id = count;
+				count++;
+			}
 		}
 	}
 	return count;
@@ -4097,7 +4405,8 @@ ixgbe_dcb_pfc_enable_generic(struct ixgbe_hw *hw, uint8_t tc_num)
 
 	/* Disable any previous flow control settings */
 	mflcn_reg = IXGBE_READ_REG(hw, IXGBE_MFLCN);
-	mflcn_reg &= ~(IXGBE_MFLCN_RPFCE_SHIFT | IXGBE_MFLCN_RFCE|IXGBE_MFLCN_RPFCE);
+	mflcn_reg &= ~(IXGBE_MFLCN_RPFCE_SHIFT |
+			IXGBE_MFLCN_RFCE | IXGBE_MFLCN_RPFCE);
 
 	fccfg_reg = IXGBE_READ_REG(hw, IXGBE_FCCFG);
 	fccfg_reg &= ~(IXGBE_FCCFG_TFCE_802_3X | IXGBE_FCCFG_TFCE_PRIORITY);
@@ -4206,7 +4515,8 @@ ixgbe_dcb_pfc_enable(struct rte_eth_dev *dev, uint8_t tc_num)
 }
 
 static int
-ixgbe_priority_flow_ctrl_set(struct rte_eth_dev *dev, struct rte_eth_pfc_conf *pfc_conf)
+ixgbe_priority_flow_ctrl_set(struct rte_eth_dev *dev,
+		struct rte_eth_pfc_conf *pfc_conf)
 {
 	int err;
 	uint32_t rx_buf_size;
