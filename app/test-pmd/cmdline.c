@@ -12455,6 +12455,65 @@ cmdline_parse_inst_t cmd_write_ppp = {
 		NULL,
 	},
 };
+
+/* Get Pipeline Personalization Profile list*/
+#define PROFILE_INFO_SIZE 48
+#define MAX_PROFILE_NUM 16
+
+struct cmd_get_ppp_list_result {
+	cmdline_fixed_string_t get;
+	cmdline_fixed_string_t ppp;
+	cmdline_fixed_string_t list;
+	uint8_t port_id;
+};
+
+cmdline_parse_token_string_t cmd_get_ppp_list_get =
+	TOKEN_STRING_INITIALIZER(struct cmd_get_ppp_list_result, get, "get");
+cmdline_parse_token_string_t cmd_get_ppp_list_ppp =
+	TOKEN_STRING_INITIALIZER(struct cmd_get_ppp_list_result, ppp, "ppp");
+cmdline_parse_token_string_t cmd_get_ppp_list_list =
+	TOKEN_STRING_INITIALIZER(struct cmd_get_ppp_list_result, list, "list");
+cmdline_parse_token_num_t cmd_get_ppp_list_port_id =
+	TOKEN_NUM_INITIALIZER(struct cmd_get_ppp_list_result, port_id, UINT8);
+
+static void
+cmd_get_ppp_list_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_get_ppp_list_result *res = parsed_result;
+	uint8_t *buff;
+	int ret;
+
+	if (res->port_id > nb_ports) {
+		printf("Invalid port, range is [0, %d]\n", nb_ports - 1);
+		return;
+	}
+
+	buff = (uint8_t *)malloc(PROFILE_INFO_SIZE * MAX_PROFILE_NUM + 4);
+	if (!buff)
+		printf("%s: Failed to malloc buffer\n", __func__);
+
+	ret = i40e_get_ppp_list(res->port_id, buff);
+	if (ret < 0)
+		printf("Failed to get ppp list\n");
+
+	free(buff);
+}
+
+cmdline_parse_inst_t cmd_get_ppp_list = {
+	.f = cmd_get_ppp_list_parsed,
+	.data = NULL,
+	.help_str = "get ppp list <port_id>",
+	.tokens = {
+		(void *)&cmd_get_ppp_list_get,
+		(void *)&cmd_get_ppp_list_ppp,
+		(void *)&cmd_get_ppp_list_list,
+		(void *)&cmd_get_ppp_list_port_id,
+		NULL,
+	},
+};
 /* ******************************************************************************** */
 
 /* list of instructions */
@@ -12631,6 +12690,7 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_set_vf_broadcast,
 	(cmdline_parse_inst_t *)&cmd_set_vf_vlan_tag,
 	(cmdline_parse_inst_t *)&cmd_write_ppp,
+	(cmdline_parse_inst_t *)&cmd_get_ppp_list,
 	NULL,
 };
 

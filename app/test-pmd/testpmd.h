@@ -624,6 +624,7 @@ void port_dcb_info_display(uint8_t port_id);
 
 uint8_t *open_package_file(const char *file_path);
 int close_package_file(uint8_t *buf);
+void get_ppp_list(uint8_t port_id);
 
 enum print_warning {
 	ENABLED_WARN = 0,
