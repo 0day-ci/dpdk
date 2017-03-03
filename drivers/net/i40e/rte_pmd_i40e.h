@@ -339,4 +339,11 @@ int rte_pmd_i40e_reset_vf_stats(uint8_t port,
  **/
 int i40e_process_package(uint8_t port, uint8_t *buff);
 
+/**
+ * i40e_get_ppp_list - Get loaded profiles
+ * @port: port id
+ * @buff: buffer for response
+ **/
+int i40e_get_ppp_list(uint8_t port, uint8_t *buff);
+
 #endif /* _PMD_I40E_H_ */

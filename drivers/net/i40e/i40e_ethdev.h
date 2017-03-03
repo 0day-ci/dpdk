@@ -839,6 +839,11 @@ struct i40e_profile_info {
 	uint8_t name[I40E_PPP_NAME_SIZE];
 };
 
+struct i40e_profile_list {
+	uint32_t p_count;
+	struct i40e_profile_info p_info[1];
+};
+
 int i40e_dev_switch_queues(struct i40e_pf *pf, bool on);
 int i40e_vsi_release(struct i40e_vsi *vsi);
 struct i40e_vsi *i40e_vsi_setup(struct i40e_pf *pf,

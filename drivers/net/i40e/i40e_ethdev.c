@@ -11508,3 +11508,39 @@ i40e_process_package(uint8_t port, uint8_t *buff)
 
 	return status;
 }
+
+#define I40E_PROFILE_INFO_SIZE 48
+#define I40E_MAX_PROFILE_NUM 16
+int
+i40e_get_ppp_list(uint8_t port, uint8_t *buff)
+{
+	struct rte_eth_dev *dev = &rte_eth_devices[port];
+	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct i40e_profile_list *p_list;
+	struct i40e_profile_info *p_info;
+	uint32_t p_num, i;
+	enum i40e_status_code status = I40E_SUCCESS;
+
+	status = i40e_aq_get_ppp_list(hw, (void *)buff,
+		      (I40E_PROFILE_INFO_SIZE * I40E_MAX_PROFILE_NUM + 4),
+		      0, NULL);
+	if (status < 0)
+		return status;
+
+	p_list = (struct i40e_profile_list *)buff;
+	p_num = p_list->p_count;
+	printf("Profile number is: %d\n\n", p_num);
+
+	for (i = 0; i < p_num; i++) {
+		p_info = &p_list->p_info[i];
+		printf("Profile %d:\n", i);
+		printf("Track id: 0x%x\n", p_info->track_id);
+		printf("Version: %d.%d.%d.%d \n\n",
+		       p_info->version.major,
+		       p_info->version.minor,
+		       p_info->version.update,
+		       p_info->version.draft);
+	}
+
+	return status;
+}
