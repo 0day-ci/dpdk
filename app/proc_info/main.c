@@ -74,6 +74,11 @@ static uint32_t reset_stats;
 static uint32_t reset_xstats;
 /**< Enable memory info. */
 static uint32_t mem_info;
+/**< Enable displaying xstat name. */
+static uint32_t enable_xstats_name;
+static char *xstats_name;
+/**< Enable displaying xstat group name. */
+static uint64_t enable_xstats_group;
 
 /**< display usage */
 static void
@@ -85,6 +90,8 @@ proc_info_usage(const char *prgname)
 		"  --stats: to display port statistics, enabled by default\n"
 		"  --xstats: to display extended port statistics, disabled by "
 			"default\n"
+		"  --xstats-name NAME: to display single xstat value by NAME\n"
+		"  --xstats-group GROUPNAME: to display group of xstats by GROUPNAME\n"
 		"  --stats-reset: to reset port statistics\n"
 		"  --xstats-reset: to reset port extended statistics\n",
 		prgname);
@@ -128,6 +135,8 @@ proc_info_parse_args(int argc, char **argv)
 		{"stats-reset", 0, NULL, 0},
 		{"xstats", 0, NULL, 0},
 		{"xstats-reset", 0, NULL, 0},
+		{"xstats-name", required_argument, NULL, 1},
+		{"xstats-group", required_argument, NULL, 1},
 		{NULL, 0, 0, 0}
 	};
 
@@ -168,7 +177,27 @@ proc_info_parse_args(int argc, char **argv)
 					MAX_LONG_OPT_SZ))
 				reset_xstats = 1;
 			break;
-
+		case 1:
+			/* Print xstat single value given by name*/
+			if (!strncmp(long_option[option_index].name,
+					"xstats-name",
+					MAX_LONG_OPT_SZ))	{
+				enable_xstats_name = 1;
+				xstats_name = optarg;
+				printf("name:%s:%s\n",
+						long_option[option_index].name,
+						optarg);
+			}
+			/* Print xstat group values given by group name*/
+			else if (!strncmp(long_option[option_index].name,
+					"xstats-group",
+					MAX_LONG_OPT_SZ))	{
+				enable_xstats_group = atoi(optarg);
+				printf("name:%s:%s\n",
+						long_option[option_index].name,
+						optarg);
+			}
+			break;
 		default:
 			proc_info_usage(prgname);
 			return -1;
@@ -238,6 +267,82 @@ nic_stats_clear(uint8_t port_id)
 	printf("\n Clearing NIC stats for port %d\n", port_id);
 	rte_eth_stats_reset(port_id);
 	printf("\n  NIC statistics for port %d cleared\n", port_id);
+}
+
+static void
+nic_xstats_by_name_display(__rte_unused uint8_t port_id,
+		__rte_unused char *name)
+{
+	struct rte_eth_xstat xstat;
+
+	printf("###### NIC statistics for port %-2d, statistic name '%s':\n",
+			   port_id, name);
+
+	if (rte_eth_xstats_get_by_name(port_id, &xstat, name) == 0)
+		printf("%s: %"PRIu64"\n", name, xstat.value);
+	else
+		printf("Statistic not found...\n");
+
+}
+
+static void
+nic_xstats_by_group_display(__rte_unused uint8_t port_id,
+		__rte_unused uint64_t group_mask)
+{
+	struct rte_eth_xstat *xstats;
+	int cnt_xstats, idx_xstat;
+	struct rte_eth_xstat_name *xstats_names;
+
+	printf("###### NIC extended statistics for port %-2d,"
+			" group %-2lu #########\n",
+			   port_id, group_mask);
+
+	/* Get count */
+	cnt_xstats = rte_eth_xstats_get_names_by_group(port_id, NULL, 0,
+			group_mask);
+	if (cnt_xstats  < 0) {
+		printf("Error: Cannot get count of xstats\n");
+		return;
+	}
+
+	/* Get id-name lookup table */
+	xstats_names = malloc(sizeof(struct rte_eth_xstat_name) * cnt_xstats);
+	if (xstats_names == NULL) {
+		printf("Cannot allocate memory for xstats lookup\n");
+		return;
+	}
+
+	if (cnt_xstats != rte_eth_xstats_get_names_by_group(
+			port_id, xstats_names, cnt_xstats, group_mask)) {
+		printf("Error: Cannot get xstats lookup\n");
+		free(xstats_names);
+		return;
+	}
+
+	/* Get stats themselves */
+	xstats = malloc(sizeof(struct rte_eth_xstat) * cnt_xstats);
+	if (xstats == NULL) {
+		printf("Cannot allocate memory for xstats\n");
+		free(xstats_names);
+		return;
+	}
+
+	if (cnt_xstats != rte_eth_xstats_get_by_group(port_id, xstats,
+			cnt_xstats, group_mask)) {
+		printf("Error: Unable to get xstats\n");
+		free(xstats_names);
+		free(xstats);
+		return;
+	}
+
+	/* Display xstats */
+	for (idx_xstat = 0; idx_xstat < cnt_xstats; idx_xstat++)
+		printf("%s: %"PRIu64"\n",
+			xstats_names[idx_xstat].name,
+			xstats[idx_xstat].value);
+	free(xstats_names);
+	free(xstats);
+
 }
 
 static void
@@ -360,6 +465,11 @@ main(int argc, char **argv)
 				nic_stats_clear(i);
 			else if (reset_xstats)
 				nic_xstats_clear(i);
+			else if (enable_xstats_group)
+				nic_xstats_by_group_display(i,
+						enable_xstats_group);
+			else if (enable_xstats_name)
+				nic_xstats_by_name_display(i, xstats_name);
 		}
 	}
 
