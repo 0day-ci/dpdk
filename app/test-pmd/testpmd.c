@@ -1615,6 +1615,7 @@ reset_port(portid_t pid)
 			continue;
 		}
 
+		rte_eth_dev_reset(pi);
 		reset_ports[pi] = 0;
 
 		if (rte_atomic16_cmpset(&(port->port_status),

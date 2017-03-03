@@ -1367,6 +1367,9 @@ typedef int (*eth_l2_tunnel_offload_set_t)
 	 uint8_t en);
 /**< @internal enable/disable the l2 tunnel offload functions */
 
+typedef int  (*eth_dev_reset_t)(struct rte_eth_dev *dev);
+/**< @internal Function used to reset a configured Ethernet device. */
+
 #ifdef RTE_NIC_BYPASS
 
 enum {
@@ -1507,6 +1510,9 @@ struct eth_dev_ops {
 	/** Config ether type of l2 tunnel. */
 	eth_l2_tunnel_offload_set_t   l2_tunnel_offload_set;
 	/** Enable/disable l2 tunnel offload functions. */
+
+	/** Reset device. */
+	eth_dev_reset_t dev_reset;
 
 	eth_set_queue_rate_limit_t set_queue_rate_limit; /**< Set queue rate limit. */
 
@@ -4405,6 +4411,25 @@ rte_eth_dev_get_port_by_name(const char *name, uint8_t *port_id);
 */
 int
 rte_eth_dev_get_name_by_port(uint8_t port_id, char *name);
+
+/**
+ * Reset an ethernet device when it's not working. One scenario is, after PF
+ * port is down and up, the related VF port should be reset.
+ * The API will stop the port, clear the rx/tx queues, re-setup the rx/tx
+ * queues, restart the port.
+ * Before calling this API, APP should stop the rx/tx. When tx is being stopped,
+ * APP can drop the packets and release the buffer instead of sending them.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ *
+ * @return
+ *   - (0) if successful.
+ *   - (-ENODEV) if port identifier is invalid.
+ *   - (-ENOTSUP) if hardware doesn't support this function.
+ */
+int
+rte_eth_dev_reset(uint8_t port_id);
 
 /**
  * @internal

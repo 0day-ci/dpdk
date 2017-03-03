@@ -3273,3 +3273,20 @@ rte_eth_dev_l2_tunnel_offload_set(uint8_t port_id,
 				-ENOTSUP);
 	return (*dev->dev_ops->l2_tunnel_offload_set)(dev, l2_tunnel, mask, en);
 }
+
+int
+rte_eth_dev_reset(uint8_t port_id)
+{
+	struct rte_eth_dev *dev;
+	int diag;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->dev_reset, -ENOTSUP);
+
+	diag = (*dev->dev_ops->dev_reset)(dev);
+
+	return diag;
+}
