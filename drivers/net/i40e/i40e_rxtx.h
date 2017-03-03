@@ -146,6 +146,8 @@ struct i40e_rx_queue {
 	bool rx_deferred_start; /**< don't start this queue in dev start */
 	uint16_t rx_using_sse; /**<flag indicate the usage of vPMD for rx */
 	uint8_t dcb_tc;         /**< Traffic class of rx queue */
+	uint8_t socket_id;
+	struct rte_eth_rxconf rxconf;
 };
 
 struct i40e_tx_entry {
@@ -187,6 +189,8 @@ struct i40e_tx_queue {
 	bool q_set; /**< indicate if tx queue has been configured */
 	bool tx_deferred_start; /**< don't start this queue in dev start */
 	uint8_t dcb_tc;         /**< Traffic class of tx queue */
+	uint8_t socket_id;
+	struct rte_eth_txconf txconf;
 };
 
 /** Offload features */

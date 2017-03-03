@@ -651,6 +651,16 @@ struct i40e_vf_tx_queues {
 	uint32_t tx_ring_len;
 };
 
+struct i40e_vf_reset_store {
+	struct ether_addr *mac_addrs;  /* Device Ethernet Link address. */
+	bool promisc_unicast_enabled;
+	bool promisc_multicast_enabled;
+	uint16_t vlan_num;    /* Total VLAN number */
+	uint32_t vfta[I40E_VFTA_SIZE];        /* VLAN bitmap */
+	uint16_t mac_num;        /* Total mac number */
+};
+
+
 /*
  * Structure to store private data specific for VF instance.
  */
@@ -708,6 +718,10 @@ struct i40e_adapter {
 	struct rte_timecounter systime_tc;
 	struct rte_timecounter rx_tstamp_tc;
 	struct rte_timecounter tx_tstamp_tc;
+
+	/* For VF reset */
+	volatile uint8_t reset_number;
+	void *reset_store_data;
 };
 
 extern const struct rte_flow_ops i40e_flow_ops;
@@ -748,6 +762,8 @@ int i40e_dev_link_update(struct rte_eth_dev *dev,
 			 __rte_unused int wait_to_complete);
 void i40e_vsi_queues_bind_intr(struct i40e_vsi *vsi);
 void i40e_vsi_queues_unbind_intr(struct i40e_vsi *vsi);
+void i40e_store_vlan_filter(struct i40e_vsi *vsi,
+		       uint16_t vlan_id, bool on);
 int i40e_vsi_vlan_pvid_set(struct i40e_vsi *vsi,
 			   struct i40e_vsi_vlan_pvid_info *info);
 int i40e_vsi_config_vlan_stripping(struct i40e_vsi *vsi, bool on);

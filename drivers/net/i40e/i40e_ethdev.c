@@ -5999,7 +5999,7 @@ i40e_find_vlan_filter(struct i40e_vsi *vsi,
 		return 0;
 }
 
-static void
+void
 i40e_store_vlan_filter(struct i40e_vsi *vsi,
 		       uint16_t vlan_id, bool on)
 {

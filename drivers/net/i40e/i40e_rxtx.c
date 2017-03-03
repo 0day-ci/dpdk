@@ -1715,6 +1715,7 @@ i40e_dev_rx_queue_setup(struct rte_eth_dev *dev,
 	uint16_t len, i;
 	uint16_t base, bsf, tc_mapping;
 	int use_def_burst_func = 1;
+	struct rte_eth_rxconf conf = *rx_conf;
 
 	if (hw->mac.type == I40E_MAC_VF || hw->mac.type == I40E_MAC_X722_VF) {
 		struct i40e_vf *vf =
@@ -1754,6 +1755,8 @@ i40e_dev_rx_queue_setup(struct rte_eth_dev *dev,
 	}
 	rxq->mp = mp;
 	rxq->nb_rx_desc = nb_desc;
+	rxq->socket_id = socket_id;
+	rxq->rxconf = conf;
 	rxq->rx_free_thresh = rx_conf->rx_free_thresh;
 	rxq->queue_id = queue_idx;
 	if (hw->mac.type == I40E_MAC_VF || hw->mac.type == I40E_MAC_X722_VF)
@@ -1943,6 +1946,7 @@ i40e_dev_tx_queue_setup(struct rte_eth_dev *dev,
 	uint32_t ring_size;
 	uint16_t tx_rs_thresh, tx_free_thresh;
 	uint16_t i, base, bsf, tc_mapping;
+	struct rte_eth_txconf conf = *tx_conf;
 
 	if (hw->mac.type == I40E_MAC_VF || hw->mac.type == I40E_MAC_X722_VF) {
 		struct i40e_vf *vf =
@@ -2065,6 +2069,8 @@ i40e_dev_tx_queue_setup(struct rte_eth_dev *dev,
 	}
 
 	txq->nb_tx_desc = nb_desc;
+	txq->socket_id = socket_id;
+	txq->txconf = conf;
 	txq->tx_rs_thresh = tx_rs_thresh;
 	txq->tx_free_thresh = tx_free_thresh;
 	txq->pthresh = tx_conf->tx_thresh.pthresh;
@@ -2531,8 +2537,12 @@ void
 i40e_dev_free_queues(struct rte_eth_dev *dev)
 {
 	uint16_t i;
+	struct i40e_adapter *adapter =
+		I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
 
 	PMD_INIT_FUNC_TRACE();
+	if (adapter->reset_number)
+		return;
 
 	for (i = 0; i < dev->data->nb_rx_queues; i++) {
 		if (!dev->data->rx_queues[i])

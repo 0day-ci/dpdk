@@ -161,6 +161,13 @@ i40evf_dev_rx_queue_intr_disable(struct rte_eth_dev *dev, uint16_t queue_id);
 static void i40evf_handle_pf_event(__rte_unused struct rte_eth_dev *dev,
 				   uint8_t *msg,
 				   uint16_t msglen);
+static int i40evf_dev_uninit(struct rte_eth_dev *eth_dev);
+static int i40evf_dev_init(struct rte_eth_dev *eth_dev);
+static void i40evf_dev_close(struct rte_eth_dev *dev);
+static int i40evf_dev_start(struct rte_eth_dev *dev);
+static int i40evf_dev_configure(struct rte_eth_dev *dev);
+static int i40evf_handle_vf_reset(struct rte_eth_dev *dev);
+
 
 /* Default hash key buffer for RSS */
 static uint32_t rss_key_default[I40E_VFQF_HKEY_MAX_INDEX + 1];
@@ -230,6 +237,7 @@ static const struct eth_dev_ops i40evf_eth_dev_ops = {
 	.rss_hash_conf_get    = i40evf_dev_rss_hash_conf_get,
 	.mtu_set              = i40evf_dev_mtu_set,
 	.mac_addr_set         = i40evf_set_default_mac_addr,
+	.dev_reset            = i40evf_handle_vf_reset,
 };
 
 /*
@@ -885,10 +893,13 @@ i40evf_add_mac_addr(struct rte_eth_dev *dev,
 	args.out_buffer = vf->aq_resp;
 	args.out_size = I40E_AQ_BUF_SZ;
 	err = i40evf_execute_vf_cmd(dev, &args);
-	if (err)
+	if (err) {
 		PMD_DRV_LOG(ERR, "fail to execute command "
 			    "OP_ADD_ETHER_ADDRESS");
-
+		goto DONE;
+	}
+	vf->vsi.mac_num++;
+DONE:
 	return;
 }
 
@@ -923,9 +934,13 @@ i40evf_del_mac_addr_by_addr(struct rte_eth_dev *dev,
 	args.out_buffer = vf->aq_resp;
 	args.out_size = I40E_AQ_BUF_SZ;
 	err = i40evf_execute_vf_cmd(dev, &args);
-	if (err)
+	if (err) {
 		PMD_DRV_LOG(ERR, "fail to execute command "
 			    "OP_DEL_ETHER_ADDRESS");
+		goto DONE;
+	}
+	vf->vsi.mac_num--;
+DONE:
 	return;
 }
 
@@ -1047,6 +1062,7 @@ static int
 i40evf_add_vlan(struct rte_eth_dev *dev, uint16_t vlanid)
 {
 	struct i40e_vf *vf = I40EVF_DEV_PRIVATE_TO_VF(dev->data->dev_private);
+	struct i40e_vsi *vsi = &vf->vsi;
 	struct i40e_virtchnl_vlan_filter_list *vlan_list;
 	uint8_t cmd_buffer[sizeof(struct i40e_virtchnl_vlan_filter_list) +
 							sizeof(uint16_t)];
@@ -1064,9 +1080,13 @@ i40evf_add_vlan(struct rte_eth_dev *dev, uint16_t vlanid)
 	args.out_buffer = vf->aq_resp;
 	args.out_size = I40E_AQ_BUF_SZ;
 	err = i40evf_execute_vf_cmd(dev, &args);
-	if (err)
+	if (err) {
 		PMD_DRV_LOG(ERR, "fail to execute command OP_ADD_VLAN");
-
+		goto DONE;
+	}
+	i40e_store_vlan_filter(vsi, vlanid, 1);
+	vsi->vlan_num++;
+DONE:
 	return err;
 }
 
@@ -1074,6 +1094,7 @@ static int
 i40evf_del_vlan(struct rte_eth_dev *dev, uint16_t vlanid)
 {
 	struct i40e_vf *vf = I40EVF_DEV_PRIVATE_TO_VF(dev->data->dev_private);
+	struct i40e_vsi *vsi = &vf->vsi;
 	struct i40e_virtchnl_vlan_filter_list *vlan_list;
 	uint8_t cmd_buffer[sizeof(struct i40e_virtchnl_vlan_filter_list) +
 							sizeof(uint16_t)];
@@ -1091,9 +1112,13 @@ i40evf_del_vlan(struct rte_eth_dev *dev, uint16_t vlanid)
 	args.out_buffer = vf->aq_resp;
 	args.out_size = I40E_AQ_BUF_SZ;
 	err = i40evf_execute_vf_cmd(dev, &args);
-	if (err)
+	if (err) {
 		PMD_DRV_LOG(ERR, "fail to execute command OP_DEL_VLAN");
-
+		goto DONE;
+	}
+	i40e_store_vlan_filter(vsi, vlanid, 0);
+	vsi->vlan_num--;
+DONE:
 	return err;
 }
 
@@ -2716,3 +2741,186 @@ i40evf_set_default_mac_addr(struct rte_eth_dev *dev,
 
 	i40evf_add_mac_addr(dev, mac_addr, 0, 0);
 }
+
+static void
+i40evf_restore_vlan_filter(struct rte_eth_dev *dev,
+			uint32_t *vfta)
+{
+	uint32_t vid_idx, vid_bit;
+	uint16_t vlan_id;
+
+	for  (vid_idx = 0; vid_idx < I40E_VFTA_SIZE; vid_idx++) {
+		for  (vid_bit = 0; vid_bit < I40E_UINT32_BIT_SIZE; vid_bit++) {
+			if (vfta[vid_idx] & (1 << vid_bit)) {
+				vlan_id = (vid_idx << 5) + vid_bit;
+				i40evf_add_vlan(dev, vlan_id);
+			}
+		}
+	}
+}
+
+static void
+i40evf_restore_macaddr(struct rte_eth_dev *dev,
+		struct ether_addr *mac_addrs)
+{
+	struct ether_addr *addr;
+	uint16_t i;
+
+	/* replay MAC address configuration including default MAC */
+	addr = &mac_addrs[0];
+
+	memcpy(dev->data->mac_addrs, mac_addrs,
+			ETHER_ADDR_LEN * I40E_NUM_MACADDR_MAX);
+
+	i40evf_set_default_mac_addr(dev, addr);
+
+	for (i = 1; i < I40E_NUM_MACADDR_MAX; i++) {
+		addr = &mac_addrs[i];
+
+		/* skip zero address */
+		if (is_zero_ether_addr(addr))
+			continue;
+
+		i40evf_add_mac_addr(dev, addr, 0, 0);
+	}
+}
+
+
+static void
+i40e_vf_queue_reset(struct rte_eth_dev *dev)
+{
+	uint16_t i;
+
+	for (i = 0; i < dev->data->nb_rx_queues; i++) {
+		struct i40e_rx_queue *rxq = dev->data->rx_queues[i];
+
+		if (rxq->q_set) {
+			i40e_dev_rx_queue_setup(dev,
+						rxq->queue_id,
+						rxq->nb_rx_desc,
+						rxq->socket_id,
+						&rxq->rxconf,
+						rxq->mp);
+		}
+	}
+	for (i = 0; i < dev->data->nb_tx_queues; i++) {
+		struct i40e_tx_queue *txq = dev->data->tx_queues[i];
+
+		if (txq->q_set) {
+			i40e_dev_tx_queue_setup(dev,
+						txq->queue_id,
+						txq->nb_tx_desc,
+						txq->socket_id,
+						&txq->txconf);
+		}
+	}
+}
+
+static int
+i40evf_store_before_reset(struct rte_eth_dev *dev)
+{
+	struct i40e_adapter *adapter =
+		I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
+	struct i40e_vf_reset_store *store_data;
+	struct i40e_vf *vf = I40EVF_DEV_PRIVATE_TO_VF(dev->data->dev_private);
+
+	adapter->reset_store_data = rte_zmalloc("i40evf_store_reset",
+					sizeof(struct i40e_vf_reset_store), 0);
+	if (adapter->reset_store_data == NULL) {
+		PMD_INIT_LOG(ERR, "Failed to allocate %ld bytes needed to"
+				" to store data when reset vf",
+				sizeof(struct i40e_vf_reset_store));
+		return -ENOMEM;
+	}
+	store_data =
+		(struct i40e_vf_reset_store *)adapter->reset_store_data;
+	store_data->mac_addrs = rte_zmalloc("i40evf_mac_store_reset",
+			ETHER_ADDR_LEN * I40E_NUM_MACADDR_MAX, 0);
+	if (store_data->mac_addrs == NULL) {
+		PMD_INIT_LOG(ERR, "Failed to allocate %d bytes needed to"
+				" to store MAC addresses when reset vf",
+				ETHER_ADDR_LEN * I40E_NUM_MACADDR_MAX);
+	}
+
+	memcpy(store_data->mac_addrs, dev->data->mac_addrs,
+			ETHER_ADDR_LEN * I40E_NUM_MACADDR_MAX);
+
+	store_data->promisc_unicast_enabled = vf->promisc_unicast_enabled;
+	store_data->promisc_multicast_enabled = vf->promisc_multicast_enabled;
+
+	store_data->vlan_num = vf->vsi.vlan_num;
+	memcpy(store_data->vfta, vf->vsi.vfta,
+			sizeof(uint32_t) * I40E_VFTA_SIZE);
+
+	store_data->mac_num = vf->vsi.mac_num;
+
+	return 0;
+}
+
+static void
+i40evf_restore_after_reset(struct rte_eth_dev *dev)
+{
+	struct i40e_adapter *adapter =
+		I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
+	struct i40e_vf_reset_store *store_data =
+		(struct i40e_vf_reset_store *)adapter->reset_store_data;
+
+	if (store_data->promisc_unicast_enabled)
+		i40evf_dev_promiscuous_enable(dev);
+	if (store_data->promisc_multicast_enabled)
+		i40evf_dev_allmulticast_enable(dev);
+
+	if (store_data->vlan_num)
+		i40evf_restore_vlan_filter(dev, store_data->vfta);
+
+	if (store_data->mac_num)
+		i40evf_restore_macaddr(dev, store_data->mac_addrs);
+}
+
+static void
+i40e_vf_reset_dev(struct rte_eth_dev *dev)
+{
+	struct i40e_adapter *adapter =
+		I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
+
+	i40evf_store_before_reset(dev);
+
+	i40evf_dev_close(dev);
+	PMD_DRV_LOG(DEBUG, "i40evf dev close complete");
+
+	i40evf_dev_uninit(dev);
+	PMD_DRV_LOG(DEBUG, "i40evf dev detached");
+
+	memset(dev->data->dev_private, 0,
+	       (uint64_t)&adapter->reset_number - (uint64_t)adapter);
+
+	i40evf_dev_init(dev);
+	PMD_DRV_LOG(DEBUG, "i40evf dev attached");
+
+	i40evf_dev_configure(dev);
+
+	i40e_vf_queue_reset(dev);
+	PMD_DRV_LOG(DEBUG, "i40evf queue reset");
+
+	i40evf_restore_after_reset(dev);
+
+	i40evf_dev_start(dev);
+	PMD_DRV_LOG(DEBUG, "i40evf dev restart");
+}
+
+static int
+i40evf_handle_vf_reset(struct rte_eth_dev *dev)
+{
+	struct i40e_adapter *adapter =
+		I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
+
+	if (!dev->data->dev_started)
+		return 0;
+
+	adapter->reset_number = 1;
+	i40e_vf_reset_dev(dev);
+	adapter->reset_number = 0;
+
+	return 0;
+}
+
