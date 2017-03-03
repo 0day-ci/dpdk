@@ -729,6 +729,116 @@ struct i40e_valid_pattern {
 	parse_filter_t parse_filter;
 };
 
+/* Support Pipeline Personalization Profile */
+#define i40e_aqc_opc_write_personalization_profile	0x0270
+#define i40e_aqc_opc_get_personalization_profile_list	0x0271
+struct i40e_aqc_write_personalization_profile {
+	uint8_t   reserved[4];
+	uint32_t  profile_track_id;
+	uint32_t  addr_high;
+	uint32_t  addr_low;
+};
+
+I40E_CHECK_CMD_LENGTH(i40e_aqc_write_personalization_profile);
+
+struct i40e_aqc_write_ppp_resp {
+	uint32_t error_offset;
+	uint32_t error_info;
+	uint32_t addr_high;
+	uint32_t addr_low;
+};
+
+struct i40e_aqc_get_applied_profiles {
+	uint8_t      flags;
+	#define I40E_AQC_GET_PPP_GET_CONF	0x1
+	#define I40E_AQC_GET_PPP_GET_RDPU_CONF	0x2
+	uint8_t   rsv[3];
+	uint32_t  reserved;
+	uint32_t  addr_high;
+	uint32_t  addr_low;
+};
+
+I40E_CHECK_CMD_LENGTH(i40e_aqc_get_applied_profiles);
+
+/* Version format for PPP */
+struct i40e_ppp_version {
+	uint8_t major;
+	uint8_t minor;
+	uint8_t update;
+	uint8_t draft;
+};
+
+#define I40E_PPP_NAME_SIZE	32
+
+/* Package header */
+struct i40e_package_header {
+	struct i40e_ppp_version version;
+	uint32_t segment_count;
+	uint32_t segment_offset[1];
+};
+
+/* Generic segment header */
+struct i40e_generic_seg_header {
+#define SEGMENT_TYPE_METADATA	0x00000001
+#define SEGMENT_TYPE_NOTES	0x00000002
+#define SEGMENT_TYPE_I40E	0x00000011
+#define SEGMENT_TYPE_X722	0x00000012
+	uint32_t type;
+	struct i40e_ppp_version version;
+	uint32_t size;
+	char name[I40E_PPP_NAME_SIZE];
+};
+
+struct i40e_metadata_segment {
+	struct i40e_generic_seg_header header;
+	struct i40e_ppp_version version;
+	uint32_t track_id;
+	char name[I40E_PPP_NAME_SIZE];
+};
+
+struct i40e_device_id_entry {
+	uint32_t vendor_dev_id;
+	uint32_t sub_vendor_dev_id;
+};
+
+struct i40e_profile_segment {
+	struct i40e_generic_seg_header header;
+	struct i40e_ppp_version version;
+	char name[I40E_PPP_NAME_SIZE];
+	uint32_t device_table_count;
+	struct i40e_device_id_entry device_table[1];
+};
+
+struct i40e_section_table {
+	uint32_t section_count;
+	uint32_t section_offset[1];
+};
+
+struct i40e_profile_section_header {
+	uint16_t tbl_size;
+	uint16_t data_end;
+	struct {
+#define SECTION_TYPE_INFO	0x0000010
+#define SECTION_TYPE_MMIO	0x0000800
+#define SECTION_TYPE_AQ		0x0000801
+#define SECTION_TYPE_NOTE	0x80000000
+#define SECTION_TYPE_NAME	0x80000001
+		uint32_t type;
+		uint32_t offset;
+		uint32_t size;
+	} section;
+};
+
+struct i40e_profile_info {
+	uint32_t track_id;
+	struct i40e_ppp_version version;
+	uint8_t op;
+#define I40E_PPP_ADD_TRACKID    0x01
+#define I40E_PPP_REMOVE_TRACKID 0x02
+	uint8_t reserved[7];
+	uint8_t name[I40E_PPP_NAME_SIZE];
+};
+
 int i40e_dev_switch_queues(struct i40e_pf *pf, bool on);
 int i40e_vsi_release(struct i40e_vsi *vsi);
 struct i40e_vsi *i40e_vsi_setup(struct i40e_pf *pf,
@@ -805,6 +915,23 @@ int i40e_dev_tunnel_filter_set(struct i40e_pf *pf,
 			       struct rte_eth_tunnel_filter_conf *tunnel_filter,
 			       uint8_t add);
 int i40e_fdir_flush(struct rte_eth_dev *dev);
+enum i40e_status_code i40e_aq_write_ppp(struct i40e_hw *hw, void *buff,
+				uint16_t buff_size, uint32_t track_id,
+				uint32_t *error_offset, uint32_t *error_info,
+				struct i40e_asq_cmd_details *cmd_details);
+enum i40e_status_code i40e_aq_get_ppp_list(struct i40e_hw *hw, void *buff,
+				   uint16_t buff_size, uint8_t flags,
+				   struct i40e_asq_cmd_details *cmd_details);
+struct i40e_generic_seg_header *
+i40e_find_segment_in_package(uint32_t segment_type,
+			     struct i40e_package_header *pkg_header);
+enum i40e_status_code
+i40e_write_profile(struct i40e_hw *hw, struct i40e_profile_segment *i40e_seg,
+		   uint32_t track_id);
+enum i40e_status_code
+i40e_add_pinfo_to_list(struct i40e_hw *hw,
+		       struct i40e_profile_segment *profile,
+		       uint8_t *profile_info_sec, uint32_t track_id);
 
 #define I40E_DEV_TO_PCI(eth_dev) \
 	RTE_DEV_TO_PCI((eth_dev)->device)
