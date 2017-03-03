@@ -311,6 +311,10 @@ static void cmd_help_long_parsed(void *parsed_result,
 
 			"set vf vlan antispoof (port_id) (vf_id) (on|off)\n"
 			"    Set VLAN antispoof for a VF from the PF.\n\n"
+#ifdef RTE_LIBRTE_I40E_PMD
+			"set vf vlan untagdrop (port_id) (vf_id) (on|off)\n"
+			"    Set VLAN untag drop for a VF from the PF.\n\n"
+#endif
 
 			"set vf vlan tag (port_id) (vf_id) (on|off)\n"
 			"    Set VLAN tag for a VF from the PF.\n\n"
@@ -10995,6 +10999,103 @@ cmdline_parse_inst_t cmd_set_vf_vlan_anti_spoof = {
 	},
 };
 
+#ifdef RTE_LIBRTE_I40E_PMD
+/* vf vlan untag drop configuration */
+
+/* Common result structure for vf vlan untag drop */
+struct cmd_vf_vlan_untag_drop_result {
+	cmdline_fixed_string_t set;
+	cmdline_fixed_string_t vf;
+	cmdline_fixed_string_t vlan;
+	cmdline_fixed_string_t untagdrop;
+	uint8_t port_id;
+	uint32_t vf_id;
+	cmdline_fixed_string_t on_off;
+};
+
+/* Common CLI fields for vf vlan untag drop enable disable */
+cmdline_parse_token_string_t cmd_vf_vlan_untag_drop_set =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_untag_drop_result,
+		 set, "set");
+cmdline_parse_token_string_t cmd_vf_vlan_untag_drop_vf =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_untag_drop_result,
+		 vf, "vf");
+cmdline_parse_token_string_t cmd_vf_vlan_untag_drop_vlan =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_untag_drop_result,
+		 vlan, "vlan");
+cmdline_parse_token_string_t cmd_vf_vlan_untag_drop_untagdrop =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_untag_drop_result,
+		 untagdrop, "untagdrop");
+cmdline_parse_token_num_t cmd_vf_vlan_untag_drop_port_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_untag_drop_result,
+		 port_id, UINT8);
+cmdline_parse_token_num_t cmd_vf_vlan_untag_drop_vf_id =
+	TOKEN_NUM_INITIALIZER
+		(struct cmd_vf_vlan_untag_drop_result,
+		 vf_id, UINT32);
+cmdline_parse_token_string_t cmd_vf_vlan_untag_drop_on_off =
+	TOKEN_STRING_INITIALIZER
+		(struct cmd_vf_vlan_untag_drop_result,
+		 on_off, "on#off");
+
+static void
+cmd_set_vf_vlan_untag_drop_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_vf_vlan_untag_drop_result *res = parsed_result;
+	int ret = -ENOTSUP;
+
+	__rte_unused int is_on = (strcmp(res->on_off, "on") == 0) ? 1 : 0;
+
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
+		return;
+
+	if (ret == -ENOTSUP)
+		ret = rte_pmd_i40e_set_vf_vlan_untag_drop(res->port_id,
+				res->vf_id, is_on);
+
+	switch (ret) {
+	case 0:
+		break;
+	case -EINVAL:
+		printf("invalid vf_id %d\n", res->vf_id);
+		break;
+	case -ENODEV:
+		printf("invalid port_id %d\n", res->port_id);
+		break;
+	case -ENOTSUP:
+		printf("function not implemented\n");
+		break;
+	default:
+		printf("programming error: (%s)\n", strerror(-ret));
+	}
+}
+
+cmdline_parse_inst_t cmd_set_vf_vlan_untag_drop = {
+	.f = cmd_set_vf_vlan_untag_drop_parsed,
+	.data = NULL,
+	.help_str = "set vf vlan untagdrop <port_id> <vf_id> on|off",
+	.tokens = {
+		(void *)&cmd_vf_vlan_untag_drop_set,
+		(void *)&cmd_vf_vlan_untag_drop_vf,
+		(void *)&cmd_vf_vlan_untag_drop_vlan,
+		(void *)&cmd_vf_vlan_untag_drop_untagdrop,
+		(void *)&cmd_vf_vlan_untag_drop_port_id,
+		(void *)&cmd_vf_vlan_untag_drop_vf_id,
+		(void *)&cmd_vf_vlan_untag_drop_on_off,
+		NULL,
+	},
+};
+
+#endif
+
 /* vf mac anti spoof configuration */
 
 /* Common result structure for vf mac anti spoof */
@@ -12549,6 +12650,9 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_config_e_tag_filter_add,
 	(cmdline_parse_inst_t *)&cmd_config_e_tag_filter_del,
 	(cmdline_parse_inst_t *)&cmd_set_vf_vlan_anti_spoof,
+#ifdef RTE_LIBRTE_I40E_PMD
+	(cmdline_parse_inst_t *)&cmd_set_vf_vlan_untag_drop,
+#endif
 	(cmdline_parse_inst_t *)&cmd_set_vf_mac_anti_spoof,
 	(cmdline_parse_inst_t *)&cmd_set_vf_vlan_stripq,
 	(cmdline_parse_inst_t *)&cmd_set_vf_vlan_insert,
