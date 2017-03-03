@@ -41,6 +41,10 @@ CFLAGS += $(WERROR_FLAGS)
 
 SRCS-y := main.c
 
+ifeq ($(CONFIG_RTE_BUILD_SHARED_LIB),y)
+	_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_PCAP) += -lrte_pmd_pcap
+endif
+
 # this application needs libraries first
 DEPDIRS-y += lib
 
