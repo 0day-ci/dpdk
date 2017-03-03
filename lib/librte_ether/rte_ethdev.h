@@ -990,6 +990,17 @@ struct rte_eth_xstat_name {
 #define ETH_MAX_VMDQ_POOL  64
 
 /**
+ * Xstats groups by bit no. in 'group_mask'
+ */
+#define TX_GROUP	0x0001
+#define RX_GROUP	0x0002
+#define ERR_GROUP	0x0004
+#define TXQ_GROUP	0x0008
+#define RXQ_GROUP	0x0010
+#define VF_GROUP	0x0020
+#define MAC_GROUP	0x0040
+
+/**
  * A structure used to get the information of queue and
  * TC mapping on both TX and RX paths.
  */
@@ -1118,12 +1129,27 @@ typedef int (*eth_xstats_get_t)(struct rte_eth_dev *dev,
 	struct rte_eth_xstat *stats, unsigned n);
 /**< @internal Get extended stats of an Ethernet device. */
 
+typedef int (*eth_xstats_get_by_group_t)(struct rte_eth_dev *dev,
+	struct rte_eth_xstat *stats, unsigned int n, uint64_t group_mask);
+/**< @internal Get extended stats of an Ethernet device. */
+
 typedef void (*eth_xstats_reset_t)(struct rte_eth_dev *dev);
 /**< @internal Reset extended stats of an Ethernet device. */
 
 typedef int (*eth_xstats_get_names_t)(struct rte_eth_dev *dev,
 	struct rte_eth_xstat_name *xstats_names, unsigned size);
 /**< @internal Get names of extended stats of an Ethernet device. */
+
+typedef int (*eth_xstats_get_names_by_group_t)(struct rte_eth_dev *dev,
+	struct rte_eth_xstat_name *xstats_names,
+	unsigned int size, uint64_t group_mask);
+/**< @internal Get names of extended stats of an Ethernet device. */
+
+typedef int (*eth_xstats_get_by_name_t)(struct rte_eth_dev *dev,
+		struct rte_eth_xstat_name *xstats_names,
+		struct rte_eth_xstat *xstat,
+		const char *name);
+/**< @internal Get xstat specified by name of an Ethernet device. */
 
 typedef int (*eth_queue_stats_mapping_set_t)(struct rte_eth_dev *dev,
 					     uint16_t queue_id,
@@ -1456,8 +1482,13 @@ struct eth_dev_ops {
 	eth_stats_get_t            stats_get;     /**< Get generic device statistics. */
 	eth_stats_reset_t          stats_reset;   /**< Reset generic device statistics. */
 	eth_xstats_get_t           xstats_get;    /**< Get extended device statistics. */
+	eth_xstats_get_by_group_t  xstats_get_by_group;
+	/**< Get extended device statistics. */
 	eth_xstats_reset_t         xstats_reset;  /**< Reset extended device statistics. */
-	eth_xstats_get_names_t     xstats_get_names;
+	eth_xstats_get_names_t	   xstats_get_names;
+	eth_xstats_get_names_by_group_t xstats_get_names_by_group;
+	eth_xstats_get_by_name_t	xstats_get_by_name;
+
 	/**< Get names of extended statistics. */
 	eth_queue_stats_mapping_set_t queue_stats_mapping_set;
 	/**< Configure per queue stat counter mapping. */
@@ -2307,6 +2338,51 @@ int rte_eth_xstats_get_names(uint8_t port_id,
 		unsigned size);
 
 /**
+ * Get extended statistics of an Ethernet device matching specified name.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param name
+ *   Phrase used to search extended statistics
+ * @param name *xstat
+ *   Pointer to allocated memory for rte_eth_xstat structure
+ * @return
+ *   - 0 when xstat was successfully found and value and id were returned
+ *   using pointer to rte_eth_xstat,
+ *   - A negative value when xstat wasn't found.
+ */
+int
+rte_eth_xstats_get_by_name(uint8_t port_id, struct rte_eth_xstat *xstat,
+		const char *name);
+
+
+/**
+ * Retrieve names of extended grouped statistics of an Ethernet device.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param xstats_names
+ *   An rte_eth_xstat_name array of at least *size* elements to
+ *   be filled. If set to NULL, the function returns the required number
+ *   of elements.
+ * @param size
+ *   The size of the xstats_names array (number of elements).
+ * @param group_id
+ *   Group identificator
+ * @return
+ *   - A positive value lower or equal to size: success. The return value
+ *     is the number of entries filled in the stats table.
+ *   - A positive value higher than size: error, the given statistics table
+ *     is too small. The return value corresponds to the size that should
+ *     be given to succeed. The entries in the table are not valid and
+ *     shall not be used by the caller.
+ */
+int
+rte_eth_xstats_get_names_by_group(uint8_t port_id,
+	struct rte_eth_xstat_name *xstats_names,
+	unsigned int size, uint64_t group_mask);
+
+/**
  * Retrieve extended statistics of an Ethernet device.
  *
  * @param port_id
@@ -2330,6 +2406,33 @@ int rte_eth_xstats_get_names(uint8_t port_id,
  */
 int rte_eth_xstats_get(uint8_t port_id, struct rte_eth_xstat *xstats,
 		unsigned n);
+
+/**
+ * Retrieve extended grouped statistics of an Ethernet device.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param xstats
+ *   A pointer to a table of structure of type *rte_eth_xstat*
+ *   to be filled with device statistics ids and values: id is the
+ *   index of the name string in xstats_names (see rte_eth_xstats_get_names()),
+ *   and value is the statistic counter.
+ *   This parameter can be set to NULL if n is 0.
+ * @param n
+ *   The size of the xstats array (number of elements).
+ * @param group_id
+ *   Group identificator
+ * @return
+ *   - A positive value lower or equal to n: success. The return value
+ *     is the number of entries filled in the stats table.
+ *   - A positive value higher than n: error, the given statistics table
+ *     is too small. The return value corresponds to the size that should
+ *     be given to succeed. The entries in the table are not valid and
+ *     shall not be used by the caller.
+ *   - A negative value on error (invalid port id).
+ */
+int rte_eth_xstats_get_by_group(uint8_t port_id, struct rte_eth_xstat *xstats,
+		unsigned int n, uint64_t group_mask);
 
 /**
  * Reset extended statistics of an Ethernet device.

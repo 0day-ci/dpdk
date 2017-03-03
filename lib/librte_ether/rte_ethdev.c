@@ -87,33 +87,37 @@ static rte_spinlock_t rte_eth_tx_cb_lock = RTE_SPINLOCK_INITIALIZER;
 struct rte_eth_xstats_name_off {
 	char name[RTE_ETH_XSTATS_NAME_SIZE];
 	unsigned offset;
+	uint64_t group_mask;
 };
 
 static const struct rte_eth_xstats_name_off rte_stats_strings[] = {
-	{"rx_good_packets", offsetof(struct rte_eth_stats, ipackets)},
-	{"tx_good_packets", offsetof(struct rte_eth_stats, opackets)},
-	{"rx_good_bytes", offsetof(struct rte_eth_stats, ibytes)},
-	{"tx_good_bytes", offsetof(struct rte_eth_stats, obytes)},
-	{"rx_errors", offsetof(struct rte_eth_stats, ierrors)},
-	{"tx_errors", offsetof(struct rte_eth_stats, oerrors)},
+	{"rx_good_packets", offsetof(struct rte_eth_stats, ipackets), RX_GROUP},
+	{"tx_good_packets", offsetof(struct rte_eth_stats, opackets), TX_GROUP},
+	{"rx_good_bytes", offsetof(struct rte_eth_stats, ibytes), RX_GROUP},
+	{"tx_good_bytes", offsetof(struct rte_eth_stats, obytes), TX_GROUP},
+	{"rx_errors", offsetof(struct rte_eth_stats, ierrors),
+			RX_GROUP | ERR_GROUP},
+	{"tx_errors", offsetof(struct rte_eth_stats, oerrors),
+			TX_GROUP | ERR_GROUP},
 	{"rx_mbuf_allocation_errors", offsetof(struct rte_eth_stats,
-		rx_nombuf)},
+		rx_nombuf), RX_GROUP | ERR_GROUP},
 };
 
 #define RTE_NB_STATS (sizeof(rte_stats_strings) / sizeof(rte_stats_strings[0]))
 
 static const struct rte_eth_xstats_name_off rte_rxq_stats_strings[] = {
-	{"packets", offsetof(struct rte_eth_stats, q_ipackets)},
-	{"bytes", offsetof(struct rte_eth_stats, q_ibytes)},
-	{"errors", offsetof(struct rte_eth_stats, q_errors)},
+	{"packets", offsetof(struct rte_eth_stats, q_ipackets), RXQ_GROUP},
+	{"bytes", offsetof(struct rte_eth_stats, q_ibytes), RXQ_GROUP},
+	{"errors", offsetof(struct rte_eth_stats, q_errors),
+			RXQ_GROUP | ERR_GROUP},
 };
 
 #define RTE_NB_RXQ_STATS (sizeof(rte_rxq_stats_strings) /	\
 		sizeof(rte_rxq_stats_strings[0]))
 
 static const struct rte_eth_xstats_name_off rte_txq_stats_strings[] = {
-	{"packets", offsetof(struct rte_eth_stats, q_opackets)},
-	{"bytes", offsetof(struct rte_eth_stats, q_obytes)},
+	{"packets", offsetof(struct rte_eth_stats, q_opackets), TXQ_GROUP},
+	{"bytes", offsetof(struct rte_eth_stats, q_obytes), TXQ_GROUP},
 };
 #define RTE_NB_TXQ_STATS (sizeof(rte_txq_stats_strings) /	\
 		sizeof(rte_txq_stats_strings[0]))
@@ -1448,6 +1452,110 @@ get_xstats_count(uint8_t port_id)
 	return count;
 }
 
+static int
+get_xstats_count_by_group(uint8_t port_id, uint64_t group_mask)
+{
+	struct rte_eth_dev *dev;
+	int count = 0;
+	int dcount = 0;
+	unsigned int i;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
+	dev = &rte_eth_devices[port_id];
+	if (dev->dev_ops->xstats_get_names_by_group != NULL) {
+		dcount = (*dev->dev_ops->xstats_get_names_by_group)
+				(dev, NULL, 0, group_mask);
+		if (dcount < 0)
+			return dcount;
+	}
+
+
+
+
+	for (i = 0; i < RTE_NB_STATS; i++) {
+		if (rte_stats_strings[i].group_mask & group_mask)
+			count++;
+	}
+	for (i = 0; i < RTE_NB_RXQ_STATS; i++) {
+		if (rte_rxq_stats_strings[i].group_mask & group_mask)
+			count += RTE_MIN(dev->data->nb_rx_queues,
+					RTE_ETHDEV_QUEUE_STAT_CNTRS);
+	}
+	for (i = 0; i < RTE_NB_TXQ_STATS; i++) {
+		if (rte_txq_stats_strings[i].group_mask & group_mask)
+			count += RTE_MIN(dev->data->nb_tx_queues,
+					RTE_ETHDEV_QUEUE_STAT_CNTRS);
+	}
+	return count+dcount;
+}
+
+int
+rte_eth_xstats_get_by_name(uint8_t port_id, struct rte_eth_xstat *xstat,
+		const char *name)
+{
+	struct rte_eth_xstat *xstats;
+	int cnt_xstats, idx_xstat;
+	struct rte_eth_xstat_name *xstats_names;
+
+
+
+	/* Get count */
+	cnt_xstats = rte_eth_xstats_get_names(port_id, NULL, 0);
+	if (cnt_xstats  < 0) {
+		printf("Error: Cannot get count of xstats\n");
+		return -1;
+	}
+
+	/* Get id-name lookup table */
+	xstats_names = malloc(sizeof(struct rte_eth_xstat_name) * cnt_xstats);
+	if (xstats_names == NULL) {
+		printf("Cannot allocate memory for xstats lookup\n");
+		return -1;
+	}
+	if (cnt_xstats != rte_eth_xstats_get_names(
+			port_id, xstats_names, cnt_xstats)) {
+		printf("Error: Cannot get xstats lookup\n");
+		free(xstats_names);
+		return -1;
+	}
+
+	/* Get stats themselves */
+	xstats = malloc(sizeof(struct rte_eth_xstat) * cnt_xstats);
+	if (xstats == NULL) {
+		printf("Cannot allocate memory for xstats\n");
+		free(xstats_names);
+		return -1;
+	}
+
+	if (cnt_xstats != rte_eth_xstats_get(port_id, xstats, cnt_xstats)) {
+		printf("Error: Unable to get xstats\n");
+		free(xstats_names);
+		free(xstats);
+		return -1;
+	}
+
+	if (!xstat) {
+		printf("Error: xstat pointer is NULL\n");
+		free(xstats_names);
+		free(xstats);
+		return -1;
+	}
+
+	/* Display xstats */
+	for (idx_xstat = 0; idx_xstat < cnt_xstats; idx_xstat++) {
+		if (!strcmp(xstats_names[idx_xstat].name, name)) {
+
+			xstat->id = xstats[idx_xstat].id;
+			xstat->value = xstats[idx_xstat].value;
+			return 0;
+		};
+	}
+
+	free(xstats_names);
+	free(xstats);
+	return -1;
+}
+
 int
 rte_eth_xstats_get_names(uint8_t port_id,
 	struct rte_eth_xstat_name *xstats_names,
@@ -1505,6 +1613,83 @@ rte_eth_xstats_get_names(uint8_t port_id,
 			dev,
 			xstats_names + cnt_used_entries,
 			size - cnt_used_entries);
+		if (cnt_driver_entries < 0)
+			return cnt_driver_entries;
+		cnt_used_entries += cnt_driver_entries;
+	}
+
+	return cnt_used_entries;
+}
+
+int
+rte_eth_xstats_get_names_by_group(uint8_t port_id,
+	struct rte_eth_xstat_name *xstats_names,
+	unsigned int size, __rte_unused uint64_t group_mask)
+{
+	struct rte_eth_dev *dev;
+	int cnt_used_entries;
+	int cnt_expected_entries;
+	int cnt_driver_entries;
+	uint32_t idx, id_queue;
+	uint16_t num_q;
+
+	cnt_expected_entries = get_xstats_count_by_group(port_id, group_mask);
+	if (xstats_names == NULL || cnt_expected_entries < 0 ||
+			(int)size < cnt_expected_entries)
+		return cnt_expected_entries;
+
+	/* port_id checked in get_xstats_count() */
+	dev = &rte_eth_devices[port_id];
+	cnt_used_entries = 0;
+
+	for (idx = 0; idx < RTE_NB_STATS; idx++) {
+		if (rte_stats_strings[idx].group_mask & group_mask) {
+			snprintf(xstats_names[cnt_used_entries].name,
+				sizeof(xstats_names[0].name),
+				"%s", rte_stats_strings[idx].name);
+			cnt_used_entries++;
+		}
+	}
+	num_q = RTE_MIN(dev->data->nb_rx_queues, RTE_ETHDEV_QUEUE_STAT_CNTRS);
+	for (id_queue = 0; id_queue < num_q; id_queue++) {
+		for (idx = 0; idx < RTE_NB_RXQ_STATS; idx++) {
+			if (rte_rxq_stats_strings[idx].group_mask &
+					group_mask) {
+				snprintf(xstats_names[cnt_used_entries].name,
+					sizeof(xstats_names[0].name),
+					"rx_q%u%s",
+					id_queue,
+					rte_rxq_stats_strings[idx].name);
+				cnt_used_entries++;
+			}
+		}
+	}
+	num_q = RTE_MIN(dev->data->nb_tx_queues, RTE_ETHDEV_QUEUE_STAT_CNTRS);
+	for (id_queue = 0; id_queue < num_q; id_queue++) {
+		for (idx = 0; idx < RTE_NB_TXQ_STATS; idx++) {
+			if (rte_txq_stats_strings[idx].group_mask &
+					group_mask) {
+				snprintf(xstats_names[cnt_used_entries].name,
+					sizeof(xstats_names[0].name),
+					"tx_q%u%s",
+					id_queue,
+					rte_txq_stats_strings[idx].name);
+				cnt_used_entries++;
+			}
+
+		}
+	}
+
+	if (dev->dev_ops->xstats_get_names != NULL) {
+		/* If there are any driver-specific xstats, append them
+		 * to end of list.
+		 */
+		cnt_driver_entries =
+				(*dev->dev_ops->xstats_get_names_by_group)(
+			dev,
+			xstats_names + cnt_used_entries,
+			size - cnt_used_entries,
+			group_mask);
 		if (cnt_driver_entries < 0)
 			return cnt_driver_entries;
 		cnt_used_entries += cnt_driver_entries;
@@ -1595,6 +1780,104 @@ rte_eth_xstats_get(uint8_t port_id, struct rte_eth_xstat *xstats,
 	return count + xcount;
 }
 
+/* retrieve ethdev extended statistics */
+int
+rte_eth_xstats_get_by_group(uint8_t port_id, struct rte_eth_xstat *xstats,
+	unsigned int n, uint64_t group_mask)
+{
+	struct rte_eth_stats eth_stats;
+	struct rte_eth_dev *dev;
+	unsigned int count = 0, i, q;
+	signed int xcount = 0;
+	uint64_t val, *stats_ptr;
+	uint16_t nb_rxqs, nb_txqs;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
+
+	dev = &rte_eth_devices[port_id];
+
+	nb_rxqs = RTE_MIN(dev->data->nb_rx_queues, RTE_ETHDEV_QUEUE_STAT_CNTRS);
+	nb_txqs = RTE_MIN(dev->data->nb_tx_queues, RTE_ETHDEV_QUEUE_STAT_CNTRS);
+
+	for (i = 0; i < RTE_NB_STATS; i++) {
+		if (rte_stats_strings[i].group_mask & group_mask)
+			count++;
+	}
+	for (i = 0; i < RTE_NB_RXQ_STATS; i++) {
+		if (rte_rxq_stats_strings[i].group_mask & group_mask)
+			count += nb_rxqs;
+	}
+	for (i = 0; i < RTE_NB_TXQ_STATS; i++) {
+		if (rte_txq_stats_strings[i].group_mask & group_mask)
+			count += nb_txqs;
+	}
+
+	/* implemented by the driver */
+	if (dev->dev_ops->xstats_get_by_group != NULL) {
+		/* Retrieve the xstats from the driver at the end of the
+		 * xstats struct.
+		 */
+		xcount = (*dev->dev_ops->xstats_get_by_group)(dev,
+				xstats ? xstats + count : NULL,
+				(n > count) ? n - count : 0,
+				group_mask);
+
+		if (xcount < 0)
+			return xcount;
+	}
+
+	if (n < count + xcount || xstats == NULL)
+		return count + xcount;
+
+	/* now fill the xstats structure */
+	count = 0;
+	rte_eth_stats_get(port_id, &eth_stats);
+
+	/* global stats */
+	for (i = 0; i < RTE_NB_STATS; i++) {
+		if (rte_stats_strings[i].group_mask & group_mask) {
+			stats_ptr = RTE_PTR_ADD(&eth_stats,
+						rte_stats_strings[i].offset);
+			val = *stats_ptr;
+			xstats[count++].value = val;
+		}
+	}
+
+	/* per-rxq stats */
+	for (q = 0; q < nb_rxqs; q++) {
+		for (i = 0; i < RTE_NB_RXQ_STATS; i++) {
+			if (rte_rxq_stats_strings[i].group_mask & group_mask) {
+				stats_ptr = RTE_PTR_ADD(&eth_stats,
+						rte_rxq_stats_strings[i].offset
+						+ q * sizeof(uint64_t));
+				val = *stats_ptr;
+				xstats[count++].value = val;
+			}
+		}
+	}
+
+	/* per-txq stats */
+	for (q = 0; q < nb_txqs; q++) {
+		for (i = 0; i < RTE_NB_TXQ_STATS; i++) {
+			if (rte_txq_stats_strings[i].group_mask & group_mask) {
+				stats_ptr = RTE_PTR_ADD(&eth_stats,
+						rte_txq_stats_strings[i].offset
+						+ q * sizeof(uint64_t));
+				val = *stats_ptr;
+				xstats[count++].value = val;
+			}
+		}
+	}
+
+	for (i = 0; i < count; i++)
+		xstats[i].id = i;
+	/* add an offset to driver-specific stats */
+	for ( ; i < count + xcount; i++)
+		xstats[i].id += count;
+
+	return count + xcount;
+}
+
 /* reset ethdev extended statistics */
 void
 rte_eth_xstats_reset(uint8_t port_id)
@@ -1624,7 +1907,8 @@ set_queue_stats_mapping(uint8_t port_id, uint16_t queue_id, uint8_t stat_idx,
 
 	dev = &rte_eth_devices[port_id];
 
-	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->queue_stats_mapping_set, -ENOTSUP);
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->queue_stats_mapping_set,
+			-ENOTSUP);
 	return (*dev->dev_ops->queue_stats_mapping_set)
 			(dev, queue_id, stat_idx, is_rx);
 }
