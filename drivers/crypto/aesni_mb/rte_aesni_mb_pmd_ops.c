@@ -342,24 +342,33 @@ aesni_mb_pmd_qp_set_unique_name(struct rte_cryptodev *dev,
 /** Create a ring to place processed operations on */
 static struct rte_ring *
 aesni_mb_pmd_qp_create_processed_ops_ring(struct aesni_mb_qp *qp,
-		unsigned ring_size, int socket_id)
-{
-	struct rte_ring *r;
+               const char *str, unsigned ring_size, int socket_id)
+ {
+        struct rte_ring *r;
+       char ring_name[RTE_CRYPTODEV_NAME_LEN];
 
-	r = rte_ring_lookup(qp->name);
-	if (r) {
-		if (r->prod.size >= ring_size) {
-			MB_LOG_INFO("Reusing existing ring %s for processed ops",
-					 qp->name);
-			return r;
-		}
+       unsigned n = snprintf(ring_name, sizeof(ring_name),
+                       "%s_%s",
+                       qp->name, str);
 
-		MB_LOG_ERR("Unable to reuse existing ring %s for processed ops",
-				 qp->name);
-		return NULL;
-	}
+       if (n > sizeof(ring_name))
+               return NULL;
 
-	return rte_ring_create(qp->name, ring_size, socket_id,
+
+       r = rte_ring_lookup(ring_name);
+        if (r) {
+                if (r->prod.size >= ring_size) {
+                        MB_LOG_INFO("Reusing existing ring %s for processed ops",
+                                       ring_name);
+                        return r;
+                }
+
+                MB_LOG_ERR("Unable to reuse existing ring %s for processed ops",
+                               ring_name);
+                return NULL;
+        }
+
+       return rte_ring_create(ring_name, ring_size, socket_id,
 			RING_F_SP_ENQ | RING_F_SC_DEQ);
 }
 
@@ -388,20 +397,20 @@ aesni_mb_pmd_qp_setup(struct rte_cryptodev *dev, uint16_t qp_id,
 	if (aesni_mb_pmd_qp_set_unique_name(dev, qp))
 		goto qp_setup_cleanup;
 
-	qp->ops = &job_ops[internals->vector_mode];
 
-	qp->processed_ops = aesni_mb_pmd_qp_create_processed_ops_ring(qp,
-			qp_conf->nb_descriptors, socket_id);
-	if (qp->processed_ops == NULL)
-		goto qp_setup_cleanup;
+	qp->op_fns = &job_ops[internals->vector_mode];
+
+	qp->ingress_queue = aesni_mb_pmd_qp_create_processed_ops_ring(qp,
+			"ingress", qp_conf->nb_descriptors, socket_id);
+	if (qp->ingress_queue == NULL)
+                goto qp_setup_cleanup;
 
 	qp->sess_mp = dev->data->session_pool;
 
 	memset(&qp->stats, 0, sizeof(qp->stats));
 
 	/* Initialise multi-buffer manager */
-	(*qp->ops->job.init_mgr)(&qp->mb_mgr);
-
+	(*qp->op_fns->job.init_mgr)(&qp->mb_mgr);
 	return 0;
 
 qp_setup_cleanup:
