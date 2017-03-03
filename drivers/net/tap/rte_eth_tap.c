@@ -691,7 +691,7 @@ eth_dev_tap_create(const char *name, char *tap_name)
 	dev->driver = NULL;
 	dev->rx_pkt_burst = pmd_rx_burst;
 	dev->tx_pkt_burst = pmd_tx_burst;
-	snprintf(dev->data->name, sizeof(dev->data->name), "%s", name);
+	snprintf(dev->data->name, sizeof(dev->data->name), "%s", tap_name);
 
 	/* Presetup the fds to -1 as being not valid */
 	for (i = 0; i < RTE_PMD_TAP_MAX_QUEUES; i++) {
