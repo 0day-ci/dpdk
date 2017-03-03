@@ -115,9 +115,18 @@ static void eth_igb_stats_get(struct rte_eth_dev *dev,
 				struct rte_eth_stats *rte_stats);
 static int eth_igb_xstats_get(struct rte_eth_dev *dev,
 			      struct rte_eth_xstat *xstats, unsigned n);
+static
+int eth_igb_xstats_get_by_group(struct rte_eth_dev *dev,
+		struct rte_eth_xstat *xstats,
+		unsigned int n, uint64_t group_mask);
 static int eth_igb_xstats_get_names(struct rte_eth_dev *dev,
 				    struct rte_eth_xstat_name *xstats_names,
 				    unsigned limit);
+static int
+eth_igb_xstats_get_names_by_group(__rte_unused struct rte_eth_dev *dev,
+	struct rte_eth_xstat_name *xstats_names,
+	__rte_unused unsigned int limit,
+	uint64_t group_mask);
 static void eth_igb_stats_reset(struct rte_eth_dev *dev);
 static void eth_igb_xstats_reset(struct rte_eth_dev *dev);
 static int eth_igb_fw_version_get(struct rte_eth_dev *dev,
@@ -390,7 +399,9 @@ static const struct eth_dev_ops eth_igb_ops = {
 	.link_update          = eth_igb_link_update,
 	.stats_get            = eth_igb_stats_get,
 	.xstats_get           = eth_igb_xstats_get,
+	.xstats_get_by_group  = eth_igb_xstats_get_by_group,
 	.xstats_get_names     = eth_igb_xstats_get_names,
+	.xstats_get_names_by_group = eth_igb_xstats_get_names_by_group,
 	.stats_reset          = eth_igb_stats_reset,
 	.xstats_reset         = eth_igb_xstats_reset,
 	.fw_version_get       = eth_igb_fw_version_get,
@@ -473,78 +484,128 @@ static const struct eth_dev_ops igbvf_eth_dev_ops = {
 struct rte_igb_xstats_name_off {
 	char name[RTE_ETH_XSTATS_NAME_SIZE];
 	unsigned offset;
+	uint64_t group_mask;
 };
 
 static const struct rte_igb_xstats_name_off rte_igb_stats_strings[] = {
-	{"rx_crc_errors", offsetof(struct e1000_hw_stats, crcerrs)},
-	{"rx_align_errors", offsetof(struct e1000_hw_stats, algnerrc)},
-	{"rx_symbol_errors", offsetof(struct e1000_hw_stats, symerrs)},
-	{"rx_missed_packets", offsetof(struct e1000_hw_stats, mpc)},
-	{"tx_single_collision_packets", offsetof(struct e1000_hw_stats, scc)},
-	{"tx_multiple_collision_packets", offsetof(struct e1000_hw_stats, mcc)},
+	{"rx_crc_errors", offsetof(struct e1000_hw_stats, crcerrs),
+			RX_GROUP | ERR_GROUP},
+	{"rx_align_errors", offsetof(struct e1000_hw_stats, algnerrc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_symbol_errors", offsetof(struct e1000_hw_stats, symerrs),
+			RX_GROUP | ERR_GROUP},
+	{"rx_missed_packets", offsetof(struct e1000_hw_stats, mpc),
+			RX_GROUP},
+	{"tx_single_collision_packets", offsetof(struct e1000_hw_stats, scc),
+			TX_GROUP},
+	{"tx_multiple_collision_packets", offsetof(struct e1000_hw_stats, mcc),
+			TX_GROUP},
 	{"tx_excessive_collision_packets", offsetof(struct e1000_hw_stats,
-		ecol)},
-	{"tx_late_collisions", offsetof(struct e1000_hw_stats, latecol)},
-	{"tx_total_collisions", offsetof(struct e1000_hw_stats, colc)},
-	{"tx_deferred_packets", offsetof(struct e1000_hw_stats, dc)},
-	{"tx_no_carrier_sense_packets", offsetof(struct e1000_hw_stats, tncrs)},
-	{"rx_carrier_ext_errors", offsetof(struct e1000_hw_stats, cexterr)},
-	{"rx_length_errors", offsetof(struct e1000_hw_stats, rlec)},
-	{"rx_xon_packets", offsetof(struct e1000_hw_stats, xonrxc)},
-	{"tx_xon_packets", offsetof(struct e1000_hw_stats, xontxc)},
-	{"rx_xoff_packets", offsetof(struct e1000_hw_stats, xoffrxc)},
-	{"tx_xoff_packets", offsetof(struct e1000_hw_stats, xofftxc)},
+		ecol), TX_GROUP},
+	{"tx_late_collisions", offsetof(struct e1000_hw_stats, latecol),
+			TX_GROUP},
+	{"tx_total_collisions", offsetof(struct e1000_hw_stats, colc),
+			TX_GROUP},
+	{"tx_deferred_packets", offsetof(struct e1000_hw_stats, dc),
+			TX_GROUP},
+	{"tx_no_carrier_sense_packets", offsetof(struct e1000_hw_stats, tncrs),
+			TX_GROUP},
+	{"rx_carrier_ext_errors", offsetof(struct e1000_hw_stats, cexterr),
+			RX_GROUP | ERR_GROUP},
+	{"rx_length_errors", offsetof(struct e1000_hw_stats, rlec),
+			RX_GROUP | ERR_GROUP},
+	{"rx_xon_packets", offsetof(struct e1000_hw_stats, xonrxc),
+			RX_GROUP},
+	{"tx_xon_packets", offsetof(struct e1000_hw_stats, xontxc),
+			TX_GROUP},
+	{"rx_xoff_packets", offsetof(struct e1000_hw_stats, xoffrxc),
+			RX_GROUP},
+	{"tx_xoff_packets", offsetof(struct e1000_hw_stats, xofftxc),
+			TX_GROUP},
 	{"rx_flow_control_unsupported_packets", offsetof(struct e1000_hw_stats,
-		fcruc)},
-	{"rx_size_64_packets", offsetof(struct e1000_hw_stats, prc64)},
-	{"rx_size_65_to_127_packets", offsetof(struct e1000_hw_stats, prc127)},
-	{"rx_size_128_to_255_packets", offsetof(struct e1000_hw_stats, prc255)},
-	{"rx_size_256_to_511_packets", offsetof(struct e1000_hw_stats, prc511)},
+		fcruc), RX_GROUP},
+	{"rx_size_64_packets", offsetof(struct e1000_hw_stats, prc64),
+			RX_GROUP},
+	{"rx_size_65_to_127_packets", offsetof(struct e1000_hw_stats, prc127),
+			RX_GROUP},
+	{"rx_size_128_to_255_packets", offsetof(struct e1000_hw_stats, prc255),
+			RX_GROUP},
+	{"rx_size_256_to_511_packets", offsetof(struct e1000_hw_stats, prc511),
+			RX_GROUP},
 	{"rx_size_512_to_1023_packets", offsetof(struct e1000_hw_stats,
-		prc1023)},
+		prc1023), RX_GROUP},
 	{"rx_size_1024_to_max_packets", offsetof(struct e1000_hw_stats,
-		prc1522)},
-	{"rx_broadcast_packets", offsetof(struct e1000_hw_stats, bprc)},
-	{"rx_multicast_packets", offsetof(struct e1000_hw_stats, mprc)},
-	{"rx_undersize_errors", offsetof(struct e1000_hw_stats, ruc)},
-	{"rx_fragment_errors", offsetof(struct e1000_hw_stats, rfc)},
-	{"rx_oversize_errors", offsetof(struct e1000_hw_stats, roc)},
-	{"rx_jabber_errors", offsetof(struct e1000_hw_stats, rjc)},
-	{"rx_management_packets", offsetof(struct e1000_hw_stats, mgprc)},
-	{"rx_management_dropped", offsetof(struct e1000_hw_stats, mgpdc)},
-	{"tx_management_packets", offsetof(struct e1000_hw_stats, mgptc)},
-	{"rx_total_packets", offsetof(struct e1000_hw_stats, tpr)},
-	{"tx_total_packets", offsetof(struct e1000_hw_stats, tpt)},
-	{"rx_total_bytes", offsetof(struct e1000_hw_stats, tor)},
-	{"tx_total_bytes", offsetof(struct e1000_hw_stats, tot)},
-	{"tx_size_64_packets", offsetof(struct e1000_hw_stats, ptc64)},
-	{"tx_size_65_to_127_packets", offsetof(struct e1000_hw_stats, ptc127)},
-	{"tx_size_128_to_255_packets", offsetof(struct e1000_hw_stats, ptc255)},
-	{"tx_size_256_to_511_packets", offsetof(struct e1000_hw_stats, ptc511)},
+		prc1522), RX_GROUP},
+	{"rx_broadcast_packets", offsetof(struct e1000_hw_stats, bprc),
+			RX_GROUP},
+	{"rx_multicast_packets", offsetof(struct e1000_hw_stats, mprc),
+			RX_GROUP},
+	{"rx_undersize_errors", offsetof(struct e1000_hw_stats, ruc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_fragment_errors", offsetof(struct e1000_hw_stats, rfc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_oversize_errors", offsetof(struct e1000_hw_stats, roc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_jabber_errors", offsetof(struct e1000_hw_stats, rjc),
+			RX_GROUP | ERR_GROUP},
+	{"rx_management_packets", offsetof(struct e1000_hw_stats, mgprc),
+			RX_GROUP},
+	{"rx_management_dropped", offsetof(struct e1000_hw_stats, mgpdc),
+			RX_GROUP},
+	{"tx_management_packets", offsetof(struct e1000_hw_stats, mgptc),
+			TX_GROUP},
+	{"rx_total_packets", offsetof(struct e1000_hw_stats, tpr),
+			RX_GROUP},
+	{"tx_total_packets", offsetof(struct e1000_hw_stats, tpt),
+			TX_GROUP},
+	{"rx_total_bytes", offsetof(struct e1000_hw_stats, tor),
+			RX_GROUP},
+	{"tx_total_bytes", offsetof(struct e1000_hw_stats, tot),
+			TX_GROUP},
+	{"tx_size_64_packets", offsetof(struct e1000_hw_stats, ptc64),
+			TX_GROUP},
+	{"tx_size_65_to_127_packets", offsetof(struct e1000_hw_stats, ptc127),
+			TX_GROUP},
+	{"tx_size_128_to_255_packets", offsetof(struct e1000_hw_stats, ptc255),
+			TX_GROUP},
+	{"tx_size_256_to_511_packets", offsetof(struct e1000_hw_stats, ptc511),
+			TX_GROUP},
 	{"tx_size_512_to_1023_packets", offsetof(struct e1000_hw_stats,
-		ptc1023)},
+		ptc1023), TX_GROUP},
 	{"tx_size_1023_to_max_packets", offsetof(struct e1000_hw_stats,
-		ptc1522)},
-	{"tx_multicast_packets", offsetof(struct e1000_hw_stats, mptc)},
-	{"tx_broadcast_packets", offsetof(struct e1000_hw_stats, bptc)},
-	{"tx_tso_packets", offsetof(struct e1000_hw_stats, tsctc)},
-	{"tx_tso_errors", offsetof(struct e1000_hw_stats, tsctfc)},
-	{"rx_sent_to_host_packets", offsetof(struct e1000_hw_stats, rpthc)},
-	{"tx_sent_by_host_packets", offsetof(struct e1000_hw_stats, hgptc)},
-	{"rx_code_violation_packets", offsetof(struct e1000_hw_stats, scvpc)},
-
-	{"interrupt_assert_count", offsetof(struct e1000_hw_stats, iac)},
+		ptc1522), TX_GROUP},
+	{"tx_multicast_packets", offsetof(struct e1000_hw_stats, mptc),
+			TX_GROUP},
+	{"tx_broadcast_packets", offsetof(struct e1000_hw_stats, bptc),
+			TX_GROUP},
+	{"tx_tso_packets", offsetof(struct e1000_hw_stats, tsctc),
+			TX_GROUP},
+	{"tx_tso_errors", offsetof(struct e1000_hw_stats, tsctfc),
+			TX_GROUP | ERR_GROUP},
+	{"rx_sent_to_host_packets", offsetof(struct e1000_hw_stats, rpthc),
+			RX_GROUP},
+	{"tx_sent_by_host_packets", offsetof(struct e1000_hw_stats, hgptc),
+			TX_GROUP},
+	{"rx_code_violation_packets", offsetof(struct e1000_hw_stats, scvpc),
+			TX_GROUP},
+	{"interrupt_assert_count", offsetof(struct e1000_hw_stats, iac),
+			RX_GROUP},
 };
 
 #define IGB_NB_XSTATS (sizeof(rte_igb_stats_strings) / \
 		sizeof(rte_igb_stats_strings[0]))
 
 static const struct rte_igb_xstats_name_off rte_igbvf_stats_strings[] = {
-	{"rx_multicast_packets", offsetof(struct e1000_vf_stats, mprc)},
-	{"rx_good_loopback_packets", offsetof(struct e1000_vf_stats, gprlbc)},
-	{"tx_good_loopback_packets", offsetof(struct e1000_vf_stats, gptlbc)},
-	{"rx_good_loopback_bytes", offsetof(struct e1000_vf_stats, gorlbc)},
-	{"tx_good_loopback_bytes", offsetof(struct e1000_vf_stats, gotlbc)},
+	{"rx_multicast_packets", offsetof(struct e1000_vf_stats, mprc),
+			RX_GROUP | VF_GROUP},
+	{"rx_good_loopback_packets", offsetof(struct e1000_vf_stats, gprlbc),
+			RX_GROUP | VF_GROUP},
+	{"tx_good_loopback_packets", offsetof(struct e1000_vf_stats, gptlbc),
+			TX_GROUP | VF_GROUP},
+	{"rx_good_loopback_bytes", offsetof(struct e1000_vf_stats, gorlbc),
+			RX_GROUP | VF_GROUP},
+	{"tx_good_loopback_bytes", offsetof(struct e1000_vf_stats, gotlbc),
+			TX_GROUP | VF_GROUP},
 };
 
 #define IGBVF_NB_XSTATS (sizeof(rte_igbvf_stats_strings) / \
@@ -1846,10 +1907,43 @@ static int eth_igb_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 }
 
 static int
-eth_igb_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
-		   unsigned n)
+eth_igb_xstats_get_names_by_group(__rte_unused struct rte_eth_dev *dev,
+	struct rte_eth_xstat_name *xstats_names,
+	__rte_unused unsigned int limit,
+	uint64_t group_mask)
 {
-	struct e1000_hw *hw = E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	unsigned int i;
+	unsigned int count = 0;
+
+	if (xstats_names == NULL) {
+		for (i = 0; i < IGB_NB_XSTATS; i++) {
+			if (rte_igb_stats_strings[i].group_mask & group_mask)
+				count++;
+		}
+		return count;
+	}
+
+	/* Note: limit checked in rte_eth_xstats_names() */
+
+	count = 0;
+	for (i = 0; i < IGB_NB_XSTATS; i++) {
+		if (rte_igb_stats_strings[i].group_mask & group_mask) {
+			snprintf(xstats_names[count].name,
+					sizeof(xstats_names[0].name),
+				 "%s", rte_igb_stats_strings[i].name);
+			count++;
+		}
+	}
+	return count;
+}
+
+static
+int eth_igb_xstats_get(struct rte_eth_dev *dev,
+		struct rte_eth_xstat *xstats,
+		unsigned int n)
+{
+	struct e1000_hw *hw =
+			E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct e1000_hw_stats *hw_stats =
 			E1000_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
 	unsigned i;
@@ -1875,8 +1969,50 @@ eth_igb_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 	return IGB_NB_XSTATS;
 }
 
+static
+int eth_igb_xstats_get_by_group(struct rte_eth_dev *dev,
+		struct rte_eth_xstat *xstats,
+		unsigned int n, uint64_t group_mask)
+{
+	struct e1000_hw *hw =
+			E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct e1000_hw_stats *hw_stats =
+			E1000_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	unsigned int i;
+	unsigned int count = 0;
+
+
+	for (i = 0; i < IGB_NB_XSTATS; i++) {
+		if (rte_igb_stats_strings[i].group_mask & group_mask)
+			count++;
+	}
+
+	if (n < IGB_NB_XSTATS)
+		return count;
+
+	igb_read_stats_registers(hw, hw_stats);
+
+	/* If this is a reset xstats is NULL, and we have cleared the
+	 * registers by reading them.
+	 */
+	if (!xstats)
+		return 0;
+
+	/* Extended stats */
+	for (i = 0; i < IGB_NB_XSTATS; i++) {
+		if (rte_igb_stats_strings[i].group_mask & group_mask) {
+			xstats[i].id = i;
+			xstats[i].value = *(uint64_t *)(((char *)hw_stats) +
+				rte_igb_stats_strings[i].offset);
+		}
+	}
+
+	return count;
+}
+
 static void
-igbvf_read_stats_registers(struct e1000_hw *hw, struct e1000_vf_stats *hw_stats)
+igbvf_read_stats_registers(struct e1000_hw *hw,
+		struct e1000_vf_stats *hw_stats)
 {
 	/* Good Rx packets, include VF loopback */
 	UPDATE_VF_STAT(E1000_VFGPRC,
@@ -2314,7 +2450,8 @@ igb_hw_control_acquire(struct e1000_hw *hw)
 
 	/* Let firmware know the driver has taken over */
 	ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
-	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext | E1000_CTRL_EXT_DRV_LOAD);
+	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext |
+			E1000_CTRL_EXT_DRV_LOAD);
 }
 
 /*
