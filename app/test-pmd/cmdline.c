@@ -596,6 +596,9 @@ static void cmd_help_long_parsed(void *parsed_result,
 			"port close (port_id|all)\n"
 			"    Close all ports or port_id.\n\n"
 
+			"port reset (port_id|all)\n"
+			"    Reset all ports or port_id.\n\n"
+
 			"port attach (ident)\n"
 			"    Attach physical or virtual dev by pci address or virtual device name\n\n"
 
@@ -906,6 +909,8 @@ static void cmd_operate_port_parsed(void *parsed_result,
 		stop_port(RTE_PORT_ALL);
 	else if (!strcmp(res->name, "close"))
 		close_port(RTE_PORT_ALL);
+	else if (!strcmp(res->name, "reset"))
+		reset_port(RTE_PORT_ALL);
 	else
 		printf("Unknown parameter\n");
 }
@@ -915,14 +920,15 @@ cmdline_parse_token_string_t cmd_operate_port_all_cmd =
 								"port");
 cmdline_parse_token_string_t cmd_operate_port_all_port =
 	TOKEN_STRING_INITIALIZER(struct cmd_operate_port_result, name,
-						"start#stop#close");
+						"start#stop#close#reset");
 cmdline_parse_token_string_t cmd_operate_port_all_all =
 	TOKEN_STRING_INITIALIZER(struct cmd_operate_port_result, value, "all");
 
 cmdline_parse_inst_t cmd_operate_port = {
 	.f = cmd_operate_port_parsed,
 	.data = NULL,
-	.help_str = "port start|stop|close all: Start/Stop/Close all ports",
+	.help_str = "port start|stop|close|reset all: Start/Stop/Close/"
+			"Reset all ports",
 	.tokens = {
 		(void *)&cmd_operate_port_all_cmd,
 		(void *)&cmd_operate_port_all_port,
@@ -950,6 +956,8 @@ static void cmd_operate_specific_port_parsed(void *parsed_result,
 		stop_port(res->value);
 	else if (!strcmp(res->name, "close"))
 		close_port(res->value);
+	else if (!strcmp(res->name, "reset"))
+		reset_port(res->value);
 	else
 		printf("Unknown parameter\n");
 }
@@ -959,7 +967,7 @@ cmdline_parse_token_string_t cmd_operate_specific_port_cmd =
 							keyword, "port");
 cmdline_parse_token_string_t cmd_operate_specific_port_port =
 	TOKEN_STRING_INITIALIZER(struct cmd_operate_specific_port_result,
-						name, "start#stop#close");
+						name, "start#stop#close#reset");
 cmdline_parse_token_num_t cmd_operate_specific_port_id =
 	TOKEN_NUM_INITIALIZER(struct cmd_operate_specific_port_result,
 							value, UINT8);
@@ -967,7 +975,8 @@ cmdline_parse_token_num_t cmd_operate_specific_port_id =
 cmdline_parse_inst_t cmd_operate_specific_port = {
 	.f = cmd_operate_specific_port_parsed,
 	.data = NULL,
-	.help_str = "port start|stop|close <port_id>: Start/Stop/Close port_id",
+	.help_str = "port start|stop|close|reset <port_id>: Start/Stop/Close/"
+			"Reset port_id",
 	.tokens = {
 		(void *)&cmd_operate_specific_port_cmd,
 		(void *)&cmd_operate_specific_port_port,

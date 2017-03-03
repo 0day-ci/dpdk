@@ -137,6 +137,7 @@ portid_t  nb_fwd_ports;  /**< Number of forwarding ports. */
 
 unsigned int fwd_lcores_cpuids[RTE_MAX_LCORE]; /**< CPU ids configuration. */
 portid_t fwd_ports_ids[RTE_MAX_ETHPORTS];      /**< Port ids configuration. */
+volatile char reset_ports[RTE_MAX_ETHPORTS] = {0};  /**< Portr reset falg. */
 
 struct fwd_stream **fwd_streams; /**< For each RX queue of each port. */
 streamid_t nb_fwd_streams;       /**< Is equal to (nb_ports * nb_rxq). */
@@ -600,6 +601,7 @@ init_config(void)
 	/* Configuration of packet forwarding streams. */
 	if (init_fwd_streams() < 0)
 		rte_exit(EXIT_FAILURE, "FAIL from init_fwd_streams()\n");
+
 
 	fwd_config_setup();
 }
@@ -1305,6 +1307,17 @@ port_is_closed(portid_t port_id)
 	return 1;
 }
 
+static void
+reset_event_callback(uint8_t port_id, enum rte_eth_event_type type, void *param)
+{
+	RTE_SET_USED(param);
+
+	printf("Event type: %s on port %d\n",
+		type == RTE_ETH_EVENT_INTR_RESET ? "RESET interrupt" :
+		"unknown event", port_id);
+	reset_ports[port_id] = 1;
+}
+
 int
 start_port(portid_t pid)
 {
@@ -1350,6 +1363,10 @@ start_port(portid_t pid)
 				return -1;
 			}
 		}
+
+		/* register reset interrupt callback */
+		rte_eth_dev_callback_register(pi, RTE_ETH_EVENT_INTR_RESET,
+			reset_event_callback, NULL);
 		if (port->need_reconfig_queues > 0) {
 			port->need_reconfig_queues = 0;
 			/* setup tx queues */
@@ -1553,6 +1570,56 @@ close_port(portid_t pid)
 		if (rte_atomic16_cmpset(&(port->port_status),
 			RTE_PORT_HANDLING, RTE_PORT_CLOSED) == 0)
 			printf("Port %d cannot be set to closed\n", pi);
+	}
+
+	printf("Done\n");
+}
+
+void
+reset_port(portid_t pid)
+{
+	portid_t pi;
+	struct rte_port *port;
+
+	if (port_id_is_invalid(pid, ENABLED_WARN))
+		return;
+
+	printf("Closing ports...\n");
+
+	FOREACH_PORT(pi, ports) {
+		if (pid != pi && pid != (portid_t)RTE_PORT_ALL)
+			continue;
+
+		if (port_is_forwarding(pi) != 0 && test_done == 0) {
+			printf("Please remove port %d from forwarding "
+					"configuration.\n", pi);
+			continue;
+		}
+
+		if (port_is_bonding_slave(pi)) {
+			printf("Please remove port %d from "
+					"bonded device.\n", pi);
+			continue;
+		}
+
+		if (!reset_ports[pi]) {
+			printf("vf must get reset port %d info from "
+					"pf before reset.\n", pi);
+			continue;
+		}
+
+		port = &ports[pi];
+		if (rte_atomic16_cmpset(&(port->port_status),
+			RTE_PORT_STARTED, RTE_PORT_HANDLING) == 1) {
+			printf("Port %d is not started\n", pi);
+			continue;
+		}
+
+		reset_ports[pi] = 0;
+
+		if (rte_atomic16_cmpset(&(port->port_status),
+			RTE_PORT_HANDLING, RTE_PORT_STARTED) == 0)
+			printf("Port %d cannot be set to started\n", pi);
 	}
 
 	printf("Done\n");
