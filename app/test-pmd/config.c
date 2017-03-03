@@ -100,6 +100,11 @@
 
 #include "testpmd.h"
 
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+
 static char *flowtype_to_str(uint16_t flow_type);
 
 static const struct {
@@ -3244,4 +3249,113 @@ port_dcb_info_display(uint8_t port_id)
 	for (i = 0; i < dcb_info.nb_tcs; i++)
 		printf("\t%4d", dcb_info.tc_queue.tc_txq[0][i].nb_queue);
 	printf("\n");
+}
+
+uint8_t *
+open_package_file(const char *file_path)
+{
+	FILE *fh = fopen(file_path, "rb");
+	uint32_t pkg_size;
+	uint8_t *buf = NULL;
+	int ret = 0;
+
+	if (fh == NULL) {
+		printf("%s: Failed to open %s\n", __func__, file_path);
+		return buf;
+	}
+
+	ret = fseek(fh, 0, SEEK_END);
+	if (ret < 0) {
+		fclose(fh);
+		printf("%s: File operations failed\n", __func__);
+		return buf;
+	}
+
+	pkg_size = ftell(fh);
+
+	buf = (uint8_t *)malloc(pkg_size);
+	if (!buf) {
+		fclose(fh);
+		printf("%s: Failed to malloc memory\n",	__func__);
+		return buf;
+	}
+
+	ret = fseek(fh, 0, SEEK_SET);
+	if (ret < 0) {
+		fclose(fh);
+                printf("%s: File operations failed\n", __func__);
+		close_package_file(buf);
+		return NULL;
+        }
+	fread(buf, 1, pkg_size, fh);
+
+	for(uint32_t i = 0; i < pkg_size; i++) {
+		if (!(i % 16))
+			printf("   ");
+		printf(" 0x%02X,", buf[i]);
+		if (!((i + 1) % 16))
+			printf("\n");
+	}
+
+	fclose(fh);
+
+	return buf;
+}
+
+/* uint8_t * */
+/* open_package_file(const char *file_path) */
+/* { */
+/* 	int fd = STDOUT_FILENO; */
+/*         struct stat stf; */
+/*         uint8_t *buf = NULL; */
+
+/*         if (stat(file_path, &stf) == -1) { */
+/*                 dprintf(fd, "unable to access '%s'\n", file_path); */
+/*                 return NULL; */
+/*         } */
+
+/*         if ((stf.st_mode & S_IFMT) != S_IFREG) { */
+/*                 dprintf(fd, "'%s' is not a file\n", file_path); */
+/*                 return NULL; */
+/*         } */
+
+/*         buf = (uint8_t *)malloc(stf.st_size); */
+/*         if (!buf) { */
+/*                 dprintf(fd, "not enough memory to load %u bytes\n", (uint32_t)stf.st_size); */
+/*                 return NULL; */
+/*         } */
+
+/*         int file = open(file_path, O_RDONLY, S_IRUSR); */
+/*         if (file < 0) { */
+/*                 dprintf(fd, "unable to open '%s'\n", file_path); */
+/*                 return NULL; */
+/*         } */
+
+/*         if (read(file, buf, stf.st_size) != stf.st_size) { */
+/*                 free((void *)buf); */
+/*                 dprintf(fd, "unable to read '%s'\n", file_path); */
+/*                 return NULL; */
+/*         } */
+/*         close(file); */
+
+/*      for(uint32_t i = 0; i < stf.st_size; i++) { */
+/*              if (!(i % 16)) */
+/*                      printf("   "); */
+/*              printf(" 0x%02X,", buf[i]); */
+/*              if (!((i + 1) % 16)) */
+/*                      printf("\n"); */
+/*      } */
+
+/* 	return buf; */
+/* } */
+
+int
+close_package_file(uint8_t *buf)
+{
+	if (buf) {
+		free((void *)buf);
+		return 0;
+	}
+
+	return -1;
 }

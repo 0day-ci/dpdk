@@ -198,6 +198,10 @@ enum i40e_admin_queue_opc {
 	i40e_aqc_opc_add_mirror_rule	= 0x0260,
 	i40e_aqc_opc_delete_mirror_rule	= 0x0261,
 
+	/* Support Pipeline Personalization Profile */
+        i40e_aqc_opc_write_personalization_profile	= 0x0270,
+        i40e_aqc_opc_read_personalization_profile_list	= 0x0271,
+
 	/* DCB commands */
 	i40e_aqc_opc_dcb_ignore_pfc	= 0x0301,
 	i40e_aqc_opc_dcb_updated	= 0x0302,
@@ -1440,6 +1444,35 @@ struct i40e_aqc_add_delete_mirror_rule_completion {
 };
 
 I40E_CHECK_CMD_LENGTH(i40e_aqc_add_delete_mirror_rule_completion);
+
+/* Pipeline Personalization Profile */
+struct i40e_aqc_write_ppp {
+        u8      flags;
+#define I40E_AQ_WR_PPP_ADD_TRACK_ID     0x01
+#define I40E_AQ_WR_PPP_REMOVE_TRACK_ID  0x02
+        u8      reserved[3];
+        __le32  profile_track_id;
+        __le32  addr_high;
+        __le32  addr_low;
+};
+
+I40E_CHECK_CMD_LENGTH(i40e_aqc_write_ppp);
+
+struct i40e_aqc_write_ppp_resp {
+        __le32 error_offset;
+        __le32 error_info;
+        __le32 addr_high;
+        __le32 addr_low;
+};
+
+struct i40e_aqc_read_ppp {
+	u8      flags;
+	u8      reserved[7];
+	__le32  addr_high;
+	__le32  addr_low;
+};
+
+I40E_CHECK_CMD_LENGTH(i40e_aqc_read_ppp);
 
 /* DCB 0x03xx*/
 

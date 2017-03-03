@@ -12395,6 +12395,62 @@ cmdline_parse_inst_t cmd_set_vf_vlan_tag = {
 	},
 };
 
+/* Write Pipeline Personalization Profile */
+struct cmd_write_ppp_result {
+	cmdline_fixed_string_t write;
+	cmdline_fixed_string_t ppp;
+	uint8_t port_id;
+	char filename[];
+};
+
+cmdline_parse_token_string_t cmd_write_ppp_write =
+	TOKEN_STRING_INITIALIZER(struct cmd_write_ppp_result, write, "write");
+cmdline_parse_token_string_t cmd_write_ppp_ppp =
+	TOKEN_STRING_INITIALIZER(struct cmd_write_ppp_result, ppp, "ppp");
+cmdline_parse_token_num_t cmd_write_ppp_port_id =
+	TOKEN_NUM_INITIALIZER(struct cmd_write_ppp_result, port_id, UINT8);
+cmdline_parse_token_string_t cmd_write_ppp_filename =
+	TOKEN_STRING_INITIALIZER(struct cmd_write_ppp_result, filename, NULL);
+
+static void
+cmd_write_ppp_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_write_ppp_result *res = parsed_result;
+	uint8_t *buff;
+	int ret = -ENOTSUP;
+
+	if (res->port_id > nb_ports) {
+		printf("Invalid port, range is [0, %d]\n", nb_ports - 1);
+		return;
+	}
+
+	buff = open_package_file(res->filename);
+	if (!buff)
+		return;
+
+	ret = i40e_process_package(res->port_id, buff);
+	if (ret < 0)
+		printf("Failed to write profile.\n");
+
+	close_package_file(buff);
+}
+
+cmdline_parse_inst_t cmd_write_ppp = {
+	.f = cmd_write_ppp_parsed,
+	.data = NULL,
+	.help_str = "write ppp <port_id> <profile_name>",
+	.tokens = {
+		(void *)&cmd_write_ppp_write,
+		(void *)&cmd_write_ppp_ppp,
+		(void *)&cmd_write_ppp_port_id,
+		(void *)&cmd_write_ppp_filename,
+		NULL,
+	},
+};
+
 /* ******************************************************************************** */
 
 /* list of instructions */
@@ -12570,6 +12626,7 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_set_vf_allmulti,
 	(cmdline_parse_inst_t *)&cmd_set_vf_broadcast,
 	(cmdline_parse_inst_t *)&cmd_set_vf_vlan_tag,
+	(cmdline_parse_inst_t *)&cmd_write_ppp,
 	NULL,
 };
 

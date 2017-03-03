@@ -332,4 +332,5 @@ int rte_pmd_i40e_get_vf_stats(uint8_t port,
 int rte_pmd_i40e_reset_vf_stats(uint8_t port,
 				uint16_t vf_id);
 
+int i40e_process_package(uint8_t port, uint8_t *buff);
 #endif /* _PMD_I40E_H_ */

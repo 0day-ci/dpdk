@@ -39,6 +39,10 @@
 #include <stdarg.h>
 #include <inttypes.h>
 #include <assert.h>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include <rte_string_fns.h>
 #include <rte_pci.h>
@@ -11211,4 +11215,55 @@ rte_pmd_i40e_reset_vf_stats(uint8_t port,
 	i40e_update_vsi_stats(vsi);
 
 	return 0;
+}
+
+/**
+ * i40e_process_package - Load package
+ * @port: port id
+ * @filename: file name of the package
+ **/
+int
+i40e_process_package(uint8_t port, uint8_t *buff)
+{
+        struct rte_eth_dev *dev = &rte_eth_devices[port];
+	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+        struct i40e_package_header *pkg_hdr;
+        struct i40e_generic_seg_header *profile_seg_hdr;
+        struct i40e_generic_seg_header *metadata_seg_hdr;
+        uint32_t track_id;
+        enum i40e_status_code status;
+
+        pkg_hdr = (struct i40e_package_header *)buff;
+
+        if (!pkg_hdr) {
+                PMD_DRV_LOG(ERR, "Failed to fill the package structure");
+                return -EINVAL;
+        }
+
+        /* Find metadata segment */
+        metadata_seg_hdr = i40e_find_segment_in_package(SEGMENT_TYPE_METADATA,
+                                                        pkg_hdr);
+        if (!metadata_seg_hdr) {
+                PMD_DRV_LOG(ERR, "Failed to find metadata segment header");
+                return -EINVAL;
+        }
+        track_id = ((struct i40e_metadata_segment *)metadata_seg_hdr)->track_id;
+
+	/* Find profile segment */
+        profile_seg_hdr = i40e_find_segment_in_package(SEGMENT_TYPE_I40E,
+                                                       pkg_hdr);
+        if (!profile_seg_hdr) {
+                PMD_DRV_LOG(ERR, "Failed to find profile segment header");
+                return -EINVAL;
+        }
+
+        /* Write profile to HW */
+        status = i40e_write_profile(hw,
+				    (struct i40e_profile_segment *)profile_seg_hdr,
+				    track_id);
+
+        if (!status)
+                printf("Write profile successfully.\n");
+
+        return status;
 }

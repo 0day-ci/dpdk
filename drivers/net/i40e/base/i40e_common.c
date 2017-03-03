@@ -6998,3 +6998,161 @@ enum i40e_status_code i40e_aq_clear_all_wol_filters(struct i40e_hw *hw,
 
 	return status;
 }
+
+/**
+ * i40e_aq_write_ppp - Write pipeline personalization profile (ppp)
+ * @hw: pointer to the hw struct
+ * @buff: command buffer (size in bytes = buff_size)
+ * @buff_size: buffer size in bytes
+ * @track_id: package tracking id
+ * @cmd_details: pointer to command details structure or NULL
+ **/
+enum
+i40e_status_code i40e_aq_write_ppp(struct i40e_hw *hw, void *buff,
+				   u16 buff_size, u32 track_id,
+				   struct i40e_asq_cmd_details *cmd_details)
+{
+	struct i40e_aq_desc desc;
+	struct i40e_aqc_write_ppp *cmd =
+		(struct i40e_aqc_write_ppp *)&desc.params.raw;
+	struct i40e_aqc_write_ppp_resp *resp;
+	enum i40e_status_code status;
+
+	i40e_fill_default_direct_cmd_desc(&desc,
+				  i40e_aqc_opc_write_personalization_profile);
+
+	desc.flags |= CPU_TO_LE16(I40E_AQ_FLAG_BUF | I40E_AQ_FLAG_RD);
+	if (buff_size > I40E_AQ_LARGE_BUF)
+		desc.flags |= CPU_TO_LE16((u16)I40E_AQ_FLAG_LB);
+
+	desc.datalen = CPU_TO_LE16(buff_size);
+
+	cmd->profile_track_id = CPU_TO_LE32(track_id);
+
+	status = i40e_asq_send_command(hw, &desc, buff, buff_size, cmd_details);
+
+	return status;
+}
+
+/**
+ * i40e_aq_read_ppp - Read pipeline personalization profile (ppp)
+ * @hw: pointer to the hw struct
+ * @buff: command buffer (size in bytes = buff_size)
+ * @buff_size: buffer size in bytes
+ * @cmd_details: pointer to command details structure or NULL
+ **/
+enum
+i40e_status_code i40e_aq_read_ppp(struct i40e_hw *hw,
+				  void *buff, u16 buff_size,
+				  struct i40e_asq_cmd_details *cmd_details)
+{
+	struct i40e_aq_desc desc;
+	struct i40e_aqc_read_ppp *cmd =
+		(struct i40e_aqc_read_ppp *)&desc.params.raw;
+	enum i40e_status_code status;
+
+	i40e_fill_default_direct_cmd_desc(&desc, i40e_aqc_opc_read_personalization_profile_list);
+
+	if (buff_size > I40E_AQ_LARGE_BUF)
+		desc.flags |= CPU_TO_LE16((u16)I40E_AQ_FLAG_LB);
+	desc.datalen = CPU_TO_LE16(buff_size);
+
+	status = i40e_asq_send_command(hw, &desc, buff, buff_size, cmd_details);
+
+	return status;
+}
+
+/**
+ * i40e_find_segment_in_package
+ * @segment_type: the segment type to search for (i.e., SEGMENT_TYPE_I40E)
+ * @pkg_hdr: pointer to the package header to be searched
+ *
+ * This function searches a package file for a particular segment type. On
+ * success it returns a pointer to the segment header, otherwise it will
+ * return NULL.
+ */
+struct i40e_generic_seg_header *
+i40e_find_segment_in_package(u32 segment_type,
+			     struct i40e_package_header *pkg_hdr)
+{
+	struct i40e_generic_seg_header *segment;
+	u32 i;
+
+	PMD_DRV_LOG(INFO, "i40e_find_segment_in_package");
+	PMD_DRV_LOG(INFO, "Package version: %d.%d.%d.%d",
+		    pkg_hdr->version.major,
+		    pkg_hdr->version.minor,
+		    pkg_hdr->version.update,
+		    pkg_hdr->version.draft);
+
+	/* Search all package segments for the requested segment type */
+	for (i = 0; i < pkg_hdr->segment_count; i++) {
+		segment =
+			(struct i40e_generic_seg_header *)((u8 *)pkg_hdr +
+		         pkg_hdr->segment_offset[i]);
+
+		if (segment->type == segment_type)
+			return segment;
+	}
+
+	return NULL;
+}
+
+/**
+ * i40e_write_profile
+ * @hw: pointer to the hardware structure
+ * @profile: pointer to the profile segment of the package to be downloaded
+ * @track_id: package tracking id
+ *
+ * Handles the download of a complete package.
+ */
+enum i40e_status_code
+i40e_write_profile(struct i40e_hw *hw, struct i40e_profile_segment *profile,
+		   u32 track_id)
+{
+	enum i40e_status_code status = I40E_SUCCESS;
+	struct i40e_section_table *sec_tbl;
+	struct i40e_profile_section_header *sec = NULL;
+	u32 dev_cnt;
+	u32 *nvm;
+	u32 section_size = 0;
+	u32 i;
+
+	PMD_DRV_LOG(INFO, "i40e_write_profile");
+	PMD_DRV_LOG(INFO, "Segment version: %d.%d.%d.%d",
+		    profile->header.version.major,
+		    profile->header.version.minor,
+		    profile->header.version.update,
+		    profile->header.version.draft);
+	PMD_DRV_LOG(INFO, "Seg: type 0x%X, size %d, name %s",
+		    LE32_TO_CPU(profile->header.type),
+		    LE32_TO_CPU(profile->header.size),
+		    profile->header.name);
+
+	dev_cnt = profile->device_table_count;
+	nvm = (u32 *)&profile->device_table[dev_cnt];
+	sec_tbl = (struct i40e_section_table *)&nvm[nvm[0] + 1];
+
+	for (i = 0; i < sec_tbl->section_count; i++) {
+		sec = (struct i40e_profile_section_header *)((char *)profile +
+					     sec_tbl->section_offset[i]);
+
+		/* Skip 'AQ', 'note' and 'name' sections */
+		if (sec->section.type != SECTION_TYPE_MMIO)
+			continue;
+
+		section_size = sec->section.size +
+			sizeof(struct i40e_profile_section_header);
+		break;
+	}
+
+	/* Write profile */
+	status = i40e_aq_write_ppp(hw, (void *)sec, section_size,
+				   track_id, NULL);
+	if (status) {
+		PMD_DRV_LOG(ERR, "Failed to write profile!");
+		return status;
+	}
+
+	return status;
+}
