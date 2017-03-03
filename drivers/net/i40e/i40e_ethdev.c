@@ -11212,3 +11212,52 @@ rte_pmd_i40e_reset_vf_stats(uint8_t port,
 
 	return 0;
 }
+
+int rte_pmd_i40e_set_vf_vlan_untag_drop(uint8_t port,
+					uint16_t vf_id,
+					uint8_t on)
+{
+	struct rte_eth_dev *dev;
+	struct i40e_pf *pf;
+	struct i40e_vsi *vsi;
+	struct i40e_aqc_add_remove_vlan_element_data vlan_data = {0};
+	struct i40e_hw *hw;
+	int ret;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port, -ENODEV);
+
+	dev = &rte_eth_devices[port];
+
+	if (!is_device_supported(dev, &rte_i40e_pmd))
+		return -ENOTSUP;
+
+	pf = I40E_DEV_PRIVATE_TO_PF(dev->data->dev_private);
+
+	if (vf_id >= pf->vf_num || !pf->vfs) {
+		PMD_DRV_LOG(ERR, "Invalid VF ID.");
+		return -EINVAL;
+	}
+
+	vsi = pf->vfs[vf_id].vsi;
+	if (!vsi) {
+		PMD_DRV_LOG(ERR, "Invalid VSI.");
+		return -EINVAL;
+	}
+
+	hw = I40E_VSI_TO_HW(vsi);
+	vlan_data.vlan_tag = 0;
+	vlan_data.vlan_flags = 0x1;
+
+	if (on) {
+		ret = i40e_aq_add_vlan(hw, vsi->seid, &vlan_data, 1, NULL);
+		if (ret != I40E_SUCCESS)
+			PMD_DRV_LOG(ERR, "Failed to add vlan filter");
+	} else {
+		ret = i40e_aq_remove_vlan(hw, vsi->seid,
+					&vlan_data, 1, NULL);
+		if (ret != I40E_SUCCESS)
+			PMD_DRV_LOG(ERR, "Failed to remove vlan filter");
+	}
+
+	return ret;
+}

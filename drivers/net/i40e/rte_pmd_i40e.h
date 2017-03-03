@@ -332,4 +332,22 @@ int rte_pmd_i40e_get_vf_stats(uint8_t port,
 int rte_pmd_i40e_reset_vf_stats(uint8_t port,
 				uint16_t vf_id);
 
+/**
+ * Enable/Disable VF untag drop
+ *
+ * @param port
+ *    The port identifier of the Ethernet device.
+ * @param vf_id
+ *    VF on witch to enable/disable
+ * @param on
+ *    Enable or Disable
+ * @retura
+ *  - (0) if successful.
+ *  -(-ENODEVE) if *port* invalid
+ *  -(-EINVAL) if bad parameter.
+ */
+int rte_pmd_i40e_set_vf_vlan_untag_drop(uint8_t port,
+					uint16_t vf_id,
+					uint8_t on);
+
 #endif /* _PMD_I40E_H_ */
