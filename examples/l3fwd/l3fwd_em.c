@@ -754,7 +754,7 @@ setup_hash(const int socketid)
 		rte_hash_create(&ipv4_l3fwd_hash_params);
 	if (ipv4_l3fwd_em_lookup_struct[socketid] == NULL)
 		rte_exit(EXIT_FAILURE,
-			"Unable to create the l3fwd hash on socket %d\n",
+			"Unable to create the v4 hash on socket %d\n",
 			socketid);
 
 	/* create ipv6 hash */
@@ -765,13 +765,15 @@ setup_hash(const int socketid)
 		rte_hash_create(&ipv6_l3fwd_hash_params);
 	if (ipv6_l3fwd_em_lookup_struct[socketid] == NULL)
 		rte_exit(EXIT_FAILURE,
-			"Unable to create the l3fwd hash on socket %d\n",
+			"Unable to create the v6 hash on socket %d\n",
 			socketid);
 
 	if (hash_entry_number != HASH_ENTRY_NUMBER_DEFAULT) {
-		/* For testing hash matching with a large number of flows we
-		 * generate millions of IP 5-tuples with an incremented dst
-		 * address to initialize the hash table. */
+		/* For testing hash matching with a large number
+		 * of flows we generate millions of IP 5-tuples
+		 * with an incremented dst address to initialize
+		 * the hash table.
+		 */
 		if (ipv6 == 0) {
 			/* populate the ipv4 hash */
 			populate_ipv4_many_flow_into_table(
@@ -781,7 +783,7 @@ setup_hash(const int socketid)
 			/* populate the ipv6 hash */
 			populate_ipv6_many_flow_into_table(
 				ipv6_l3fwd_em_lookup_struct[socketid],
-				hash_entry_number);
+			hash_entry_number);
 		}
 	} else {
 		/*

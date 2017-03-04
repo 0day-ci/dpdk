@@ -77,6 +77,24 @@
 #endif
 #define HASH_ENTRY_NUMBER_DEFAULT	4
 
+/* Config options */
+#define OPTION_CONFIG           "config"
+#define OPTION_NONUMA           "no-numa"
+#define OPTION_ENBJMO           "enable-jumbo"
+#define OPTION_RULE_IPV4        "rule_ipv4"
+#define OPTION_RULE_IPV6        "rule_ipv6"
+#define OPTION_SCALAR           "scalar"
+#define OPTION_ETH_DEST         "eth-dest"
+#define OPTION_IPV6		"ipv6"
+#define OPTION_HASH_ENTRY_NUM	"hash-entry-num"
+#define OPTION_PARSE_PTYPE	"parse-ptype"
+#define OPTION_MAX_PKT_LEN	"max-pkt-len"
+
+/*Log file related character defs. */
+#define ACL_LEAD_CHAR		('@')
+#define ROUTE_LEAD_CHAR		('R')
+#define COMMENT_LEAD_CHAR	('#')
+
 struct mbuf_table {
 	uint16_t len;
 	struct rte_mbuf *m_table[MAX_PKT_BURST];
@@ -94,6 +112,7 @@ struct lcore_conf {
 	uint16_t tx_port_id[RTE_MAX_ETHPORTS];
 	uint16_t tx_queue_id[RTE_MAX_ETHPORTS];
 	struct mbuf_table tx_mbufs[RTE_MAX_ETHPORTS];
+	struct rte_eth_dev_tx_buffer *tx_buffer[RTE_MAX_ETHPORTS];
 	void *ipv4_lookup_struct;
 	void *ipv6_lookup_struct;
 } __rte_cache_aligned;
@@ -114,6 +133,8 @@ extern uint32_t hash_entry_number;
 extern xmm_t val_eth[RTE_MAX_ETHPORTS];
 
 extern struct lcore_conf lcore_conf[RTE_MAX_LCORE];
+
+extern int numa_on; /**< NUMA is enabled by default. */
 
 /* Send burst of packets on an output interface */
 static inline int
@@ -205,11 +226,17 @@ setup_lpm(const int socketid);
 void
 setup_hash(const int socketid);
 
+void
+setup_acl(const int socketid);
+
 int
 em_check_ptype(int portid);
 
 int
 lpm_check_ptype(int portid);
+
+int
+acl_check_ptype(int portid);
 
 uint16_t
 em_cb_parse_ptype(uint8_t port, uint16_t queue, struct rte_mbuf *pkts[],
@@ -219,11 +246,18 @@ uint16_t
 lpm_cb_parse_ptype(uint8_t port, uint16_t queue, struct rte_mbuf *pkts[],
 		   uint16_t nb_pkts, uint16_t max_pkts, void *user_param);
 
+uint16_t
+acl_cb_parse_ptype(uint8_t port, uint16_t queue, struct rte_mbuf *pkts[],
+		  uint16_t nb_pkts, uint16_t max_pkts, void *user_param);
+
 int
 em_main_loop(__attribute__((unused)) void *dummy);
 
 int
 lpm_main_loop(__attribute__((unused)) void *dummy);
+
+int
+acl_main_loop(__attribute__((unused)) void *dummy);
 
 /* Return ipv4/ipv6 fwd lookup struct for LPM or EM. */
 void *
@@ -237,5 +271,20 @@ lpm_get_ipv4_l3fwd_lookup_struct(const int socketid);
 
 void *
 lpm_get_ipv6_l3fwd_lookup_struct(const int socketid);
+
+void *
+acl_get_ipv4_l3fwd_lookup_struct(const int socketid);
+
+void *
+acl_get_ipv6_l3fwd_lookup_struct(const int socketid);
+
+void
+l3fwd_acl_set_scalar(void);
+
+void
+l3fwd_acl_set_rule_ipv6_name(const char *optarg);
+
+void
+l3fwd_acl_set_rule_ipv4_name(const char *optarg);
 
 #endif  /* __L3_FWD_H__ */

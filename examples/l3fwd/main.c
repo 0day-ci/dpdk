@@ -51,6 +51,7 @@
 #include <rte_memory.h>
 #include <rte_memcpy.h>
 #include <rte_memzone.h>
+#include <rte_malloc.h>
 #include <rte_eal.h>
 #include <rte_per_lcore.h>
 #include <rte_launch.h>
@@ -97,11 +98,12 @@ static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 /**< Ports set in promiscuous mode off by default. */
 static int promiscuous_on;
 
-/* Select Longest-Prefix or Exact match. */
+/* Select Longest-Prefix(aka LPM), Exact match(aka EM) or ACL. */
 static int l3fwd_lpm_on;
 static int l3fwd_em_on;
+static int l3fwd_acl_on;
 
-static int numa_on = 1; /**< NUMA is enabled by default. */
+int numa_on = 1; /**< NUMA is enabled by default. */
 static int parse_ptype; /**< Parse packet type using rx callback, and */
 			/**< disabled by default */
 
@@ -161,7 +163,9 @@ static struct rte_eth_conf port_conf = {
 	.rx_adv_conf = {
 		.rss_conf = {
 			.rss_key = NULL,
-			.rss_hf = ETH_RSS_IP,
+			.rss_hf = ETH_RSS_IP | ETH_RSS_UDP |
+				ETH_RSS_TCP | ETH_RSS_SCTP,
+
 		},
 	},
 	.txmode = {
@@ -172,7 +176,7 @@ static struct rte_eth_conf port_conf = {
 static struct rte_mempool * pktmbuf_pool[NB_SOCKETS];
 
 struct l3fwd_lkp_mode {
-	void  (*setup)(int);
+	void  (*setup)(const int);
 	int   (*check_ptype)(int);
 	rte_rx_callback_fn cb_parse_ptype;
 	int   (*main_loop)(void *);
@@ -200,6 +204,15 @@ static struct l3fwd_lkp_mode l3fwd_lpm_lkp = {
 	.get_ipv6_lookup_struct = lpm_get_ipv6_l3fwd_lookup_struct,
 };
 
+static struct l3fwd_lkp_mode l3fwd_acl_lkp = {
+	.setup                  = setup_acl,
+	.check_ptype		= acl_check_ptype,
+	.cb_parse_ptype		= acl_cb_parse_ptype,
+	.main_loop              = acl_main_loop,
+	.get_ipv4_lookup_struct = acl_get_ipv4_l3fwd_lookup_struct,
+	.get_ipv6_lookup_struct = acl_get_ipv6_l3fwd_lookup_struct,
+};
+
 /*
  * Setup lookup methods for forwarding.
  * Currently exact-match and longest-prefix-match
@@ -211,8 +224,11 @@ setup_l3fwd_lookup_tables(void)
 	/* Setup HASH lookup functions. */
 	if (l3fwd_em_on)
 		l3fwd_lkp = l3fwd_em_lkp;
-	/* Setup LPM lookup functions. */
+	/* Setup ACL lookup functions. */
+	else if (l3fwd_acl_on)
+		l3fwd_lkp = l3fwd_acl_lkp;
 	else
+	/* Setup LPM lookup functions. */
 		l3fwd_lkp = l3fwd_lpm_lkp;
 }
 
@@ -312,31 +328,45 @@ print_usage(const char *prgname)
 {
 	printf("%s [EAL options] --"
 		" -p PORTMASK"
+		"--"OPTION_RULE_IPV4"=FILE"
+		"--"OPTION_RULE_IPV6"=FILE"
 		" [-P]"
 		" [-E]"
+		" [-A]"
 		" [-L]"
-		" --config (port,queue,lcore)[,(port,queue,lcore)]"
-		" [--eth-dest=X,MM:MM:MM:MM:MM:MM]"
-		" [--enable-jumbo [--max-pkt-len PKTLEN]]"
-		" [--no-numa]"
-		" [--hash-entry-num]"
-		" [--ipv6]"
-		" [--parse-ptype]\n\n"
+		" [--"OPTION_CONFIG" (port,queue,lcore)[,(port,queue,lcore]]"
+		" [--"OPTION_ETH_DEST" =X,MM:MM:MM:MM:MM:MM]"
+		" [--"OPTION_ENBJMO" [--"OPTION_MAX_PKT_LEN" PKTLEN]]"
+		" [--"OPTION_NONUMA"]"
+		" [--"OPTION_HASH_ENTRY_NUM"]"
+		" [--"OPTION_IPV6"]"
+		" [--"OPTION_PARSE_PTYPE"]\n\n"
 
 		"  -p PORTMASK: Hexadecimal bitmask of ports to configure\n"
 		"  -P : Enable promiscuous mode\n"
 		"  -E : Enable exact match\n"
+		"  -A : Enable access control list match\n"
 		"  -L : Enable longest prefix match (default)\n"
-		"  --config (port,queue,lcore): Rx queue configuration\n"
-		"  --eth-dest=X,MM:MM:MM:MM:MM:MM: Ethernet destination for port X\n"
-		"  --enable-jumbo: Enable jumbo frames\n"
-		"  --max-pkt-len: Under the premise of enabling jumbo,\n"
+		"  --"OPTION_CONFIG" (port,queue,lcore): Rx queue configuration\n"
+		"  --"OPTION_ETH_DEST"=X,MM:MM:MM:MM:MM:MM: Ethernet destination for port X\n"
+		"  --"OPTION_ENBJMO": Enable jumbo frames\n"
+		"  --"OPTION_MAX_PKT_LEN": Under the premise of enabling jumbo,\n"
 		"                 maximum packet length in decimal (64-9600)\n"
-		"  --no-numa: Disable numa awareness\n"
-		"  --hash-entry-num: Specify the hash entry number in hexadecimal to be setup\n"
-		"  --ipv6: Set if running ipv6 packets\n"
-		"  --parse-ptype: Set to use software to analyze packet type\n\n",
-		prgname);
+		"  --"OPTION_NONUMA": Disable numa awareness\n"
+		"  --"OPTION_HASH_ENTRY_NUM": Specify the hash entry number in hexadecimal to be setup\n"
+		"  --"OPTION_IPV6": Set if running ipv6 packets\n"
+		"  --"OPTION_PARSE_PTYPE": Set to use software to analyze packet type\n\n"
+		"  --"OPTION_RULE_IPV4"=FILE: specify the ipv4 rules "
+		"entries file. "
+		"Each rule occupy one line. "
+		"2 kinds of rules are supported. "
+		"One is ACL entry at while line leads with character '%c', "
+		"another is route entry at while line leads with "
+		"character '%c'.\n"
+		"  --"OPTION_RULE_IPV6"=FILE: specify the ipv6 rules "
+		"entries file.\n"
+		"  --"OPTION_SCALAR": Use scalar function to do lookup\n",
+		prgname, ACL_LEAD_CHAR, ROUTE_LEAD_CHAR);
 }
 
 static int
@@ -477,17 +507,11 @@ parse_eth_dest(const char *optarg)
 static const char short_options[] =
 	"p:"  /* portmask */
 	"P"   /* promiscuous */
+	"A"   /* enable access control list match */
 	"L"   /* enable long prefix match */
 	"E"   /* enable exact match */
 	;
 
-#define CMD_LINE_OPT_CONFIG "config"
-#define CMD_LINE_OPT_ETH_DEST "eth-dest"
-#define CMD_LINE_OPT_NO_NUMA "no-numa"
-#define CMD_LINE_OPT_IPV6 "ipv6"
-#define CMD_LINE_OPT_ENABLE_JUMBO "enable-jumbo"
-#define CMD_LINE_OPT_HASH_ENTRY_NUM "hash-entry-num"
-#define CMD_LINE_OPT_PARSE_PTYPE "parse-ptype"
 enum {
 	/* long options mapped to a short option */
 
@@ -501,16 +525,22 @@ enum {
 	CMD_LINE_OPT_ENABLE_JUMBO_NUM,
 	CMD_LINE_OPT_HASH_ENTRY_NUM_NUM,
 	CMD_LINE_OPT_PARSE_PTYPE_NUM,
+	CMD_LINE_OPT_RULE_IPV4,
+	CMD_LINE_OPT_RULE_IPV6,
+	CMD_LINE_OPT_SCALAR,
 };
 
 static const struct option lgopts[] = {
-	{CMD_LINE_OPT_CONFIG, 1, 0, CMD_LINE_OPT_CONFIG_NUM},
-	{CMD_LINE_OPT_ETH_DEST, 1, 0, CMD_LINE_OPT_ETH_DEST_NUM},
-	{CMD_LINE_OPT_NO_NUMA, 0, 0, CMD_LINE_OPT_NO_NUMA_NUM},
-	{CMD_LINE_OPT_IPV6, 0, 0, CMD_LINE_OPT_IPV6_NUM},
-	{CMD_LINE_OPT_ENABLE_JUMBO, 0, 0, CMD_LINE_OPT_ENABLE_JUMBO_NUM},
-	{CMD_LINE_OPT_HASH_ENTRY_NUM, 1, 0, CMD_LINE_OPT_HASH_ENTRY_NUM_NUM},
-	{CMD_LINE_OPT_PARSE_PTYPE, 0, 0, CMD_LINE_OPT_PARSE_PTYPE_NUM},
+	{OPTION_CONFIG, 1, 0, CMD_LINE_OPT_CONFIG_NUM},
+	{OPTION_ETH_DEST, 1, 0, CMD_LINE_OPT_ETH_DEST_NUM},
+	{OPTION_NONUMA, 0, 0, CMD_LINE_OPT_NO_NUMA_NUM},
+	{OPTION_IPV6, 0, 0, CMD_LINE_OPT_IPV6_NUM},
+	{OPTION_ENBJMO, 0, 0, CMD_LINE_OPT_ENABLE_JUMBO_NUM},
+	{OPTION_HASH_ENTRY_NUM, 1, 0, CMD_LINE_OPT_HASH_ENTRY_NUM_NUM},
+	{OPTION_PARSE_PTYPE, 0, 0, CMD_LINE_OPT_PARSE_PTYPE_NUM},
+	{OPTION_RULE_IPV4, 1, 0, CMD_LINE_OPT_RULE_IPV4},
+	{OPTION_RULE_IPV6, 1, 0, CMD_LINE_OPT_RULE_IPV6},
+	{OPTION_SCALAR, 0, 0, CMD_LINE_OPT_SCALAR},
 	{NULL, 0, 0, 0}
 };
 
@@ -522,17 +552,17 @@ static const struct option lgopts[] = {
  * value of 8192
  */
 #define NB_MBUF RTE_MAX(	\
-	(nb_ports*nb_rx_queue*RTE_TEST_RX_DESC_DEFAULT +	\
-	nb_ports*nb_lcores*MAX_PKT_BURST +			\
-	nb_ports*n_tx_queue*RTE_TEST_TX_DESC_DEFAULT +		\
-	nb_lcores*MEMPOOL_CACHE_SIZE),				\
+	(nb_ports * nb_rx_queue * RTE_TEST_RX_DESC_DEFAULT +	\
+	nb_ports * nb_lcores * MAX_PKT_BURST +			\
+	nb_ports * n_tx_queue * RTE_TEST_TX_DESC_DEFAULT +		\
+	nb_lcores * MEMPOOL_CACHE_SIZE),				\
 	(unsigned)8192)
 
 /* Parse the argument given in the command line of the application */
 static int
 parse_args(int argc, char **argv)
 {
-	int opt, ret;
+	int opt, ret, chk_cond;
 	char **argvopt;
 	int option_index;
 	char *prgname = argv[0];
@@ -544,17 +574,19 @@ parse_args(int argc, char **argv)
 	const char *str2 = "L3FWD: Promiscuous mode selected";
 	const char *str3 = "L3FWD: Exact match selected";
 	const char *str4 = "L3FWD: Longest-prefix match selected";
-	const char *str5 = "L3FWD: Invalid config";
-	const char *str6 = "L3FWD: NUMA is disabled";
-	const char *str7 = "L3FWD: IPV6 is specified";
-	const char *str8 =
+	const char *str5 = "L3FWD: Access Control List match selected";
+	const char *str6 = "L3FWD: Invalid config";
+	const char *str7 = "L3FWD: NUMA is disabled";
+	const char *str8 = "L3FWD: IPV6 is specified";
+	const char *str9 =
 		"L3FWD: Jumbo frame is enabled - disabling simple TX path";
-	const char *str9 = "L3FWD: Invalid packet length";
-	const char *str10 = "L3FWD: Set jumbo frame max packet len to ";
-	const char *str11 = "L3FWD: Invalid hash entry number";
-	const char *str12 =
-		"L3FWD: LPM and EM are mutually exclusive, select only one";
-	const char *str13 = "L3FWD: LPM or EM none selected, default LPM on";
+	const char *str10 = "L3FWD: Invalid packet length";
+	const char *str11 = "L3FWD: Set jumbo frame max packet len to ";
+	const char *str12 = "L3FWD: Invalid hash entry number";
+	const char *str13 =
+		"L3FWD: LPM, EM and ACL are mutually exclusive, select only one";
+	const char *str14 =
+		"L3FWD: LPM, EM or ACL none selected, default LPM on";
 
 	while ((opt = getopt_long(argc, argvopt, short_options,
 				lgopts, &option_index)) != EOF) {
@@ -585,11 +617,16 @@ parse_args(int argc, char **argv)
 			l3fwd_lpm_on = 1;
 			break;
 
+		case 'A':
+			printf("%s\n", str5);
+			l3fwd_acl_on = 1;
+			break;
+
 		/* long options */
 		case CMD_LINE_OPT_CONFIG_NUM:
 			ret = parse_config(optarg);
 			if (ret) {
-				printf("%s\n", str5);
+				printf("%s\n", str6);
 				print_usage(prgname);
 				return -1;
 			}
@@ -600,12 +637,12 @@ parse_args(int argc, char **argv)
 			break;
 
 		case CMD_LINE_OPT_NO_NUMA_NUM:
-			printf("%s\n", str6);
+			printf("%s\n", str7);
 			numa_on = 0;
 			break;
 
 		case CMD_LINE_OPT_IPV6_NUM:
-			printf("%sn", str7);
+			printf("%sn", str8);
 			ipv6 = 1;
 			break;
 
@@ -614,7 +651,7 @@ parse_args(int argc, char **argv)
 				"max-pkt-len", required_argument, 0, 0
 			};
 
-			printf("%s\n", str8);
+			printf("%s\n", str9);
 			port_conf.rxmode.jumbo_frame = 1;
 
 			/*
@@ -626,13 +663,13 @@ parse_args(int argc, char **argv)
 				ret = parse_max_pkt_len(optarg);
 				if ((ret < 64) ||
 					(ret > MAX_JUMBO_PKT_LEN)) {
-					printf("%s\n", str9);
+					printf("%s\n", str10);
 					print_usage(prgname);
 					return -1;
 				}
 				port_conf.rxmode.max_rx_pkt_len = ret;
 			}
-			printf("%s %u\n", str10,
+			printf("%s %u\n", str11,
 				(unsigned int)port_conf.rxmode.max_rx_pkt_len);
 			break;
 		}
@@ -642,7 +679,7 @@ parse_args(int argc, char **argv)
 			if ((ret > 0) && (ret <= L3FWD_HASH_ENTRIES)) {
 				hash_entry_number = ret;
 			} else {
-				printf("%s\n", str11);
+				printf("%s\n", str12);
 				print_usage(prgname);
 				return -1;
 			}
@@ -653,15 +690,29 @@ parse_args(int argc, char **argv)
 			parse_ptype = 1;
 			break;
 
+		case CMD_LINE_OPT_RULE_IPV4:
+			l3fwd_acl_set_rule_ipv4_name(optarg);
+			break;
+
+		case CMD_LINE_OPT_RULE_IPV6:
+			l3fwd_acl_set_rule_ipv6_name(optarg);
+			break;
+
+		case CMD_LINE_OPT_SCALAR:
+			l3fwd_acl_set_scalar();
+			break;
+
 		default:
 			print_usage(prgname);
 			return -1;
 		}
 	}
 
-	/* If both LPM and EM are selected, return error. */
-	if (l3fwd_lpm_on && l3fwd_em_on) {
-		printf("%s\n", str12);
+	/* If more than one(LPM, EM and ACL) are selected, return error. */
+	chk_cond = l3fwd_lpm_on ? (l3fwd_em_on || l3fwd_acl_on) :
+				(l3fwd_em_on && l3fwd_acl_on);
+	if (chk_cond) {
+		printf("%s\n", str13);
 		return -1;
 	}
 
@@ -669,9 +720,9 @@ parse_args(int argc, char **argv)
 	 * Nothing is selected, pick longest-prefix match
 	 * as default match.
 	 */
-	if (!l3fwd_lpm_on && !l3fwd_em_on) {
+	if (!l3fwd_lpm_on && !l3fwd_em_on && !l3fwd_acl_on) {
 		l3fwd_lpm_on = 1;
-		printf("%s\n", str13);
+		printf("%s\n", str14);
 	}
 
 	/*
@@ -737,8 +788,9 @@ init_mem(unsigned nb_mbuf)
 				printf("Allocated mbuf pool on socket %d\n",
 					socketid);
 
-			/* Setup either LPM or EM(f.e Hash).  */
-			l3fwd_lkp.setup(socketid);
+			/* Setup LPM/EM (f.e. Hash) functions */
+			if (l3fwd_lpm_on || l3fwd_em_on)
+				l3fwd_lkp.setup(socketid);
 		}
 		qconf = &lcore_conf[lcore_id];
 		qconf->ipv4_lookup_struct =
@@ -836,7 +888,7 @@ prepare_ptype_parser(uint8_t portid, uint16_t queueid)
 		return 1;
 
 	printf("port %d cannot parse packet type, please add --%s\n",
-	       portid, CMD_LINE_OPT_PARSE_PTYPE);
+	       portid, OPTION_PARSE_PTYPE);
 	return 0;
 }
 
@@ -893,6 +945,10 @@ main(int argc, char **argv)
 	/* Setup function pointers for lookup method. */
 	setup_l3fwd_lookup_tables();
 
+	/* Setup ACL functions */
+	if (l3fwd_acl_on)
+		l3fwd_lkp.setup(-1);
+
 	/* initialize all ports */
 	for (portid = 0; portid < nb_ports; portid++) {
 		/* skip ports that are not enabled */
@@ -935,6 +991,28 @@ main(int argc, char **argv)
 		ret = init_mem(NB_MBUF);
 		if (ret < 0)
 			rte_exit(EXIT_FAILURE, "init_mem failed\n");
+
+		/* ACL specific. */
+		if (l3fwd_acl_on) {
+			for (lcore_id = 0;
+				lcore_id < RTE_MAX_LCORE; lcore_id++) {
+				if (rte_lcore_is_enabled(lcore_id) == 0)
+					continue;
+
+				/* Initialize TX buffers */
+				qconf = &lcore_conf[lcore_id];
+				qconf->tx_buffer[portid] =
+					rte_zmalloc_socket("tx_buffer",
+					RTE_ETH_TX_BUFFER_SIZE(MAX_PKT_BURST),
+					0, rte_eth_dev_socket_id(portid));
+
+				if (qconf->tx_buffer[portid] == NULL)
+					rte_exit(EXIT_FAILURE, "Can't allocate tx buffer for port %u\n", (unsigned) portid);
+
+				rte_eth_tx_buffer_init(qconf->tx_buffer[portid],
+							MAX_PKT_BURST);
+			}
+		}
 
 		/* init one TX queue per couple (lcore,port) */
 		queueid = 0;
