@@ -147,10 +147,6 @@ struct rte_acl_field_def ipv4_defs[NUM_FIELDS_IPV4] = {
 	},
 };
 
-#define	IPV6_ADDR_LEN	16
-#define	IPV6_ADDR_U16	(IPV6_ADDR_LEN / sizeof(uint16_t))
-#define	IPV6_ADDR_U32	(IPV6_ADDR_LEN / sizeof(uint32_t))
-
 enum {
 	PROTO_FIELD_IPV6,
 	SRC1_FIELD_IPV6,
@@ -297,12 +293,6 @@ static struct {
 
 const char cb_port_delim[] = ":";
 
-static struct {
-	const char *rule_ipv4_name;
-	const char *rule_ipv6_name;
-	int scalar;
-} parm_config;
-
 /*
  * Print and dump ACL/Route rules functions are defined in
  * following header file.
@@ -314,27 +304,6 @@ static struct {
  * following header file.
  */
 #include "l3fwd_acl_scalar.h"
-
-/*
- * API's called during initialization to setup ACL rules.
- */
-void
-l3fwd_acl_set_rule_ipv4_name(const char *optarg)
-{
-	parm_config.rule_ipv4_name = optarg;
-}
-
-void
-l3fwd_acl_set_rule_ipv6_name(const char *optarg)
-{
-	parm_config.rule_ipv6_name = optarg;
-}
-
-void
-l3fwd_acl_set_scalar(void)
-{
-	parm_config.scalar = 1;
-}
 
 /*
  * Parses IPV6 address, exepcts the following format:
@@ -566,7 +535,7 @@ parse_cb_ipv4vlan_rule(char *str, struct rte_acl_rule *v, int has_userdata)
 }
 
 static int
-add_rules(const char *rule_path,
+acl_add_rules(const char *rule_path,
 		struct rte_acl_rule **proute_base,
 		unsigned int *proute_num,
 		struct rte_acl_rule **pacl_base,
@@ -764,8 +733,8 @@ setup_acl(const int socket_id __attribute__((unused)))
 
 	dump_acl_config();
 
-	/* Load  rules from the input file */
-	if (add_rules(parm_config.rule_ipv4_name, &route_base_ipv4,
+	/* Load rules from the input file */
+	if (acl_add_rules(parm_config.rule_ipv4_name, &route_base_ipv4,
 			&route_num_ipv4, &acl_base_ipv4, &acl_num_ipv4,
 			sizeof(struct acl4_rule), &parse_cb_ipv4vlan_rule) < 0)
 		rte_exit(EXIT_FAILURE, "Failed to add rules\n");
@@ -776,7 +745,7 @@ setup_acl(const int socket_id __attribute__((unused)))
 	acl_log("IPv4 ACL entries %u:\n", acl_num_ipv4);
 	dump_ipv4_rules((struct acl4_rule *)acl_base_ipv4, acl_num_ipv4, 1);
 
-	if (add_rules(parm_config.rule_ipv6_name, &route_base_ipv6,
+	if (acl_add_rules(parm_config.rule_ipv6_name, &route_base_ipv6,
 			&route_num_ipv6,
 			&acl_base_ipv6, &acl_num_ipv6,
 			sizeof(struct acl6_rule), &parse_cb_ipv6_rule) < 0)
