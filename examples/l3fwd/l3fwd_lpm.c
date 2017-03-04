@@ -57,44 +57,23 @@
 
 #include "l3fwd.h"
 
-struct ipv4_l3fwd_lpm_route {
-	uint32_t ip;
+enum {
+	CB_FLD_DST_ADDR,
+	CB_FLD_IF_OUT,
+	CB_FLD_MAX
+};
+
+struct lpm_rule {
+	union {
+		uint32_t ip;
+		union {
+			uint32_t ip_32[4];
+			uint8_t ip_8[16];
+		};
+	};
 	uint8_t  depth;
 	uint8_t  if_out;
 };
-
-struct ipv6_l3fwd_lpm_route {
-	uint8_t ip[16];
-	uint8_t  depth;
-	uint8_t  if_out;
-};
-
-static struct ipv4_l3fwd_lpm_route ipv4_l3fwd_lpm_route_array[] = {
-	{IPv4(1, 1, 1, 0), 24, 0},
-	{IPv4(2, 1, 1, 0), 24, 1},
-	{IPv4(3, 1, 1, 0), 24, 2},
-	{IPv4(4, 1, 1, 0), 24, 3},
-	{IPv4(5, 1, 1, 0), 24, 4},
-	{IPv4(6, 1, 1, 0), 24, 5},
-	{IPv4(7, 1, 1, 0), 24, 6},
-	{IPv4(8, 1, 1, 0), 24, 7},
-};
-
-static struct ipv6_l3fwd_lpm_route ipv6_l3fwd_lpm_route_array[] = {
-	{{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, 48, 0},
-	{{2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, 48, 1},
-	{{3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, 48, 2},
-	{{4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, 48, 3},
-	{{5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, 48, 4},
-	{{6, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, 48, 5},
-	{{7, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, 48, 6},
-	{{8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, 48, 7},
-};
-
-#define IPV4_L3FWD_LPM_NUM_ROUTES \
-	(sizeof(ipv4_l3fwd_lpm_route_array) / sizeof(ipv4_l3fwd_lpm_route_array[0]))
-#define IPV6_L3FWD_LPM_NUM_ROUTES \
-	(sizeof(ipv6_l3fwd_lpm_route_array) / sizeof(ipv6_l3fwd_lpm_route_array[0]))
 
 #define IPV4_L3FWD_LPM_MAX_RULES         1024
 #define IPV4_L3FWD_LPM_NUMBER_TBL8S (1 << 8)
@@ -109,6 +88,211 @@ struct rte_lpm6 *ipv6_l3fwd_lpm_lookup_struct[NB_SOCKETS];
 #else
 #include "l3fwd_lpm.h"
 #endif
+
+static int
+lpm_parse_v6_addr(const char *in, const char **end, uint32_t v[IPV6_ADDR_U32],
+	char dlm)
+{
+	uint32_t addr[IPV6_ADDR_U16];
+
+	GET_CB_FIELD(in, addr[0], 16, UINT16_MAX, ':');
+	GET_CB_FIELD(in, addr[1], 16, UINT16_MAX, ':');
+	GET_CB_FIELD(in, addr[2], 16, UINT16_MAX, ':');
+	GET_CB_FIELD(in, addr[3], 16, UINT16_MAX, ':');
+	GET_CB_FIELD(in, addr[4], 16, UINT16_MAX, ':');
+	GET_CB_FIELD(in, addr[5], 16, UINT16_MAX, ':');
+	GET_CB_FIELD(in, addr[6], 16, UINT16_MAX, ':');
+	GET_CB_FIELD(in, addr[7], 16, UINT16_MAX, dlm);
+
+	*end = in;
+
+	v[0] = (addr[0] << 16) + addr[1];
+	v[1] = (addr[2] << 16) + addr[3];
+	v[2] = (addr[4] << 16) + addr[5];
+	v[3] = (addr[6] << 16) + addr[7];
+
+	return 0;
+}
+
+static int
+lpm_parse_v6_net(const char *in, uint32_t *v, uint8_t *mask_len)
+{
+	int32_t rc;
+	const char *mp;
+	uint8_t m;
+	uint32_t tmp[4];
+
+	/* get address. */
+	rc = lpm_parse_v6_addr(in, &mp, v, '/');
+	if (rc != 0) {
+		RTE_LOG(ERR, L3FWD, "parse_v6_addr failed %d\n", rc);
+		return rc;
+	}
+
+	/* get mask. */
+	GET_CB_FIELD(mp, m, 0, sizeof(tmp) * CHAR_BIT, 0);
+	*mask_len = m;
+
+	return 0;
+}
+
+static int
+lpm_parse_v6_rule(char *str, struct lpm_rule *v)
+{
+	int i, rc;
+	char *s, *sp, *in[CB_FLD_MAX];
+	static const char *dlm = " \t\n";
+	int dim = CB_FLD_MAX;
+	s = str;
+
+	for (i = 0; i != dim; i++, s = NULL) {
+		in[i] = strtok_r(s, dlm, &sp);
+		if (in[i] == NULL) {
+			RTE_LOG(ERR, L3FWD,
+				"\nparse_v6_rule strtok_r failed\n");
+			return -EINVAL;
+		}
+	}
+
+	rc = lpm_parse_v6_net(in[CB_FLD_DST_ADDR], v->ip_32, &v->depth);
+	if (rc != 0) {
+		RTE_LOG(ERR, L3FWD, "parse_v6_net failed\n");
+		return rc;
+	}
+
+	GET_CB_FIELD(in[CB_FLD_IF_OUT], v->if_out, 0, UINT8_MAX, 0);
+
+	return 0;
+}
+
+static int
+lpm_parse_v4_net(const char *in, uint32_t *addr, uint8_t *mask_len)
+{
+	uint8_t a, b, c, d, m;
+
+	GET_CB_FIELD(in, a, 0, UINT8_MAX, '.');
+	GET_CB_FIELD(in, b, 0, UINT8_MAX, '.');
+	GET_CB_FIELD(in, c, 0, UINT8_MAX, '.');
+	GET_CB_FIELD(in, d, 0, UINT8_MAX, '/');
+	GET_CB_FIELD(in, m, 0, sizeof(uint32_t) * CHAR_BIT, 0);
+
+	addr[0] = IPv4(a, b, c, d);
+	*mask_len = m;
+
+	return 0;
+}
+
+static int
+lpm_parse_v4_rule(char *str, struct lpm_rule *v)
+{
+	int i, rc;
+	char *s, *sp, *in[CB_FLD_MAX];
+	static const char *dlm = " \t\n";
+	int dim = CB_FLD_MAX;
+	s = str;
+
+	for (i = 0; i != dim; i++, s = NULL) {
+		in[i] = strtok_r(s, dlm, &sp);
+		if (in[i] == NULL)
+			return -EINVAL;
+	}
+
+	rc = lpm_parse_v4_net(in[CB_FLD_DST_ADDR], &v->ip, &v->depth);
+	if (rc != 0) {
+		RTE_LOG(ERR, L3FWD, "parse_v4_net failed %d\n", rc);
+		return rc;
+	}
+
+	GET_CB_FIELD(in[CB_FLD_IF_OUT], v->if_out, 0, UINT8_MAX, 0);
+
+	return 0;
+}
+
+static int
+lpm_add_rules(const char *rule_path,
+		struct lpm_rule **proute_base,
+		unsigned int *proute_num,
+		int (*parser)(char *, struct lpm_rule *))
+{
+	uint8_t *route_rules;
+	struct lpm_rule *next;
+	unsigned int route_num = 0;
+	unsigned int route_cnt = 0;
+	char buff[LINE_MAX];
+	FILE *fh = fopen(rule_path, "rb");
+	unsigned int i = 0, rule_size = sizeof(*next);
+
+	if (fh == NULL)
+		rte_exit(EXIT_FAILURE, "%s: Open %s failed\n", __func__,
+			rule_path);
+
+	while ((fgets(buff, LINE_MAX, fh) != NULL)) {
+		if (buff[0] == LPM_LEAD_CHAR)
+			route_num++;
+	}
+
+	if (route_num == 0)
+		rte_exit(EXIT_FAILURE, "Not find any route entries in %s!\n",
+				rule_path);
+
+	fseek(fh, 0, SEEK_SET);
+
+	route_rules = calloc(route_num, rule_size);
+
+	if (route_rules == NULL)
+		rte_exit(EXIT_FAILURE, "%s: failed to malloc memory\n",
+			__func__);
+
+	i = 0;
+	while (fgets(buff, LINE_MAX, fh) != NULL) {
+		i++;
+
+		if (is_bypass_line(buff))
+			continue;
+
+		char s = buff[0];
+
+		/* Route entry */
+		if (s == LPM_LEAD_CHAR)
+			next = (struct lpm_rule *)
+				(route_rules + route_cnt * rule_size);
+
+		/* Illegal line */
+		else
+			rte_exit(EXIT_FAILURE,
+				"%s Line %u: should start with leading "
+				"char %c\n",
+				rule_path, i, LPM_LEAD_CHAR);
+
+		if (parser(buff + 1, next) != 0)
+			rte_exit(EXIT_FAILURE,
+				"%s Line %u: parse rules error\n",
+				rule_path, i);
+
+		route_cnt++;
+	}
+
+	fclose(fh);
+
+	*proute_base = (struct lpm_rule *)route_rules;
+	*proute_num = route_cnt;
+
+	return 0;
+}
+
+static int
+check_lpm_config(void)
+{
+	if (parm_config.rule_ipv4_name == NULL) {
+		RTE_LOG(ERR, L3FWD, "LPM IPv4 rule file not specified\n");
+		return -1;
+	} else if (parm_config.rule_ipv6_name == NULL) {
+		RTE_LOG(ERR, L3FWD, "LPM IPv6 rule file not specified\n");
+		return -1;
+	}
+
+	return 0;
+}
 
 /* main processing loop */
 int
@@ -196,9 +380,15 @@ setup_lpm(const int socketid)
 {
 	struct rte_lpm6_config config;
 	struct rte_lpm_config config_ipv4;
+	struct lpm_rule *route_base_v4;
+	struct lpm_rule *route_base_v6;
+	unsigned int route_num_v4 = 0, route_num_v6 = 0;
 	unsigned i;
 	int ret;
 	char s[64];
+
+	if (check_lpm_config() != 0)
+		rte_exit(EXIT_FAILURE, "Failed to get valid LPM options\n");
 
 	/* create the LPM table */
 	config_ipv4.max_rules = IPV4_L3FWD_LPM_MAX_RULES;
@@ -212,18 +402,25 @@ setup_lpm(const int socketid)
 			"Unable to create v4 LPM table on socket %d\n",
 			socketid);
 
+	/* Load rules from the input file */
+	if (lpm_add_rules(parm_config.rule_ipv4_name,
+		&route_base_v4, &route_num_v4,
+		&lpm_parse_v4_rule) < 0)
+		rte_exit(EXIT_FAILURE, "Failed to add lpm v4 rules\n");
+
 	/* populate the LPM table */
-	for (i = 0; i < IPV4_L3FWD_LPM_NUM_ROUTES; i++) {
+	for (i = 0; i < route_num_v4; i++) {
 
 		/* skip unused ports */
-		if ((1 << ipv4_l3fwd_lpm_route_array[i].if_out &
-				enabled_port_mask) == 0)
+		if ((1 << route_base_v4[i].if_out &
+			enabled_port_mask) == 0)
 			continue;
 
-		ret = rte_lpm_add(ipv4_l3fwd_lpm_lookup_struct[socketid],
-				ipv4_l3fwd_lpm_route_array[i].ip,
-				ipv4_l3fwd_lpm_route_array[i].depth,
-				ipv4_l3fwd_lpm_route_array[i].if_out);
+		ret = rte_lpm_add(
+			ipv4_l3fwd_lpm_lookup_struct[socketid],
+			route_base_v4[i].ip,
+			route_base_v4[i].depth,
+			route_base_v4[i].if_out);
 
 		if (ret < 0) {
 			rte_exit(EXIT_FAILURE,
@@ -231,9 +428,9 @@ setup_lpm(const int socketid)
 		}
 
 		printf("LPM: Adding route 0x%08x / %d (%d)\n",
-			(unsigned)ipv4_l3fwd_lpm_route_array[i].ip,
-			ipv4_l3fwd_lpm_route_array[i].depth,
-			ipv4_l3fwd_lpm_route_array[i].if_out);
+			(unsigned int)route_base_v4[i].ip,
+			route_base_v4[i].depth,
+			route_base_v4[i].if_out);
 	}
 
 	/* create the LPM6 table */
@@ -249,18 +446,25 @@ setup_lpm(const int socketid)
 			"Unable to create v6 LPM table on socket %d\n",
 			socketid);
 
+	/* Load rules from the input file */
+	if (lpm_add_rules(parm_config.rule_ipv6_name,
+		&route_base_v6, &route_num_v6,
+		&lpm_parse_v6_rule) < 0)
+		rte_exit(EXIT_FAILURE, "Failed to add lpm v6 rules\n");
+
 	/* populate the LPM table */
-	for (i = 0; i < IPV6_L3FWD_LPM_NUM_ROUTES; i++) {
+	for (i = 0; i < route_num_v6; i++) {
 
 		/* skip unused ports */
-		if ((1 << ipv6_l3fwd_lpm_route_array[i].if_out &
-				enabled_port_mask) == 0)
+		if ((1 << route_base_v6[i].if_out &
+			enabled_port_mask) == 0)
 			continue;
 
-		ret = rte_lpm6_add(ipv6_l3fwd_lpm_lookup_struct[socketid],
-			ipv6_l3fwd_lpm_route_array[i].ip,
-			ipv6_l3fwd_lpm_route_array[i].depth,
-			ipv6_l3fwd_lpm_route_array[i].if_out);
+		ret = rte_lpm6_add(
+			ipv6_l3fwd_lpm_lookup_struct[socketid],
+			route_base_v6[i].ip_8,
+			route_base_v6[i].depth,
+			route_base_v6[i].if_out);
 
 		if (ret < 0) {
 			rte_exit(EXIT_FAILURE,
@@ -268,8 +472,8 @@ setup_lpm(const int socketid)
 		}
 
 		printf("LPM: Adding route %s / %d (%d)\n",
-			"IPV6", ipv6_l3fwd_lpm_route_array[i].depth,
-			ipv6_l3fwd_lpm_route_array[i].if_out);
+			"IPV6", route_base_v6[i].depth,
+			route_base_v6[i].if_out);
 	}
 }
 

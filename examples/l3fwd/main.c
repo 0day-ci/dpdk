@@ -126,6 +126,8 @@ uint32_t hash_entry_number = HASH_ENTRY_NUMBER_DEFAULT;
 
 struct lcore_conf lcore_conf[RTE_MAX_LCORE];
 
+struct parm_cfg parm_config;
+
 struct lcore_params {
 	uint8_t port_id;
 	uint8_t queue_id;
@@ -212,6 +214,27 @@ static struct l3fwd_lkp_mode l3fwd_acl_lkp = {
 	.get_ipv4_lookup_struct = acl_get_ipv4_l3fwd_lookup_struct,
 	.get_ipv6_lookup_struct = acl_get_ipv6_l3fwd_lookup_struct,
 };
+
+/*
+ * API's called during initialization to setup ACL/LPM/EM rules.
+ */
+static void
+l3fwd_set_rule_ipv4_name(const char *optarg)
+{
+	parm_config.rule_ipv4_name = optarg;
+}
+
+static void
+l3fwd_set_rule_ipv6_name(const char *optarg)
+{
+	parm_config.rule_ipv6_name = optarg;
+}
+
+static void
+l3fwd_set_scalar(void)
+{
+	parm_config.scalar = 1;
+}
 
 /*
  * Setup lookup methods for forwarding.
@@ -691,15 +714,15 @@ parse_args(int argc, char **argv)
 			break;
 
 		case CMD_LINE_OPT_RULE_IPV4:
-			l3fwd_acl_set_rule_ipv4_name(optarg);
+			l3fwd_set_rule_ipv4_name(optarg);
 			break;
 
 		case CMD_LINE_OPT_RULE_IPV6:
-			l3fwd_acl_set_rule_ipv6_name(optarg);
+			l3fwd_set_rule_ipv6_name(optarg);
 			break;
 
 		case CMD_LINE_OPT_SCALAR:
-			l3fwd_acl_set_scalar();
+			l3fwd_set_scalar();
 			break;
 
 		default:

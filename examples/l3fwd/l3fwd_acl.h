@@ -55,17 +55,6 @@
 #define MBUF_IPV6_2PROTO(m)	\
 	rte_pktmbuf_mtod_offset((m), uint8_t *, OFF_ETHHEAD + OFF_IPV62PROTO)
 
-#define GET_CB_FIELD(in, fd, base, lim, dlm)	do {            \
-	unsigned long val;                                      \
-	char *end;                                              \
-	errno = 0;                                              \
-	val = strtoul((in), &end, (base));                      \
-	if (errno != 0 || end[0] != (dlm) || val > (lim))       \
-		return -EINVAL;                               \
-	(fd) = (typeof(fd))val;                                 \
-	(in) = end + 1;                                         \
-} while (0)
-
 /*
  * ACL rules should have higher priorities than route ones to ensure ACL rule
  * always be found when input packets have multi-matches in the database.
@@ -161,24 +150,6 @@ print_one_ipv6_rule(struct acl6_rule *rule, int extra)
 			rule->data.category_mask,
 			rule->data.priority,
 			rule->data.userdata);
-}
-
-/* Bypass comment and empty lines */
-static inline int
-is_bypass_line(char *buff)
-{
-	int i = 0;
-
-	/* comment line */
-	if (buff[0] == COMMENT_LEAD_CHAR)
-		return 1;
-	/* empty line */
-	while (buff[i] != '\0') {
-		if (!isspace(buff[i]))
-			return 0;
-		i++;
-	}
-	return 1;
 }
 
 #ifdef L3FWDACL_DEBUG

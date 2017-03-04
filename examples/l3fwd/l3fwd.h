@@ -94,6 +94,47 @@
 #define ACL_LEAD_CHAR		('@')
 #define ROUTE_LEAD_CHAR		('R')
 #define COMMENT_LEAD_CHAR	('#')
+#define LPM_LEAD_CHAR		('L')
+#define EM_LEAD_CHAR		('E')
+
+#define	IPV6_ADDR_LEN	16
+#define	IPV6_ADDR_U16	(IPV6_ADDR_LEN / sizeof(uint16_t))
+#define	IPV6_ADDR_U32	(IPV6_ADDR_LEN / sizeof(uint32_t))
+
+#define GET_CB_FIELD(in, fd, base, lim, dlm)	do {            \
+	unsigned long val;                                      \
+	char *end;                                              \
+	errno = 0;                                              \
+	val = strtoul((in), &end, (base));                      \
+	if (errno != 0 || end[0] != (dlm) || val > (lim))       \
+		return -EINVAL;                               \
+	(fd) = (typeof(fd))val;                                 \
+	(in) = end + 1;                                         \
+} while (0)
+
+/* Bypass comment and empty lines */
+static inline int
+is_bypass_line(char *buff)
+{
+	int i = 0;
+
+	/* comment line */
+	if (buff[0] == COMMENT_LEAD_CHAR)
+		return 1;
+	/* empty line */
+	while (buff[i] != '\0') {
+		if (!isspace(buff[i]))
+			return 0;
+		i++;
+	}
+	return 1;
+}
+
+struct parm_cfg {
+	const char *rule_ipv4_name;
+	const char *rule_ipv6_name;
+	int scalar;
+};
 
 struct mbuf_table {
 	uint16_t len;
@@ -133,6 +174,8 @@ extern uint32_t hash_entry_number;
 extern xmm_t val_eth[RTE_MAX_ETHPORTS];
 
 extern struct lcore_conf lcore_conf[RTE_MAX_LCORE];
+
+extern struct parm_cfg parm_config;
 
 extern int numa_on; /**< NUMA is enabled by default. */
 
