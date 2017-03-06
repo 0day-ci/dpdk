@@ -41,6 +41,12 @@ New Features
      Also, make sure to start the actual text at the margin.
      =========================================================
 
+   * **Added vmxnet3 version 3 support.**
+
+     Added support for vmxnet3 version 3 which includes several
+     performance enhancements viz. configurable TX data ring, Receive
+     Data Ring, ability to register memory regions.
+
 
 Resolved Issues
 ---------------
