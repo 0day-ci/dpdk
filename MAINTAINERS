@@ -598,6 +598,7 @@ Other libraries
 Configuration file
 M: Cristian Dumitrescu <cristian.dumitrescu@intel.com>
 F: lib/librte_cfgfile/
+F: test/test/test_cfgfile*
 
 Interactive command line
 M: Olivier Matz <olivier.matz@6wind.com>
