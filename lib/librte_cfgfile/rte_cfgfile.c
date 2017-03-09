@@ -112,7 +112,7 @@ rte_cfgfile_load_with_params(const char *filename,
 	int allocated_entries = 0;
 	int curr_section = -1;
 	int curr_entry = -1;
-	char buffer[256] = {0};
+	char buffer[CFG_NAME_LEN + CFG_VALUE_LEN + 4] = {0};
 	int lineno = 0;
 	struct rte_cfgfile *cfg = NULL;
 
