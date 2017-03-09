@@ -132,6 +132,32 @@ These user-owned caches can be explicitly passed to ``rte_mempool_generic_put()`
 The ``rte_mempool_default_cache()`` call returns the default internal cache if any.
 In contrast to the default caches, user-owned caches can be used by non-EAL threads too.
 
+In addition to a core's local cache, many of the drivers don't release the mbuf back to the mempool, or local cache,
+immediately after the packet has been transmitted.
+Instead, they leave the mbuf in their Tx ring and either perform a bulk release when the ``tx_rs_thresh`` has been
+crossed or free the mbuf when a slot in the Tx ring is needed.
+
+An application can request the driver to release used mbufs with the ``rte_eth_tx_done_cleanup()`` API.
+This API requests the driver to release mbufs that are no longer in use, independent of whether or not the
+``tx_rs_thresh`` has been crossed.
+There are two scenarios when an application may want the mbuf released immediately:
+
+* When a given packet needs to be sent to multiple destination interfaces (either for Layer 2 flooding or Layer 3
+  multi-cast).
+  One option is to make a copy of the packet or a copy of the header portion that needs to be manipulated.
+  A second option is to transmit the packet and then poll the ``rte_eth_tx_done_cleanup()`` API until the reference
+  count on the packet is decremented.
+  Then the same packet can be transmitted to the next destination interface.
+
+* If an application is designed to make multiple runs, like a packet generator, and one run has completed.
+  The application may want to reset to a clean state.
+  In this case, it may want to call the ``rte_eth_tx_done_cleanup()`` API to request each destination interface it has
+  been using to release all of its used mbufs.
+
+To determine if a driver supports this API, check for the *Free Tx mbuf on demand* feature in the *Network Interface
+Controller Drivers* document.
+
+
 Mempool Handlers
 ------------------------
 
