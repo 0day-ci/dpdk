@@ -105,8 +105,7 @@ _test_cfgfile_sample(struct rte_cfgfile *cfgfile)
 		    "key2 unexpected value: %s", value);
 
 	value = rte_cfgfile_get_entry(cfgfile, "section2", "key3");
-	TEST_ASSERT(strcmp("value3", value) == 0,
-		    "key3 unexpected value: %s", value);
+	TEST_ASSERT(strlen(value) == 0, "key3 unexpected value: %s", value);
 
 	return 0;
 }
@@ -161,17 +160,6 @@ test_cfgfile_invalid_section_header(void)
 	struct rte_cfgfile *cfgfile;
 
 	cfgfile = rte_cfgfile_load(CFG_FILES_ETC "/invalid_section.ini", 0);
-	TEST_ASSERT_NULL(cfgfile, "Expected failured did not occur");
-
-	return 0;
-}
-
-static int
-test_cfgfile_invalid_key_value_pair(void)
-{
-	struct rte_cfgfile *cfgfile;
-
-	cfgfile = rte_cfgfile_load(CFG_FILES_ETC "/invalid_key_value.ini", 0);
 	TEST_ASSERT_NULL(cfgfile, "Expected failured did not occur");
 
 	return 0;
@@ -249,9 +237,6 @@ test_cfgfile(void)
 		return -1;
 
 	if (test_cfgfile_invalid_section_header())
-		return -1;
-
-	if (test_cfgfile_invalid_key_value_pair())
 		return -1;
 
 	if (test_cfgfile_missing_section())
