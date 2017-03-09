@@ -85,8 +85,28 @@ _strip(char *str, unsigned len)
 	return newlen;
 }
 
+void
+rte_cfgfile_init_parameters(struct rte_cfgfile_parameters *params)
+{
+	memset(params, 0, sizeof(*params));
+	params->comment_character = CFG_DEFAULT_COMMENT_CHARACTER;
+}
+
 struct rte_cfgfile *
 rte_cfgfile_load(const char *filename, int flags)
+{
+	struct rte_cfgfile_parameters params;
+
+	/* setup default parameter are add specified flags */
+	rte_cfgfile_init_parameters(&params);
+	params.flags |= flags;
+
+	return rte_cfgfile_load_with_params(filename, &params);
+}
+
+struct rte_cfgfile *
+rte_cfgfile_load_with_params(const char *filename,
+			     const struct rte_cfgfile_parameters *params)
 {
 	int allocated_sections = CFG_ALLOC_SECTION_BATCH;
 	int allocated_entries = 0;
@@ -107,7 +127,7 @@ rte_cfgfile_load(const char *filename, int flags)
 
 	memset(cfg->sections, 0, sizeof(cfg->sections[0]) * allocated_sections);
 
-	if (flags & CFG_FLAG_GLOBAL_SECTION) {
+	if (params->flags & CFG_FLAG_GLOBAL_SECTION) {
 		curr_section = 0;
 		allocated_entries = CFG_ALLOC_ENTRY_BATCH;
 		cfg->sections[curr_section] = malloc(
@@ -132,7 +152,7 @@ rte_cfgfile_load(const char *filename, int flags)
 					"Check if line too long\n", lineno);
 			goto error1;
 		}
-		pos = memchr(buffer, ';', sizeof(buffer));
+		pos = memchr(buffer, params->comment_character, sizeof(buffer));
 		if (pos != NULL) {
 			*pos = '\0';
 			len = pos -  buffer;
@@ -242,7 +262,7 @@ rte_cfgfile_load(const char *filename, int flags)
 		}
 	}
 	fclose(f);
-	cfg->flags = flags;
+	cfg->flags = params->flags;
 	cfg->num_sections = curr_section + 1;
 	/* curr_section will still be -1 if we have an empty file */
 	if (curr_section >= 0)

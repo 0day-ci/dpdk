@@ -66,6 +66,12 @@ struct rte_cfgfile_entry {
 	char value[CFG_VALUE_LEN]; /**< Value */
 };
 
+/** Configuration file operation optional arguments */
+struct rte_cfgfile_parameters {
+	int flags; /**< Config file flags */
+	char comment_character; /**< Config file comment character */
+};
+
 /**@{ cfgfile load operation flags */
 /**
  * Indicates that the file supports key value entries before the first defined
@@ -73,6 +79,17 @@ struct rte_cfgfile_entry {
  */
 #define CFG_FLAG_GLOBAL_SECTION (1 << 0)
 /**@} */
+
+/** Defines the default comment character used for parsing config files. */
+#define CFG_DEFAULT_COMMENT_CHARACTER ';'
+
+/**
+ * Initialize config file optional parameters to default values.
+ *
+ * @param params
+ *   parameters to be initialized
+ */
+void rte_cfgfile_init_parameters(struct rte_cfgfile_parameters *params);
 
 /**
 * Open config file
@@ -85,6 +102,23 @@ struct rte_cfgfile_entry {
 *   Handle to configuration file on success, NULL otherwise
 */
 struct rte_cfgfile *rte_cfgfile_load(const char *filename, int flags);
+
+/**
+ * Open config file with specified optional parameters.  Use @see
+ * rte_cfgfile_init_parameters to setup the default parameters.
+ *
+ * @param filename
+ *   Config file name
+ * @param params
+ *   Config file flags
+ * @return
+ *   Handle to configuration file on success, NULL otherwise
+ * @param
+ *
+ */
+struct rte_cfgfile *rte_cfgfile_load_with_params(const char *filename,
+	const struct rte_cfgfile_parameters *params);
+
 
 /**
 * Get number of sections in config file

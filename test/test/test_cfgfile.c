@@ -130,6 +130,32 @@ test_cfgfile_sample1(void)
 }
 
 static int
+test_cfgfile_sample2(void)
+{
+	struct rte_cfgfile_parameters params;
+	struct rte_cfgfile *cfgfile;
+	int ret;
+
+	/* setup default */
+	rte_cfgfile_init_parameters(&params);
+
+	/* override comment character */
+	params.comment_character = '#';
+
+	cfgfile = rte_cfgfile_load_with_params(CFG_FILES_ETC "/sample2.ini",
+					       &params);
+	TEST_ASSERT_NOT_NULL(cfgfile, "Failed to parse sample2.ini");
+
+	ret = _test_cfgfile_sample(cfgfile);
+	TEST_ASSERT_SUCCESS(ret, "Failed to validate sample file: %d", ret);
+
+	ret = rte_cfgfile_close(cfgfile);
+	TEST_ASSERT_SUCCESS(ret, "Failed to close cfgfile");
+
+	return 0;
+}
+
+static int
 test_cfgfile_invalid_section_header(void)
 {
 	struct rte_cfgfile *cfgfile;
@@ -217,6 +243,9 @@ test_cfgfile(void)
 		return -1;
 
 	if (test_cfgfile_sample1())
+		return -1;
+
+	if (test_cfgfile_sample2())
 		return -1;
 
 	if (test_cfgfile_invalid_section_header())
