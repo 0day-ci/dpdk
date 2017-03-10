@@ -268,6 +268,7 @@ l3fwd_simple_forward(struct rte_mbuf *m, struct lcore_queue_conf *qconf,
 	uint32_t i, len, next_hop_ipv4;
 	uint8_t next_hop_ipv6, port_out, ipv6;
 	int32_t len2;
+	struct ether_hdr *eth_hdr;
 
 	ipv6 = 0;
 	rxq = &qconf->rx_queue_list[queueid];
@@ -276,13 +277,14 @@ l3fwd_simple_forward(struct rte_mbuf *m, struct lcore_queue_conf *qconf,
 	port_out = port_in;
 
 	/* Remove the Ethernet header and trailer from the input packet */
+	eth_hdr = rte_pktmbuf_mtod(m, struct ether_hdr *);
 	rte_pktmbuf_adj(m, (uint16_t)sizeof(struct ether_hdr));
 
 	/* Build transmission burst */
 	len = qconf->tx_mbufs[port_out].len;
 
 	/* if this is an IPv4 packet */
-	if (RTE_ETH_IS_IPV4_HDR(m->packet_type)) {
+	if (eth_hdr->ether_type == rte_cpu_to_be_16(ETHER_TYPE_IPv4)) {
 		struct ipv4_hdr *ip_hdr;
 		uint32_t ip_dst;
 		/* Read the lookup key (i.e. ip_dst) from the input packet */
@@ -316,7 +318,7 @@ l3fwd_simple_forward(struct rte_mbuf *m, struct lcore_queue_conf *qconf,
 			if (unlikely (len2 < 0))
 				return;
 		}
-	} else if (RTE_ETH_IS_IPV6_HDR(m->packet_type)) {
+	} else if (eth_hdr->ether_type == rte_be_to_cpu_16(ETHER_TYPE_IPv6)) {
 		/* if this is an IPv6 packet */
 		struct ipv6_hdr *ip_hdr;
 
@@ -363,8 +365,8 @@ l3fwd_simple_forward(struct rte_mbuf *m, struct lcore_queue_conf *qconf,
 		void *d_addr_bytes;
 
 		m = qconf->tx_mbufs[port_out].m_table[i];
-		struct ether_hdr *eth_hdr = (struct ether_hdr *)
-			rte_pktmbuf_prepend(m, (uint16_t)sizeof(struct ether_hdr));
+		eth_hdr = (struct ether_hdr *)rte_pktmbuf_prepend(m,
+			(uint16_t)sizeof(struct ether_hdr));
 		if (eth_hdr == NULL) {
 			rte_panic("No headroom in mbuf.\n");
 		}
