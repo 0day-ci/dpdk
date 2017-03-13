@@ -874,8 +874,8 @@ rcd_done:
 
 /*
  * Create memzone for device rings. malloc can't be used as the physical address is
- * needed. If the memzone is already created, then this function returns a ptr
- * to the old one.
+ * needed. If the memzone already exists, we free it since it may have been created
+ * with a different size.
  */
 static const struct rte_memzone *
 ring_dma_zone_reserve(struct rte_eth_dev *dev, const char *ring_name,
@@ -890,7 +890,7 @@ ring_dma_zone_reserve(struct rte_eth_dev *dev, const char *ring_name,
 
 	mz = rte_memzone_lookup(z_name);
 	if (mz)
-		return mz;
+		rte_memzone_free(mz);
 
 	return rte_memzone_reserve_aligned(z_name, ring_size,
 					   socket_id, 0, VMXNET3_RING_BA_ALIGN);
