@@ -155,8 +155,6 @@ struct virtio_net {
 	int			vid;
 	uint32_t		flags;
 	uint16_t		vhost_hlen;
-	/* to tell if we need broadcast rarp packet */
-	rte_atomic16_t		broadcast_rarp;
 	uint32_t		virt_qp_nb;
 	int			dequeue_zero_copy;
 	struct vhost_virtqueue	*virtqueue[VHOST_MAX_QUEUE_PAIRS * 2];
@@ -166,6 +164,8 @@ struct virtio_net {
 	uint64_t		log_base;
 	uint64_t		log_addr;
 	struct ether_addr	mac;
+	/* to tell if we need broadcast rarp packet */
+	rte_atomic16_t		broadcast_rarp;
 
 	uint32_t		nr_guest_pages;
 	uint32_t		max_guest_pages;
