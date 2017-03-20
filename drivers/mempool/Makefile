@@ -31,6 +31,7 @@
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
+DIRS-$(CONFIG_RTE_DRIVER_MEMPOOL_RING) += ring
 DIRS-$(CONFIG_RTE_DRIVER_MEMPOOL_STACK) += stack
 
 include $(RTE_SDK)/mk/rte.subdir.mk
