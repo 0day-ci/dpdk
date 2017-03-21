@@ -98,6 +98,20 @@ static const struct eth_dev_ops ark_eth_dev_ops = {
 
 };
 
+int
+ark_get_port_id(struct rte_eth_dev *dev, struct ark_adapter *ark)
+{
+	int n = ark->num_ports;
+	int i;
+
+	/* There has to be a smarter way to do this ... */
+	for (i = 0; i < n; i++) {
+		if (ark->port[i].eth_dev == dev)
+			return i;
+	}
+	ARK_DEBUG_TRACE("ARK: Device is NOT associated with a port !!");
+	return -1;
+}
 
 static int
 eth_ark_dev_init(struct rte_eth_dev *dev __rte_unused)
