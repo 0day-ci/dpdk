@@ -609,6 +609,11 @@ CONFIG_RTE_LIBRTE_VHOST_DEBUG=n
 CONFIG_RTE_LIBRTE_PMD_VHOST=n
 
 #
+# Compile GRO library
+#
+CONFIG_RTE_LIBRTE_GRO=y
+
+#
 #Compile Xen domain0 support
 #
 CONFIG_RTE_LIBRTE_XEN_DOM0=n
