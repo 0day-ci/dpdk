@@ -53,11 +53,7 @@
  *
  * Note: the mempool implementation is not preemptable. A lcore must
  * not be interrupted by another task that uses the same mempool
- * (because it uses a ring which is not preemptable). Also, mempool
- * functions must not be used outside the DPDK environment: for
- * example, in linuxapp environment, a thread that is not created by
- * the EAL must not use mempools. This is due to the per-lcore cache
- * that won't work as rte_lcore_id() will not return a correct value.
+ * (because it uses a ring which is not preemptible).
  */
 
 #include <stdio.h>
