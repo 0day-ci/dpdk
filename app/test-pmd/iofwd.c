@@ -65,6 +65,7 @@
 #include <rte_ethdev.h>
 #include <rte_string_fns.h>
 #include <rte_flow.h>
+#include <rte_gro_tcp.h>
 
 #include "testpmd.h"
 
@@ -99,6 +100,12 @@ pkt_burst_io_forward(struct fwd_stream *fs)
 			pkts_burst, nb_pkt_per_burst);
 	if (unlikely(nb_rx == 0))
 		return;
+	if (enable_gro_tcp4) {
+		nb_rx = rte_gro_tcp4_reassemble_burst(
+				gro_tcp4_tbls[fs->tbl_idx],
+				pkts_burst,
+				nb_rx);
+	}
 	fs->rx_packets += nb_rx;
 
 #ifdef RTE_TEST_PMD_RECORD_BURST_STATS

@@ -273,6 +273,16 @@ uint32_t bypass_timeout = RTE_BYPASS_TMT_OFF;
 #endif
 
 /*
+ * TCP IPv4 lookup tables. Each lcore has a lookup table.
+ */
+struct rte_hash *gro_tcp4_tbls[RTE_MAX_LCORE];
+
+/*
+ * TCP IPv4 GRO enable/disable flag.
+ */
+uint8_t enable_gro_tcp4 = 0;	/* turn off by default */
+
+/*
  * Ethernet device configuration.
  */
 struct rte_eth_rxmode rx_mode = {

@@ -109,6 +109,8 @@ struct fwd_stream {
 	queueid_t  tx_queue;  /**< TX queue to send forwarded packets */
 	streamid_t peer_addr; /**< index of peer ethernet address of packets */
 
+	uint16_t tbl_idx;	/**< TCP IPv4 GRO lookup tale index */
+
 	unsigned int retry_enabled;
 
 	/* "read-write" results */
@@ -420,6 +422,9 @@ extern struct ether_addr peer_eth_addrs[RTE_MAX_ETHPORTS];
 extern uint32_t burst_tx_delay_time; /**< Burst tx delay time(us) for mac-retry. */
 extern uint32_t burst_tx_retry_num;  /**< Burst tx retry number for mac-retry. */
 
+extern struct rte_hash *gro_tcp4_tbls[RTE_MAX_LCORE];
+extern uint8_t enable_gro_tcp4;
+
 static inline unsigned int
 lcore_num(void)
 {
@@ -616,6 +621,7 @@ void get_2tuple_filter(uint8_t port_id, uint16_t index);
 void get_5tuple_filter(uint8_t port_id, uint16_t index);
 int rx_queue_id_is_invalid(queueid_t rxq_id);
 int tx_queue_id_is_invalid(queueid_t txq_id);
+void setup_gro_tcp4(const char *mode);
 
 /* Functions to manage the set of filtered Multicast MAC addresses */
 void mcast_addr_add(uint8_t port_id, struct ether_addr *mc_addr);

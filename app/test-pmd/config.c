@@ -97,6 +97,7 @@
 #ifdef RTE_LIBRTE_IXGBE_PMD
 #include <rte_pmd_ixgbe.h>
 #endif
+#include <rte_gro_tcp.h>
 
 #include "testpmd.h"
 
@@ -2413,6 +2414,64 @@ set_tx_pkt_segments(unsigned *seg_lengths, unsigned nb_segs)
 
 	tx_pkt_length  = tx_pkt_len;
 	tx_pkt_nb_segs = (uint8_t) nb_segs;
+}
+
+void
+setup_gro_tcp4(const char *mode)
+{
+	lcoreid_t lc_id;
+	streamid_t sm_id;
+	uint64_t nb_entries = 64;	/* lookup table entry number */
+
+	if (strcmp(mode, "on") == 0) {
+		if (test_done == 0) {
+			printf("Before enable TCP IPv4 GRO,"
+					" please stop forwarding first\n");
+			return;
+		}
+		if (enable_gro_tcp4 == 1) {
+			printf("GRO TCP IPv4 has been turned on\n");
+			return;
+		}
+		for (lc_id = 0; lc_id < cur_fwd_config.nb_fwd_lcores; lc_id++) {
+			char name[20];
+
+			snprintf(name, sizeof(name), "GRO_TCP4_%u", lc_id);
+			if (gro_tcp4_tbls[lc_id])
+				rte_hash_free(gro_tcp4_tbls[lc_id]);
+
+			gro_tcp4_tbls[lc_id] = rte_gro_tcp4_tbl_create(
+					name,
+					nb_entries,
+					rte_lcore_to_socket_id
+					(fwd_lcores_cpuids[lc_id]));
+			if (gro_tcp4_tbls[lc_id] == NULL) {
+				enable_gro_tcp4 = 0;
+				return;
+			}
+			for (sm_id = fwd_lcores[lc_id]->stream_idx; sm_id <
+					fwd_lcores[lc_id]->stream_idx +
+					fwd_lcores[lc_id]->stream_nb; sm_id++) {
+				fwd_streams[sm_id]->tbl_idx = lc_id;
+			}
+		}
+		enable_gro_tcp4 = 1;
+	} else if (strcmp(mode, "off") == 0) {
+		if (test_done == 0) {
+			printf("Before disable TCP IPv4 GRO,"
+					" please stop forwarding first\n");
+			return;
+		}
+		if (enable_gro_tcp4 == 0) {
+			printf("GRO TCP IPv4 has been turned off\n");
+			return;
+		}
+		for (lc_id = 0; lc_id < cur_fwd_config.nb_fwd_lcores; lc_id++) {
+			rte_hash_free(gro_tcp4_tbls[lc_id]);
+			gro_tcp4_tbls[lc_id] = NULL;
+		}
+		enable_gro_tcp4 = 0;
+	}
 }
 
 char*
