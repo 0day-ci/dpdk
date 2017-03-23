@@ -856,21 +856,11 @@ rte_eth_dev_configure(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 	 * length is supported by the configured device.
 	 */
 	if (dev_conf->rxmode.jumbo_frame == 1) {
-		if (dev_conf->rxmode.max_rx_pkt_len >
-		    dev_info.max_rx_pktlen) {
-			RTE_PMD_DEBUG_TRACE("ethdev port_id=%d max_rx_pkt_len %u"
-				" > max valid value %u\n",
-				port_id,
-				(unsigned)dev_conf->rxmode.max_rx_pkt_len,
-				(unsigned)dev_info.max_rx_pktlen);
-			return -EINVAL;
-		} else if (dev_conf->rxmode.max_rx_pkt_len < ETHER_MIN_LEN) {
-			RTE_PMD_DEBUG_TRACE("ethdev port_id=%d max_rx_pkt_len %u"
-				" < min valid value %u\n",
-				port_id,
-				(unsigned)dev_conf->rxmode.max_rx_pkt_len,
-				(unsigned)ETHER_MIN_LEN);
-			return -EINVAL;
+		if (dev_conf->rxmode.max_rx_pkt_len > dev_info.max_rx_pktlen ||
+			dev_conf->rxmode.max_rx_pkt_len < ETHER_MIN_LEN) {
+			/* Use maximum frame size the NIC supports */
+			dev->data->dev_conf.rxmode.max_rx_pkt_len =
+							dev_info.max_rx_pktlen;
 		}
 	} else {
 		if (dev_conf->rxmode.max_rx_pkt_len < ETHER_MIN_LEN ||

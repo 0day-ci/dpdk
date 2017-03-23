@@ -349,7 +349,11 @@ enum rte_eth_tx_mq_mode {
 struct rte_eth_rxmode {
 	/** The multi-queue packet distribution mode to be used, e.g. RSS. */
 	enum rte_eth_rx_mq_mode mq_mode;
-	uint32_t max_rx_pkt_len;  /**< Only used if jumbo_frame enabled. */
+	/**
+	 * Desired maximum RX frame size. Too short or too long size will be
+	 * substituted by a default value.
+	 */
+	uint32_t max_rx_pkt_len;
 	uint16_t split_hdr_size;  /**< hdr buf size (header_split enabled).*/
 	__extension__
 	uint16_t header_split : 1, /**< Header Split enable. */
