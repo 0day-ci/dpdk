@@ -407,8 +407,20 @@ struct rte_cryptodev_sym_session;
  * to the data in the source buffer.
  */
 struct rte_crypto_sym_op {
-	struct rte_mbuf *m_src;	/**< source mbuf */
-	struct rte_mbuf *m_dst;	/**< destination mbuf */
+	struct rte_mbuf *m_src;
+	 /**< source mbuf
+	 *
+	 * @note
+	 * For DOCSISBPI mode rte_mbuf.next must be NULL, i.e.
+	 * chained mbufs are not supported in this mode.
+	 */
+	struct rte_mbuf *m_dst;
+	/**< destination mbuf
+	 *
+	 * @note
+	 * For DOCSISBPI mode rte_mbuf.next must be NULL, i.e.
+	 * chained mbufs are not supported in this mode.
+	 */
 
 	enum rte_crypto_sym_op_sess_type sess_type;
 
