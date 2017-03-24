@@ -932,15 +932,10 @@ struct rte_flow_error {
 /**
  * Check whether a flow rule can be created on a given port.
  *
- * While this function has no effect on the target device, the flow rule is
- * validated against its current configuration state and the returned value
- * should be considered valid by the caller for that state only.
- *
- * The returned value is guaranteed to remain valid only as long as no
- * successful calls to rte_flow_create() or rte_flow_destroy() are made in
- * the meantime and no device parameter affecting flow rules in any way are
- * modified, due to possible collisions or resource limitations (although in
- * such cases EINVAL should not be returned).
+ * The flow rule is validated against the target device. There is no check
+ * against the current state of the device- creating the flow could still
+ * fail due to a lack of resources on the device. This function has no effect
+ * on the target device.
  *
  * @param port_id
  *   Port identifier of Ethernet device.
@@ -965,13 +960,7 @@ struct rte_flow_error {
  *   -ENOTSUP: valid but unsupported rule specification (e.g. partial
  *   bit-masks are unsupported).
  *
- *   -EEXIST: collision with an existing rule.
- *
- *   -ENOMEM: not enough resources.
- *
- *   -EBUSY: action cannot be performed due to busy device resources, may
- *   succeed if the affected queues or even the entire port are in a stopped
- *   state (see rte_eth_dev_rx_queue_stop() and rte_eth_dev_stop()).
+ *   -ENOMEM: not enough host resources to execute this funtion.
  */
 int
 rte_flow_validate(uint8_t port_id,
