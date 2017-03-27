@@ -901,7 +901,7 @@ copy_desc_to_mbuf(struct virtio_net *dev, struct vring_desc *descs,
 		if (mbuf_avail == 0) {
 			cur = rte_pktmbuf_alloc(mbuf_pool);
 			if (unlikely(cur == NULL)) {
-				RTE_LOG(ERR, VHOST_DATA, "Failed to "
+				LOG_DEBUG(VHOST_DATA, "Failed to "
 					"allocate memory for mbuf.\n");
 				return -1;
 			}
@@ -1129,7 +1129,7 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 
 		pkts[i] = rte_pktmbuf_alloc(mbuf_pool);
 		if (unlikely(pkts[i] == NULL)) {
-			RTE_LOG(ERR, VHOST_DATA,
+			LOG_DEBUG(VHOST_DATA,
 				"Failed to allocate memory for mbuf.\n");
 			break;
 		}
