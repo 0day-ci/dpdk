@@ -49,6 +49,10 @@ New Features
 
   sPAPR IOMMU based pci probing enabled for vfio-pci devices.
 
+* **Added VFIO hotplug support.**
+
+  How hotplug supported with UIO and VFIO drivers.
+
 Resolved Issues
 ---------------
 

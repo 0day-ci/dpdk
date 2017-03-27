@@ -35,5 +35,6 @@ DIRS-$(CONFIG_RTE_TEST_PMD) += test-pmd
 DIRS-$(CONFIG_RTE_APP_CRYPTO_PERF) += test-crypto-perf
 DIRS-$(CONFIG_RTE_EXEC_ENV_LINUXAPP) += proc_info
 DIRS-$(CONFIG_RTE_LIBRTE_PDUMP) += pdump
+DIRS-y += multivf
 
 include $(RTE_SDK)/mk/rte.subdir.mk
