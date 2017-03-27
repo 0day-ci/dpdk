@@ -230,9 +230,13 @@ for conf in $configs ; do
 	make -j$J EXTRA_CFLAGS="$maxerr $DPDK_DEP_CFLAGS" \
 		EXTRA_LDFLAGS="$DPDK_DEP_LDFLAGS" $verbose O=$dir
 	! $short || break
-	echo "================== Build examples for $dir"
 	export RTE_SDK=$(pwd)
 	export RTE_TARGET=$dir
+	echo "================== Build tests for $dir"
+	make -j$J EXTRA_CFLAGS="$maxerr $DPDK_DEP_CFLAGS" \
+		EXTRA_LDFLAGS="$DPDK_DEP_LDFLAGS" $verbose O=$dir \
+		test-build
+	echo "================== Build examples for $dir"
 	make -j$J -sC examples \
 		EXTRA_LDFLAGS="$DPDK_DEP_LDFLAGS" $verbose \
 		O=$(readlink -m $dir/examples)
