@@ -467,3 +467,16 @@ Incorrect Rx statistics when packet is oversize
 When a packet is over maximum frame size, the packet is dropped.
 However the Rx statistics, when calling `rte_eth_stats_get` incorrectly
 shows it as received.
+
+igb uio legacy mode can not be used in X710/XL710/XXV710
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When insmod ``igb_uio`` with ``intr_mode=legacy`` and test link status
+interrupt, it will cause Input/Output error when reading file descriptor.
+The root cause is X710/XL710/XXV710 NICs lack support for indicating INTx
+is asserted via the interrupt bit in the PCI status register. Linux delect
+them from INTx support table. The related link `linux kernel commit <https:
+//git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git/commit/
+drivers/pci/quirks.c?id=8bcf4525c5d43306c5fd07e132bc8650e3491aec>`_.
+
+NOTE: happening when Linux kernel version >= 4.7
