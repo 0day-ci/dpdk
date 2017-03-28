@@ -94,6 +94,9 @@
 #ifdef RTE_LIBRTE_I40E_PMD
 #include <rte_pmd_i40e.h>
 #endif
+#ifdef RTE_LIBRTE_BNXT_PMD
+#include <rte_pmd_bnxt.h>
+#endif
 #include "testpmd.h"
 
 static struct cmdline *testpmd_cl;
@@ -11353,6 +11356,9 @@ cmd_set_tx_loopback_parsed(
 	if (ret == -ENOTSUP)
 		ret = rte_pmd_ixgbe_set_tx_loopback(res->port_id, is_on);
 #endif
+#ifdef RTE_LIBRTE_BNXT_PMD
+		ret = rte_pmd_bnxt_set_tx_loopback(res->port_id, is_on);
+#endif
 #ifdef RTE_LIBRTE_I40E_PMD
 	if (ret == -ENOTSUP)
 		ret = rte_pmd_i40e_set_tx_loopback(res->port_id, is_on);
@@ -11441,7 +11447,12 @@ cmd_set_all_queues_drop_en_parsed(
 	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
 
-	ret = rte_pmd_ixgbe_set_all_queues_drop_en(res->port_id, is_on);
+#ifdef RTE_LIBRTE_BNXT_PMD
+		ret = rte_pmd_bnxt_set_all_queues_drop_en(res->port_id, is_on);
+#endif
+#ifdef RTE_LIBRTE_IXGBE_PMD
+		ret = rte_pmd_ixgbe_set_all_queues_drop_en(res->port_id, is_on);
+#endif
 	switch (ret) {
 	case 0:
 		break;

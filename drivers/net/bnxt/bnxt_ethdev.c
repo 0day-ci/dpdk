@@ -52,6 +52,7 @@
 #include "bnxt_txr.h"
 #include "bnxt_vnic.h"
 #include "hsi_struct_def_dpdk.h"
+#include "rte_pmd_bnxt.h"
 
 #define DRV_MODULE_NAME		"bnxt"
 static const char bnxt_version[] =
