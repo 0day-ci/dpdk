@@ -420,7 +420,7 @@ rte_eal_pci_probe(void)
 	int probe_all = 0;
 	int ret = 0;
 
-	if (rte_eal_devargs_type_count(RTE_DEVTYPE_WHITELISTED_PCI) == 0)
+	if (rte_eal_devargs_type_count(RTE_DEVTYPE_BLACKLISTED_PCI) > 0)
 		probe_all = 1;
 
 	TAILQ_FOREACH(dev, &pci_device_list, next) {
