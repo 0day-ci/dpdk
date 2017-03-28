@@ -893,7 +893,7 @@ int bnxt_hwrm_vnic_alloc(struct bnxt *bp, struct bnxt_vnic_info *vnic)
 int bnxt_hwrm_vnic_cfg(struct bnxt *bp, struct bnxt_vnic_info *vnic)
 {
 	int rc = 0;
-	struct hwrm_vnic_cfg_input req = {.req_type = 0 };
+	struct hwrm_vnic_cfg_input req = { 0 };
 	struct hwrm_vnic_cfg_output *resp = bp->hwrm_cmd_resp_addr;
 
 	HWRM_PREP(req, VNIC_CFG, -1, resp);
