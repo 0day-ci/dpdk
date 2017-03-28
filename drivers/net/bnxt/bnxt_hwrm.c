@@ -312,7 +312,7 @@ int bnxt_hwrm_func_qcaps(struct bnxt *bp)
 	if (BNXT_PF(bp)) {
 		bp->pf.port_id = resp->port_id;
 		bp->pf.first_vf_id = rte_le_to_cpu_16(resp->first_vf_id);
-		new_max_vfs = rte_le_to_cpu_16(resp->max_vfs);
+		new_max_vfs = bp->pdev->max_vfs;
 		if (new_max_vfs != bp->pf.max_vfs) {
 			if (bp->pf.vf_info)
 				rte_free(bp->pf.vf_info);
@@ -331,7 +331,15 @@ int bnxt_hwrm_func_qcaps(struct bnxt *bp)
 	bp->max_tx_rings = rte_le_to_cpu_16(resp->max_tx_rings);
 	bp->max_rx_rings = rte_le_to_cpu_16(resp->max_rx_rings);
 	bp->max_l2_ctx = rte_le_to_cpu_16(resp->max_l2_ctxs);
-	bp->max_vnics = rte_le_to_cpu_16(resp->max_vnics);
+	/* TODO: For now, do not support VMDq/RFS on VFs. */
+	if (BNXT_PF(bp)) {
+		if (bp->pf.max_vfs)
+			bp->max_vnics = 1;
+		else
+			bp->max_vnics = rte_le_to_cpu_16(resp->max_vnics);
+	} else {
+		bp->max_vnics = 1;
+	}
 	bp->max_stat_ctx = rte_le_to_cpu_16(resp->max_stat_ctx);
 	if (BNXT_PF(bp))
 		bp->pf.total_vnics = rte_le_to_cpu_16(resp->max_vnics);
@@ -1842,6 +1850,8 @@ static void populate_vf_func_cfg_req(struct bnxt *bp,
 	req->num_rx_rings = rte_cpu_to_le_16(bp->max_rx_rings / (num_vfs + 1));
 	req->num_l2_ctxs = rte_cpu_to_le_16(bp->max_l2_ctx / (num_vfs + 1));
 	req->num_vnics = rte_cpu_to_le_16(bp->max_vnics / (num_vfs + 1));
+	/* TODO: For now, do not support VMDq/RFS on VFs. */
+	req->num_vnics = rte_cpu_to_le_16(1);
 	req->num_hw_ring_grps =
 		rte_cpu_to_le_16(bp->max_ring_grps / (num_vfs + 1));
 }
@@ -1904,7 +1914,11 @@ static void reserve_resources_from_vf(struct bnxt *bp,
 	bp->max_tx_rings -= rte_le_to_cpu_16(resp->max_tx_rings);
 	bp->max_rx_rings -= rte_le_to_cpu_16(resp->max_rx_rings);
 	bp->max_l2_ctx -= rte_le_to_cpu_16(resp->max_l2_ctxs);
-	bp->max_vnics -= rte_le_to_cpu_16(resp->max_vnics);
+	/* TODO:
+	 * While not supporting VMDq with VFs, max_vnics is always
+	 * forced to 1 in this case
+	 */
+	//bp->max_vnics -= rte_le_to_cpu_16(esp->max_vnics);
 	bp->max_ring_grps -= rte_le_to_cpu_16(resp->max_hw_ring_grps);
 }
 
@@ -2025,7 +2039,8 @@ int bnxt_hwrm_allocate_vfs(struct bnxt *bp, int num_vfs)
 			RTE_LOG(ERR, PMD,
 				"Failed to initizlie VF %d.\n", i);
 			RTE_LOG(ERR, PMD,
-				"Not all VFs available.\n");
+				"Not all VFs available. (%d, %d)\n",
+				rc, resp->error_code);
 			break;
 		}
 
