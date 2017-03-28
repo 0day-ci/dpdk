@@ -159,6 +159,10 @@ static uint16_t bnxt_start_xmit(struct rte_mbuf *tx_pkt,
 		TX_BD_LONG_FLAGS_LHINT_LT2K
 	};
 
+	/* Devices before Cu+B1 need to avoid mixing long and short BDs
+	 * Revisit this fix once Cu+B1 is available.
+	 */
+	long_bd = true;
 	if (tx_pkt->ol_flags & (PKT_TX_TCP_SEG | PKT_TX_TCP_CKSUM |
 				PKT_TX_UDP_CKSUM | PKT_TX_IP_CKSUM |
 				PKT_TX_VLAN_PKT))
