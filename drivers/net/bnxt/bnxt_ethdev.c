@@ -881,7 +881,7 @@ static int bnxt_rss_hash_conf_get_op(struct rte_eth_dev *eth_dev,
 		}
 		if (hash_types) {
 			RTE_LOG(ERR, PMD,
-				"Unknwon RSS config from firmware (%08x), RSS disabled",
+				"Unknwon RSS config from firmware (%08x), RSS disabled\n",
 				vnic->hash_type);
 			return -ENOTSUP;
 		}
@@ -1071,7 +1071,7 @@ bnxt_udp_tunnel_port_del_op(struct rte_eth_dev *eth_dev,
 		port = bp->geneve_fw_dst_port_id;
 		break;
 	default:
-		RTE_LOG(ERR, PMD, "Tunnel type is not supported");
+		RTE_LOG(ERR, PMD, "Tunnel type is not supported\n");
 		return -ENOTSUP;
 	}
 
@@ -1181,7 +1181,7 @@ bnxt_dev_init(struct rte_eth_dev *eth_dev)
 	int rc;
 
 	if (version_printed++ == 0)
-		RTE_LOG(INFO, PMD, "%s", bnxt_version);
+		RTE_LOG(INFO, PMD, "%s\n", bnxt_version);
 
 	rte_eth_copy_pci_info(eth_dev, pci_dev);
 	eth_dev->data->dev_flags |= RTE_ETH_DEV_DETACHABLE;
@@ -1231,7 +1231,7 @@ bnxt_dev_init(struct rte_eth_dev *eth_dev)
 					ETHER_ADDR_LEN * MAX_NUM_MAC_ADDR, 0);
 	if (eth_dev->data->mac_addrs == NULL) {
 		RTE_LOG(ERR, PMD,
-			"Failed to alloc %u bytes needed to store MAC addr tbl",
+			"Failed to alloc %u bytes needed to store MAC addr tbl\n",
 			ETHER_ADDR_LEN * MAX_NUM_MAC_ADDR);
 		rc = -ENOMEM;
 		goto error_free;
@@ -1275,7 +1275,7 @@ bnxt_dev_init(struct rte_eth_dev *eth_dev)
 	rc = bnxt_hwrm_func_driver_register(bp);
 	if (rc) {
 		RTE_LOG(ERR, PMD,
-			"Failed to register driver");
+			"Failed to register driver\n");
 		rc = -EBUSY;
 		goto error_free;
 	}
