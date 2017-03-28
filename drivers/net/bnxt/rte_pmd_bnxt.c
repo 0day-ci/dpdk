@@ -170,3 +170,51 @@ int rte_pmd_bnxt_set_vf_mac_addr(uint8_t port, uint16_t vf,
 
 	return rc;
 }
+
+int rte_pmd_bnxt_set_vf_rate_limit(uint8_t port, uint16_t vf,
+				uint16_t tx_rate, uint64_t q_msk)
+{
+	struct rte_eth_dev *eth_dev;
+	struct rte_eth_dev_info dev_info;
+	struct bnxt *bp;
+	uint16_t tot_rate = 0;
+	uint64_t idx;
+	int rc;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port, -ENODEV);
+
+	eth_dev = &rte_eth_devices[port];
+	rte_eth_dev_info_get(port, &dev_info);
+	bp = (struct bnxt *)eth_dev->data->dev_private;
+
+	if (!bp->pf.active_vfs)
+		return -EINVAL;
+
+	if (vf >= bp->pf.max_vfs)
+		return -EINVAL;
+
+	/* Add up the per queue BW and configure MAX BW of the VF */
+	for (idx = 0; idx < 64; idx++) {
+		if ((1ULL << idx) & q_msk)
+			tot_rate += tx_rate;
+	}
+
+	/* Requested BW can't be greater than link speed */
+	if (tot_rate > eth_dev->data->dev_link.link_speed) {
+		RTE_LOG(ERR, PMD, "Rate > Link speed. Set to %d\n", tot_rate);
+		return -EINVAL;
+	}
+
+	/* Requested BW already configured */
+	if (tot_rate == bp->pf.vf_info[vf].max_tx_rate)
+		return 0;
+
+	rc = bnxt_hwrm_func_bw_cfg(bp, vf, tot_rate,
+				HWRM_FUNC_CFG_INPUT_ENABLES_MAX_BW);
+
+	if (!rc)
+		bp->pf.vf_info[vf].max_tx_rate = tot_rate;
+
+	return rc;
+}
+

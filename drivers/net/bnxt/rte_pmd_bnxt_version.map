@@ -3,5 +3,6 @@ DPDK_17.05 {
 
 	rte_pmd_bnxt_set_tx_loopback;
 	rte_pmd_bnxt_set_all_queues_drop_en;
+	rte_pmd_bnxt_set_vf_mac_addr;
 };
 

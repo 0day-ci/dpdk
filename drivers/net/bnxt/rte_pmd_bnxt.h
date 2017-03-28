@@ -112,4 +112,22 @@ int rte_pmd_bnxt_set_tx_loopback(uint8_t port, uint8_t on);
  */
 int rte_pmd_bnxt_set_all_queues_drop_en(uint8_t port, uint8_t on);
 
+/**
+ * Set the VF rate limit.
+ *
+ * @param port
+ *   The port identifier of the Ethernet device.
+ * @param vf
+ *   VF id.
+ * @param tx_rate
+ *   Tx rate for the VF
+ * @param q_msk
+ *   Mask of the Tx queue
+ * @return
+ *   - (0) if successful.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if *vf* or *mac_addr* is invalid.
+ */
+int rte_pmd_bnxt_set_vf_rate_limit(uint8_t port, uint16_t vf,
+				uint16_t tx_rate, uint64_t q_msk);
 #endif /* _PMD_BNXT_H_ */

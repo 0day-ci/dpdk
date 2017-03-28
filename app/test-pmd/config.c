@@ -97,6 +97,9 @@
 #ifdef RTE_LIBRTE_IXGBE_PMD
 #include <rte_pmd_ixgbe.h>
 #endif
+#ifdef RTE_LIBRTE_BNXT_PMD
+#include <rte_pmd_bnxt.h>
+#endif
 
 #include "testpmd.h"
 
@@ -3046,17 +3049,22 @@ set_queue_rate_limit(portid_t port_id, uint16_t queue_idx, uint16_t rate)
 	return diag;
 }
 
-#ifdef RTE_LIBRTE_IXGBE_PMD
+#if defined(RTE_LIBRTE_IXGBE_PMD) || (RTE_LIBRTE_BNXT_PMD)
 int
 set_vf_rate_limit(portid_t port_id, uint16_t vf, uint16_t rate, uint64_t q_msk)
 {
+	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
 	int diag;
 
-	diag = rte_pmd_ixgbe_set_vf_rate_limit(port_id, vf, rate, q_msk);
+	if (strcmp(dev->driver->pci_drv.driver.name, "net_bnxt") == 0)
+		diag = rte_pmd_bnxt_set_vf_rate_limit(port_id, vf, rate,
+						      q_msk);
+	else
+		diag = rte_pmd_ixgbe_set_vf_rate_limit(port_id, vf, rate,
+						       q_msk);
 	if (diag == 0)
 		return diag;
-	printf("rte_pmd_ixgbe_set_vf_rate_limit for port_id=%d failed diag=%d\n",
-		port_id, diag);
+	printf("set_vf_rate_limit for port_id=%d failed %d\n", port_id, diag);
 	return diag;
 }
 #endif
