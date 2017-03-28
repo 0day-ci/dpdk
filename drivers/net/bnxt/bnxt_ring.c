@@ -237,7 +237,7 @@ int bnxt_alloc_hwrm_rings(struct bnxt *bp)
 
 		/* Rx cmpl */
 		rc = bnxt_hwrm_ring_alloc(bp, cp_ring,
-					HWRM_RING_ALLOC_INPUT_RING_TYPE_CMPL,
+					HWRM_RING_ALLOC_INPUT_RING_TYPE_L2_CMPL,
 					idx, HWRM_NA_SIGNATURE);
 		if (rc)
 			goto err_out;
@@ -275,7 +275,7 @@ int bnxt_alloc_hwrm_rings(struct bnxt *bp)
 
 		/* Tx cmpl */
 		rc = bnxt_hwrm_ring_alloc(bp, cp_ring,
-					HWRM_RING_ALLOC_INPUT_RING_TYPE_CMPL,
+					HWRM_RING_ALLOC_INPUT_RING_TYPE_L2_CMPL,
 					idx, HWRM_NA_SIGNATURE);
 		if (rc)
 			goto err_out;
