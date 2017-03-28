@@ -1330,6 +1330,42 @@ bnxt_vlan_offload_set_op(struct rte_eth_dev *dev, int mask)
 }
 
 
+static void
+bnxt_set_default_mac_addr_op(struct rte_eth_dev *dev, struct ether_addr *addr)
+{
+	struct bnxt *bp = (struct bnxt *)dev->data->dev_private;
+	/* Default Filter is tied to VNIC 0 */
+	struct bnxt_vnic_info *vnic = &bp->vnic_info[0];
+	struct bnxt_filter_info *filter;
+	int rc;
+
+	if (BNXT_VF(bp))
+		return;
+
+	memcpy(bp->mac_addr, addr, sizeof(bp->mac_addr));
+	memcpy(&dev->data->mac_addrs[0], bp->mac_addr, ETHER_ADDR_LEN);
+
+	STAILQ_FOREACH(filter, &vnic->filter, next) {
+		/* Default Filter is at Index 0 */
+		if (filter->mac_index != 0)
+			continue;
+		rc = bnxt_hwrm_clear_filter(bp, filter);
+		if (rc)
+			break;
+		memcpy(filter->l2_addr, bp->mac_addr, ETHER_ADDR_LEN);
+		memset(filter->l2_addr_mask, 0xff, ETHER_ADDR_LEN);
+		filter->flags |= HWRM_CFA_L2_FILTER_ALLOC_INPUT_FLAGS_PATH_RX;
+		filter->enables |=
+			HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_L2_ADDR |
+			HWRM_CFA_L2_FILTER_ALLOC_INPUT_ENABLES_L2_ADDR_MASK;
+		rc = bnxt_hwrm_set_filter(bp, vnic, filter);
+		if (rc)
+			break;
+		filter->mac_index = 0;
+		RTE_LOG(DEBUG, PMD, "Set MAC addr\n");
+	}
+}
+
 /*
  * Initialization
  */
@@ -1366,6 +1402,7 @@ static const struct eth_dev_ops bnxt_dev_ops = {
 	.vlan_filter_set = bnxt_vlan_filter_set_op,
 	.vlan_strip_queue_set = bnxt_vlan_strip_queue_set_op,
 	.vlan_offload_set = bnxt_vlan_offload_set_op,
+	.mac_addr_set = bnxt_set_default_mac_addr_op,
 };
 
 static bool bnxt_vf_pciid(uint16_t id)
