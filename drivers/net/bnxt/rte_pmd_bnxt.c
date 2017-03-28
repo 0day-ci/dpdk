@@ -218,3 +218,33 @@ int rte_pmd_bnxt_set_vf_rate_limit(uint8_t port, uint16_t vf,
 	return rc;
 }
 
+int rte_pmd_bnxt_set_vf_vlan_filter(uint8_t port, uint16_t vlan,
+				uint64_t vf_mask, uint8_t vlan_on)
+{
+	struct rte_eth_dev *eth_dev;
+	struct rte_eth_dev_info dev_info;
+	struct bnxt *bp;
+	int i;
+	int ret;
+	int rc = 0;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port, -ENODEV);
+
+	eth_dev = &rte_eth_devices[port];
+	rte_eth_dev_info_get(port, &dev_info);
+	bp = (struct bnxt *)eth_dev->data->dev_private;
+
+	if (!bp->pf.vf_info)
+		return -EINVAL;
+
+	for (i = 0; vf_mask; i++, vf_mask >>= 1) {
+		if (vf_mask & 1) {
+			ret = bnxt_hwrm_set_vf_vlan(bp, i, vlan_on ? vlan : 0);
+			if (ret)
+				rc = ret;
+		}
+	}
+
+	return rc;
+}
+

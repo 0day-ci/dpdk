@@ -6919,6 +6919,11 @@ cmd_vf_rx_vlan_filter_parsed(void *parsed_result,
 		ret = rte_pmd_ixgbe_set_vf_vlan_filter(res->port_id,
 				res->vlan_id, res->vf_mask, is_add);
 #endif
+#ifdef RTE_LIBRTE_BNXT_PMD
+	if (ret == -ENOTSUP)
+		ret = rte_pmd_bnxt_set_vf_vlan_filter(res->port_id,
+				res->vlan_id, res->vf_mask, is_add);
+#endif
 #ifdef RTE_LIBRTE_I40E_PMD
 	if (ret == -ENOTSUP)
 		ret = rte_pmd_i40e_set_vf_vlan_filter(res->port_id,
