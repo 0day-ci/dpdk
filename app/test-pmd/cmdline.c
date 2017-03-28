@@ -6744,7 +6744,9 @@ cmdline_parse_inst_t cmd_set_vf_traffic = {
 		NULL,
 	},
 };
+#endif
 
+#if defined(RTE_LIBRTE_IXGBE_PMD) || defined(RTE_LIBRTE_BNXT_PMD)
 /* *** CONFIGURE VF RECEIVE MODE *** */
 struct cmd_set_vf_rxmode {
 	cmdline_fixed_string_t set;
@@ -6778,7 +6780,13 @@ cmd_set_vf_rxmode_parsed(void *parsed_result,
 			rx_mode |= ETH_VMDQ_ACCEPT_MULTICAST;
 	}
 
+#ifdef RTE_LIBRTE_BNXT_PMD
+	ret = rte_pmd_bnxt_set_vf_rxmode(res->port_id, res->vf_id, rx_mode,
+					 (uint8_t)is_on);
+#endif
+#ifdef RTE_LIBRTE_IXGBE_PMD
 	ret = rte_pmd_ixgbe_set_vf_rxmode(res->port_id, res->vf_id, rx_mode, (uint8_t)is_on);
+#endif
 	if (ret < 0)
 		printf("bad VF receive mode parameter, return code = %d \n",
 		ret);

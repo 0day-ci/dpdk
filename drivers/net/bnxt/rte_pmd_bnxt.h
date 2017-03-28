@@ -209,4 +209,24 @@ int rte_pmd_bnxt_set_vf_vlan_filter(uint8_t port, uint16_t vlan,
  *   - (-EINVAL) if bad parameter.
  */
 int rte_pmd_bnxt_set_vf_mac_anti_spoof(uint8_t port, uint16_t vf, uint8_t on);
+
+/**
+ * Set RX L2 Filtering mode of a VF of an Ethernet device.
+ *
+ * @param port
+ *   The port identifier of the Ethernet device.
+ * @param vf
+ *   VF id.
+ * @param rx_mask
+ *    The RX mode mask
+ * @param on
+ *    1 - Enable a VF RX mode.
+ *    0 - Disable a VF RX mode.
+ * @return
+ *   - (0) if successful.
+ *   - (-ENODEV) if *port_id* invalid.
+ *   - (-EINVAL) if bad parameter.
+ */
+int rte_pmd_bnxt_set_vf_rxmode(uint8_t port, uint16_t vf,
+				uint16_t rx_mask, uint8_t on);
 #endif /* _PMD_BNXT_H_ */

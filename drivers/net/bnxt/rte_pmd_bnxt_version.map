@@ -8,5 +8,6 @@ DPDK_17.05 {
 	rte_pmd_bnxt_set_vf_mac_anti_spoof;
 	rte_pmd_bnxt_set_vf_vlan_stripq;
 	rte_pmd_bnxt_set_vf_vlan_insert;
+	rte_pmd_bnxt_set_vf_rxmode;
 };
 
