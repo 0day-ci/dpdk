@@ -477,8 +477,15 @@ int bnxt_hwrm_ver_get(struct bnxt *bp)
 			rc = -ENOMEM;
 			goto error;
 		}
+		rte_mem_lock_page(bp->hwrm_cmd_resp_addr);
 		bp->hwrm_cmd_resp_dma_addr =
-			rte_malloc_virt2phy(bp->hwrm_cmd_resp_addr);
+			rte_mem_virt2phy(bp->hwrm_cmd_resp_addr);
+		if (bp->hwrm_cmd_resp_dma_addr == 0) {
+			RTE_LOG(ERR, PMD,
+			"Unable to map response buffer to physical memory.\n");
+			rc = -ENOMEM;
+			goto error;
+		}
 		bp->max_resp_len = max_resp_len;
 	}
 
@@ -1065,6 +1072,11 @@ int bnxt_hwrm_func_buf_rgtr(struct bnxt *bp)
 	req.req_buf_len = rte_cpu_to_le_16(HWRM_MAX_REQ_LEN);
 	req.req_buf_page_addr[0] =
 		rte_cpu_to_le_64(rte_malloc_virt2phy(bp->pf.vf_req_buf));
+	if (req.req_buf_page_addr[0] == 0) {
+		RTE_LOG(ERR, PMD,
+			"unable to map buffer address to physical memory\n");
+		return -ENOMEM;
+	}
 
 	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
 
@@ -1334,6 +1346,7 @@ int bnxt_alloc_all_hwrm_ring_grps(struct bnxt *bp)
 void bnxt_free_hwrm_resources(struct bnxt *bp)
 {
 	/* Release memzone */
+	/* TODO: unlock page?!?! */
 	rte_free(bp->hwrm_cmd_resp_addr);
 	bp->hwrm_cmd_resp_addr = NULL;
 	bp->hwrm_cmd_resp_dma_addr = 0;
@@ -1349,10 +1362,17 @@ int bnxt_alloc_hwrm_resources(struct bnxt *bp)
 	bp->max_req_len = HWRM_MAX_REQ_LEN;
 	bp->max_resp_len = HWRM_MAX_RESP_LEN;
 	bp->hwrm_cmd_resp_addr = rte_malloc(type, bp->max_resp_len, 0);
+	rte_mem_lock_page(bp->hwrm_cmd_resp_addr);
 	if (bp->hwrm_cmd_resp_addr == NULL)
 		return -ENOMEM;
+
 	bp->hwrm_cmd_resp_dma_addr =
-		rte_malloc_virt2phy(bp->hwrm_cmd_resp_addr);
+		rte_mem_virt2phy(bp->hwrm_cmd_resp_addr);
+	if (bp->hwrm_cmd_resp_dma_addr == 0) {
+		RTE_LOG(ERR, PMD,
+			"unable to map response address to physical memory\n");
+		return -ENOMEM;
+	}
 	rte_spinlock_init(&bp->hwrm_lock);
 
 	return 0;
@@ -1935,7 +1955,9 @@ int bnxt_hwrm_allocate_vfs(struct bnxt *bp, int num_vfs)
 	struct hwrm_func_cfg_input req = {0};
 	struct hwrm_func_cfg_output *resp = bp->hwrm_cmd_resp_addr;
 	int i;
+	unsigned int ui;
 	int rc = 0;
+	size_t req_buf_sz;
 
 	if (!BNXT_PF(bp)) {
 		RTE_LOG(ERR, PMD, "Attempt to allcoate VFs on a VF!\n");
@@ -1967,14 +1989,18 @@ int bnxt_hwrm_allocate_vfs(struct bnxt *bp, int num_vfs)
 	/*
 	 * Now, create and register a buffer to hold forwarded VF requests
 	 */
-	bp->pf.vf_req_buf = rte_malloc("bnxt_vf_fwd",
-				       num_vfs * HWRM_MAX_REQ_LEN,
+	req_buf_sz = num_vfs * HWRM_MAX_REQ_LEN;
+	bp->pf.vf_req_buf = rte_malloc("bnxt_vf_fwd", req_buf_sz,
 				       page_roundup(num_vfs *
 						    HWRM_MAX_REQ_LEN));
 	if (bp->pf.vf_req_buf == NULL) {
 		rc = -ENOMEM;
 		goto error_free;
 	}
+
+	for (ui = 0; ui < req_buf_sz; ui += rte_eal_get_physmem_size())
+		rte_mem_lock_page(((char *)bp->pf.vf_req_buf) + ui);
+
 	for (i = 0; i < num_vfs; i++)
 		bp->pf.vf_info[i].req_buf =
 			((char *)bp->pf.vf_req_buf) + (i * HWRM_MAX_REQ_LEN);
@@ -2130,21 +2156,6 @@ int bnxt_hwrm_set_vf_vlan(struct bnxt *bp, int vf, uint16_t vlan)
 	return rc;
 }
 
-int bnxt_hwrm_func_cfg_vf_set_flags(struct bnxt *bp, uint16_t vf)
-{
-	struct hwrm_func_cfg_output *resp = bp->hwrm_cmd_resp_addr;
-	struct hwrm_func_cfg_input req = {0};
-	int rc;
-
-	HWRM_PREP(req, FUNC_CFG, -1, resp);
-	req.fid = rte_cpu_to_le_16(bp->pf.vf_info[vf].fid);
-	req.flags = rte_cpu_to_le_32(bp->pf.vf_info[vf].func_cfg_flags);
-	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
-	HWRM_CHECK_RESULT;
-
-	return rc;
-}
-
 int bnxt_hwrm_func_vf_vnic_cfg_do(struct bnxt *bp, uint16_t vf,
 				  void (*vnic_cb)(struct bnxt_vnic_info *,
 						  void *), void *cbdata)
@@ -2198,6 +2209,21 @@ int bnxt_hwrm_func_vf_vnic_cfg_do(struct bnxt *bp, uint16_t vf,
 	}
 
 	rte_free(vnic_ids);
+
+	return rc;
+}
+
+int bnxt_hwrm_func_cfg_vf_set_flags(struct bnxt *bp, uint16_t vf)
+{
+	struct hwrm_func_cfg_output *resp = bp->hwrm_cmd_resp_addr;
+	struct hwrm_func_cfg_input req = {0};
+	int rc;
+
+	HWRM_PREP(req, FUNC_CFG, -1, resp);
+	req.fid = rte_cpu_to_le_16(bp->pf.vf_info[vf].fid);
+	req.flags = rte_cpu_to_le_32(bp->pf.vf_info[vf].func_cfg_flags);
+	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
+	HWRM_CHECK_RESULT;
 
 	return rc;
 }
