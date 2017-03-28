@@ -34,11 +34,23 @@
 #ifndef _BNXT_STATS_H_
 #define _BNXT_STATS_H_
 
+#include <inttypes.h>
+#include <stdbool.h>
 #include <rte_ethdev.h>
 
 void bnxt_free_stats(struct bnxt *bp);
 void bnxt_stats_get_op(struct rte_eth_dev *eth_dev,
 			   struct rte_eth_stats *bnxt_stats);
 void bnxt_stats_reset_op(struct rte_eth_dev *eth_dev);
+int bnxt_dev_xstats_get_names_op(__rte_unused struct rte_eth_dev *eth_dev,
+	struct rte_eth_xstat_name *xstats_names, __rte_unused unsigned limit);
+int bnxt_dev_xstats_get_op(struct rte_eth_dev *eth_dev,
+			   struct rte_eth_xstat *xstats, unsigned n);
+void bnxt_dev_xstats_reset_op(struct rte_eth_dev *eth_dev);
 
+
+struct bnxt_xstats_name_off {
+	char name[RTE_ETH_XSTATS_NAME_SIZE];
+	uint64_t offset;
+};
 #endif

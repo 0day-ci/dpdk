@@ -97,6 +97,8 @@ struct ctx_hw_stats64 {
 #define HWRM_FUNC_DRV_RGTR		(UINT32_C(0x1d))
 #define HWRM_FUNC_BUF_RGTR		(UINT32_C(0x1f))
 #define HWRM_PORT_PHY_CFG		(UINT32_C(0x20))
+#define HWRM_PORT_QSTATS		(UINT32_C(0x23))
+#define HWRM_PORT_CLR_STATS		(UINT32_C(0x25))
 #define HWRM_PORT_PHY_QCFG		(UINT32_C(0x27))
 #define HWRM_QUEUE_QPORTCFG		(UINT32_C(0x30))
 #define HWRM_VNIC_ALLOC			(UINT32_C(0x40))
@@ -1362,6 +1364,350 @@ struct hwrm_err_output {
 	 * command completion or response to an internal processor, the order of
 	 * writes has to be such that this field is written last.
 	 */
+} __attribute__((packed));
+
+/* Port Tx Statistics Formats (408 bytes) */
+struct tx_port_stats {
+	uint64_t tx_64b_frames;
+	/* Total Number of 64 Bytes frames transmitted */
+	uint64_t tx_65b_127b_frames;
+	/* Total Number of 65-127 Bytes frames transmitted */
+	uint64_t tx_128b_255b_frames;
+	/* Total Number of 128-255 Bytes frames transmitted */
+	uint64_t tx_256b_511b_frames;
+	/* Total Number of 256-511 Bytes frames transmitted */
+	uint64_t tx_512b_1023b_frames;
+	/* Total Number of 512-1023 Bytes frames transmitted */
+	uint64_t tx_1024b_1518_frames;
+	/* Total Number of 1024-1518 Bytes frames transmitted */
+	uint64_t tx_good_vlan_frames;
+	/*
+	 * Total Number of each good VLAN (exludes FCS errors) frame
+	 * transmitted which is 1519 to 1522 bytes in length inclusive
+	 * (excluding framing bits but including FCS bytes).
+	 */
+	uint64_t tx_1519b_2047_frames;
+	/* Total Number of 1519-2047 Bytes frames transmitted */
+	uint64_t tx_2048b_4095b_frames;
+	/* Total Number of 2048-4095 Bytes frames transmitted */
+	uint64_t tx_4096b_9216b_frames;
+	/* Total Number of 4096-9216 Bytes frames transmitted */
+	uint64_t tx_9217b_16383b_frames;
+	/* Total Number of 9217-16383 Bytes frames transmitted */
+	uint64_t tx_good_frames;
+	/* Total Number of good frames transmitted */
+	uint64_t tx_total_frames;
+	/* Total Number of frames transmitted */
+	uint64_t tx_ucast_frames;
+	/* Total number of unicast frames transmitted */
+	uint64_t tx_mcast_frames;
+	/* Total number of multicast frames transmitted */
+	uint64_t tx_bcast_frames;
+	/* Total number of broadcast frames transmitted */
+	uint64_t tx_pause_frames;
+	/* Total number of PAUSE control frames transmitted */
+	uint64_t tx_pfc_frames;
+	/* Total number of PFC/per-priority PAUSE control frames transmitted */
+	uint64_t tx_jabber_frames;
+	/* Total number of jabber frames transmitted */
+	uint64_t tx_fcs_err_frames;
+	/* Total number of frames transmitted with FCS error */
+	uint64_t tx_control_frames;
+	/* Total number of control frames transmitted */
+	uint64_t tx_oversz_frames;
+	/* Total number of over-sized frames transmitted */
+	uint64_t tx_single_dfrl_frames;
+	/* Total number of frames with single deferral */
+	uint64_t tx_multi_dfrl_frames;
+	/* Total number of frames with multiple deferrals */
+	uint64_t tx_single_coll_frames;
+	/* Total number of frames with single collision */
+	uint64_t tx_multi_coll_frames;
+	/* Total number of frames with multiple collisions */
+	uint64_t tx_late_coll_frames;
+	/* Total number of frames with late collisions */
+	uint64_t tx_excessive_coll_frames;
+	/* Total number of frames with excessive collisions */
+	uint64_t tx_frag_frames;
+	/* Total number of fragmented frames transmitted */
+	uint64_t tx_err;
+	/* Total number of transmit errors */
+	uint64_t tx_tagged_frames;
+	/* Total number of single VLAN tagged frames transmitted */
+	uint64_t tx_dbl_tagged_frames;
+	/* Total number of double VLAN tagged frames transmitted */
+	uint64_t tx_runt_frames;
+	/* Total number of runt frames transmitted */
+	uint64_t tx_fifo_underruns;
+	/* Total number of TX FIFO under runs */
+	uint64_t tx_pfc_ena_frames_pri0;
+	/*
+	 * Total number of PFC frames with PFC enabled bit for Pri 0
+	 * transmitted
+	 */
+	uint64_t tx_pfc_ena_frames_pri1;
+	/*
+	 * Total number of PFC frames with PFC enabled bit for Pri 1
+	 * transmitted
+	 */
+	uint64_t tx_pfc_ena_frames_pri2;
+	/*
+	 * Total number of PFC frames with PFC enabled bit for Pri 2
+	 * transmitted
+	 */
+	uint64_t tx_pfc_ena_frames_pri3;
+	/*
+	 * Total number of PFC frames with PFC enabled bit for Pri 3
+	 * transmitted
+	 */
+	uint64_t tx_pfc_ena_frames_pri4;
+	/*
+	 * Total number of PFC frames with PFC enabled bit for Pri 4
+	 * transmitted
+	 */
+	uint64_t tx_pfc_ena_frames_pri5;
+	/*
+	 * Total number of PFC frames with PFC enabled bit for Pri 5
+	 * transmitted
+	 */
+	uint64_t tx_pfc_ena_frames_pri6;
+	/*
+	 * Total number of PFC frames with PFC enabled bit for Pri 6
+	 * transmitted
+	 */
+	uint64_t tx_pfc_ena_frames_pri7;
+	/*
+	 * Total number of PFC frames with PFC enabled bit for Pri 7
+	 * transmitted
+	 */
+	uint64_t tx_eee_lpi_events;
+	/* Total number of EEE LPI Events on TX */
+	uint64_t tx_eee_lpi_duration;
+	/* EEE LPI Duration Counter on TX */
+	uint64_t tx_llfc_logical_msgs;
+	/*
+	 * Total number of Link Level Flow Control (LLFC) messages
+	 * transmitted
+	 */
+	uint64_t tx_hcfc_msgs;
+	/* Total number of HCFC messages transmitted */
+	uint64_t tx_total_collisions;
+	/* Total number of TX collisions */
+	uint64_t tx_bytes;
+	/* Total number of transmitted bytes */
+	uint64_t tx_xthol_frames;
+	/* Total number of end-to-end HOL frames */
+	uint64_t tx_stat_discard;
+	/* Total Tx Drops per Port reported by STATS block */
+	uint64_t tx_stat_error;
+	/* Total Tx Error Drops per Port reported by STATS block */
+} __attribute__((packed));
+
+/* Port Rx Statistics Formats (528 bytes) */
+struct rx_port_stats {
+	uint64_t rx_64b_frames;
+	/* Total Number of 64 Bytes frames received */
+	uint64_t rx_65b_127b_frames;
+	/* Total Number of 65-127 Bytes frames received */
+	uint64_t rx_128b_255b_frames;
+	/* Total Number of 128-255 Bytes frames received */
+	uint64_t rx_256b_511b_frames;
+	/* Total Number of 256-511 Bytes frames received */
+	uint64_t rx_512b_1023b_frames;
+	/* Total Number of 512-1023 Bytes frames received */
+	uint64_t rx_1024b_1518_frames;
+	/* Total Number of 1024-1518 Bytes frames received */
+	uint64_t rx_good_vlan_frames;
+	/*
+	 * Total Number of each good VLAN (exludes FCS errors) frame
+	 * received which is 1519 to 1522 bytes in length inclusive
+	 * (excluding framing bits but including FCS bytes).
+	 */
+	uint64_t rx_1519b_2047b_frames;
+	/* Total Number of 1519-2047 Bytes frames received */
+	uint64_t rx_2048b_4095b_frames;
+	/* Total Number of 2048-4095 Bytes frames received */
+	uint64_t rx_4096b_9216b_frames;
+	/* Total Number of 4096-9216 Bytes frames received */
+	uint64_t rx_9217b_16383b_frames;
+	/* Total Number of 9217-16383 Bytes frames received */
+	uint64_t rx_total_frames;
+	/* Total number of frames received */
+	uint64_t rx_ucast_frames;
+	/* Total number of unicast frames received */
+	uint64_t rx_mcast_frames;
+	/* Total number of multicast frames received */
+	uint64_t rx_bcast_frames;
+	/* Total number of broadcast frames received */
+	uint64_t rx_fcs_err_frames;
+	/* Total number of received frames with FCS error */
+	uint64_t rx_ctrl_frames;
+	/* Total number of control frames received */
+	uint64_t rx_pause_frames;
+	/* Total number of PAUSE frames received */
+	uint64_t rx_pfc_frames;
+	/* Total number of PFC frames received */
+	uint64_t rx_unsupported_opcode_frames;
+	/* Total number of frames received with an unsupported opcode */
+	uint64_t rx_unsupported_da_pausepfc_frames;
+	/*
+	 * Total number of frames received with an unsupported DA for
+	 * pause and PFC
+	 */
+	uint64_t rx_wrong_sa_frames;
+	/* Total number of frames received with an unsupported SA */
+	uint64_t rx_align_err_frames;
+	/* Total number of received packets with alignment error */
+	uint64_t rx_oor_len_frames;
+	/* Total number of received frames with out-of-range length */
+	uint64_t rx_code_err_frames;
+	/* Total number of received frames with error termination */
+	uint64_t rx_false_carrier_frames;
+	/*
+	 * Total number of received frames with a false carrier is
+	 * detected during idle, as defined by RX_ER samples active and
+	 * RXD is 0xE. The event is reported along with the statistics
+	 * generated on the next received frame. Only one false carrier
+	 * condition can be detected and logged between frames. Carrier
+	 * event, valid for 10M/100M speed modes only.
+	 */
+	uint64_t rx_ovrsz_frames;
+	/* Total number of over-sized frames received */
+	uint64_t rx_jbr_frames;
+	/* Total number of jabber packets received */
+	uint64_t rx_mtu_err_frames;
+	/* Total number of received frames with MTU error */
+	uint64_t rx_match_crc_frames;
+	/* Total number of received frames with CRC match */
+	uint64_t rx_promiscuous_frames;
+	/* Total number of frames received promiscuously */
+	uint64_t rx_tagged_frames;
+	/* Total number of received frames with one or two VLAN tags */
+	uint64_t rx_double_tagged_frames;
+	/* Total number of received frames with two VLAN tags */
+	uint64_t rx_trunc_frames;
+	/* Total number of truncated frames received */
+	uint64_t rx_good_frames;
+	/* Total number of good frames (without errors) received */
+	uint64_t rx_pfc_xon2xoff_frames_pri0;
+	/*
+	 * Total number of received PFC frames with transition from XON
+	 * to XOFF on Pri 0
+	 */
+	uint64_t rx_pfc_xon2xoff_frames_pri1;
+	/*
+	 * Total number of received PFC frames with transition from XON
+	 * to XOFF on Pri 1
+	 */
+	uint64_t rx_pfc_xon2xoff_frames_pri2;
+	/*
+	 * Total number of received PFC frames with transition from XON
+	 * to XOFF on Pri 2
+	 */
+	uint64_t rx_pfc_xon2xoff_frames_pri3;
+	/*
+	 * Total number of received PFC frames with transition from XON
+	 * to XOFF on Pri 3
+	 */
+	uint64_t rx_pfc_xon2xoff_frames_pri4;
+	/*
+	 * Total number of received PFC frames with transition from XON
+	 * to XOFF on Pri 4
+	 */
+	uint64_t rx_pfc_xon2xoff_frames_pri5;
+	/*
+	 * Total number of received PFC frames with transition from XON
+	 * to XOFF on Pri 5
+	 */
+	uint64_t rx_pfc_xon2xoff_frames_pri6;
+	/*
+	 * Total number of received PFC frames with transition from XON
+	 * to XOFF on Pri 6
+	 */
+	uint64_t rx_pfc_xon2xoff_frames_pri7;
+	/*
+	 * Total number of received PFC frames with transition from XON
+	 * to XOFF on Pri 7
+	 */
+	uint64_t rx_pfc_ena_frames_pri0;
+	/*
+	 * Total number of received PFC frames with PFC enabled bit for
+	 * Pri 0
+	 */
+	uint64_t rx_pfc_ena_frames_pri1;
+	/*
+	 * Total number of received PFC frames with PFC enabled bit for
+	 * Pri 1
+	 */
+	uint64_t rx_pfc_ena_frames_pri2;
+	/*
+	 * Total number of received PFC frames with PFC enabled bit for
+	 * Pri 2
+	 */
+	uint64_t rx_pfc_ena_frames_pri3;
+	/*
+	 * Total number of received PFC frames with PFC enabled bit for
+	 * Pri 3
+	 */
+	uint64_t rx_pfc_ena_frames_pri4;
+	/*
+	 * Total number of received PFC frames with PFC enabled bit for
+	 * Pri 4
+	 */
+	uint64_t rx_pfc_ena_frames_pri5;
+	/*
+	 * Total number of received PFC frames with PFC enabled bit for
+	 * Pri 5
+	 */
+	uint64_t rx_pfc_ena_frames_pri6;
+	/*
+	 * Total number of received PFC frames with PFC enabled bit for
+	 * Pri 6
+	 */
+	uint64_t rx_pfc_ena_frames_pri7;
+	/*
+	 * Total number of received PFC frames with PFC enabled bit for
+	 * Pri 7
+	 */
+	uint64_t rx_sch_crc_err_frames;
+	/* Total Number of frames received with SCH CRC error */
+	uint64_t rx_undrsz_frames;
+	/* Total Number of under-sized frames received */
+	uint64_t rx_frag_frames;
+	/* Total Number of fragmented frames received */
+	uint64_t rx_eee_lpi_events;
+	/* Total number of RX EEE LPI Events */
+	uint64_t rx_eee_lpi_duration;
+	/* EEE LPI Duration Counter on RX */
+	uint64_t rx_llfc_physical_msgs;
+	/*
+	 * Total number of physical type Link Level Flow Control (LLFC)
+	 * messages received
+	 */
+	uint64_t rx_llfc_logical_msgs;
+	/*
+	 * Total number of logical type Link Level Flow Control (LLFC)
+	 * messages received
+	 */
+	uint64_t rx_llfc_msgs_with_crc_err;
+	/*
+	 * Total number of logical type Link Level Flow Control (LLFC)
+	 * messages received with CRC error
+	 */
+	uint64_t rx_hcfc_msgs;
+	/* Total number of HCFC messages received */
+	uint64_t rx_hcfc_msgs_with_crc_err;
+	/* Total number of HCFC messages received with CRC error */
+	uint64_t rx_bytes;
+	/* Total number of received bytes */
+	uint64_t rx_runt_bytes;
+	/* Total number of bytes received in runt frames */
+	uint64_t rx_runt_frames;
+	/* Total number of runt frames received */
+	uint64_t rx_stat_discard;
+	/* Total Rx Discards per Port reported by STATS block */
+	uint64_t rx_stat_err;
+	/* Total Rx Error Drops per Port reported by STATS block */
 } __attribute__((packed));
 
 /* hwrm_ver_get */
@@ -7163,6 +7509,154 @@ struct hwrm_stat_ctx_free_output {
 	 */
 } __attribute__((packed));
 
+/* hwrm_port_qstats */
+/* Description: This function returns per port Ethernet statistics. */
+/* Input (40 bytes) */
+struct hwrm_port_qstats_input {
+	uint16_t req_type;
+	/*
+	 * This value indicates what type of request this is. The format
+	 * for the rest of the command is determined by this field.
+	 */
+	uint16_t cmpl_ring;
+	/*
+	 * This value indicates the what completion ring the request
+	 * will be optionally completed on. If the value is -1, then no
+	 * CR completion will be generated. Any other value must be a
+	 * valid CR ring_id value for this function.
+	 */
+	uint16_t seq_id;
+	/* This value indicates the command sequence number. */
+	uint16_t target_id;
+	/*
+	 * Target ID of this command. 0x0 - 0xFFF8 - Used for function
+	 * ids 0xFFF8 - 0xFFFE - Reserved for internal processors 0xFFFF
+	 * - HWRM
+	 */
+	uint64_t resp_addr;
+	/*
+	 * This is the host address where the response will be written
+	 * when the request is complete. This area must be 16B aligned
+	 * and must be cleared to zero before the request is made.
+	 */
+	uint16_t port_id;
+	/* Port ID of port that is being queried. */
+	uint8_t unused_0;
+	uint8_t unused_1;
+	uint8_t unused_2[3];
+	uint8_t unused_3;
+	uint64_t tx_stat_host_addr;
+	/* This is the host address where Tx port statistics will be stored */
+	uint64_t rx_stat_host_addr;
+	/* This is the host address where Rx port statistics will be stored */
+} __attribute__((packed));
+
+/* Output (16 bytes) */
+struct hwrm_port_qstats_output {
+	uint16_t error_code;
+	/*
+	 * Pass/Fail or error type Note: receiver to verify the in
+	 * parameters, and fail the call with an error when appropriate
+	 */
+	uint16_t req_type;
+	/* This field returns the type of original request. */
+	uint16_t seq_id;
+	/* This field provides original sequence number of the command. */
+	uint16_t resp_len;
+	/*
+	 * This field is the length of the response in bytes. The last
+	 * byte of the response is a valid flag that will read as '1'
+	 * when the command has been completely written to memory.
+	 */
+	uint16_t tx_stat_size;
+	/* The size of TX port statistics block in bytes. */
+	uint16_t rx_stat_size;
+	/* The size of RX port statistics block in bytes. */
+	uint8_t unused_0;
+	uint8_t unused_1;
+	uint8_t unused_2;
+	uint8_t valid;
+	/*
+	 * This field is used in Output records to indicate that the
+	 * output is completely written to RAM. This field should be
+	 * read as '1' to indicate that the output has been completely
+	 * written. When writing a command completion or response to an
+	 * internal processor, the order of writes has to be such that
+	 * this field is written last.
+	 */
+} __attribute__((packed));
+
+/* hwrm_port_clr_stats */
+/*
+ * Description: This function clears per port statistics. The HWRM shall not
+ * allow a VF driver to clear port statistics. The HWRM shall not allow a PF
+ * driver to clear port statistics in a partitioning mode. The HWRM may allow a
+ * PF driver to clear port statistics in the non-partitioning mode.
+ */
+/* Input (24 bytes) */
+struct hwrm_port_clr_stats_input {
+	uint16_t req_type;
+	/*
+	 * This value indicates what type of request this is. The format
+	 * for the rest of the command is determined by this field.
+	 */
+	uint16_t cmpl_ring;
+	/*
+	 * This value indicates the what completion ring the request
+	 * will be optionally completed on. If the value is -1, then no
+	 * CR completion will be generated. Any other value must be a
+	 * valid CR ring_id value for this function.
+	 */
+	uint16_t seq_id;
+	/* This value indicates the command sequence number. */
+	uint16_t target_id;
+	/*
+	 * Target ID of this command. 0x0 - 0xFFF8 - Used for function
+	 * ids 0xFFF8 - 0xFFFE - Reserved for internal processors 0xFFFF
+	 * - HWRM
+	 */
+	uint64_t resp_addr;
+	/*
+	 * This is the host address where the response will be written
+	 * when the request is complete. This area must be 16B aligned
+	 * and must be cleared to zero before the request is made.
+	 */
+	uint16_t port_id;
+	/* Port ID of port that is being queried. */
+	uint16_t unused_0[3];
+} __attribute__((packed));
+
+/* Output (16 bytes) */
+struct hwrm_port_clr_stats_output {
+	uint16_t error_code;
+	/*
+	 * Pass/Fail or error type Note: receiver to verify the in
+	 * parameters, and fail the call with an error when appropriate
+	 */
+	uint16_t req_type;
+	/* This field returns the type of original request. */
+	uint16_t seq_id;
+	/* This field provides original sequence number of the command. */
+	uint16_t resp_len;
+	/*
+	 * This field is the length of the response in bytes. The last
+	 * byte of the response is a valid flag that will read as '1'
+	 * when the command has been completely written to memory.
+	 */
+	uint32_t unused_0;
+	uint8_t unused_1;
+	uint8_t unused_2;
+	uint8_t unused_3;
+	uint8_t valid;
+	/*
+	 * This field is used in Output records to indicate that the
+	 * output is completely written to RAM. This field should be
+	 * read as '1' to indicate that the output has been completely
+	 * written. When writing a command completion or response to an
+	 * internal processor, the order of writes has to be such that
+	 * this field is written last.
+	 */
+} __attribute__((packed));
 /* hwrm_stat_ctx_clr_stats */
 /* Description: This command clears statistics of a context. */
 /* Input (24 bytes) */
