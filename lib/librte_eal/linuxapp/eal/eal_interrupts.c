@@ -194,7 +194,7 @@ vfio_disable_intx(const struct rte_intr_handle *intr_handle) {
 	irq_set = (struct vfio_irq_set *) irq_set_buf;
 	irq_set->argsz = len;
 	irq_set->count = 1;
-	irq_set->flags = VFIO_IRQ_SET_DATA_NONE | VFIO_IRQ_SET_ACTION_UNMASK;
+	irq_set->flags = VFIO_IRQ_SET_DATA_NONE | VFIO_IRQ_SET_ACTION_MASK;
 	irq_set->index = VFIO_PCI_INTX_IRQ_INDEX;
 	irq_set->start = 0;
 
