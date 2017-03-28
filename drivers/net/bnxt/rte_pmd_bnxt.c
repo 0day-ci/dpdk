@@ -141,3 +141,32 @@ int bnxt_rcv_msg_from_vf(struct bnxt *bp, uint16_t vf_id, void *msg)
 
 	return cb_param.retval == RTE_PMD_BNXT_MB_EVENT_NOOP_ACK ? true : false;
 }
+
+int rte_pmd_bnxt_set_vf_mac_addr(uint8_t port, uint16_t vf,
+				struct ether_addr *mac_addr)
+{
+	struct rte_eth_dev *dev;
+	struct rte_eth_dev_info dev_info;
+	struct bnxt *bp;
+	int rc;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port, -ENODEV);
+
+	dev = &rte_eth_devices[port];
+	rte_eth_dev_info_get(port, &dev_info);
+	bp = (struct bnxt *)dev->data->dev_private;
+
+	if (vf >= dev_info.max_vfs || mac_addr == NULL)
+		return -EINVAL;
+
+	if (!BNXT_PF(bp)) {
+		RTE_LOG(ERR, PMD,
+			"Attempt to set VF %d mac address on non-PF port %d!\n",
+			vf, port);
+		return -ENOTSUP;
+	}
+
+	rc = bnxt_hwrm_func_vf_mac(bp, vf, (uint8_t *)mac_addr);
+
+	return rc;
+}

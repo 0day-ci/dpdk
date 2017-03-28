@@ -11634,6 +11634,11 @@ cmd_set_vf_mac_addr_parsed(
 		ret = rte_pmd_ixgbe_set_vf_mac_addr(res->port_id, res->vf_id,
 				&res->mac_addr);
 #endif
+#ifdef RTE_LIBRTE_BNXT_PMD
+	if (ret == -ENOTSUP)
+		ret = rte_pmd_bnxt_set_vf_mac_addr(res->port_id, res->vf_id,
+				&res->mac_addr);
+#endif
 #ifdef RTE_LIBRTE_I40E_PMD
 	if (ret == -ENOTSUP)
 		ret = rte_pmd_i40e_set_vf_mac_addr(res->port_id, res->vf_id,
