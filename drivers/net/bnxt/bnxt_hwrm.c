@@ -192,7 +192,7 @@ int bnxt_hwrm_cfa_l2_clear_rx_mask(struct bnxt *bp, struct bnxt_vnic_info *vnic)
 	struct hwrm_cfa_l2_set_rx_mask_output *resp = bp->hwrm_cmd_resp_addr;
 
 	HWRM_PREP(req, CFA_L2_SET_RX_MASK, -1, resp);
-	req.vnic_id = rte_cpu_to_le_16(vnic->fw_vnic_id);
+	req.vnic_id = rte_cpu_to_le_32(vnic->fw_vnic_id);
 	req.mask = 0;
 
 	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
@@ -226,6 +226,11 @@ int bnxt_hwrm_cfa_l2_set_rx_mask(struct bnxt *bp, struct bnxt_vnic_info *vnic)
 		mask |= HWRM_CFA_L2_SET_RX_MASK_INPUT_MASK_ALL_MCAST;
 	if (vnic->flags & BNXT_VNIC_INFO_MCAST)
 		mask |= HWRM_CFA_L2_SET_RX_MASK_INPUT_MASK_MCAST;
+	if (vnic->mc_addr_cnt) {
+		mask |= HWRM_CFA_L2_SET_RX_MASK_INPUT_MASK_MCAST;
+		req.num_mc_entries = rte_cpu_to_le_32(vnic->mc_addr_cnt);
+		req.mc_tbl_addr = rte_cpu_to_le_64(vnic->mc_list_dma_addr);
+	}
 
 	req.mask = rte_cpu_to_le_32(mask);
 
@@ -886,7 +891,7 @@ int bnxt_hwrm_vnic_alloc(struct bnxt *bp, struct bnxt_vnic_info *vnic)
 
 	HWRM_CHECK_RESULT;
 
-	vnic->fw_vnic_id = rte_le_to_cpu_16(resp->vnic_id);
+	vnic->fw_vnic_id = rte_le_to_cpu_32(resp->vnic_id);
 	return rc;
 }
 
@@ -903,7 +908,7 @@ int bnxt_hwrm_vnic_cfg(struct bnxt *bp, struct bnxt_vnic_info *vnic)
 	    rte_cpu_to_le_32(HWRM_VNIC_CFG_INPUT_ENABLES_DFLT_RING_GRP |
 			     HWRM_VNIC_CFG_INPUT_ENABLES_RSS_RULE |
 			     HWRM_VNIC_CFG_INPUT_ENABLES_MRU);
-	req.vnic_id = rte_cpu_to_le_16(vnic->fw_vnic_id);
+	req.vnic_id = rte_cpu_to_le_32(vnic->fw_vnic_id);
 	req.dflt_ring_grp =
 		rte_cpu_to_le_16(bp->grp_info[vnic->start_grp_id].fw_grp_id);
 	req.rss_rule = rte_cpu_to_le_16(vnic->fw_rss_cos_lb_ctx);
@@ -1010,7 +1015,7 @@ int bnxt_hwrm_vnic_free(struct bnxt *bp, struct bnxt_vnic_info *vnic)
 
 	HWRM_PREP(req, VNIC_FREE, -1, resp);
 
-	req.vnic_id = rte_cpu_to_le_16(vnic->fw_vnic_id);
+	req.vnic_id = rte_cpu_to_le_32(vnic->fw_vnic_id);
 
 	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
 

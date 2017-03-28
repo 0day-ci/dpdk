@@ -1373,6 +1373,36 @@ bnxt_set_default_mac_addr_op(struct rte_eth_dev *dev, struct ether_addr *addr)
 	}
 }
 
+static int
+bnxt_dev_set_mc_addr_list_op(struct rte_eth_dev *eth_dev,
+			  struct ether_addr *mc_addr_set,
+			  uint32_t nb_mc_addr)
+{
+	struct bnxt *bp = (struct bnxt *)eth_dev->data->dev_private;
+	char *mc_addr_list = (char *)mc_addr_set;
+	struct bnxt_vnic_info *vnic;
+	uint32_t off = 0, i = 0;
+
+	vnic = &bp->vnic_info[0];
+
+	if (nb_mc_addr > BNXT_MAX_MC_ADDRS) {
+		vnic->flags |= BNXT_VNIC_INFO_ALLMULTI;
+		goto allmulti;
+	}
+
+	/* TODO Check for Duplicate mcast addresses */
+	vnic->flags &= ~BNXT_VNIC_INFO_ALLMULTI;
+	for (i = 0; i < nb_mc_addr; i++) {
+		memcpy(vnic->mc_list + off, &mc_addr_list[i], ETHER_ADDR_LEN);
+		off += ETHER_ADDR_LEN;
+	}
+
+	vnic->mc_addr_cnt = i;
+
+allmulti:
+	return bnxt_hwrm_cfa_l2_set_rx_mask(bp, vnic);
+}
+
 /*
  * Initialization
  */
@@ -1413,6 +1443,7 @@ static const struct eth_dev_ops bnxt_dev_ops = {
 	.xstats_get = bnxt_dev_xstats_get_op,
 	.xstats_get_names = bnxt_dev_xstats_get_names_op,
 	.xstats_reset = bnxt_dev_xstats_reset_op,
+	.set_mc_addr_list = bnxt_dev_set_mc_addr_list_op,
 };
 
 static bool bnxt_vf_pciid(uint16_t id)

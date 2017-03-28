@@ -41,7 +41,7 @@ struct bnxt_vnic_info {
 	STAILQ_ENTRY(bnxt_vnic_info)	next;
 	uint8_t		ff_pool_idx;
 
-	uint16_t	fw_vnic_id; /* returned by Chimp during alloc */
+	uint32_t	fw_vnic_id; /* returned by Chimp during alloc */
 	uint16_t	fw_rss_cos_lb_ctx;
 	uint16_t	ctx_is_rss_cos_lb;
 #define MAX_NUM_TRAFFIC_CLASSES		8
@@ -58,6 +58,10 @@ struct bnxt_vnic_info {
 	uint16_t	*rss_table;
 	phys_addr_t	rss_hash_key_dma_addr;
 	void		*rss_hash_key;
+	phys_addr_t	mc_list_dma_addr;
+	char		*mc_list;
+	uint32_t	mc_addr_cnt;
+#define BNXT_MAX_MC_ADDRS		16
 	uint32_t	flags;
 #define BNXT_VNIC_INFO_PROMISC			(1 << 0)
 #define BNXT_VNIC_INFO_ALLMULTI			(1 << 1)
