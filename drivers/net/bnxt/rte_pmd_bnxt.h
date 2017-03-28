@@ -152,4 +152,21 @@ int rte_pmd_bnxt_set_vf_rate_limit(uint8_t port, uint16_t vf,
  */
 int rte_pmd_bnxt_set_vf_vlan_filter(uint8_t port, uint16_t vlan,
 				uint64_t vf_mask, uint8_t vlan_on);
+/**
+ * Enable/Disable VF MAC anti spoof
+ *
+ * @param port
+ *    The port identifier of the Ethernet device.
+ * @param vf
+ *   VF id.
+ * @param on
+ *    1 - Enable VF MAC anti spoof.
+ *    0 - Disable VF MAC anti spoof.
+ *
+ * @return
+ *   - (0) if successful.
+ *   - (-ENODEV) if *port* invalid.
+ *   - (-EINVAL) if bad parameter.
+ */
+int rte_pmd_bnxt_set_vf_mac_anti_spoof(uint8_t port, uint16_t vf, uint8_t on);
 #endif /* _PMD_BNXT_H_ */

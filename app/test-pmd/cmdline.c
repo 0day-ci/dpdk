@@ -11071,6 +11071,11 @@ cmd_set_vf_mac_anti_spoof_parsed(
 		ret = rte_pmd_ixgbe_set_vf_mac_anti_spoof(res->port_id,
 			res->vf_id, is_on);
 #endif
+#ifdef RTE_LIBRTE_IXGBE_PMD
+	if (ret == -ENOTSUP)
+		ret = rte_pmd_bnxt_set_vf_mac_anti_spoof(res->port_id,
+			res->vf_id, is_on);
+#endif
 #ifdef RTE_LIBRTE_I40E_PMD
 	if (ret == -ENOTSUP)
 		ret = rte_pmd_i40e_set_vf_mac_anti_spoof(res->port_id,
