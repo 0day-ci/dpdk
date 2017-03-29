@@ -433,13 +433,15 @@ fail_tx_qinit:
 static void
 sfc_tx_queue_release(void *queue)
 {
-	struct sfc_txq *txq = queue;
+	struct sfc_dp_txq *dp_txq = queue;
+	struct sfc_txq *txq;
 	unsigned int sw_index;
 	struct sfc_adapter *sa;
 
-	if (txq == NULL)
+	if (dp_txq == NULL)
 		return;
 
+	txq = sfc_txq_by_dp_txq(dp_txq);
 	sw_index = sfc_txq_sw_index(txq);
 
 	SFC_ASSERT(txq->evq != NULL);
