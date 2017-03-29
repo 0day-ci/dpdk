@@ -25,6 +25,7 @@ DPDK_17.02 {
 	rte_pmd_ixgbe_macsec_enable;
 	rte_pmd_ixgbe_macsec_select_rxsa;
 	rte_pmd_ixgbe_macsec_select_txsa;
+	rte_pmd_ixgbe_ping_vf;
 	rte_pmd_ixgbe_set_vf_rate_limit;
 	rte_pmd_ixgbe_set_vf_rx;
 	rte_pmd_ixgbe_set_vf_rxmode;
