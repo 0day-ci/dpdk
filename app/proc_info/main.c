@@ -83,6 +83,9 @@ static uint32_t reset_stats;
 static uint32_t reset_xstats;
 /**< Enable memory info. */
 static uint32_t mem_info;
+/**< Enable displaying xstat name. */
+static uint32_t enable_xstats_name;
+static char *xstats_name;
 
 /**< display usage */
 static void
@@ -94,6 +97,7 @@ proc_info_usage(const char *prgname)
 		"  --stats: to display port statistics, enabled by default\n"
 		"  --xstats: to display extended port statistics, disabled by "
 			"default\n"
+		"  --xstats-name NAME: to display single xstat value by NAME\n"
 		"  --stats-reset: to reset port statistics\n"
 		"  --xstats-reset: to reset port extended statistics\n"
 		"  --collectd-format: to print statistics to STDOUT in expected by collectd format\n"
@@ -172,6 +176,7 @@ proc_info_parse_args(int argc, char **argv)
 		{"stats-reset", 0, NULL, 0},
 		{"xstats", 0, NULL, 0},
 		{"xstats-reset", 0, NULL, 0},
+		{"xstats-name", required_argument, NULL, 1},
 		{"collectd-format", 0, NULL, 0},
 		{"host-id", 0, NULL, 0},
 		{NULL, 0, 0, 0}
@@ -214,7 +219,18 @@ proc_info_parse_args(int argc, char **argv)
 					MAX_LONG_OPT_SZ))
 				reset_xstats = 1;
 			break;
-
+		case 1:
+			/* Print xstat single value given by name*/
+			if (!strncmp(long_option[option_index].name,
+					"xstats-name",
+					MAX_LONG_OPT_SZ))	{
+				enable_xstats_name = 1;
+				xstats_name = optarg;
+				printf("name:%s:%s\n",
+						long_option[option_index].name,
+						optarg);
+			}
+			break;
 		default:
 			proc_info_usage(prgname);
 			return -1;
@@ -341,20 +357,36 @@ static void collectd_resolve_cnt_type(char *cnt_type, size_t cnt_type_len,
 }
 
 static void
+nic_xstats_by_name_display(__rte_unused uint8_t port_id,
+		__rte_unused char *name)
+{
+	uint64_t id;
+
+	printf("###### NIC statistics for port %-2d, statistic name '%s':\n",
+			   port_id, name);
+
+	if (rte_eth_xstats_get_id_by_name(port_id, name, &id) == 0)
+		printf("%s: %"PRIu64"\n", name, id);
+	else
+		printf("Statistic not found...\n");
+
+}
+
+static void
 nic_xstats_display(uint8_t port_id)
 {
 	struct rte_eth_xstat_name *xstats_names;
-	struct rte_eth_xstat *xstats;
+	uint64_t *values;
 	int len, ret, i;
 	static const char *nic_stats_border = "########################";
 
-	len = rte_eth_xstats_get_names(port_id, NULL, 0);
+	len = rte_eth_xstats_get_names(port_id, NULL, NULL, 0);
 	if (len < 0) {
 		printf("Cannot get xstats count\n");
 		return;
 	}
-	xstats = malloc(sizeof(xstats[0]) * len);
-	if (xstats == NULL) {
+	values = malloc(sizeof(values) * len);
+	if (values == NULL) {
 		printf("Cannot allocate memory for xstats\n");
 		return;
 	}
@@ -362,11 +394,11 @@ nic_xstats_display(uint8_t port_id)
 	xstats_names = malloc(sizeof(struct rte_eth_xstat_name) * len);
 	if (xstats_names == NULL) {
 		printf("Cannot allocate memory for xstat names\n");
-		free(xstats);
+		free(values);
 		return;
 	}
 	if (len != rte_eth_xstats_get_names(
-			port_id, xstats_names, len)) {
+			port_id, xstats_names, NULL, len)) {
 		printf("Cannot get xstat names\n");
 		goto err;
 	}
@@ -375,7 +407,7 @@ nic_xstats_display(uint8_t port_id)
 			   port_id);
 	printf("%s############################\n",
 			   nic_stats_border);
-	ret = rte_eth_xstats_get(port_id, xstats, len);
+	ret = rte_eth_xstats_get(port_id, NULL, values, len);
 	if (ret < 0 || ret > len) {
 		printf("Cannot get xstats\n");
 		goto err;
@@ -391,18 +423,18 @@ nic_xstats_display(uint8_t port_id)
 						  xstats_names[i].name);
 			sprintf(buf, "PUTVAL %s/dpdkstat-port.%u/%s-%s N:%"
 				PRIu64"\n", host_id, port_id, counter_type,
-				xstats_names[i].name, xstats[i].value);
+				xstats_names[i].name, values[i]);
 			write(stdout_fd, buf, strlen(buf));
 		} else {
 			printf("%s: %"PRIu64"\n", xstats_names[i].name,
-			       xstats[i].value);
+					values[i]);
 		}
 	}
 
 	printf("%s############################\n",
 			   nic_stats_border);
 err:
-	free(xstats);
+	free(values);
 	free(xstats_names);
 }
 
@@ -480,6 +512,8 @@ main(int argc, char **argv)
 				nic_stats_clear(i);
 			else if (reset_xstats)
 				nic_xstats_clear(i);
+			else if (enable_xstats_name)
+				nic_xstats_by_name_display(i, xstats_name);
 		}
 	}
 
