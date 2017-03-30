@@ -154,3 +154,15 @@ DPDK_17.02 {
 	rte_flow_validate;
 
 } DPDK_16.11;
+
+DPDK_17.05 {
+	global:
+
+	rte_eth_xstats_get_names;
+	rte_eth_xstats_get;
+	rte_eth_xstats_get_all;
+	rte_eth_xstats_get_names_all;
+	rte_eth_xstats_get_id_by_name;
+
+} DPDK_17.02;
+
