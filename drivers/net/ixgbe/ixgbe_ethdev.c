@@ -4930,6 +4930,40 @@ rte_pmd_ixgbe_set_vf_vlan_anti_spoof(uint8_t port, uint16_t vf, uint8_t on)
 }
 
 int
+rte_pmd_ixgbe_ping_vf(uint8_t port, uint16_t vf)
+{
+	struct ixgbe_hw *hw;
+	struct ixgbe_vf_info *vfinfo;
+	struct rte_eth_dev *dev;
+	struct rte_pci_device *pci_dev;
+	uint32_t ctrl;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port, -ENODEV);
+
+	dev = &rte_eth_devices[port];
+	pci_dev = IXGBE_DEV_TO_PCI(dev);
+
+	if (!is_device_supported(dev, &rte_ixgbe_pmd))
+		return -ENOTSUP;
+
+	if (vf >= pci_dev->max_vfs)
+		return -EINVAL;
+
+	hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	vfinfo = *(IXGBE_DEV_PRIVATE_TO_P_VFDATA(dev->data->dev_private));
+
+	hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+
+	ctrl = IXGBE_PF_CONTROL_MSG;
+	if (vfinfo[vf].clear_to_send)
+		ctrl |= IXGBE_VT_MSGTYPE_CTS;
+
+	ixgbe_write_mbx(hw, &ctrl, 1, vf);
+
+	return 0;
+}
+
+int
 rte_pmd_ixgbe_set_vf_mac_anti_spoof(uint8_t port, uint16_t vf, uint8_t on)
 {
 	struct ixgbe_hw *hw;
