@@ -78,9 +78,10 @@ rte_cpu_get_flag_enabled(enum rte_cpu_flag_t feature);
  * This function checks that the currently used CPU supports the CPU features
  * that were specified at compile time. It is called automatically within the
  * EAL, so does not need to be used by applications.
+ * This version is replaced by rte_cpu_is_supported
  */
 void
-rte_cpu_check_supported(void);
+rte_cpu_check_supported(void) __rte_deprecated;
 
 /**
  * This function checks that the currently used CPU supports the CPU features

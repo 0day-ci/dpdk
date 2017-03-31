@@ -33,6 +33,7 @@
 
 #include <stdint.h>
 
+#include "rte_common.h"
 #include "rte_cpuflags.h"
 
 uint8_t rte_rtm_supported; /* cache the flag to avoid the overhead

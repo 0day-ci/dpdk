@@ -31,6 +31,7 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "rte_common.h"
 #include "rte_cpuflags.h"
 
 #include <stdio.h>

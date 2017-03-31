@@ -182,3 +182,10 @@ DPDK_17.02 {
 	rte_bus_unregister;
 
 } DPDK_16.11;
+
+DPDK_17.05 {
+	global;
+
+	rte_cpu_is_supported;
+
+} DPDK_17.02;
