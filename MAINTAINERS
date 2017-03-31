@@ -211,6 +211,7 @@ Core Libraries
 Memory pool
 M: Olivier Matz <olivier.matz@6wind.com>
 F: lib/librte_mempool/
+F: drivers/mempool/stack
 F: drivers/mempool/ring
 F: doc/guides/prog_guide/mempool_lib.rst
 F: test/test/test_mempool*
