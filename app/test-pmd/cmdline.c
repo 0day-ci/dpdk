@@ -6396,6 +6396,57 @@ cmdline_parse_inst_t cmd_mac_addr = {
 	},
 };
 
+/* *** ADD MORE THAN ONE MAC ADDRESS FROM A PORT *** */
+struct cmd_add_more_mac_addr_result {
+	cmdline_fixed_string_t mac_addr_cmd;
+	uint8_t port_num;
+	struct ether_addr address;
+	uint8_t cnt_addr;
+};
+
+static void cmd_add_more_mac_addr_parsed(void *parsed_result,
+		__attribute__((unused)) struct cmdline *cl,
+		__attribute__((unused)) void *data)
+{
+	struct cmd_add_more_mac_addr_result *res = parsed_result;
+	int ret;
+	int k;
+
+	for(k = 0; k < res->cnt_addr; k++) {
+		ret = rte_eth_dev_mac_addr_add(res->port_num, &res->address, 0);
+		if (ret  < 0) {
+			printf("Fail to add mac addr : (%s) after adding %u addresses\n",
+				strerror(-ret), k);
+			return;
+		}
+		res->address.addr_bytes[5]++;
+	}
+	printf("Success to add %u mac addresses\n", k);
+}
+
+cmdline_parse_token_string_t cmd_add_more_mac_addr_cmd =
+	TOKEN_STRING_INITIALIZER(struct cmd_add_more_mac_addr_result, mac_addr_cmd,
+				"add_more_mac_addr");
+cmdline_parse_token_num_t cmd_add_more_mac_addr_portnum =
+		TOKEN_NUM_INITIALIZER(struct cmd_add_more_mac_addr_result, port_num, UINT8);
+cmdline_parse_token_etheraddr_t cmd_add_more_mac_addr_addr =
+		TOKEN_ETHERADDR_INITIALIZER(struct cmd_add_more_mac_addr_result, address);
+cmdline_parse_token_num_t cmd_add_more_mac_addr_cnt_addr =
+		TOKEN_NUM_INITIALIZER(struct cmd_add_more_mac_addr_result, cnt_addr, UINT8);
+
+cmdline_parse_inst_t cmd_add_more_mac_addr = {
+	.f = cmd_add_more_mac_addr_parsed,
+	.data = (void *)0,
+	.help_str = "add_more_mac_addr <port_id> <mac_addr> <cnt_addr>: "
+			"Add cnt_addr MAC addresses on port_id",
+	.tokens = {
+		(void *)&cmd_add_more_mac_addr_cmd,
+		(void *)&cmd_add_more_mac_addr_portnum,
+		(void *)&cmd_add_more_mac_addr_addr,
+		(void *)&cmd_add_more_mac_addr_cnt_addr,
+		NULL,
+	},
+};
 
 /* *** CONFIGURE QUEUE STATS COUNTER MAPPINGS *** */
 struct cmd_set_qmap_result {
@@ -12484,6 +12535,7 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_read_rxd_txd,
 	(cmdline_parse_inst_t *)&cmd_stop,
 	(cmdline_parse_inst_t *)&cmd_mac_addr,
+	(cmdline_parse_inst_t *)&cmd_add_more_mac_addr,
 	(cmdline_parse_inst_t *)&cmd_set_qmap,
 	(cmdline_parse_inst_t *)&cmd_operate_port,
 	(cmdline_parse_inst_t *)&cmd_operate_specific_port,
