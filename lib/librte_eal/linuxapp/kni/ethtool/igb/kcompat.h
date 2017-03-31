@@ -3929,8 +3929,10 @@ skb_set_hash(struct sk_buff *skb, __u32 hash, __always_unused int type)
 #define vlan_tx_tag_present skb_vlan_tag_present
 #endif
 
-#if ( LINUX_VERSION_CODE >= KERNEL_VERSION(4,9,0) )
+#if (( LINUX_VERSION_CODE >= KERNEL_VERSION(4,9,0) ) \
+    || (defined(CONFIG_SUSE_KERNEL) && \
+       (LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,57))))
 #define HAVE_VF_VLAN_PROTO
-#endif /* >= 4.9.0 */
+#endif /* >= 4.9.0, >= SLES12SP3 */
 
 #endif /* _KCOMPAT_H_ */
