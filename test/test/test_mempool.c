@@ -509,9 +509,11 @@ walk_cb(struct rte_mempool *mp, void *userdata __rte_unused)
 static int
 test_mempool(void)
 {
+	int ret = -1;
 	struct rte_mempool *mp_cache = NULL;
 	struct rte_mempool *mp_nocache = NULL;
 	struct rte_mempool *mp_stack = NULL;
+	struct rte_mempool *default_pool = NULL;
 
 	rte_atomic32_init(&synchro);
 
@@ -561,6 +563,30 @@ test_mempool(void)
 	}
 	rte_mempool_obj_iter(mp_stack, my_obj_init, NULL);
 
+	/* Create a mempool based on Default handler, if not "stack" */
+	printf("Testing %s mempool handler\n",
+	       RTE_MBUF_DEFAULT_MEMPOOL_OPS);
+	default_pool = rte_mempool_create_empty("default_pool",
+					MEMPOOL_SIZE,
+					MEMPOOL_ELT_SIZE,
+					RTE_MEMPOOL_CACHE_MAX_SIZE, 0,
+					SOCKET_ID_ANY, 0);
+
+	if (default_pool == NULL) {
+		printf("cannot allocate default mempool\n");
+		goto err;
+	}
+	if (rte_mempool_set_ops_byname(default_pool,
+			RTE_MBUF_DEFAULT_MEMPOOL_OPS, NULL) < 0) {
+		printf("cannot set default handler\n");
+		goto err;
+	}
+	if (rte_mempool_populate_default(default_pool) < 0) {
+		printf("cannot populate default mempool\n");
+		goto err;
+	}
+	rte_mempool_obj_iter(default_pool, my_obj_init, NULL);
+
 	/* retrieve the mempool from its name */
 	if (rte_mempool_lookup("test_nocache") != mp_nocache) {
 		printf("Cannot lookup mempool from its name\n");
@@ -605,15 +631,20 @@ test_mempool(void)
 	if (test_mempool_basic(mp_stack, 1) < 0)
 		goto err;
 
+	if (test_mempool_basic(default_pool, 1) < 0)
+		goto err;
+
 	rte_mempool_list_dump(stdout);
 
-	return 0;
+	ret = 0;
 
 err:
 	rte_mempool_free(mp_nocache);
 	rte_mempool_free(mp_cache);
 	rte_mempool_free(mp_stack);
-	return -1;
+	rte_mempool_free(default_pool);
+
+	return ret;
 }
 
 REGISTER_TEST_COMMAND(mempool_autotest, test_mempool);
