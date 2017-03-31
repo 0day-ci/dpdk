@@ -1924,11 +1924,25 @@ nicvf_dev_configure(struct rte_eth_dev *dev)
 	return 0;
 }
 
+static int
+nicvf_dev_set_link_up(struct rte_eth_dev *dev __rte_unused)
+{
+	return 0;
+}
+
+static int
+nicvf_dev_set_link_down(struct rte_eth_dev *dev __rte_unused)
+{
+	return 0;
+}
+
 /* Initialize and register driver with DPDK Application */
 static const struct eth_dev_ops nicvf_eth_dev_ops = {
 	.dev_configure            = nicvf_dev_configure,
 	.dev_start                = nicvf_dev_start,
 	.dev_stop                 = nicvf_dev_stop,
+	.dev_set_link_up          = nicvf_dev_set_link_up,
+	.dev_set_link_down        = nicvf_dev_set_link_down,
 	.link_update              = nicvf_dev_link_update,
 	.dev_close                = nicvf_dev_close,
 	.stats_get                = nicvf_dev_stats_get,
