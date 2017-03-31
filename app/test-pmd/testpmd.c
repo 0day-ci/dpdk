@@ -87,6 +87,7 @@ uint16_t verbose_level = 0; /**< Silent by default. */
 /* use master core for command line ? */
 uint8_t interactive = 0;
 uint8_t auto_start = 0;
+char cmdline_filename[PATH_MAX] = {0};
 
 /*
  * NUMA support configuration.
@@ -2140,6 +2141,9 @@ main(int argc, char** argv)
 		rte_eth_promiscuous_enable(port_id);
 
 #ifdef RTE_LIBRTE_CMDLINE
+	if (strlen(cmdline_filename) != 0)
+		cmdline_read_from_file(cmdline_filename);
+
 	if (interactive == 1) {
 		if (auto_start) {
 			printf("Start automatic packet forwarding\n");
