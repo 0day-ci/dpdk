@@ -247,7 +247,7 @@ static int ixgbe_dev_interrupt_action(struct rte_eth_dev *dev,
 static void ixgbe_dev_interrupt_handler(struct rte_intr_handle *handle,
 		void *param);
 static void ixgbe_dev_interrupt_delayed_handler(void *param);
-static void ixgbe_add_rar(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
+static int ixgbe_add_rar(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
 		uint32_t index, uint32_t pool);
 static void ixgbe_remove_rar(struct rte_eth_dev *dev, uint32_t index);
 static void ixgbe_set_default_mac_addr(struct rte_eth_dev *dev,
@@ -304,7 +304,7 @@ static void ixgbe_configure_msix(struct rte_eth_dev *dev);
 static int ixgbe_set_queue_rate_limit(struct rte_eth_dev *dev,
 		uint16_t queue_idx, uint16_t tx_rate);
 
-static void ixgbevf_add_mac_addr(struct rte_eth_dev *dev,
+static int ixgbevf_add_mac_addr(struct rte_eth_dev *dev,
 				 struct ether_addr *mac_addr,
 				 uint32_t index, uint32_t pool);
 static void ixgbevf_remove_mac_addr(struct rte_eth_dev *dev, uint32_t index);
@@ -4359,14 +4359,15 @@ ixgbe_dev_rss_reta_query(struct rte_eth_dev *dev,
 	return 0;
 }
 
-static void
+static int
 ixgbe_add_rar(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
 				uint32_t index, uint32_t pool)
 {
 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	uint32_t enable_addr = 1;
 
-	ixgbe_set_rar(hw, index, mac_addr->addr_bytes, pool, enable_addr);
+	return ixgbe_set_rar(hw, index, mac_addr->addr_bytes,
+				pool, enable_addr);
 }
 
 static void
@@ -5884,7 +5885,7 @@ static int ixgbe_set_queue_rate_limit(struct rte_eth_dev *dev,
 	return 0;
 }
 
-static void
+static int
 ixgbevf_add_mac_addr(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
 		     __attribute__((unused)) uint32_t index,
 		     __attribute__((unused)) uint32_t pool)
@@ -5898,11 +5899,19 @@ ixgbevf_add_mac_addr(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
 	 * set of PF resources used to store VF MAC addresses.
 	 */
 	if (memcmp(hw->mac.perm_addr, mac_addr, sizeof(struct ether_addr)) == 0)
-		return;
+		return -1;
 	diag = ixgbevf_set_uc_addr_vf(hw, 2, mac_addr->addr_bytes);
-	if (diag == 0)
-		return;
-	PMD_DRV_LOG(ERR, "Unable to add MAC address - diag=%d", diag);
+	if (diag != 0)
+		PMD_DRV_LOG(ERR, "Unable to add MAC address "
+				"%02x:%02x:%02x:%02x:%02x:%02x- diag=%d",
+				mac_addr->addr_bytes[0],
+				mac_addr->addr_bytes[1],
+				mac_addr->addr_bytes[2],
+				mac_addr->addr_bytes[3],
+				mac_addr->addr_bytes[4],
+				mac_addr->addr_bytes[5],
+				diag);
+	return diag;
 }
 
 static void

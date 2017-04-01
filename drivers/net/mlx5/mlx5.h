@@ -229,8 +229,8 @@ int hash_rxq_mac_addrs_add(struct hash_rxq *);
 int priv_mac_addr_add(struct priv *, unsigned int,
 		      const uint8_t (*)[ETHER_ADDR_LEN]);
 int priv_mac_addrs_enable(struct priv *);
-void mlx5_mac_addr_add(struct rte_eth_dev *, struct ether_addr *, uint32_t,
-		       uint32_t);
+int mlx5_mac_addr_add(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
+		  uint32_t index, uint32_t vmdq);
 void mlx5_mac_addr_set(struct rte_eth_dev *, struct ether_addr *);
 
 /* mlx5_rss.c */

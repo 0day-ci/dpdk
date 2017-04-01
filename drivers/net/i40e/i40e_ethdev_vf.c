@@ -135,7 +135,7 @@ static int i40evf_dev_tx_queue_start(struct rte_eth_dev *dev,
 				     uint16_t tx_queue_id);
 static int i40evf_dev_tx_queue_stop(struct rte_eth_dev *dev,
 				    uint16_t tx_queue_id);
-static void i40evf_add_mac_addr(struct rte_eth_dev *dev,
+static int i40evf_add_mac_addr(struct rte_eth_dev *dev,
 				struct ether_addr *addr,
 				uint32_t index,
 				uint32_t pool);
@@ -854,7 +854,7 @@ i40evf_stop_queues(struct rte_eth_dev *dev)
 	return 0;
 }
 
-static void
+static int
 i40evf_add_mac_addr(struct rte_eth_dev *dev,
 		    struct ether_addr *addr,
 		    __rte_unused uint32_t index,
@@ -872,7 +872,7 @@ i40evf_add_mac_addr(struct rte_eth_dev *dev,
 			    addr->addr_bytes[0], addr->addr_bytes[1],
 			    addr->addr_bytes[2], addr->addr_bytes[3],
 			    addr->addr_bytes[4], addr->addr_bytes[5]);
-		return;
+		return -1;
 	}
 
 	list = (struct i40e_virtchnl_ether_addr_list *)cmd_buffer;
@@ -891,7 +891,7 @@ i40evf_add_mac_addr(struct rte_eth_dev *dev,
 		PMD_DRV_LOG(ERR, "fail to execute command "
 			    "OP_ADD_ETHER_ADDRESS");
 
-	return;
+	return err;
 }
 
 static void

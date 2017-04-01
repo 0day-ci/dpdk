@@ -855,7 +855,7 @@ int e1000_rar_set(struct e1000_hw *hw, u8 *addr, u32 index)
 	if (hw->mac.ops.rar_set)
 		return hw->mac.ops.rar_set(hw, addr, index);
 
-	return E1000_SUCCESS;
+	return E1000_ERR_NO_SPACE;
 }
 
 /**
