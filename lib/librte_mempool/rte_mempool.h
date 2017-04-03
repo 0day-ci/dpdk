@@ -263,6 +263,11 @@ struct rte_mempool {
 #define MEMPOOL_F_SC_GET         0x0008 /**< Default get is "single-consumer".*/
 #define MEMPOOL_F_POOL_CREATED   0x0010 /**< Internal: pool is created. */
 #define MEMPOOL_F_NO_PHYS_CONTIG 0x0020 /**< Don't need physically contiguous objs. */
+#define MEMPOOL_F_HW_POOL        (1 << ((sizeof(int) * 8) - 1)) /**< Internal:
+	* Hardware offloaded pool. This information may be used by the
+	* NIC or other hw. Some NICs autonomously free the HW backed pool packets. */
+
+/**< Don't need physically contiguous objs. */
 
 /**
  * @internal When debug is enabled, store some statistics.
