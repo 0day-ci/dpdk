@@ -419,9 +419,10 @@ config_slave_sess(struct scheduler_ctx *sched_ctx,
 			if (create)
 				continue;
 			/* !create */
-			(*dev->dev_ops->session_clear)(dev,
-					(void *)sess->sessions[i]);
-			sess->sessions[i] = NULL;
+			sess->sessions[i] = rte_cryptodev_sym_session_free(
+					slave->dev_id, sess->sessions[i]);
+			if (!sess->sessions[i])
+				return -1;
 		} else {
 			if (!create)
 				continue;
@@ -429,10 +430,6 @@ config_slave_sess(struct scheduler_ctx *sched_ctx,
 			sess->sessions[i] =
 					rte_cryptodev_sym_session_create(
 							slave->dev_id, xform);
-			if (!sess->sessions[i]) {
-				config_slave_sess(sched_ctx, NULL, sess, 0);
-				return -1;
-			}
 		}
 	}
 
