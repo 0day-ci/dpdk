@@ -185,6 +185,9 @@ ABI Changes
    Also, make sure to start the actual text at the margin.
    =========================================================
 
+* The ``rte_cryptodev_info.sym`` structure has new field ``max_nb_sessions_per_qp``
+  to support drivers which may support limited number of sessions per queue_pair.
+
 
 Removed Items
 -------------
