@@ -109,6 +109,8 @@ struct fwd_stream {
 	queueid_t  tx_queue;  /**< TX queue to send forwarded packets */
 	streamid_t peer_addr; /**< index of peer ethernet address of packets */
 
+	uint16_t tbl_idx;	/**< TCP IPv4 GRO lookup tale index */
+
 	unsigned int retry_enabled;
 
 	/* "read-write" results */
@@ -616,6 +618,7 @@ void get_2tuple_filter(uint8_t port_id, uint16_t index);
 void get_5tuple_filter(uint8_t port_id, uint16_t index);
 int rx_queue_id_is_invalid(queueid_t rxq_id);
 int tx_queue_id_is_invalid(queueid_t txq_id);
+void setup_gro(const char *mode, uint8_t port_id);
 
 /* Functions to manage the set of filtered Multicast MAC addresses */
 void mcast_addr_add(uint8_t port_id, struct ether_addr *mc_addr);

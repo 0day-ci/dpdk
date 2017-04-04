@@ -79,6 +79,7 @@
 #include <rte_pdump.h>
 #endif
 #include <rte_flow.h>
+#include <rte_gro.h>
 
 #include "testpmd.h"
 
@@ -1454,6 +1455,10 @@ start_port(portid_t pid)
 		check_all_ports_link_status(RTE_PORT_ALL);
 	else if (need_check_link_status == 0)
 		printf("Please stop the ports first\n");
+
+	/* initialize GRO environment */
+	if (pid == (portid_t)RTE_PORT_ALL)
+		rte_gro_init();
 
 	printf("Done\n");
 	return 0;
