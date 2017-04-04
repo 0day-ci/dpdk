@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <linux/pci_regs.h>
+#include <sys/sysmacros.h>
 
 #if defined(RTE_ARCH_X86)
 #include <sys/io.h>
