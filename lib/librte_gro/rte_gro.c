@@ -6,9 +6,12 @@
 
 #include "rte_gro.h"
 #include "rte_gro_common.h"
+#include "rte_gro_tcp.h"
 
-gro_reassemble_fn reassemble_functions[GRO_TYPE_MAX_NB] = {NULL};
-gro_tbl_create_fn tbl_create_functions[GRO_TYPE_MAX_NB] = {NULL};
+gro_reassemble_fn reassemble_functions[GRO_TYPE_MAX_NB] = {
+	rte_gro_tcp4_reassemble, NULL};
+gro_tbl_create_fn tbl_create_functions[GRO_TYPE_MAX_NB] = {
+	rte_gro_tcp4_tbl_create, NULL};
 
 struct rte_gro_status *gro_status;
 
@@ -102,7 +105,81 @@ rte_gro_reassemble_burst(uint8_t port __rte_unused,
 		printf("invalid parameters for GRO.\n");
 		return 0;
 	}
+	struct ether_hdr *eth_hdr;
+	struct ipv4_hdr *ipv4_hdr;
+	uint16_t l3proc_type;
+
+	/* record packet GRO info */
+	struct gro_info gro_infos[nb_pkts];
+	struct rte_gro_lkp_tbl *lkp_tbls = ((struct rte_gro_tbl *)
+			gro_tbl)->lkp_tbls;
+	int32_t ret;
 	uint16_t nb_after_gro = nb_pkts;
+	uint8_t dirty_tbls[GRO_SUPPORT_TYPE_NB] = {0};
+
+	/* pre-allocate tcp items for TCP GRO */
+	struct gro_tcp_item tcp_items[nb_pkts * nb_pkts];
+
+	for (uint16_t i = 0; i < nb_pkts; i++) {
+		gro_infos[i].nb_merged_packets = 1;	/* initial value */
+		eth_hdr = rte_pktmbuf_mtod(pkts[i], struct ether_hdr *);
+		l3proc_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+		if (l3proc_type == ETHER_TYPE_IPv4) {
+			ipv4_hdr = (struct ipv4_hdr *)(eth_hdr + 1);
+			if (ipv4_hdr->next_proto_id == IPPROTO_TCP) {
+				gro_infos[i].gro_type = GRO_TCP_IPV4;
+				/* allocate an item-list for the packet */
+				gro_infos[i].item_list.items =
+					&tcp_items[i * nb_pkts];
+				gro_infos[i].item_list.nb_item = 1;
+				/**
+				 * fill the packet information into the first
+				 * item of the item-list
+				 */
+				tcp_items[i * nb_pkts].segment = pkts[i];
+				tcp_items[i * nb_pkts].segment_idx = i;
+
+				ret = rte_gro_tcp4_reassemble(
+						lkp_tbls[GRO_TCP_IPV4].hash_tbl,
+						&gro_infos[i].item_list);
+				if (ret > 0) {
+					gro_infos[i].nb_merged_packets = 0;
+					gro_infos[--ret].nb_merged_packets++;
+					nb_after_gro--;
+				}
+				dirty_tbls[GRO_TCP_IPV4] = ret >= 0 ? 1 : 0;
+			}
+		}
+	}
+	/**
+	 * if there are packets been merged, update their headers,
+	 * and remove useless packet addresses from the inputted
+	 * packet array.
+	 */
+	if (nb_after_gro < nb_pkts) {
+		struct rte_mbuf *tmp[nb_pkts];
+
+		memset(tmp, 0,
+				sizeof(struct rte_mbuf *) * nb_pkts);
+		for (uint16_t i = 0, j = 0; i < nb_pkts; i++) {
+			if (gro_infos[i].nb_merged_packets > 1) {
+				switch (gro_infos[i].gro_type) {
+				case GRO_TCP_IPV4:
+					gro_tcp4_cksum_update(pkts[i]);
+					break;
+				}
+			}
+			if (gro_infos[i].nb_merged_packets != 0)
+				tmp[j++] = pkts[i];
+		}
+		rte_memcpy(pkts, tmp,
+				nb_pkts * sizeof(struct rte_mbuf *));
+	}
+
+	/* if GRO is performed, reset the hash table */
+	for (uint16_t i = 0; i < GRO_SUPPORT_TYPE_NB; i++)
+		if (dirty_tbls[i])
+			rte_hash_reset(lkp_tbls[i].hash_tbl);
 
 	return nb_after_gro;
 }

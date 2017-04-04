@@ -12,7 +12,9 @@
 /**
  * current supported GRO types number
  */
-#define GRO_SUPPORT_TYPE_NB 0
+#define GRO_SUPPORT_TYPE_NB 1
+
+#define GRO_TCP_IPV4 0	/**< TCP/IPv4 GRO */
 
 /**
  * default element number of the hashing table
