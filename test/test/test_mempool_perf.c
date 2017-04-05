@@ -111,6 +111,7 @@
 
 static struct rte_mempool *mp;
 static struct rte_mempool *mp_cache, *mp_nocache;
+static struct rte_mempool *default_pool;
 static int use_external_cache;
 static unsigned external_cache_size = RTE_MEMPOOL_CACHE_MAX_SIZE;
 
@@ -337,9 +338,48 @@ test_mempool_perf(void)
 	if (mp_cache == NULL)
 		goto err;
 
+	/* Create a mempool based on Default handler */
+	default_pool = rte_mempool_create_empty("default_pool",
+						MEMPOOL_SIZE,
+						MEMPOOL_ELT_SIZE,
+						0, 0,
+						SOCKET_ID_ANY, 0);
+
+	if (default_pool == NULL) {
+		printf("cannot allocate %s mempool\n",
+			RTE_MBUF_DEFAULT_MEMPOOL_OPS);
+		goto err;
+	}
+	if (rte_mempool_set_ops_byname(default_pool,
+				RTE_MBUF_DEFAULT_MEMPOOL_OPS, NULL) < 0) {
+		printf("cannot set %s handler\n",
+			RTE_MBUF_DEFAULT_MEMPOOL_OPS);
+		goto err;
+	}
+	if (rte_mempool_populate_default(default_pool) < 0) {
+		printf("cannot populate %s mempool\n",
+			RTE_MBUF_DEFAULT_MEMPOOL_OPS);
+		goto err;
+	}
+	rte_mempool_obj_iter(default_pool, my_obj_init, NULL);
+
 	/* performance test with 1, 2 and max cores */
 	printf("start performance test (without cache)\n");
 	mp = mp_nocache;
+
+	if (do_one_mempool_test(1) < 0)
+		goto err;
+
+	if (do_one_mempool_test(2) < 0)
+		goto err;
+
+	if (do_one_mempool_test(rte_lcore_count()) < 0)
+		goto err;
+
+	/* performance test with 1, 2 and max cores */
+	printf("start performance test for %s (without cache)\n",
+			RTE_MBUF_DEFAULT_MEMPOOL_OPS);
+	mp = default_pool;
 
 	if (do_one_mempool_test(1) < 0)
 		goto err;
@@ -384,6 +424,7 @@ test_mempool_perf(void)
 err:
 	rte_mempool_free(mp_cache);
 	rte_mempool_free(mp_nocache);
+	rte_mempool_free(default_pool);
 	return ret;
 }
 
