@@ -265,6 +265,13 @@ New Features
 
   * DES DOCSIS BPI algorithm.
 
+* **Added Cloud Filter for QinQ steering.**
+
+  * Added a QinQ cloud filter on the i40e PMD, for steering traffic to a VM
+    using both VLAN tags.
+  * QinQ is not supported in Vector Mode on the i40e PMD.
+  * Vector Mode must be disabled when using the QinQ Cloud Filter.
+
 Resolved Issues
 ---------------
 
