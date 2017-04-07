@@ -251,6 +251,7 @@ nicvf_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 	uint16_t rx_start, rx_end;
 	uint16_t tx_start, tx_end;
 	size_t i;
+	bool breakout = false;
 
 	/* RX queue indices for the first VF */
 	nicvf_rx_range(dev, nic, &rx_start, &rx_end);
@@ -289,8 +290,10 @@ nicvf_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 
 		/* Reading per RX ring stats */
 		for (qidx = rx_start; qidx <= rx_end; qidx++) {
-			if (qidx == RTE_ETHDEV_QUEUE_STAT_CNTRS)
+			if (qidx == RTE_ETHDEV_QUEUE_STAT_CNTRS) {
+				breakout = true;
 				break;
+			}
 
 			nicvf_hw_get_rx_qstats(snic, &rx_qstats,
 					       qidx % MAX_RCV_QUEUES_PER_QS);
@@ -302,14 +305,18 @@ nicvf_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 		nicvf_tx_range(dev, snic, &tx_start, &tx_end);
 		/* Reading per TX ring stats */
 		for (qidx = tx_start; qidx <= tx_end; qidx++) {
-			if (qidx == RTE_ETHDEV_QUEUE_STAT_CNTRS)
+			if (qidx == RTE_ETHDEV_QUEUE_STAT_CNTRS) {
+				breakout = true;
 				break;
+			}
 
 			nicvf_hw_get_tx_qstats(snic, &tx_qstats,
 					       qidx % MAX_SND_QUEUES_PER_QS);
 			stats->q_obytes[qidx] = tx_qstats.q_tx_bytes;
 			stats->q_opackets[qidx] = tx_qstats.q_tx_packets;
 		}
+		if (breakout)
+			break;
 	}
 
 	nicvf_hw_get_stats(nic, &port_stats);
