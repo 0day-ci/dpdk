@@ -150,6 +150,13 @@ extern "C" {
  */
 #define RTE_PTYPE_L2_ETHER_QINQ             0x00000007
 /**
+ * PPPOE packet type.
+ *
+ * Packet format:
+ * <'ether type'=[0x8864]>
+ */
+#define RTE_PTYPE_L2_ETHER_PPPOE            0x00000008
+/**
  * Mask of layer 2 packet types.
  * It is used for outer packet for tunneling cases.
  */

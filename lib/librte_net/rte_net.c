@@ -302,6 +302,25 @@ uint32_t rte_net_get_ptype(const struct rte_mbuf *m,
 		off += 2 * sizeof(*vh);
 		hdr_lens->l2_len += 2 * sizeof(*vh);
 		proto = vh->eth_proto;
+	} else if (proto == rte_cpu_to_be_16(ETHER_TYPE_PPPOE)) {
+		const struct pppoe_hdr *ph;
+		struct pppoe_hdr ph_copy;
+
+		pkt_type = RTE_PTYPE_L2_ETHER_PPPOE;
+		ph = rte_pktmbuf_read(m, off, sizeof(*ph), &ph_copy);
+		if (unlikely(ph == NULL))
+			return pkt_type;
+
+		off += sizeof(*ph);
+		hdr_lens->l2_len += sizeof(*ph);
+		if (ph->code != 0) /* Not Seesion Data */
+			return pkt_type;
+		if (ph->proto == rte_cpu_to_be_16(0x21))
+			proto = rte_cpu_to_be_16(ETHER_TYPE_IPv4);
+		else if (ph->proto == rte_cpu_to_be_16(0x57))
+			proto = rte_cpu_to_be_16(ETHER_TYPE_IPv6);
+		else
+			return pkt_type;
 	}
 
  l3:

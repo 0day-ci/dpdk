@@ -323,12 +323,24 @@ struct vxlan_hdr {
 	uint32_t vx_vni;   /**< VNI (24) + Reserved (8). */
 } __attribute__((__packed__));
 
+/**
+ * PPPOE protocol header
+ */
+struct pppoe_hdr {
+	uint8_t  type_ver;
+	uint8_t  code;
+	uint16_t sid;
+	uint16_t length;
+	uint16_t proto;
+} __attribute__((packed));
+
 /* Ethernet frame types */
 #define ETHER_TYPE_IPv4 0x0800 /**< IPv4 Protocol. */
 #define ETHER_TYPE_IPv6 0x86DD /**< IPv6 Protocol. */
 #define ETHER_TYPE_ARP  0x0806 /**< Arp Protocol. */
 #define ETHER_TYPE_RARP 0x8035 /**< Reverse Arp Protocol. */
 #define ETHER_TYPE_VLAN 0x8100 /**< IEEE 802.1Q VLAN tagging. */
+#define ETHER_TYPE_PPPOE 0x8864 /**< PPPoE Protocol */
 #define ETHER_TYPE_QINQ 0x88A8 /**< IEEE 802.1ad QinQ tagging. */
 #define ETHER_TYPE_1588 0x88F7 /**< IEEE 802.1AS 1588 Precise Time Protocol. */
 #define ETHER_TYPE_SLOW 0x8809 /**< Slow protocols (LACP and Marker). */
