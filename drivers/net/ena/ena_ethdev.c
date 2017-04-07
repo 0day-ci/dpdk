@@ -1144,7 +1144,7 @@ static int ena_populate_rx_queue(struct ena_ring *rxq, unsigned int count)
 		return 0;
 
 	in_use = rxq->next_to_use - rxq->next_to_clean;
-	ena_assert_msg(((in_use + count) <= ring_size), "bad ring state");
+	ena_assert_msg(((in_use + count) < ring_size), "bad ring state");
 
 	count = RTE_MIN(count,
 			(uint16_t)(ring_size - (next_to_use & ring_mask)));
@@ -1504,7 +1504,7 @@ static uint16_t eth_ena_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
 	unsigned int ring_size = rx_ring->ring_size;
 	unsigned int ring_mask = ring_size - 1;
 	uint16_t next_to_clean = rx_ring->next_to_clean;
-	uint16_t desc_in_use = 0;
+	uint16_t desc_in_use, desc_to_refill;
 	unsigned int recv_idx = 0;
 	struct rte_mbuf *mbuf = NULL;
 	struct rte_mbuf *mbuf_head = NULL;
@@ -1575,11 +1575,12 @@ static uint16_t eth_ena_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts,
 		recv_idx++;
 	}
 
-	/* Burst refill to save doorbells, memory barriers, const interval */
-	if (ring_size - desc_in_use > ENA_RING_DESCS_RATIO(ring_size))
-		ena_populate_rx_queue(rx_ring, ring_size - desc_in_use);
-
 	rx_ring->next_to_clean = next_to_clean;
+
+	desc_to_refill = ring_size - desc_in_use + completed - 1;
+	/* Burst refill to save doorbells, memory barriers, const interval */
+	if (desc_to_refill > ENA_RING_DESCS_RATIO(ring_size))
+		ena_populate_rx_queue(rx_ring, desc_to_refill);
 
 	return recv_idx;
 }
