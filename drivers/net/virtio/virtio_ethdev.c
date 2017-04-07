@@ -1163,7 +1163,7 @@ virtio_negotiate_features(struct virtio_hw *hw, uint64_t req_features)
 
 	/* If supported, ensure MTU value is valid before acknowledging it. */
 	if (host_features & req_features & (1ULL << VIRTIO_NET_F_MTU)) {
-		struct virtio_net_config config;
+		struct virtio_net_config config = {0};
 
 		vtpci_read_dev_config(hw,
 			offsetof(struct virtio_net_config, mtu),
@@ -1332,7 +1332,7 @@ virtio_init_device(struct rte_eth_dev *eth_dev, uint64_t req_features)
 {
 	struct virtio_hw *hw = eth_dev->data->dev_private;
 	struct virtio_net_config *config;
-	struct virtio_net_config local_config;
+	struct virtio_net_config local_config = {0};
 	struct rte_pci_device *pci_dev = NULL;
 	int ret;
 

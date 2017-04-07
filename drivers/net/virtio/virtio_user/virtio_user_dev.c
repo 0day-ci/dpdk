@@ -362,6 +362,12 @@ virtio_user_dev_init(struct virtio_user_dev *dev, char *path, int queues,
 	/* The backend will not report this feature, we add it explicitly */
 	dev->device_features |= (1ull << VIRTIO_NET_F_STATUS);
 
+	/* TODO: VIRTIO_NET_F_MTU is for QEMU to advertise MTU to both frontend
+	 * and backend driver. For virtio-user, disable it for now, until we
+	 * have a parameter to specify the MTU.
+	 */
+	dev->device_features &= ~(1ull << VIRTIO_NET_F_MTU);
+
 	return 0;
 }
 
