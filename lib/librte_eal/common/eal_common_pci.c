@@ -72,6 +72,7 @@
 #include <rte_errno.h>
 #include <rte_interrupts.h>
 #include <rte_log.h>
+#include <rte_bus.h>
 #include <rte_pci.h>
 #include <rte_per_lcore.h>
 #include <rte_memory.h>
@@ -87,6 +88,8 @@ struct pci_driver_list pci_driver_list =
 	TAILQ_HEAD_INITIALIZER(pci_driver_list);
 struct pci_device_list pci_device_list =
 	TAILQ_HEAD_INITIALIZER(pci_device_list);
+
+extern struct rte_pci_bus rte_pci_bus;
 
 #define SYSFS_PCI_DEVICES "/sys/bus/pci/devices"
 
@@ -488,4 +491,26 @@ rte_eal_pci_unregister(struct rte_pci_driver *driver)
 {
 	rte_eal_driver_unregister(&driver->driver);
 	TAILQ_REMOVE(&pci_driver_list, driver, next);
+}
+
+/* Add a device to PCI bus */
+void
+rte_eal_pci_add_device(struct rte_pci_device *pci_dev)
+{
+	TAILQ_INSERT_TAIL(&rte_pci_bus.device_list, pci_dev, next);
+}
+
+/* Insert a device into a predefined position in PCI bus */
+void
+rte_eal_pci_insert_device(struct rte_pci_device *exist_pci_dev,
+			  struct rte_pci_device *new_pci_dev)
+{
+	TAILQ_INSERT_BEFORE(exist_pci_dev, new_pci_dev, next);
+}
+
+/* Remove a device from PCI bus */
+void
+rte_eal_pci_remove_device(struct rte_pci_device *pci_dev)
+{
+	TAILQ_REMOVE(&rte_pci_bus.device_list, pci_dev, next);
 }

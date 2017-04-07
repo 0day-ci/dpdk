@@ -35,6 +35,7 @@
 #include <dirent.h>
 
 #include <rte_log.h>
+#include <rte_bus.h>
 #include <rte_pci.h>
 #include <rte_eal_memconfig.h>
 #include <rte_malloc.h>
@@ -728,3 +729,14 @@ rte_eal_pci_init(void)
 
 	return 0;
 }
+
+struct rte_pci_bus rte_pci_bus = {
+	.bus = {
+		.scan = rte_eal_pci_scan,
+		.probe = rte_eal_pci_probe,
+	},
+	.device_list = TAILQ_HEAD_INITIALIZER(rte_pci_bus.device_list),
+	.driver_list = TAILQ_HEAD_INITIALIZER(rte_pci_bus.driver_list),
+};
+
+RTE_REGISTER_BUS(PCI_BUS_NAME, rte_pci_bus.bus);

@@ -85,6 +85,7 @@ extern "C" {
 #include <rte_debug.h>
 #include <rte_interrupts.h>
 #include <rte_dev.h>
+#include <rte_bus.h>
 
 TAILQ_HEAD(pci_device_list, rte_pci_device); /**< PCI devices in D-linked Q. */
 TAILQ_HEAD(pci_driver_list, rte_pci_driver); /**< PCI drivers in D-linked Q. */
@@ -110,6 +111,25 @@ const char *pci_get_sysfs_path(void);
 
 /** Maximum number of PCI resources. */
 #define PCI_MAX_RESOURCE 6
+
+/** Name of PCI Bus */
+#define PCI_BUS_NAME "PCI"
+
+/* Forward declarations */
+struct rte_pci_device;
+struct rte_pci_driver;
+
+/** List of PCI devices */
+TAILQ_HEAD(rte_pci_device_list, rte_pci_device);
+/** List of PCI drivers */
+TAILQ_HEAD(rte_pci_driver_list, rte_pci_driver);
+
+/* PCI Bus iterators */
+#define FOREACH_DEVICE_ON_PCIBUS(p)	\
+		TAILQ_FOREACH(p, &(rte_pci_bus.device_list), next)
+
+#define FOREACH_DRIVER_ON_PCIBUS(p)	\
+		TAILQ_FOREACH(p, &(rte_pci_bus.driver_list), next)
 
 /**
  * A structure describing an ID for a PCI driver. Each driver provides a
@@ -206,10 +226,20 @@ typedef int (pci_remove_t)(struct rte_pci_device *);
 struct rte_pci_driver {
 	TAILQ_ENTRY(rte_pci_driver) next;       /**< Next in list. */
 	struct rte_driver driver;               /**< Inherit core driver. */
+	struct rte_pci_bus *bus;                /**< PCI bus reference. */
 	pci_probe_t *probe;                     /**< Device Probe function. */
 	pci_remove_t *remove;                   /**< Device Remove function. */
 	const struct rte_pci_id *id_table;	/**< ID table, NULL terminated. */
 	uint32_t drv_flags;                     /**< Flags contolling handling of device. */
+};
+
+/**
+ * Structure describing the PCI bus
+ */
+struct rte_pci_bus {
+	struct rte_bus bus;               /**< Inherit the generic class */
+	struct rte_pci_device_list device_list;  /**< List of PCI devices */
+	struct rte_pci_driver_list driver_list;  /**< List of PCI drivers */
 };
 
 /** Device needs PCI BAR mapping (done with either IGB_UIO or VFIO) */
@@ -506,6 +536,41 @@ RTE_PMD_EXPORT_NAME(nm, __COUNTER__)
  *   to be unregistered.
  */
 void rte_eal_pci_unregister(struct rte_pci_driver *driver);
+
+/**
+ * Add a PCI device to the PCI Bus (append to PCI Device list). This function
+ * also updates the bus references of the PCI Device (and the generic device
+ * object embedded within.
+ *
+ * @param pci_dev
+ *	PCI device to add
+ * @return void
+ */
+void rte_eal_pci_add_device(struct rte_pci_device *pci_dev);
+
+/**
+ * Insert a PCI device in the PCI Bus at a particular location in the device
+ * list. It also updates the PCI Bus reference of the new devices to be
+ * inserted.
+ *
+ * @param exist_pci_dev
+ *	Existing PCI device in PCI Bus
+ * @param new_pci_dev
+ *	PCI device to be added before exist_pci_dev
+ * @return void
+ */
+void rte_eal_pci_insert_device(struct rte_pci_device *exist_pci_dev,
+			       struct rte_pci_device *new_pci_dev);
+
+/**
+ * Remove a PCI device from the PCI Bus. This sets to NULL the bus references
+ * in the PCI device object as well as the generic device object.
+ *
+ * @param pci_device
+ *	PCI device to be removed from PCI Bus
+ * @return void
+ */
+void rte_eal_pci_remove_device(struct rte_pci_device *pci_device);
 
 /**
  * Read PCI config space.
