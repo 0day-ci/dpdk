@@ -348,6 +348,16 @@ cperf_throughput_test_runner(void *test_ctx)
 					ops_needed, ctx->sess, ctx->options,
 					ctx->test_vector);
 
+			/**
+			 * When ops_needed is smaller than ops_enqd, the
+			 * unused ops need to be moved to the front for
+			 * next round use.
+			 */
+			if (unlikely(ops_enqd > ops_needed))
+				memmove(&ops[ops_needed],
+						&ops[ops_enqd - ops_needed],
+						burst_size - ops_needed);
+
 #ifdef CPERF_LINEARIZATION_ENABLE
 			if (linearize) {
 				/* PMD doesn't support scatter-gather and source buffer
