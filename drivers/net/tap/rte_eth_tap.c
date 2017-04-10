@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2016 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2017 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -71,6 +71,13 @@
 #define ETH_TAP_IFACE_ARG       "iface"
 #define ETH_TAP_SPEED_ARG       "speed"
 #define ETH_TAP_REMOTE_ARG      "remote"
+#define ETH_TAP_MAC_ARG		"mac"
+
+#ifdef IFF_MULTI_QUEUE
+#define RTE_PMD_TAP_MAX_QUEUES	16
+#else
+#define RTE_PMD_TAP_MAX_QUEUES	1
+#endif
 
 #define FLOWER_KERNEL_VERSION KERNEL_VERSION(4, 2, 0)
 #define FLOWER_VLAN_KERNEL_VERSION KERNEL_VERSION(4, 9, 0)
@@ -81,10 +88,12 @@ static const char *valid_arguments[] = {
 	ETH_TAP_IFACE_ARG,
 	ETH_TAP_SPEED_ARG,
 	ETH_TAP_REMOTE_ARG,
+	ETH_TAP_MAC_ARG,
 	NULL
 };
 
 static int tap_unit;
+static int fixed_mac_type;
 
 static volatile uint32_t tap_trigger;	/* Rx trigger */
 
@@ -1230,7 +1239,17 @@ eth_dev_tap_create(const char *name, char *tap_name, char *remote_iface)
 		rte_memcpy(&pmd->eth_addr, ifr.ifr_hwaddr.sa_data,
 			   ETHER_ADDR_LEN);
 	} else {
-		eth_random_addr((uint8_t *)&pmd->eth_addr);
+		if (fixed_mac_type) {
+			static int iface_idx;
+
+			pmd->eth_addr.addr_bytes[0] = 0x00;
+			pmd->eth_addr.addr_bytes[1] = 'd';
+			pmd->eth_addr.addr_bytes[2] = 't';
+			pmd->eth_addr.addr_bytes[3] = 'a';
+			pmd->eth_addr.addr_bytes[4] = 'p';
+			pmd->eth_addr.addr_bytes[5] = 0 + iface_idx++;
+		} else
+			eth_random_addr((uint8_t *)&pmd->eth_addr);
 	}
 
 	return 0;
@@ -1285,6 +1304,16 @@ set_remote_iface(const char *key __rte_unused,
 	return 0;
 }
 
+static int
+set_mac_type(const char *key __rte_unused, const char *value, void *extra_args)
+{
+	/* Assume random mac address */
+	*(int *)extra_args = 0;
+	if (value && !strcasecmp("fixed", value))
+		*(int *)extra_args = 1;
+	return 0;
+}
+
 /* Open a TAP interface device.
  */
 static int
@@ -1301,6 +1330,7 @@ rte_pmd_tap_probe(const char *name, const char *params)
 		 DEFAULT_TAP_NAME, tap_unit++);
 	memset(remote_iface, 0, RTE_ETH_NAME_MAX_LEN);
 
+	fixed_mac_type = 0;
 	if (params && (params[0] != '\0')) {
 		RTE_LOG(DEBUG, PMD, "paramaters (%s)\n", params);
 
@@ -1329,6 +1359,15 @@ rte_pmd_tap_probe(const char *name, const char *params)
 							 ETH_TAP_REMOTE_ARG,
 							 &set_remote_iface,
 							 remote_iface);
+				if (ret == -1)
+					goto leave;
+			}
+
+			if (rte_kvargs_count(kvlist, ETH_TAP_MAC_ARG) == 1) {
+				ret = rte_kvargs_process(kvlist,
+							 ETH_TAP_MAC_ARG,
+							 &set_mac_type,
+							 &fixed_mac_type);
 				if (ret == -1)
 					goto leave;
 			}
@@ -1394,4 +1433,8 @@ static struct rte_vdev_driver pmd_tap_drv = {
 };
 RTE_PMD_REGISTER_VDEV(net_tap, pmd_tap_drv);
 RTE_PMD_REGISTER_ALIAS(net_tap, eth_tap);
-RTE_PMD_REGISTER_PARAM_STRING(net_tap, "iface=<string>,speed=N");
+RTE_PMD_REGISTER_PARAM_STRING(net_tap,
+			      "iface=<string>,"
+			      "speed=N,"
+			      "remote=<string>,"
+			      "mac=fixed");
