@@ -428,6 +428,7 @@ static int i40e_cloud_filter_qinq_create(struct i40e_pf *pf);
 static void i40e_ethertype_filter_restore(struct i40e_pf *pf);
 static void i40e_tunnel_filter_restore(struct i40e_pf *pf);
 static void i40e_filter_restore(struct i40e_pf *pf);
+static void i40e_notify_all_vfs_link_status(struct rte_eth_dev *dev);
 
 int i40e_logtype_init;
 int i40e_logtype_driver;
@@ -2306,6 +2307,8 @@ out:
 	rte_i40e_dev_atomic_write_link_status(dev, &link);
 	if (link.link_status == old.link_status)
 		return -1;
+
+	i40e_notify_all_vfs_link_status(dev);
 
 	return 0;
 }
