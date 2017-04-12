@@ -1091,6 +1091,9 @@ eth_i40e_dev_init(struct rte_eth_dev *dev)
 	hw->bus.func = pci_dev->addr.function;
 	hw->adapter_stopped = 0;
 
+	/* Reset NIC core */
+	I40E_WRITE_REG(hw, I40E_GLGEN_RTRIG, 0x1);
+
 	/* Make sure all is clean before doing PF reset */
 	i40e_clear_hw(hw);
 
