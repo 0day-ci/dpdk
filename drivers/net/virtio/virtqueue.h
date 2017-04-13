@@ -72,7 +72,8 @@ struct rte_mbuf;
  * Return the physical address (or virtual address in case of
  * virtio-user) of mbuf data buffer.
  */
-#define VIRTIO_MBUF_ADDR(mb, vq) (*(uint64_t *)((uintptr_t)(mb) + (vq)->offset))
+#define VIRTIO_MBUF_ADDR(mb, vq) \
+	((uint64_t)((uintptr_t)(*(void **)((uintptr_t)(mb) + (vq)->offset))))
 #else
 #define VIRTIO_MBUF_ADDR(mb, vq) ((mb)->buf_physaddr)
 #endif
