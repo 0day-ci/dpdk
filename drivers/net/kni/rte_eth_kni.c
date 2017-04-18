@@ -393,7 +393,6 @@ eth_kni_create(const char *name, struct eth_kni_args *args,
 
 	eth_dev->data = data;
 	eth_dev->dev_ops = &eth_kni_ops;
-	eth_dev->device->driver = NULL;
 
 	data->dev_flags = RTE_ETH_DEV_DETACHABLE;
 	data->kdrv = RTE_KDRV_NONE;
