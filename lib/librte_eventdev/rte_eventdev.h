@@ -517,6 +517,64 @@ rte_event_dev_configure(uint8_t dev_id,
  *  @see rte_event_port_setup(), rte_event_port_link()
  */
 
+/** Event queue producers configuration structure.
+ * The events are injected to event device through *enqueue* operation with
+ * op == RTE_EVENT_OP_NEW by event producers in the system. If the event
+ * producers is an Ethernet device then eventdev PMD may operate in conjunction
+ * with ethdev PMD to injects the events(Ethernet packets) to eventdev.
+ * The event injection can happen in HW or SW or the combination of these two
+ * based on the HW capabilities of target eventdev and ethdev PMDs.
+ * If the eventdev PMD needs additional threads to inject the events,
+ * a set of callbacks will be provided in rte_event_dev_start().
+ * Application must invoke each callback on each lcores to meet the required
+ * functionality.
+ *
+ * @see rte_event_dev_start()
+ *
+ */
+struct rte_event_queue_producer_conf {
+	uint32_t event_type:4;
+	/**< Event type to classify the event source.
+	 * @see RTE_EVENT_TYPE_ETHDEV, (RTE_EVENT_TYPE_*)
+	 */
+	uint8_t sched_type:2;
+	/**< Scheduler synchronization type (RTE_SCHED_TYPE_*)
+	 * associated with flow id on a given event queue for the enqueue
+	 * operation.
+	 */
+	uint8_t priority;
+	/**< Event priority relative to other events in the
+	 * event queue. The requested priority should in the
+	 * range of  [RTE_EVENT_DEV_PRIORITY_HIGHEST,
+	 * RTE_EVENT_DEV_PRIORITY_LOWEST].
+	 * The implementation shall normalize the requested
+	 * priority to supported priority value.
+	 * Valid when the device has
+	 * RTE_EVENT_DEV_CAP_EVENT_QOS capability.
+	 */
+	union {
+		struct rte_event_ethdev_producer {
+			uint16_t ethdev_port;
+			/**< The port identifier of the Ethernet device */
+			int32_t rx_queue_id;
+			/**< The index of the receive queue from which to
+			* retrieve the input packets and inject to eventdev.
+			* The value -1 denotes all the Rx queues configured
+			* for the given ethdev_port are selected for retrieving
+			* the input packets and then injecting the
+			* events/packets to eventdev.
+			* The rte_eth_rx_burst() result is undefined
+			* if application invokes on bounded ethdev_port and
+			* rx_queue_id.
+			*/
+		} ethdev; /* RTE_EVENT_TYPE_ETHDEV */
+		/**< Valid when event_type == RTE_EVENT_TYPE_ETHDEV.
+		 * Implementation may use mbuff's rss->hash value as
+		 * flow_id for the enqueue operation.
+		 */
+	};
+};
+
 /** Event queue configuration structure */
 struct rte_event_queue_conf {
 	uint32_t nb_atomic_flows;
@@ -544,6 +602,17 @@ struct rte_event_queue_conf {
 	 * The implementation shall normalize the requested priority to
 	 * event device supported priority value.
 	 * Valid when the device has RTE_EVENT_DEV_CAP_QUEUE_QOS capability
+	 */
+	uint16_t nb_producers;
+	/**< The number of producers to inject the events with operation as
+	 * RTE_EVENT_OP_NEW to this event queue.
+	 *
+	 * @see rte_event_queue_producer_conf RTE_EVENT_OP_NEW
+	 */
+	struct rte_event_queue_producer_conf *producers;
+	/**< Points to an array of *nb_producers* objects of type
+	 * *rte_event_queue_producer_conf* structure which contain
+	 * event queue producers configuration information.
 	 */
 };
 
@@ -590,7 +659,14 @@ rte_event_queue_default_conf_get(uint8_t dev_id, uint8_t queue_id,
  * @return
  *   - 0: Success, event queue correctly set up.
  *   - <0: event queue configuration failed
+ *   - -EDQUOT: Quota exceeded(Application tried to configure the same producer
+ *   on more than one event queue)
+ *   - -EOPNOTSUPP: Implementation is not capable of pulling the events from
+ *   the specific producer queue. On this error, application may try to
+ *   reconfigure the event queue with rx_queue_id as -1 in
+ *   struct rte_event_queue_producer_conf.
  */
+
 int
 rte_event_queue_setup(uint8_t dev_id, uint8_t queue_id,
 		      const struct rte_event_queue_conf *queue_conf);
@@ -755,13 +831,20 @@ rte_event_port_count(uint8_t dev_id);
  *
  * @param dev_id
  *   Event device identifier
+ * @param[out] fns
+ *   Block of memory to insert callback pointers into. Application must launch
+ *   these callbacks on available lcores using rte_eal_remote_launch() or
+ *   equivalent.
+ *   The caller has to allocate *RTE_MAX_LCORE * sizeof(void\*)* bytes to
+ *   store the callback pointers.
  * @return
- *   - 0: Success, device started.
+ *   - >= 0: Success, device started.
+ *   - Positive value: Number of callback pointers filled into the fns array.
  *   - -ESTALE : Not all ports of the device are configured
  *   - -ENOLINK: Not all queues are linked, which could lead to deadlock.
  */
 int
-rte_event_dev_start(uint8_t dev_id);
+rte_event_dev_start(uint8_t dev_id, lcore_function_t *fns[]);
 
 /**
  * Stop an event device. The device can be restarted with a call to
