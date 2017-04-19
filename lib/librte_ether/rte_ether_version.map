@@ -153,3 +153,10 @@ DPDK_17.05 {
 	rte_eth_find_next;
 
 } DPDK_17.02;
+
+DPDK_17.08 {
+	global:
+
+	rte_flow_isolate;
+
+} DPDK_17.05;
