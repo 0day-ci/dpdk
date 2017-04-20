@@ -456,6 +456,12 @@ Null Networking PMD
 M: Tetsuya Mukawa <mtetsuyah@gmail.com>
 F: drivers/net/null/
 
+DPAA2_SEC PMD
+M: Akhil Goyal <akhil.goyal@nxp.com>
+M: Hemant Agrawal <hemant.agrawal@nxp.com>
+F: drivers/crypto/dpaa2_sec/
+F: doc/guides/cryptodevs/dpaa2_sec.rst
+
 
 Crypto Drivers
 --------------
