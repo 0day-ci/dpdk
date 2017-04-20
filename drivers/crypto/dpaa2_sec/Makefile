@@ -1,7 +1,7 @@
 #   BSD LICENSE
 #
-#   Copyright(c) 2010-2017 Intel Corporation. All rights reserved.
-#   All rights reserved.
+#   Copyright (c) 2016 Freescale Semiconductor, Inc. All rights reserved.
+#   Copyright (c) 2016 NXP. All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or without
 #   modification, are permitted provided that the following conditions
@@ -13,7 +13,7 @@
 #       notice, this list of conditions and the following disclaimer in
 #       the documentation and/or other materials provided with the
 #       distribution.
-#     * Neither the name of Intel Corporation nor the names of its
+#     * Neither the name of Freescale Semiconductor, Inc nor the names of its
 #       contributors may be used to endorse or promote products derived
 #       from this software without specific prior written permission.
 #
@@ -31,29 +31,46 @@
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-core-libs := librte_eal librte_mbuf librte_mempool librte_ring librte_cryptodev
+#
+# library name
+#
+LIB = librte_pmd_dpaa2_sec.a
 
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_AESNI_GCM) += aesni_gcm
-DEPDIRS-aesni_gcm = $(core-libs)
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_AESNI_MB) += aesni_mb
-DEPDIRS-aesni_mb = $(core-libs)
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_ARMV8_CRYPTO) += armv8
-DEPDIRS-armv8 = $(core-libs)
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_OPENSSL) += openssl
-DEPDIRS-openssl = $(core-libs)
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_QAT) += qat
-DEPDIRS-qat = $(core-libs)
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_CRYPTO_SCHEDULER) += scheduler
-DEPDIRS-scheduler = $(core-libs) librte_kvargs librte_reorder
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_SNOW3G) += snow3g
-DEPDIRS-snow3g = $(core-libs)
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_KASUMI) += kasumi
-DEPDIRS-kasumi = $(core-libs)
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_ZUC) += zuc
-DEPDIRS-zuc = $(core-libs)
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_NULL_CRYPTO) += null
-DEPDIRS-null = $(core-libs)
-DIRS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_SEC) += dpaa2_sec
-DEPDIRS-dpaa2_sec = $(core-libs)
+# build flags
+ifeq ($(CONFIG_RTE_LIBRTE_DPAA2_SEC_DEBUG_INIT),y)
+CFLAGS += -O0 -g
+CFLAGS += "-Wno-error"
+else
+CFLAGS += -O3
+CFLAGS += $(WERROR_FLAGS)
+endif
+CFLAGS += -D _GNU_SOURCE
 
-include $(RTE_SDK)/mk/rte.subdir.mk
+CFLAGS += -I$(RTE_SDK)/drivers/crypto/dpaa2_sec/
+CFLAGS += -I$(RTE_SDK)/drivers/bus/fslmc/
+CFLAGS += -I$(RTE_SDK)/drivers/bus/fslmc/qbman/include
+CFLAGS += -I$(RTE_SDK)/drivers/bus/fslmc/mc
+CFLAGS += -I$(RTE_SDK)/drivers/bus/fslmc/portal
+CFLAGS += -I$(RTE_SDK)/drivers/mempool/dpaa2/
+CFLAGS += -I$(RTE_SDK)/lib/librte_eal/linuxapp/eal
+
+# versioning export map
+EXPORT_MAP := rte_pmd_dpaa2_sec_version.map
+
+# library version
+LIBABIVER := 1
+
+# library source files
+SRCS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_SEC) += dpaa2_sec_dpseci.c
+
+# library dependencies
+DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_SEC) += lib/librte_eal
+DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_SEC) += lib/librte_mempool lib/librte_mbuf
+DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_SEC) += lib/librte_cryptodev
+DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_SEC) += drivers/bus/fslmc
+DEPDIRS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_SEC) += drivers/mempool/dpaa2
+
+LDLIBS += -lrte_bus_fslmc
+LDLIBS += -lrte_mempool_dpaa2
+
+include $(RTE_SDK)/mk/rte.lib.mk
