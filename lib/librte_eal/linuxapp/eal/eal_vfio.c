@@ -658,7 +658,7 @@ vfio_spapr_dma_map(int vfio_container_fd)
 {
 	const struct rte_memseg *ms = rte_eal_get_physmem_layout();
 	int i, ret;
-
+	phys_addr_t io_offset;
 	struct vfio_iommu_spapr_register_memory reg = {
 		.argsz = sizeof(reg),
 		.flags = 0
@@ -702,6 +702,13 @@ vfio_spapr_dma_map(int vfio_container_fd)
 		return -1;
 	}
 
+	io_offset = create.start_addr;
+	if (io_offset) {
+		RTE_LOG(ERR, EAL, "  DMA offsets other than zero is not supported, "
+				"new window is created at %lx\n", io_offset);
+		return -1;
+	}
+
 	/* map all DPDK segments for DMA. use 1:1 PA to IOVA mapping */
 	for (i = 0; i < RTE_MAX_MEMSEG; i++) {
 		struct vfio_iommu_type1_dma_map dma_map;
@@ -723,7 +730,7 @@ vfio_spapr_dma_map(int vfio_container_fd)
 		dma_map.argsz = sizeof(struct vfio_iommu_type1_dma_map);
 		dma_map.vaddr = ms[i].addr_64;
 		dma_map.size = ms[i].len;
-		dma_map.iova = ms[i].phys_addr;
+		dma_map.iova = io_offset;
 		dma_map.flags = VFIO_DMA_MAP_FLAG_READ |
 				 VFIO_DMA_MAP_FLAG_WRITE;
 
@@ -735,6 +742,7 @@ vfio_spapr_dma_map(int vfio_container_fd)
 			return -1;
 		}
 
+		io_offset += dma_map.size;
 	}
 
 	return 0;
