@@ -36,6 +36,15 @@
 #include <pthread.h>
 
 /*
+ * on BSD, the non-std calls are in pthread_np.h,
+ * and cpuset_t has only one "_" rather than two.
+ */
+#ifdef RTE_EXEC_ENV_BSDAPP
+#include <pthread_np.h>
+#define cpu_set_t cpuset_t
+#endif
+
+/*
  * This pthread shim is an example that demonstrates how legacy code
  * that makes use of POSIX pthread services can make use of lthreads
  * with reduced porting effort.

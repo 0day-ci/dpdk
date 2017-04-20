@@ -576,15 +576,26 @@ int pthread_rwlock_wrlock(pthread_rwlock_t *a)
 	return _sys_pthread_funcs.f_pthread_rwlock_wrlock(a);
 }
 
-int pthread_yield(void)
+#ifdef RTE_EXEC_ENV_LINUXAPP
+int
+pthread_yield(void)
 {
 	if (override) {
 		lthread_yield();
 		return 0;
 	}
 	return _sys_pthread_funcs.f_pthread_yield();
-
 }
+#else
+void
+pthread_yield(void)
+{
+	if (override)
+		lthread_yield();
+	else
+		_sys_pthread_funcs.f_pthread_yield();
+}
+#endif
 
 pthread_t pthread_self(void)
 {

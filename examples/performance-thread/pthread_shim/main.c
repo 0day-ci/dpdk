@@ -59,6 +59,10 @@
 #define DEBUG_APP 0
 #define HELLOW_WORLD_MAX_LTHREADS 10
 
+#ifndef __GLIBC__ /* sched_getcpu() is glibc-specific */
+#define sched_getcpu() rte_lcore_id()
+#endif
+
 __thread int print_count;
 __thread pthread_mutex_t print_lock;
 
