@@ -175,6 +175,12 @@ New Features
   "Network Interface Controller Drivers" document for more details on this new
   driver.
 
+* **Added NXP DPAA2 SEC crypto PMD.**
+
+  A new "dpaa2_sec" hardware based crypto PMD for NXP DPAA2 devices has been
+  added. See the "Crypto Device Drivers" document for more details on this
+  driver.
+
 * **Added support for the Wind River Systems AVP PMD.**
 
   Added a new networking driver for the AVP device type. Theses devices are
