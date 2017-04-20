@@ -2520,6 +2520,19 @@ ixgbe_dev_start(struct rte_eth_dev *dev)
 	status = ixgbe_pf_reset_hw(hw);
 	if (status != 0)
 		return -1;
+
+	/* Set phy type as unknown so that PHY scan is always done */
+	hw->phy.type = ixgbe_phy_unknown;
+
+	/* Identify PHY and related function pointers */
+	status = hw->phy.ops.init(hw);
+
+	if (status == IXGBE_ERR_SFP_NOT_SUPPORTED) {
+		PMD_INIT_LOG(ERR, "Found unsupported SFP in "
+					"ixgbe_dev_start(): %d", status);
+		return -1;
+	}
+
 	hw->mac.ops.start_hw(hw);
 	hw->mac.get_link_status = true;
 
