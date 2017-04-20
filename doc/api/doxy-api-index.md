@@ -97,6 +97,7 @@ There are many libraries, so their headers may be grouped by topics:
   [LPM IPv4 route]     (@ref rte_lpm.h),
   [LPM IPv6 route]     (@ref rte_lpm6.h),
   [ACL]                (@ref rte_acl.h),
+  [flow_classify]      (@ref rte_flow_classify.h),
   [EFD]                (@ref rte_efd.h)
 
 - **QoS**:

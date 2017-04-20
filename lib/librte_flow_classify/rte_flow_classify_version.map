@@ -1,0 +1,10 @@
+DPDK_17.08 {
+	global:
+
+	rte_flow_classify_stats_get;
+	rte_flow_classify_type_get;
+	rte_flow_classify_type_reset;
+	rte_flow_classify_type_set;
+
+	local: *;
+};
