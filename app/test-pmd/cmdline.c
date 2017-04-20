@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2017 Intel Corporation. All rights reserved.
  *   Copyright(c) 2014 6WIND S.A.
  *   All rights reserved.
  *
@@ -3036,6 +3036,7 @@ cmd_vlan_offload_parsed(void *parsed_result,
 	int i, len = 0;
 	portid_t port_id = 0;
 	unsigned int tmp;
+	struct rte_port *port;
 
 	str = res->port_id;
 	len = strnlen(str, STR_TOKEN_SIZE);
@@ -3053,6 +3054,7 @@ cmd_vlan_offload_parsed(void *parsed_result,
 	if(tmp >= RTE_MAX_ETHPORTS)
 		return;
 	port_id = (portid_t)tmp;
+	port = &ports[port_id];
 
 	if (!strcmp(res->on, "on"))
 		on = 1;
@@ -3079,9 +3081,13 @@ cmd_vlan_offload_parsed(void *parsed_result,
 	}
 	else if (!strcmp(res->what, "filter"))
 		rx_vlan_filter_set(port_id, on);
-	else
+	else {
+		if (port->port_status != RTE_PORT_STOPPED) {
+			printf("Please stop port %d first\n", port_id);
+			return;
+		}
 		vlan_extend_set(port_id, on);
-
+	}
 	return;
 }
 
