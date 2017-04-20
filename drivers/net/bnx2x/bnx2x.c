@@ -9535,8 +9535,8 @@ static void bnx2x_init_rte(struct bnx2x_softc *sc)
 }
 
 #define FW_HEADER_LEN 104
-#define FW_NAME_57711 "/lib/firmware/bnx2x/bnx2x-e1h-7.2.51.0.fw"
-#define FW_NAME_57810 "/lib/firmware/bnx2x/bnx2x-e2-7.2.51.0.fw"
+#define FW_NAME_57711 "/lib/firmware/bnx2x/bnx2x-e1h-7.13.1.0.fw"
+#define FW_NAME_57810 "/lib/firmware/bnx2x/bnx2x-e2-7.12.30.0.fw"
 
 void bnx2x_load_firmware(struct bnx2x_softc *sc)
 {
