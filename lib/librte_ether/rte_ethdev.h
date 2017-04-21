@@ -902,6 +902,10 @@ struct rte_eth_conf {
 #define DEV_TX_OFFLOAD_IPIP_TNL_TSO     0x00000800    /**< Used for tunneling packet. */
 #define DEV_TX_OFFLOAD_GENEVE_TNL_TSO   0x00001000    /**< Used for tunneling packet. */
 #define DEV_TX_OFFLOAD_MACSEC_INSERT    0x00002000
+#define DEV_TX_OFFLOAD_TXQ_MT_LOCKFREE	0x00004000
+/**< Multiple threads can invoke rte_eth_tx_burst() concurrently on the same
+ * tx queue without SW lock.
+ */
 
 struct rte_pci_device;
 
