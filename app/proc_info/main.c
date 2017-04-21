@@ -189,7 +189,7 @@ proc_info_preparse_args(int argc, char **argv)
 				proc_info_usage(prgname);
 				return -1;
 			}
-			strncpy(host_id, argv[i+1], sizeof(host_id));
+			strncpy(host_id, argv[i+1], sizeof(host_id)-1);
 		}
 	}
 
