@@ -95,6 +95,8 @@ SRCS-$(CONFIG_RTE_LIBRTE_FM10K_PMD) += fm10k_common.c
 SRCS-$(CONFIG_RTE_LIBRTE_FM10K_PMD) += fm10k_mbx.c
 SRCS-$(CONFIG_RTE_LIBRTE_FM10K_PMD) += fm10k_vf.c
 SRCS-$(CONFIG_RTE_LIBRTE_FM10K_PMD) += fm10k_api.c
+ifeq ($(CONFIG_RTE_ARCH_X86_64),y)
 SRCS-$(CONFIG_RTE_LIBRTE_FM10K_INC_VECTOR) += fm10k_rxtx_vec.c
+endif
 
 include $(RTE_SDK)/mk/rte.lib.mk
