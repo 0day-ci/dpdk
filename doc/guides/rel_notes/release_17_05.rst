@@ -298,6 +298,11 @@ New Features
 
   * DES DOCSIS BPI algorithm.
 
+* **Added Device Removal Interrupt.**
+
+  * Added a new ethdev event ``RTE_ETH_DEV_INTR_RMV`` to signify the sudden removal of a device. This
+    event can be advertized by PCI drivers and enabled accordingly.
+
 
 Resolved Issues
 ---------------
@@ -458,7 +463,6 @@ API Changes
     ``rte_eth_xstats_get`` and ``rte_eth_xstats_get_names``
 
   * Added new function ``rte_eth_xstats_get_id_by_name``
-
 
 ABI Changes
 -----------
