@@ -1501,7 +1501,6 @@ qede_xmit_pkts(void *p_txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 
 		/* Fill the entry in the SW ring and the BDs in the FW ring */
 		idx = TX_PROD(txq);
-		*tx_pkts++;
 		txq->sw_tx_ring[idx].mbuf = mbuf;
 
 		/* BD1 */
