@@ -109,6 +109,18 @@ rte_ip_frag_table_create(uint32_t bucket_num, uint32_t bucket_entries,
 	return tbl;
 }
 
+/* delete fragmentation table */
+void
+rte_ip_frag_table_destroy(struct rte_ip_frag_tbl *tbl)
+{
+	uint32_t i;
+
+	for (i = 0; i < tbl->nb_entries; i++)
+		ip_frag_free_immediate(&tbl->pkt[i]);
+
+	rte_free(tbl);
+}
+
 /* dump frag table statistics to file */
 void
 rte_ip_frag_table_statistics_dump(FILE *f, const struct rte_ip_frag_tbl *tbl)
