@@ -132,6 +132,7 @@ bad=$(echo "$headlines" | grep -E --color=always \
 	-e ':.*\<numa\>' \
 	-e ':.*\<pci\>' \
 	-e ':.*\<pmd\>' \
+	-e ':.*\<rmv\>' \
 	-e ':.*\<rss\>' \
 	-e ':.*\<tso\>' \
 	-e ':.*\<[Vv]lan\>' \
