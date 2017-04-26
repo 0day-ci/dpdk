@@ -382,7 +382,7 @@ rte_mempool_populate_phys(struct rte_mempool *mp, char *vaddr,
 	if (mp->flags & MEMPOOL_F_NO_CACHE_ALIGN)
 		off = RTE_PTR_ALIGN_CEIL(vaddr, 8) - vaddr;
 	else
-		off = RTE_PTR_ALIGN_CEIL(vaddr, RTE_CACHE_LINE_SIZE) - vaddr;
+		off = RTE_PTR_ALIGN_CEIL(vaddr, mp->elt_align) - vaddr;
 
 	while (off + total_elt_sz <= len && mp->populated_size < mp->size) {
 		off += mp->header_size;
@@ -392,6 +392,7 @@ rte_mempool_populate_phys(struct rte_mempool *mp, char *vaddr,
 		else
 			mempool_add_elem(mp, (char *)vaddr + off, paddr + off);
 		off += mp->elt_size + mp->trailer_size;
+		off = RTE_ALIGN_CEIL(off, mp->elt_align);
 		i++;
 	}
 
@@ -508,6 +509,20 @@ rte_mempool_populate_virt(struct rte_mempool *mp, char *addr,
 	return ret;
 }
 
+static uint32_t
+mempool_default_elt_aligment(void)
+{
+	uint32_t align;
+	if (rte_xen_dom0_supported()) {
+		   align = RTE_PGSIZE_2M;;
+	} else if (rte_eal_has_hugepages()) {
+		   align = RTE_CACHE_LINE_SIZE;
+	} else {
+		   align = getpagesize();
+	}
+	return align;
+}
+
 /* Default function to populate the mempool: allocate memory in memzones,
  * and populate them. Return the number of objects added, or a negative
  * value on error.
@@ -518,7 +533,7 @@ rte_mempool_populate_default(struct rte_mempool *mp)
 	int mz_flags = RTE_MEMZONE_1GB|RTE_MEMZONE_SIZE_HINT_ONLY;
 	char mz_name[RTE_MEMZONE_NAMESIZE];
 	const struct rte_memzone *mz;
-	size_t size, total_elt_sz, align, pg_sz, pg_shift;
+	size_t size, total_elt_sz, pg_sz, pg_shift;
 	phys_addr_t paddr;
 	unsigned mz_id, n;
 	int ret;
@@ -530,15 +545,12 @@ rte_mempool_populate_default(struct rte_mempool *mp)
 	if (rte_xen_dom0_supported()) {
 		pg_sz = RTE_PGSIZE_2M;
 		pg_shift = rte_bsf32(pg_sz);
-		align = pg_sz;
 	} else if (rte_eal_has_hugepages()) {
 		pg_shift = 0; /* not needed, zone is physically contiguous */
 		pg_sz = 0;
-		align = RTE_CACHE_LINE_SIZE;
 	} else {
 		pg_sz = getpagesize();
 		pg_shift = rte_bsf32(pg_sz);
-		align = pg_sz;
 	}
 
 	total_elt_sz = mp->header_size + mp->elt_size + mp->trailer_size;
@@ -553,11 +565,11 @@ rte_mempool_populate_default(struct rte_mempool *mp)
 		}
 
 		mz = rte_memzone_reserve_aligned(mz_name, size,
-			mp->socket_id, mz_flags, align);
+			mp->socket_id, mz_flags, mp->elt_align);
 		/* not enough memory, retry with the biggest zone we have */
 		if (mz == NULL)
 			mz = rte_memzone_reserve_aligned(mz_name, 0,
-				mp->socket_id, mz_flags, align);
+				mp->socket_id, mz_flags, mp->elt_align);
 		if (mz == NULL) {
 			ret = -rte_errno;
 			goto fail;
@@ -827,6 +839,7 @@ rte_mempool_create_empty(const char *name, unsigned n, unsigned elt_size,
 	/* Size of default caches, zero means disabled. */
 	mp->cache_size = cache_size;
 	mp->private_data_size = private_data_size;
+	mp->elt_align = mempool_default_elt_aligment();
 	STAILQ_INIT(&mp->elt_list);
 	STAILQ_INIT(&mp->mem_list);
 

@@ -245,6 +245,7 @@ struct rte_mempool {
 	 * this mempool.
 	 */
 	int32_t ops_index;
+	uint32_t elt_align;
 
 	struct rte_mempool_cache *local_cache; /**< Per-lcore local cache */
 
