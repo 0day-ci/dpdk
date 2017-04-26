@@ -469,6 +469,14 @@ port_infos_display(portid_t port_id)
 	print_ethaddr("MAC address: ", &mac_addr);
 	printf("\nDriver name: %s", dev_info.driver_name);
 	printf("\nConnect to socket: %u", port->socket_id);
+	if (dev_info.pci_dev)
+		printf("\nBus-info: %04x:%02x:%02x:%x",
+			dev_info.pci_dev->addr.domain,
+			dev_info.pci_dev->addr.bus,
+			dev_info.pci_dev->addr.devid,
+			dev_info.pci_dev->addr.function);
+	else
+		printf("\nBus-info: N/A");
 
 	if (port_numa[port_id] != NUMA_NO_CONFIG) {
 		mp = mbuf_pool_find(port_numa[port_id]);
