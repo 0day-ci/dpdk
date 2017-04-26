@@ -543,6 +543,12 @@ init_config(void)
 		fwd_lcores[lc_id]->cpuid_idx = lc_id;
 	}
 
+	if (numa_support) {
+		memset(port_numa, NUMA_NO_CONFIG, RTE_MAX_ETHPORTS);
+		memset(rxring_numa, NUMA_NO_CONFIG, RTE_MAX_ETHPORTS);
+		memset(txring_numa, NUMA_NO_CONFIG, RTE_MAX_ETHPORTS);
+	}
+
 	/*
 	 * Create pools of mbuf.
 	 * If NUMA support is disabled, create a single pool of mbuf in
