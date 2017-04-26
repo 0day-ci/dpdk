@@ -9535,8 +9535,11 @@ static void bnx2x_init_rte(struct bnx2x_softc *sc)
 }
 
 #define FW_HEADER_LEN 104
-#define FW_NAME_57711 "/lib/firmware/bnx2x/bnx2x-e1h-7.2.51.0.fw"
-#define FW_NAME_57810 "/lib/firmware/bnx2x/bnx2x-e2-7.2.51.0.fw"
+#define FW_NAME_57711_MIN "/lib/firmware/bnx2x/bnx2x-e1h-7.8.17.0.fw"
+#define FW_NAME_57810_MIN "/lib/firmware/bnx2x/bnx2x-e2-7.8.17.0.fw"
+#define FW_NAME_57711 "/lib/firmware/bnx2x/bnx2x-e1h-7.13.1.0.fw"
+#define FW_NAME_57810 "/lib/firmware/bnx2x/bnx2x-e2-7.13.1.0.fw"
+
 
 void bnx2x_load_firmware(struct bnx2x_softc *sc)
 {
@@ -9547,6 +9550,11 @@ void bnx2x_load_firmware(struct bnx2x_softc *sc)
 	fwname = sc->devinfo.device_id == CHIP_NUM_57711
 		? FW_NAME_57711 : FW_NAME_57810;
 	f = open(fwname, O_RDONLY);
+	if (f < 0) {
+		fwname = sc->devinfo.device_id == CHIP_NUM_57711
+			? FW_NAME_57711_MIN : FW_NAME_57810_MIN;
+		f = open(fwname, O_RDONLY);
+	}
 	if (f < 0) {
 		PMD_DRV_LOG(NOTICE, "Can't open firmware file");
 		return;
