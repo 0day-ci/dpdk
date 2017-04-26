@@ -652,9 +652,11 @@ struct rte_flow_item_mpls {
 };
 
 /** Default mask for RTE_FLOW_ITEM_TYPE_MPLS. */
+#ifndef __cplusplus
 static const struct rte_flow_item_mpls rte_flow_item_mpls_mask = {
 	.label_tc_s = "\xff\xff\xf0",
 };
+#endif
 
 /**
  * RTE_FLOW_ITEM_TYPE_GRE.
@@ -671,9 +673,11 @@ struct rte_flow_item_gre {
 };
 
 /** Default mask for RTE_FLOW_ITEM_TYPE_GRE. */
+#ifndef __cplusplus
 static const struct rte_flow_item_gre rte_flow_item_gre_mask = {
 	.protocol = 0xffff,
 };
+#endif
 
 /**
  * Matching pattern item definition.
