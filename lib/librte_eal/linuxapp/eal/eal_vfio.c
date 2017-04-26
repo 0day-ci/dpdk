@@ -702,6 +702,13 @@ vfio_spapr_dma_map(int vfio_container_fd)
 		return -1;
 	}
 
+	if (create.start_addr) {
+		RTE_LOG(ERR, EAL,
+			"  DMA offsets other than zero is not supported, "
+			"new window is created at %lx\n", create.start_addr);
+		return -1;
+	}
+
 	/* map all DPDK segments for DMA. use 1:1 PA to IOVA mapping */
 	for (i = 0; i < RTE_MAX_MEMSEG; i++) {
 		struct vfio_iommu_type1_dma_map dma_map;
@@ -734,7 +741,6 @@ vfio_spapr_dma_map(int vfio_container_fd)
 				"error %i (%s)\n", errno, strerror(errno));
 			return -1;
 		}
-
 	}
 
 	return 0;
