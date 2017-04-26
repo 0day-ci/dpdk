@@ -887,6 +887,8 @@ bond_mode_8023ad_activate_slave(struct rte_eth_dev *bond_dev, uint8_t slave_id)
 	RTE_ASSERT(port->rx_ring == NULL);
 	RTE_ASSERT(port->tx_ring == NULL);
 	socket_id = rte_eth_devices[slave_id].data->numa_node;
+	if (socket_id == (uint8_t)LCORE_ID_ANY)
+		socket_id = 0;
 
 	element_size = sizeof(struct slow_protocol_frame) +
 				RTE_PKTMBUF_HEADROOM;
