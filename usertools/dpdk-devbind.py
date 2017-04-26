@@ -86,7 +86,8 @@ Options:
         Display usage information and quit
 
     -s, --status:
-        Print the current status of all known network and crypto devices.
+        Print the current status of all known devices in a device group.
+        Device group selected by --type (-t) argument.
         For each device, it displays the PCI domain, bus, slot and function,
         along with a text description of the device. Depending upon whether the
         device is being used by a kernel driver, the igb_uio driver, or no
@@ -98,6 +99,11 @@ Options:
         NOTE: if this flag is passed along with a bind/unbind option, the
         status display will always occur after the other operations have taken
         place.
+
+    -t, --type:
+        Select device group to print status.
+        Device group can be network, crypto, eventdev or mempool.
+        Type argument can be emitted, by default "network" group used.
 
     -b driver, --bind=driver:
         Select the driver to use or \"none\" to unbind the device
@@ -598,26 +604,34 @@ def show_status():
     Displays to the user what devices are bound to the igb_uio driver, the
     kernel driver or to no driver'''
 
-    show_device_status(network_devices, "Network")
-    show_device_status(crypto_devices, "Crypto")
-    show_device_status(eventdev_devices, "Eventdev")
-    show_device_status(mempool_devices, "Mempool")
+    if status_type == "crypto":
+        show_device_status(crypto_devices, "Crypto")
+    elif status_type == "event":
+        show_device_status(eventdev_devices, "Eventdev")
+    elif status_type == "mempool":
+        show_device_status(mempool_devices, "Mempool")
+    else:
+        show_device_status(network_devices, "Network")
 
 def parse_args():
     '''Parses the command-line arguments given by the user and takes the
     appropriate action for each'''
     global b_flag
     global status_flag
+    global status_type
     global force_flag
     global args
     if len(sys.argv) <= 1:
         usage()
         sys.exit(0)
 
+    # set default status device type
+    status_type = "net"
+
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "b:us",
+        opts, args = getopt.getopt(sys.argv[1:], "b:ust:",
                                    ["help", "usage", "status", "force",
-                                    "bind=", "unbind"])
+                                    "bind=", "unbind", "type="])
     except getopt.GetoptError as error:
         print(str(error))
         print("Run '%s --usage' for further information" % sys.argv[0])
@@ -627,6 +641,8 @@ def parse_args():
         if opt == "--help" or opt == "--usage":
             usage()
             sys.exit(0)
+        if opt == "--type" or opt == "-t":
+                status_type = arg
         if opt == "--status" or opt == "-s":
             status_flag = True
         if opt == "--force":
