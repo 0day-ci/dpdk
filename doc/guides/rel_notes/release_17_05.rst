@@ -454,6 +454,8 @@ API Changes
 
   * Added new functions ``rte_eth_xstats_get_by_id`` and ``rte_eth_xstats_get_names_by_id``
 
+  * Added new function ``rte_eth_xstats_get_id_by_name``
+
 
 ABI Changes
 -----------
