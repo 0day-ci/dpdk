@@ -450,6 +450,10 @@ API Changes
   * The vhost public header file ``rte_virtio_net.h`` is renamed to
     ``rte_vhost.h``
 
+* **Reworked rte_ethdev library**
+
+  * Added new functions ``rte_eth_xstats_get_by_id`` and ``rte_eth_xstats_get_names_by_id``
+
 
 ABI Changes
 -----------
