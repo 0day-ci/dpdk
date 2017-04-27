@@ -188,7 +188,7 @@ rte_eth_dev_allocated(const char *name)
 static uint8_t
 rte_eth_dev_find_free_port(void)
 {
-	unsigned i;
+	unsigned int i;
 
 	for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
 		if (rte_eth_devices[i].state == RTE_ETH_DEV_UNUSED)
