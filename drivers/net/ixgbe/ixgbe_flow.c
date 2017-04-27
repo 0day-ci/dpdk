@@ -142,6 +142,8 @@ cons_parse_ntuple_filter(const struct rte_flow_attr *attr,
 	const struct rte_flow_item_tcp *tcp_mask;
 	const struct rte_flow_item_udp *udp_spec;
 	const struct rte_flow_item_udp *udp_mask;
+	const struct rte_flow_item_sctp *sctp_spec;
+	const struct rte_flow_item_sctp *sctp_mask;
 	uint32_t index;
 
 	if (!pattern) {
@@ -319,7 +321,7 @@ cons_parse_ntuple_filter(const struct rte_flow_attr *attr,
 		filter->dst_port  = tcp_spec->hdr.dst_port;
 		filter->src_port  = tcp_spec->hdr.src_port;
 		filter->tcp_flags = tcp_spec->hdr.tcp_flags;
-	} else {
+	} else if (item->type == RTE_FLOW_ITEM_TYPE_UDP) {
 		udp_mask = (const struct rte_flow_item_udp *)item->mask;
 
 		/**
@@ -342,6 +344,29 @@ cons_parse_ntuple_filter(const struct rte_flow_attr *attr,
 		udp_spec = (const struct rte_flow_item_udp *)item->spec;
 		filter->dst_port = udp_spec->hdr.dst_port;
 		filter->src_port = udp_spec->hdr.src_port;
+	} else {
+		sctp_mask = (const struct rte_flow_item_sctp *)item->mask;
+
+		/**
+		 * Only support src & dst ports,
+		 * others should be masked.
+		 */
+		if (sctp_mask->hdr.tag ||
+		    sctp_mask->hdr.cksum) {
+			memset(filter, 0,
+				sizeof(struct rte_eth_ntuple_filter));
+			rte_flow_error_set(error, EINVAL,
+				RTE_FLOW_ERROR_TYPE_ITEM,
+				item, "Not supported by ntuple filter");
+			return -rte_errno;
+		}
+
+		filter->dst_port_mask = sctp_mask->hdr.dst_port;
+		filter->src_port_mask = sctp_mask->hdr.src_port;
+
+		sctp_spec = (const struct rte_flow_item_sctp *)item->spec;
+		filter->dst_port = sctp_spec->hdr.dst_port;
+		filter->src_port = sctp_spec->hdr.src_port;
 	}
 
 	/* check if the next not void item is END */
