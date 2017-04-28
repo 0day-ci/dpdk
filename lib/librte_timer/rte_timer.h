@@ -117,7 +117,7 @@ struct rte_timer;
 /**
  * Callback function type for timer expiry.
  */
-typedef void (*rte_timer_cb_t)(struct rte_timer *, void *);
+typedef void (*rte_timer_cb_t)(struct rte_timer *, unsigned int count, void *);
 
 #define MAX_SKIPLIST_DEPTH 10
 

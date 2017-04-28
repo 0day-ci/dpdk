@@ -437,7 +437,9 @@ static inline void _lthread_resume(struct lthread *lt)
  * Handle sleep timer expiry
 */
 void
-_sched_timer_cb(struct rte_timer *tim, void *arg)
+_sched_timer_cb(struct rte_timer *tim,
+		unsigned int count __rte_unused,
+		void *arg)
 {
 	struct lthread *lt = (struct lthread *) arg;
 	uint64_t state = lt->state;

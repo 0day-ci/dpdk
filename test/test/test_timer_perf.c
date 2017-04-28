@@ -48,7 +48,9 @@
 int outstanding_count = 0;
 
 static void
-timer_cb(struct rte_timer *t __rte_unused, void *param __rte_unused)
+timer_cb(struct rte_timer *t __rte_unused,
+		unsigned int count __rte_unused,
+		void *param __rte_unused)
 {
 	outstanding_count--;
 }

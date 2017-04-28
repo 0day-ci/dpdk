@@ -65,7 +65,8 @@ static volatile unsigned stop_slaves;
 static int reload_timer(struct rte_timer *tim);
 
 static void
-timer_cb(struct rte_timer *tim, void *arg __rte_unused)
+timer_cb(struct rte_timer *tim, unsigned int count __rte_unused,
+		void *arg __rte_unused)
 {
 	/* Simulate slow callback function, 100 us. */
 	rte_delay_us(100);

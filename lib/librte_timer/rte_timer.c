@@ -590,7 +590,14 @@ void rte_timer_manage(void)
 		priv_timer[lcore_id].running_tim = tim;
 
 		/* execute callback function with list unlocked */
-		tim->f(tim, tim->arg);
+		if (tim->period == 0)
+			tim->f(tim, 1, tim->arg);
+		else {
+			/* for periodic check how many expiries we have */
+			uint64_t over_time = cur_time - tim->expire;
+			unsigned int extra_expiries = over_time / tim->period;
+			tim->f(tim, 1 + extra_expiries, tim->arg);
+		}
 
 		__TIMER_STAT_ADD(pending, -1);
 		/* the timer was stopped or reloaded by the callback

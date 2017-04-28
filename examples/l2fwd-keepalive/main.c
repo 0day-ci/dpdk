@@ -144,8 +144,9 @@ struct rte_keepalive *rte_global_keepalive_info;
 
 /* Print out statistics on packets dropped */
 static void
-print_stats(__attribute__((unused)) struct rte_timer *ptr_timer,
-	__attribute__((unused)) void *ptr_data)
+print_stats(__rte_unused struct rte_timer *ptr_timer,
+		__rte_unused unsigned int count,
+		__rte_unused void *ptr_data)
 {
 	uint64_t total_packets_dropped, total_packets_tx, total_packets_rx;
 	unsigned portid;
@@ -748,8 +749,7 @@ main(int argc, char **argv)
 				(check_period * rte_get_timer_hz()) / 1000,
 				PERIODICAL,
 				rte_lcore_id(),
-				(void(*)(struct rte_timer*, void*))
-				&rte_keepalive_dispatch_pings,
+				(void *)&rte_keepalive_dispatch_pings,
 				rte_global_keepalive_info
 				) != 0 )
 			rte_exit(EXIT_FAILURE, "Keepalive setup failure.\n");

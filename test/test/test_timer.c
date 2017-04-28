@@ -153,7 +153,8 @@ struct mytimerinfo {
 
 static struct mytimerinfo mytiminfo[NB_TIMER];
 
-static void timer_basic_cb(struct rte_timer *tim, void *arg);
+static void
+timer_basic_cb(struct rte_timer *tim, unsigned int count, void *arg);
 
 static void
 mytimer_reset(struct mytimerinfo *timinfo, uint64_t ticks,
@@ -167,6 +168,7 @@ mytimer_reset(struct mytimerinfo *timinfo, uint64_t ticks,
 /* timer callback for stress tests */
 static void
 timer_stress_cb(__attribute__((unused)) struct rte_timer *tim,
+		__attribute__((unused)) unsigned int count,
 		__attribute__((unused)) void *arg)
 {
 	long r;
@@ -293,9 +295,11 @@ static volatile int cb_count = 0;
 /* callback for second stress test. will only be called
  * on master lcore */
 static void
-timer_stress2_cb(struct rte_timer *tim __rte_unused, void *arg __rte_unused)
+timer_stress2_cb(struct rte_timer *tim __rte_unused,
+		unsigned int count,
+		void *arg __rte_unused)
 {
-	cb_count++;
+	cb_count += count;
 }
 
 #define NB_STRESS2_TIMERS 8192
@@ -430,7 +434,7 @@ cleanup:
 
 /* timer callback for basic tests */
 static void
-timer_basic_cb(struct rte_timer *tim, void *arg)
+timer_basic_cb(struct rte_timer *tim, unsigned int count, void *arg)
 {
 	struct mytimerinfo *timinfo = arg;
 	uint64_t hz = rte_get_timer_hz();
@@ -440,7 +444,7 @@ timer_basic_cb(struct rte_timer *tim, void *arg)
 	if (rte_timer_pending(tim))
 		return;
 
-	timinfo->count ++;
+	timinfo->count += count;
 
 	RTE_LOG(INFO, TESTTIMER,
 		"%"PRIu64": callback id=%u count=%u on core %u\n",
