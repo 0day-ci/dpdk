@@ -2688,7 +2688,7 @@ i40evf_dev_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 	struct i40e_vf *vf = I40EVF_DEV_PRIVATE_TO_VF(dev->data->dev_private);
 	struct rte_eth_dev_data *dev_data = vf->dev_data;
 	uint32_t frame_size = mtu + ETHER_HDR_LEN
-			      + ETHER_CRC_LEN + I40E_VLAN_TAG_SIZE;
+			      + ETHER_CRC_LEN + I40E_VLAN_TAG_SIZE * 2;
 	int ret = 0;
 
 	/* check if mtu is within the allowed range */
