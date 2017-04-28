@@ -81,3 +81,6 @@ Deprecation Notices
 
   - ``rte_crpytodev_scheduler_mode_get``, replaced by ``rte_cryptodev_scheduler_mode_get``
   - ``rte_crpytodev_scheduler_mode_set``, replaced by ``rte_cryptodev_scheduler_mode_set``
+
+* cryptodev: the structures ``rte_crypto_op``, ``rte_crypto_sym_op`` and ``rte_crypto_sym_xform``
+  will be restructured in 17.08, for correctness and improvement.
