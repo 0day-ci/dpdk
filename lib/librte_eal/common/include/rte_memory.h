@@ -98,7 +98,8 @@ enum rte_page_sizes {
  */
 #define __rte_cache_min_aligned __rte_aligned(RTE_CACHE_LINE_MIN_SIZE)
 
-typedef uint64_t phys_addr_t; /**< Physical address definition. */
+/** Physical address definition. */
+typedef uint64_t phys_addr_t __rte_aligned(sizeof(uint64_t));
 #define RTE_BAD_PHYS_ADDR ((phys_addr_t)-1)
 
 /**
