@@ -316,35 +316,6 @@ struct rte_crypto_auth_xform {
 	 * by *rte_cryptodev_sym_session_create* or by the
 	 * *rte_cryptodev_sym_enqueue_burst* if using session-less APIs.
 	 */
-
-	uint32_t add_auth_data_length;
-	/**< The length of the additional authenticated data (AAD) in bytes.
-	 * The maximum permitted value is 240 bytes, unless otherwise specified
-	 * below.
-	 *
-	 * This field must be specified when the hash algorithm is one of the
-	 * following:
-	 *
-	 * - For SNOW 3G (@ref RTE_CRYPTO_AUTH_SNOW3G_UIA2), this is the
-	 *   length of the IV (which should be 16).
-	 *
-	 * - For GCM (@ref RTE_CRYPTO_AUTH_AES_GCM).  In this case, this is
-	 *   the length of the Additional Authenticated Data (called A, in NIST
-	 *   SP800-38D).
-	 *
-	 * - For CCM (@ref RTE_CRYPTO_AUTH_AES_CCM).  In this case, this is
-	 *   the length of the associated data (called A, in NIST SP800-38C).
-	 *   Note that this does NOT include the length of any padding, or the
-	 *   18 bytes reserved at the start of the above field to store the
-	 *   block B0 and the encoded length.  The maximum permitted value in
-	 *   this case is 222 bytes.
-	 *
-	 * @note
-	 *  For AES-GMAC (@ref RTE_CRYPTO_AUTH_AES_GMAC) mode of operation
-	 *  this field is not used and should be set to 0. Instead the length
-	 *  of the AAD data is specified in additional authentication data
-	 *  length field of the rte_crypto_sym_op_data structure
-	 */
 };
 
 /** Crypto transformation types */
@@ -366,8 +337,8 @@ enum rte_crypto_sym_xform_type {
 struct rte_crypto_sym_xform {
 	struct rte_crypto_sym_xform *next;
 	/**< next xform in chain */
-	enum rte_crypto_sym_xform_type type
-	; /**< xform type */
+	enum rte_crypto_sym_xform_type type;
+	/**< xform type */
 	RTE_STD_C11
 	union {
 		struct rte_crypto_auth_xform auth;
@@ -375,18 +346,8 @@ struct rte_crypto_sym_xform {
 		struct rte_crypto_cipher_xform cipher;
 		/**< Cipher xform */
 	};
+	uint32_t iv_length;
 };
-
-/**
- * Crypto operation session type. This is used to specify whether a crypto
- * operation has session structure attached for immutable parameters or if all
- * operation information is included in the operation data structure.
- */
-enum rte_crypto_sym_op_sess_type {
-	RTE_CRYPTO_SYM_OP_WITH_SESSION,	/**< Session based crypto operation */
-	RTE_CRYPTO_SYM_OP_SESSIONLESS	/**< Session-less crypto operation */
-};
-
 
 struct rte_cryptodev_sym_session;
 
@@ -424,8 +385,6 @@ struct rte_crypto_sym_op {
 	struct rte_mbuf *m_src;	/**< source mbuf */
 	struct rte_mbuf *m_dst;	/**< destination mbuf */
 
-	enum rte_crypto_sym_op_sess_type sess_type;
-
 	RTE_STD_C11
 	union {
 		struct rte_cryptodev_sym_session *session;
@@ -434,6 +393,157 @@ struct rte_crypto_sym_op {
 		/**< Session-less API crypto operation parameters */
 	};
 
+	struct {
+		uint8_t offset;
+		/**< Initialisation Vector or Counter.
+		 *
+		 * - For block ciphers in CBC or F8 mode, or for KASUMI
+		 * in F8 mode, or for SNOW 3G in UEA2 mode, this is the
+		 * Initialisation Vector (IV) value.
+		 *
+		 * - For block ciphers in CTR mode, this is the counter.
+		 *
+		 * - For GCM mode, this is either the IV (if the length
+		 * is 96 bits) or J0 (for other sizes), where J0 is as
+		 * defined by NIST SP800-38D. Regardless of the IV
+		 * length, a full 16 bytes needs to be allocated.
+		 *
+		 * - For CCM mode, the first byte is reserved, and the
+		 * nonce should be written starting at &iv[1] (to allow
+		 * space for the implementation to write in the flags
+		 * in the first byte). Note that a full 16 bytes should
+		 * be allocated, even though the length field will
+		 * have a value less than this.
+		 *
+		 * - For AES-XTS, this is the 128bit tweak, i, from
+		 * IEEE Std 1619-2007.
+		 * 
+		 * This offset is in bytes from the start of the crypto op.
+		 * For optimum performance, the data pointed to SHOULD
+		 * be 8-byte aligned.
+		 */
+	} iv;	/**< Initialisation vector parameters (length is fixed in session) */
+
+	struct {
+		union {
+			struct {
+				uint32_t offset;
+				 /**< Starting point for hash processing, specified as
+				  * number of bytes from start of packet in source
+				  * buffer.
+				  *
+				  * @note
+				  * For CCM and GCM modes of operation, this field is
+				  * ignored. The field @ref aad field
+				  * should be set instead.
+				  *
+				  * @note For AES-GMAC (@ref RTE_CRYPTO_AUTH_AES_GMAC)
+				  * mode of operation, this field is set to 0. aad data
+				  * pointer of rte_crypto_sym_op_data structure is
+				  * used instead
+				  *
+				  * @note
+				  * For SNOW 3G @ RTE_CRYPTO_AUTH_SNOW3G_UIA2,
+				  * KASUMI @ RTE_CRYPTO_AUTH_KASUMI_F9
+				  * and ZUC @ RTE_CRYPTO_AUTH_ZUC_EIA3,
+				  * this field should be in bits.
+				  */
+
+				uint32_t length;
+				 /**< The message length, in bytes, of the source
+				  * buffer that the hash will be computed on.
+				  *
+				  * @note
+				  * For CCM and GCM modes of operation, this field is
+				  * ignored. The field @ref aad field should be set
+				  * instead.
+				  *
+				  * @note
+				  * For AES-GMAC @ref RTE_CRYPTO_AUTH_AES_GMAC mode
+				  * of operation, this field is set to 0.
+				  * Auth.aad.length is used instead.
+				  *
+				  * @note
+				  * For SNOW 3G @ RTE_CRYPTO_AUTH_SNOW3G_UIA2,
+				  * KASUMI @ RTE_CRYPTO_AUTH_KASUMI_F9
+				  * and ZUC @ RTE_CRYPTO_AUTH_ZUC_EIA3,
+				  * this field should be in bits.
+				  */
+			} data; /**< Data offsets and length for authentication */
+			struct {
+				uint32_t length;	/**< Length of AAD */
+				uint8_t *data;
+				/**< Pointer to Additional Authenticated Data (AAD)
+				 * needed for authenticated cipher mechanisms (CCM and
+				 * GCM)
+				 *
+				 * The length of the data pointed to by this field is
+				 * set up for the session in the @ref
+				 * rte_crypto_auth_xform structure as part of the @ref
+				 * rte_cryptodev_sym_session_create function call.
+				 * This length must not exceed 240 bytes.
+				 *
+				 * Specifically for CCM (@ref RTE_CRYPTO_AUTH_AES_CCM),
+				 * the caller should setup this field as follows:
+				 *
+				 * - the nonce should be written starting at an offset
+				 * of one byte into the array, leaving room for the
+				 * implementation to write in the flags to the first
+				 *  byte.
+				 *
+				 * - the additional  authentication data itself should
+				 * be written starting at an offset of 18 bytes into
+				 * the array, leaving room for the length encoding in
+				 * the first two bytes of the second block.
+				 *
+				 * - the array should be big enough to hold the above
+				 *  fields, plus any padding to round this up to the
+				 *  nearest multiple of the block size (16 bytes).
+				 *  Padding will be added by the implementation.
+				 *
+				 * Finally, for GCM (@ref RTE_CRYPTO_AUTH_AES_GCM), the
+				 * caller should setup this field as follows:
+				 *
+				 * - the AAD is written in starting at byte 0
+				 * - the array must be big enough to hold the AAD, plus
+				 * any space to round this up to the nearest multiple
+				 * of the block size (16 bytes).
+				 *
+				 * @note
+				 * For AES-GMAC (@ref RTE_CRYPTO_AUTH_AES_GMAC) mode of
+				 * operation, this field is used to pass plaintext.
+				 */
+				phys_addr_t phys_addr;	/**< physical address */
+			} aad;
+			/**< Additional authentication parameters (for AEAD operations only) */
+		};
+
+		struct {
+			uint8_t *data;
+			/**< This points to the location where the digest result
+			 * should be inserted (in the case of digest generation)
+			 * or where the purported digest exists (in the case of
+			 * digest verification).
+			 *
+			 * At session creation time, the client specified the
+			 * digest result length with the digest_length member
+			 * of the @ref rte_crypto_auth_xform structure. For
+			 * physical crypto devices the caller must allocate at
+			 * least digest_length of physically contiguous memory
+			 * at this location.
+			 *
+			 * For digest generation, the digest result will
+			 * overwrite any data at this location.
+			 *
+			 * @note
+			 * For GCM (@ref RTE_CRYPTO_AUTH_AES_GCM), for
+			 * "digest result" read "authentication tag T".
+			 */
+			phys_addr_t phys_addr;
+			/**< Physical address of digest */
+		} digest; /**< Digest parameters (length is fixed in session) */
+
+	} auth;
 	struct {
 		struct {
 			uint32_t offset;
@@ -477,179 +587,11 @@ struct rte_crypto_sym_op {
 			  */
 		} data; /**< Data offsets and length for ciphering */
 
-		struct {
-			uint8_t *data;
-			/**< Initialisation Vector or Counter.
-			 *
-			 * - For block ciphers in CBC or F8 mode, or for KASUMI
-			 * in F8 mode, or for SNOW 3G in UEA2 mode, this is the
-			 * Initialisation Vector (IV) value.
-			 *
-			 * - For block ciphers in CTR mode, this is the counter.
-			 *
-			 * - For GCM mode, this is either the IV (if the length
-			 * is 96 bits) or J0 (for other sizes), where J0 is as
-			 * defined by NIST SP800-38D. Regardless of the IV
-			 * length, a full 16 bytes needs to be allocated.
-			 *
-			 * - For CCM mode, the first byte is reserved, and the
-			 * nonce should be written starting at &iv[1] (to allow
-			 * space for the implementation to write in the flags
-			 * in the first byte). Note that a full 16 bytes should
-			 * be allocated, even though the length field will
-			 * have a value less than this.
-			 *
-			 * - For AES-XTS, this is the 128bit tweak, i, from
-			 * IEEE Std 1619-2007.
-			 *
-			 * For optimum performance, the data pointed to SHOULD
-			 * be 8-byte aligned.
-			 */
-			phys_addr_t phys_addr;
-			uint16_t length;
-			/**< Length of valid IV data.
-			 *
-			 * - For block ciphers in CBC or F8 mode, or for KASUMI
-			 * in F8 mode, or for SNOW 3G in UEA2 mode, this is the
-			 * length of the IV (which must be the same as the
-			 * block length of the cipher).
-			 *
-			 * - For block ciphers in CTR mode, this is the length
-			 * of the counter (which must be the same as the block
-			 * length of the cipher).
-			 *
-			 * - For GCM mode, this is either 12 (for 96-bit IVs)
-			 * or 16, in which case data points to J0.
-			 *
-			 * - For CCM mode, this is the length of the nonce,
-			 * which can be in the range 7 to 13 inclusive.
-			 */
-		} iv;	/**< Initialisation vector parameters */
 	} cipher;
 
-	struct {
-		struct {
-			uint32_t offset;
-			 /**< Starting point for hash processing, specified as
-			  * number of bytes from start of packet in source
-			  * buffer.
-			  *
-			  * @note
-			  * For CCM and GCM modes of operation, this field is
-			  * ignored. The field @ref aad field
-			  * should be set instead.
-			  *
-			  * @note For AES-GMAC (@ref RTE_CRYPTO_AUTH_AES_GMAC)
-			  * mode of operation, this field is set to 0. aad data
-			  * pointer of rte_crypto_sym_op_data structure is
-			  * used instead
-			  *
-			  * @note
-			  * For SNOW 3G @ RTE_CRYPTO_AUTH_SNOW3G_UIA2,
-			  * KASUMI @ RTE_CRYPTO_AUTH_KASUMI_F9
-			  * and ZUC @ RTE_CRYPTO_AUTH_ZUC_EIA3,
-			  * this field should be in bits.
-			  */
-
-			uint32_t length;
-			 /**< The message length, in bytes, of the source
-			  * buffer that the hash will be computed on.
-			  *
-			  * @note
-			  * For CCM and GCM modes of operation, this field is
-			  * ignored. The field @ref aad field should be set
-			  * instead.
-			  *
-			  * @note
-			  * For AES-GMAC @ref RTE_CRYPTO_AUTH_AES_GMAC mode
-			  * of operation, this field is set to 0.
-			  * Auth.aad.length is used instead.
-			  *
-			  * @note
-			  * For SNOW 3G @ RTE_CRYPTO_AUTH_SNOW3G_UIA2,
-			  * KASUMI @ RTE_CRYPTO_AUTH_KASUMI_F9
-			  * and ZUC @ RTE_CRYPTO_AUTH_ZUC_EIA3,
-			  * this field should be in bits.
-			  */
-		} data; /**< Data offsets and length for authentication */
-
-		struct {
-			uint8_t *data;
-			/**< This points to the location where the digest result
-			 * should be inserted (in the case of digest generation)
-			 * or where the purported digest exists (in the case of
-			 * digest verification).
-			 *
-			 * At session creation time, the client specified the
-			 * digest result length with the digest_length member
-			 * of the @ref rte_crypto_auth_xform structure. For
-			 * physical crypto devices the caller must allocate at
-			 * least digest_length of physically contiguous memory
-			 * at this location.
-			 *
-			 * For digest generation, the digest result will
-			 * overwrite any data at this location.
-			 *
-			 * @note
-			 * For GCM (@ref RTE_CRYPTO_AUTH_AES_GCM), for
-			 * "digest result" read "authentication tag T".
-			 */
-			phys_addr_t phys_addr;
-			/**< Physical address of digest */
-			uint16_t length;
-			/**< Length of digest */
-		} digest; /**< Digest parameters */
-
-		struct {
-			uint8_t *data;
-			/**< Pointer to Additional Authenticated Data (AAD)
-			 * needed for authenticated cipher mechanisms (CCM and
-			 * GCM), and to the IV for SNOW 3G authentication
-			 * (@ref RTE_CRYPTO_AUTH_SNOW3G_UIA2). For other
-			 * authentication mechanisms this pointer is ignored.
-			 *
-			 * The length of the data pointed to by this field is
-			 * set up for the session in the @ref
-			 * rte_crypto_auth_xform structure as part of the @ref
-			 * rte_cryptodev_sym_session_create function call.
-			 * This length must not exceed 240 bytes.
-			 *
-			 * Specifically for CCM (@ref RTE_CRYPTO_AUTH_AES_CCM),
-			 * the caller should setup this field as follows:
-			 *
-			 * - the nonce should be written starting at an offset
-			 * of one byte into the array, leaving room for the
-			 * implementation to write in the flags to the first
-			 *  byte.
-			 *
-			 * - the additional  authentication data itself should
-			 * be written starting at an offset of 18 bytes into
-			 * the array, leaving room for the length encoding in
-			 * the first two bytes of the second block.
-			 *
-			 * - the array should be big enough to hold the above
-			 *  fields, plus any padding to round this up to the
-			 *  nearest multiple of the block size (16 bytes).
-			 *  Padding will be added by the implementation.
-			 *
-			 * Finally, for GCM (@ref RTE_CRYPTO_AUTH_AES_GCM), the
-			 * caller should setup this field as follows:
-			 *
-			 * - the AAD is written in starting at byte 0
-			 * - the array must be big enough to hold the AAD, plus
-			 * any space to round this up to the nearest multiple
-			 * of the block size (16 bytes).
-			 *
-			 * @note
-			 * For AES-GMAC (@ref RTE_CRYPTO_AUTH_AES_GMAC) mode of
-			 * operation, this field is used to pass plaintext.
-			 */
-			phys_addr_t phys_addr;	/**< physical address */
-			uint16_t length;	/**< Length of digest */
-		} aad;
-		/**< Additional authentication parameters */
-	} auth;
-} __rte_cache_aligned;
+	__extension__ char _private[0];
+	/**< Private crypto operation material */
+};
 
 
 /**
@@ -661,8 +603,6 @@ static inline void
 __rte_crypto_sym_op_reset(struct rte_crypto_sym_op *op)
 {
 	memset(op, 0, sizeof(*op));
-
-	op->sess_type = RTE_CRYPTO_SYM_OP_SESSIONLESS;
 }
 
 
@@ -704,7 +644,6 @@ __rte_crypto_sym_op_attach_sym_session(struct rte_crypto_sym_op *sym_op,
 		struct rte_cryptodev_sym_session *sess)
 {
 	sym_op->session = sess;
-	sym_op->sess_type = RTE_CRYPTO_SYM_OP_WITH_SESSION;
 
 	return 0;
 }

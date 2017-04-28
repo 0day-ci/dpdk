@@ -82,6 +82,16 @@ enum rte_crypto_op_status {
 };
 
 /**
+ * Crypto operation session type. This is used to specify whether a crypto
+ * operation has session structure attached for immutable parameters or if all
+ * operation information is included in the operation data structure.
+ */
+enum rte_crypto_op_sess_type {
+	RTE_CRYPTO_OP_WITH_SESSION,	/**< Session based crypto operation */
+	RTE_CRYPTO_OP_SESSIONLESS	/**< Session-less crypto operation */
+};
+
+/**
  * Cryptographic Operation.
  *
  * This structure contains data relating to performing cryptographic
@@ -92,31 +102,28 @@ enum rte_crypto_op_status {
  * rte_cryptodev_enqueue_burst() / rte_cryptodev_dequeue_burst() .
  */
 struct rte_crypto_op {
-	enum rte_crypto_op_type type;
+	uint64_t type: 8;
 	/**< operation type */
-
-	enum rte_crypto_op_status status;
+	uint64_t status: 8;
 	/**<
 	 * operation status - this is reset to
 	 * RTE_CRYPTO_OP_STATUS_NOT_PROCESSED on allocation from mempool and
 	 * will be set to RTE_CRYPTO_OP_STATUS_SUCCESS after crypto operation
 	 * is successfully processed by a crypto PMD
 	 */
-
+	uint64_t sess_type: 8;
+	/**< operation session type */
 	struct rte_mempool *mempool;
 	/**< crypto operation mempool which operation is allocated from */
 
 	phys_addr_t phys_addr;
 	/**< physical address of crypto operation */
 
-	void *opaque_data;
-	/**< Opaque pointer for user data */
-
 	RTE_STD_C11
 	union {
-		struct rte_crypto_sym_op *sym;
+		struct rte_crypto_sym_op sym[0];
 		/**< Symmetric operation parameters */
-	}; /**< operation specific parameters */
+	} /**< operation specific parameters */ __rte_aligned(8);
 } __rte_cache_aligned;
 
 /**
@@ -130,22 +137,15 @@ __rte_crypto_op_reset(struct rte_crypto_op *op, enum rte_crypto_op_type type)
 {
 	op->type = type;
 	op->status = RTE_CRYPTO_OP_STATUS_NOT_PROCESSED;
+	op->sess_type = RTE_CRYPTO_OP_SESSIONLESS;
 
 	switch (type) {
 	case RTE_CRYPTO_OP_TYPE_SYMMETRIC:
-		/** Symmetric operation structure starts after the end of the
-		 * rte_crypto_op structure.
-		 */
-		op->sym = (struct rte_crypto_sym_op *)(op + 1);
-		op->type = type;
-
 		__rte_crypto_sym_op_reset(op->sym);
 		break;
 	default:
 		break;
 	}
-
-	op->opaque_data = NULL;
 }
 
 /**
@@ -406,6 +406,8 @@ rte_crypto_op_attach_sym_session(struct rte_crypto_op *op,
 {
 	if (unlikely(op->type != RTE_CRYPTO_OP_TYPE_SYMMETRIC))
 		return -1;
+
+	op->sess_type = RTE_CRYPTO_OP_WITH_SESSION;
 
 	return __rte_crypto_sym_op_attach_sym_session(op->sym, sess);
 }
