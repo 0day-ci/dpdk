@@ -1458,7 +1458,7 @@ qede_xmit_pkts(void *p_txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 		bd3 = NULL;
 		hdr_size = 0;
 
-		mbuf = *tx_pkts;
+		mbuf = *tx_pkts++;
 		assert(mbuf);
 
 		/* Check minimum TX BDS availability against available BDs */
