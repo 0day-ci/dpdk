@@ -81,3 +81,11 @@ Deprecation Notices
 
   - ``rte_crpytodev_scheduler_mode_get``, replaced by ``rte_cryptodev_scheduler_mode_get``
   - ``rte_crpytodev_scheduler_mode_set``, replaced by ``rte_cryptodev_scheduler_mode_set``
+
+* ethdev: in 17.08 ABI changes are planned:
+  Tx offloads will no longer be enabled by default.
+  Instead, the ``rte_eth_txmode`` structure will be extended with bit field to enable
+  each Tx offload.
+  Besides of making the Rx/Tx configuration API more consistent for the
+  application, PMDs will be able to provide a better out of the box performance.
+  as part of the work, ``ETH_TXQ_FLAGS_NO*`` will be superseded as well.
