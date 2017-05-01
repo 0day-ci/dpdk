@@ -150,15 +150,17 @@ int rte_eal_hpet_init(int make_default);
 static inline uint64_t
 rte_get_timer_cycles(void)
 {
+#ifdef RTE_LIBEAL_USE_HPET
 	switch(eal_timer_source) {
 	case EAL_TIMER_TSC:
 		return rte_get_tsc_cycles();
 	case EAL_TIMER_HPET:
-#ifdef RTE_LIBEAL_USE_HPET
 		return rte_get_hpet_cycles();
-#endif
 	default: rte_panic("Invalid timer source specified\n");
 	}
+#else
+	return rte_get_tsc_cycles();
+#endif
 }
 
 /**
@@ -170,15 +172,17 @@ rte_get_timer_cycles(void)
 static inline uint64_t
 rte_get_timer_hz(void)
 {
+#ifdef RTE_LIBEAL_USE_HPET
 	switch(eal_timer_source) {
 	case EAL_TIMER_TSC:
 		return rte_get_tsc_hz();
 	case EAL_TIMER_HPET:
-#ifdef RTE_LIBEAL_USE_HPET
 		return rte_get_hpet_hz();
-#endif
 	default: rte_panic("Invalid timer source specified\n");
 	}
+#else
+	return rte_get_tsc_hz();
+#endif
 }
 /**
  * Wait at least us microseconds.
