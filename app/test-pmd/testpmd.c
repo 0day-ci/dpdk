@@ -970,7 +970,8 @@ run_pkt_fwd_on_lcore(struct fwd_lcore *fc, packet_fwd_t pkt_fwd)
 		}
 #endif
 #ifdef RTE_LIBRTE_LATENCY_STATS
-		if (latencystats_lcore_id == rte_lcore_id())
+		if (latencystats_enabled != 0 &&
+				latencystats_lcore_id == rte_lcore_id())
 			rte_latencystats_update();
 #endif
 
@@ -2237,8 +2238,9 @@ main(int argc, char** argv)
 		rte_panic("Empty set of forwarding logical cores - check the "
 			  "core mask supplied in the command parameters\n");
 
-	/* Bitrate stats disabled by default */
+	/* Bitrate/latency stats disabled by default */
 	bitrate_enabled = 0;
+	latencystats_enabled = 0;
 
 	argc -= diag;
 	argv += diag;
