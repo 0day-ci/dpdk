@@ -35,8 +35,13 @@
 #ifndef __L3FWD_EM_HLM_H__
 #define __L3FWD_EM_HLM_H__
 
+#if defined(__SSE4_1__)
 #include "l3fwd_sse.h"
 #include "l3fwd_em_hlm_sse.h"
+#elif defined(RTE_MACHINE_CPUFLAG_NEON)
+#include "l3fwd_neon.h"
+#include "l3fwd_em_hlm_neon.h"
+#endif
 
 static inline __attribute__((always_inline)) void
 em_get_dst_port_ipv4x8(struct lcore_conf *qconf, struct rte_mbuf *m[8],

@@ -43,7 +43,11 @@
  * compilation time.
  */
 
+#if defined(__SSE4_1__)
 #include "l3fwd_sse.h"
+#elif defined(RTE_MACHINE_CPUFLAG_NEON)
+#include "l3fwd_neon.h"
+#endif
 
 static inline __attribute__((always_inline)) uint16_t
 em_get_dst_port(const struct lcore_conf *qconf, struct rte_mbuf *pkt,
