@@ -469,6 +469,8 @@ kni_ioctl_create(struct net *net, uint32_t ioctl_num,
 		memcpy(net_dev->dev_addr, dev_info.macaddr, ETH_ALEN);
 	}
 
+	net_dev->mtu = dev_info.mtu;
+
 	ret = register_netdev(net_dev);
 	if (ret) {
 		pr_err("error %i registering device \"%s\"\n",

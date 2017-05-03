@@ -373,6 +373,7 @@ rte_kni_alloc(struct rte_mempool *pktmbuf_pool,
 	dev_info.mbuf_size = conf->mbuf_size;
 
 	memcpy(dev_info.macaddr, conf->macaddr, ETH_ADDR_LEN);
+	dev_info.mtu = conf->mtu;
 
 	snprintf(ctx->name, RTE_KNI_NAMESIZE, "%s", intf_name);
 	snprintf(dev_info.name, RTE_KNI_NAMESIZE, "%s", intf_name);
