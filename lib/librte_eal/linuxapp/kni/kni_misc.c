@@ -234,6 +234,9 @@ kni_release(struct inode *inode, struct file *file)
 
 	down_write(&knet->kni_list_lock);
 	list_for_each_entry_safe(dev, n, &knet->kni_list_head, list) {
+		/* check for the matching user context */
+		if (dev->usrctxt != inode)
+			continue;
 		/* Stop kernel thread for multiple mode */
 		if (multiple_kthread_on && dev->pthread != NULL) {
 			kthread_stop(dev->pthread);
@@ -311,9 +314,10 @@ kni_run_thread(struct kni_net *knet, struct kni_dev *kni, uint8_t force_bind)
 }
 
 static int
-kni_ioctl_create(struct net *net, uint32_t ioctl_num,
+kni_ioctl_create(struct inode *inode, uint32_t ioctl_num,
 		unsigned long ioctl_param)
 {
+	struct net *net = current->nsproxy->net_ns;
 	struct kni_net *knet = net_generic(net, kni_net_id);
 	int ret;
 	struct rte_kni_device_info dev_info;
@@ -374,7 +378,8 @@ kni_ioctl_create(struct net *net, uint32_t ioctl_num,
 	dev_net_set(net_dev, net);
 
 	kni = netdev_priv(net_dev);
-
+	
+	kni->usrctxt = inode;
 	kni->net_dev = net_dev;
 	kni->group_id = dev_info.group_id;
 	kni->core_id = dev_info.core_id;
@@ -493,9 +498,10 @@ kni_ioctl_create(struct net *net, uint32_t ioctl_num,
 }
 
 static int
-kni_ioctl_release(struct net *net, uint32_t ioctl_num,
+kni_ioctl_release(struct inode *inode, uint32_t ioctl_num,
 		unsigned long ioctl_param)
 {
+	struct net *net = current->nsproxy->net_ns;
 	struct kni_net *knet = net_generic(net, kni_net_id);
 	int ret = -EINVAL;
 	struct kni_dev *dev, *n;
@@ -516,6 +522,10 @@ kni_ioctl_release(struct net *net, uint32_t ioctl_num,
 
 	down_write(&knet->kni_list_lock);
 	list_for_each_entry_safe(dev, n, &knet->kni_list_head, list) {
+		/* only the owner user process can remove it*/
+		if (dev->usrctxt != inode)
+			continue;
+
 		if (strncmp(dev->name, dev_info.name, RTE_KNI_NAMESIZE) != 0)
 			continue;
 
@@ -540,7 +550,6 @@ static int
 kni_ioctl(struct inode *inode, uint32_t ioctl_num, unsigned long ioctl_param)
 {
 	int ret = -EINVAL;
-	struct net *net = current->nsproxy->net_ns;
 
 	pr_debug("IOCTL num=0x%0x param=0x%0lx\n", ioctl_num, ioctl_param);
 
@@ -552,10 +561,10 @@ kni_ioctl(struct inode *inode, uint32_t ioctl_num, unsigned long ioctl_param)
 		/* For test only, not used */
 		break;
 	case _IOC_NR(RTE_KNI_IOCTL_CREATE):
-		ret = kni_ioctl_create(net, ioctl_num, ioctl_param);
+		ret = kni_ioctl_create(inode, ioctl_num, ioctl_param);
 		break;
 	case _IOC_NR(RTE_KNI_IOCTL_RELEASE):
-		ret = kni_ioctl_release(net, ioctl_num, ioctl_param);
+		ret = kni_ioctl_release(inode, ioctl_num, ioctl_param);
 		break;
 	default:
 		pr_debug("IOCTL default\n");

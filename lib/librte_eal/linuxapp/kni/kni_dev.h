@@ -61,6 +61,7 @@ struct kni_dev {
 	uint32_t core_id;            /* Core ID to bind */
 	char name[RTE_KNI_NAMESIZE]; /* Network device name */
 	struct task_struct *pthread;
+	void *usrctxt; /* User space process context*/
 
 	/* wait queue for req/resp */
 	wait_queue_head_t wq;
