@@ -252,6 +252,7 @@ kni_net_tx(struct sk_buff *skb, struct net_device *dev)
 		}
 		pkt_kva->pkt_len = len;
 		pkt_kva->data_len = len;
+		pkt_kva->gso_size = skb_shinfo(skb)->gso_size; /* passes gso_size from Kernel to GPP */
 
 		/* enqueue mbuf into tx_q */
 		ret = kni_fifo_put(kni->tx_q, &pkt_va, 1);

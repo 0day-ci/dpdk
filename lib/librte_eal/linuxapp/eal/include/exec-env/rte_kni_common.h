@@ -125,7 +125,8 @@ struct rte_kni_mbuf {
 	uint16_t nb_segs;       /**< Number of segments. */
 	char pad4[2];
 	uint64_t ol_flags;      /**< Offload features. */
-	char pad2[4];
+	uint16_t gso_size;      /**< TCP Segmentation Offload Information. */
+	char pad2[2];
 	uint32_t pkt_len;       /**< Total pkt len: sum of all segment data_len. */
 	uint16_t data_len;      /**< Amount of data in segment buffer. */
 
