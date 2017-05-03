@@ -81,3 +81,10 @@ Deprecation Notices
 
   - ``rte_crpytodev_scheduler_mode_get``, replaced by ``rte_cryptodev_scheduler_mode_get``
   - ``rte_crpytodev_scheduler_mode_set``, replaced by ``rte_cryptodev_scheduler_mode_set``
+
+* kni: additional functionality is planned to be added in kni to support mtu, macaddr,
+  gso_size, promiscusity configuration.
+  some of the kni structure will be changed to support additional functionality
+  e.g  ``rte_kni_request`` to support promiscusity`` and mac_addr,
+  ``rte_kni_mbu`` to support the configured gso_size,
+  ``rte_kni_device_info`` and ``rte_kni_conf`` to also support mtu and macaddr.
