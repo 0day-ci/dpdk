@@ -186,9 +186,12 @@ the advanced context descriptor should be set and set it. And DPDK has to ask
 the info about the header length from the upper layer, because parsing the
 packet itself is not acceptable. So, it's too expensive to support MDD.
 When using kernel PF + DPDK VF on x550, please make sure using the kernel
-driver that disables MDD or can disable MDD. (Some kernel driver can use
-this CLI 'insmod ixgbe.ko MDD=0,0' to disable MDD. Some kernel driver disables
-it by default.)
+PF driver that disables MDD or can disable MDD.
+Some kernel driver already disables MDD by default.
+Some kernel driver can use this CLI "insmod ixgbe.ko MDD=0,0" to disable MDD.
+Every "0" in the CLI means a port. Users need to add more "0"s if the machine
+has more ports. For example, if there're 6 ixgbe ports, the CLI should be
+changed to "insmod ixgbe.ko MDD=0,0,0,0,0,0".
 
 
 Statistics
