@@ -552,6 +552,11 @@ rte_kni_handle_request(struct rte_kni *kni)
 			req->result = kni->ops.config_mac_address(kni->ops.port_id,
 							req->mac_addr);
 		break;
+	case RTE_KNI_REQ_CHANGE_PROMISC: /* Change PROMISCUOUS MODE */
+		if (kni->ops.config_promiscusity)
+			req->result = kni->ops.config_promiscusity(kni->ops.port_id,
+							req->promiscusity);
+		break;
 	default:
 		RTE_LOG(ERR, KNI, "Unknown request id %u\n", req->req_id);
 		req->result = -EINVAL;

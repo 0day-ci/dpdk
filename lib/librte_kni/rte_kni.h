@@ -74,6 +74,9 @@ struct rte_kni_ops {
 
 	/* Pointer to function of configuring network interface */
 	int (*config_network_if)(uint8_t port_id, uint8_t if_up);
+	
+	/* Pointer to function of configuring promiscuous mode */
+	int (*config_promiscusity)(uint8_t port_id, uint8_t to_on);
 
 	/* Pointer to function of configuring mac address */
 	int (*config_mac_address)(uint8_t port_id, uint8_t mac_addr[6]);
