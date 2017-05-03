@@ -52,6 +52,10 @@
 
 #define MAX_MBUF_BURST_NUM            32
 
+#ifndef ETH_ADDR_LEN
+#define ETH_ADDR_LEN                  6
+#endif
+
 /* Maximum number of ring entries */
 #define KNI_FIFO_COUNT_MAX     1024
 #define KNI_FIFO_SIZE          (KNI_FIFO_COUNT_MAX * sizeof(void *) + \
@@ -368,6 +372,8 @@ rte_kni_alloc(struct rte_mempool *pktmbuf_pool,
 	dev_info.group_id = conf->group_id;
 	dev_info.mbuf_size = conf->mbuf_size;
 
+	memcpy(dev_info.macaddr, conf->macaddr, ETH_ADDR_LEN);
+
 	snprintf(ctx->name, RTE_KNI_NAMESIZE, "%s", intf_name);
 	snprintf(dev_info.name, RTE_KNI_NAMESIZE, "%s", intf_name);
 
@@ -540,6 +546,11 @@ rte_kni_handle_request(struct rte_kni *kni)
 		if (kni->ops.config_network_if)
 			req->result = kni->ops.config_network_if(\
 					kni->ops.port_id, req->if_up);
+		break;
+	case RTE_KNI_REQ_CHANGE_MAC_ADDR: /* Change MAC Address */
+		if (kni->ops.config_mac_address)
+			req->result = kni->ops.config_mac_address(kni->ops.port_id,
+							req->mac_addr);
 		break;
 	default:
 		RTE_LOG(ERR, KNI, "Unknown request id %u\n", req->req_id);
@@ -735,6 +746,7 @@ rte_kni_unregister_handlers(struct rte_kni *kni)
 
 	kni->ops.change_mtu = NULL;
 	kni->ops.config_network_if = NULL;
+	kni->ops.config_mac_address = NULL;
 	return 0;
 }
 void

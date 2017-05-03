@@ -59,6 +59,10 @@ extern "C" {
 struct rte_kni;
 struct rte_mbuf;
 
+#ifndef ETH_ADDR_LEN
+#define ETH_ADDR_LEN                  6
+#endif
+
 /**
  * Structure which has the function pointers for KNI interface.
  */
@@ -70,6 +74,9 @@ struct rte_kni_ops {
 
 	/* Pointer to function of configuring network interface */
 	int (*config_network_if)(uint8_t port_id, uint8_t if_up);
+
+	/* Pointer to function of configuring mac address */
+	int (*config_mac_address)(uint8_t port_id, uint8_t mac_addr[6]);
 };
 
 /**
@@ -87,6 +94,7 @@ struct rte_kni_conf {
 	unsigned mbuf_size; /* mbuf size */
 	struct rte_pci_addr addr;
 	struct rte_pci_id id;
+	char macaddr[ETH_ADDR_LEN]; /* MAC address assigned to KNI */
 
 	__extension__
 	uint8_t force_bind : 1; /* Flag to bind kernel thread */
