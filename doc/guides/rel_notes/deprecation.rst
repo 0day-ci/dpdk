@@ -81,3 +81,24 @@ Deprecation Notices
 
   - ``rte_crpytodev_scheduler_mode_get``, replaced by ``rte_cryptodev_scheduler_mode_get``
   - ``rte_crpytodev_scheduler_mode_set``, replaced by ``rte_cryptodev_scheduler_mode_set``
+
+* cryptodev: API changes are planned for 17.08 for the sessions management
+  to make it agnostic to the underlying devices, removing coupling with
+  crypto PMDs, so a single session can be used on multiple devices.
+
+  - ``struct rte_cryptodev_sym_session``, dev_id, dev_type will be removed,
+    _private field changed to the indirect array of private data pointers of
+    all supported devices
+
+  An API of followed functions will be changed to allow operate on multiple
+  devices with one session:
+
+  - ``rte_cryptodev_sym_session_create``
+  - ``rte_cryptodev_sym_session_free``
+  - ``rte_cryptodev_sym_session_pool_create``
+
+  While dev_id will not be stored in the ``struct rte_cryptodev_sym_session``,
+  directly, the change of followed API is required:
+
+  - ``rte_cryptodev_queue_pair_attach_sym_session``
+  - ``rte_cryptodev_queue_pair_detach_sym_session``
