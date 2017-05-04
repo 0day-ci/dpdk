@@ -40,12 +40,6 @@ extern "C" {
 
 #include <stdint.h>
 
-#ifdef __INTEL_COMPILER
-#define GCC_VERSION (0)
-#else
-#define GCC_VERSION (__GNUC__ * 10000+__GNUC_MINOR__*100 + __GNUC_PATCHLEVEL__)
-#endif
-
 #ifndef RTE_TABLE_HASH_LRU_STRATEGY
 #ifdef __SSE4_2__
 #define RTE_TABLE_HASH_LRU_STRATEGY                        2
