@@ -34,7 +34,9 @@
 #define _RTE_VECT_ARM_H_
 
 #include <stdint.h>
+
 #include "generic/rte_vect.h"
+#include "rte_debug.h"
 #include "arm_neon.h"
 
 #ifdef __cplusplus
@@ -75,6 +77,33 @@ vqtbl1q_u8(uint8x16_t a, uint8x16_t b)
 	}
 
 	return vld1q_u8(rte_ret.u8);
+}
+#endif
+
+#if (GCC_VERSION < 70000)
+/* NEON intrinsic vreinterpretq_u64_p128() is supported since GCC version 7 */
+static inline uint64x2_t
+vreinterpretq_u64_p128(poly128_t x)
+{
+	return (uint64x2_t)x;
+}
+
+/* NEON intrinsic vreinterpretq_p64_u64() is supported since GCC version 7 */
+static inline poly64x2_t
+vreinterpretq_p64_u64(uint64x2_t x)
+{
+	return (poly64x2_t)x;
+}
+
+/* NEON intrinsic vgetq_lane_p64() is supported since GCC version 7 */
+static inline poly64_t
+vgetq_lane_p64(poly64x2_t x, const int lane)
+{
+	RTE_ASSERT(lane >= 0 && lane <= 1);
+
+	poly64_t *p = (poly64_t *)&x;
+
+	return p[lane];
 }
 #endif
 
