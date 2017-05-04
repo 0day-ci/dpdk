@@ -866,65 +866,49 @@ rte_cryptodev_enqueue_burst(uint8_t dev_id, uint16_t qp_id,
 
 /** Cryptodev symmetric crypto session */
 struct rte_cryptodev_sym_session {
-	RTE_STD_C11
-	struct {
-		uint8_t dev_id;
-		/**< Device Id */
-		enum rte_cryptodev_type dev_type;
-		/** Crypto Device type session created on */
-		struct rte_mempool *mp;
-		/**< Mempool session allocated from */
-	} __rte_aligned(8);
-	/**< Public symmetric session details */
-
-	__extension__ char _private[0];
-	/**< Private session material */
+	struct rte_mempool *mp;       /**< Mempool session allocated from */
+	uint32_t sess_mask;           /**< Mask containing which private data
+					   is set (faster free) */
+	void *sess_private_data[32];  /**< Device type specific session private
+					   data */
 };
 
-
-/**
- * Initialise a session for symmetric cryptographic operations.
- *
- * This function is used by the client to initialize immutable
- * parameters of symmetric cryptographic operation.
- * To perform the operation the rte_cryptodev_enqueue_burst function is
- * used.  Each mbuf should contain a reference to the session
- * pointer returned from this function contained within it's crypto_op if a
- * session-based operation is being provisioned. Memory to contain the session
- * information is allocated from within mempool managed by the cryptodev.
- *
- * The rte_cryptodev_session_free must be called to free allocated
- * memory when the session is no longer required.
- *
- * @param	dev_id		The device identifier.
- * @param	xform		Crypto transform chain.
-
- *
- * @return
- *  Pointer to the created session or NULL
+/**<
+ * Frees symmetric crypto session and all related device type specific
+ * private data objects associated with session
  */
-extern struct rte_cryptodev_sym_session *
-rte_cryptodev_sym_session_create(uint8_t dev_id,
-		struct rte_crypto_sym_xform *xform);
+void
+rte_cryptodev_sym_session_free(struct rte_cryptodev_sym_session *sess);
 
-/**
- * Free the memory associated with a previously allocated session.
+/**<
+ * Fill out private data for the device id, based on its device type
  *
- * @param	dev_id		The device identifier.
- * @param	session		Session pointer previously allocated by
- *				*rte_cryptodev_sym_session_create*.
- *
- * @return
- *   NULL on successful freeing of session.
- *   Session pointer on failure to free session.
+ * @param   dev_id   ID of device that we want the session to be used on
+ * @param   sess     Session where the private data will be attached to
+ * @param   xforms   Symmetric crypto transform operations to apply on flow
+ *                   processed with this session
  */
-extern struct rte_cryptodev_sym_session *
-rte_cryptodev_sym_session_free(uint8_t dev_id,
-		struct rte_cryptodev_sym_session *session);
+int
+rte_cryptodev_sym_session_init(uint8_t dev_id,
+		struct rte_cryptodev_sym_session *sess,
+		struct rte_crypto_sym_xform *xforms);
+
+/**<
+ * Create symmetric crypto session (generic with no private data)
+ *
+ * @param   mempool    Symmetric session mempool to allocate session
+ *                     objects from
+ * @return
+ *  - On success return pointer to sym-session
+ *  - On failure returns NULL
+ */
+struct rte_cryptodev_sym_session *
+rte_cryptodev_sym_session_create(struct rte_mempool *mempool);
 
 /**
  * Attach queue pair with sym session.
  *
+ * @param	dev_id		The identifier of the device.
  * @param	qp_id		Queue pair to which session will be attached.
  * @param	session		Session pointer previously allocated by
  *				*rte_cryptodev_sym_session_create*.
@@ -934,12 +918,13 @@ rte_cryptodev_sym_session_free(uint8_t dev_id,
  *  - On failure, a negative value.
  */
 int
-rte_cryptodev_queue_pair_attach_sym_session(uint16_t qp_id,
+rte_cryptodev_queue_pair_attach_sym_session(uint8_t dev_id, uint16_t qp_id,
 		struct rte_cryptodev_sym_session *session);
 
 /**
  * Detach queue pair with sym session.
  *
+ * @param	dev_id		The identifier of the device.
  * @param	qp_id		Queue pair to which session is attached.
  * @param	session		Session pointer previously allocated by
  *				*rte_cryptodev_sym_session_create*.
@@ -949,9 +934,29 @@ rte_cryptodev_queue_pair_attach_sym_session(uint16_t qp_id,
  *  - On failure, a negative value.
  */
 int
-rte_cryptodev_queue_pair_detach_sym_session(uint16_t qp_id,
+rte_cryptodev_queue_pair_detach_sym_session(uint8_t dev_id, uint16_t qp_id,
 		struct rte_cryptodev_sym_session *session);
 
+struct rte_mempool *
+rte_cryptodev_sym_session_pool_create(unsigned int nb_objs,
+			unsigned int *device_ids, unsigned int nb_device_ids,
+			unsigned int obj_cache_size, unsigned int socket_id);
+
+static inline void
+set_session_private_data(struct rte_cryptodev_sym_session *sess,
+		unsigned int device_type_id, void *private_data) {
+	sess->sess_private_data[device_type_id] = private_data;
+}
+
+
+static inline void *
+get_session_private_data(struct rte_cryptodev_sym_session *sess,
+		unsigned int device_type_id) {
+	return sess->sess_private_data[device_type_id];
+}
+
+#define rte_cryptodev_sym_sess_get_private_data(type, sess, id) \
+	(type *)get_session_private_data(sess, id)
 
 #ifdef __cplusplus
 }

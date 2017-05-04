@@ -934,10 +934,6 @@ rte_cryptodev_queue_pair_stop(uint8_t dev_id, uint16_t queue_pair_id)
 
 }
 
-static int
-rte_cryptodev_sym_session_pool_create(struct rte_cryptodev *dev,
-		unsigned nb_objs, unsigned obj_cache_size, int socket_id);
-
 int
 rte_cryptodev_configure(uint8_t dev_id, struct rte_cryptodev_config *config)
 {
@@ -967,14 +963,6 @@ rte_cryptodev_configure(uint8_t dev_id, struct rte_cryptodev_config *config)
 				dev_id, diag);
 		return diag;
 	}
-
-	/* Setup Session mempool for device */
-	diag = rte_cryptodev_sym_session_pool_create(dev,
-			config->session_mp.nb_objs,
-			config->session_mp.cache_size,
-			config->socket_id);
-	if (diag != 0)
-		return diag;
 
 	return (*dev->dev_ops->dev_configure)(dev, config);
 }
@@ -1280,65 +1268,145 @@ rte_cryptodev_pmd_callback_process(struct rte_cryptodev *dev,
 	rte_spinlock_unlock(&rte_cryptodev_cb_lock);
 }
 
+int
+rte_cryptodev_sym_session_init(uint8_t dev_id,
+		struct rte_cryptodev_sym_session *sess,
+		struct rte_crypto_sym_xform *xforms) {
 
-static void
-rte_cryptodev_sym_session_init(struct rte_mempool *mp,
-		void *opaque_arg,
-		void *_sess,
-		__rte_unused unsigned i)
-{
-	struct rte_cryptodev_sym_session *sess = _sess;
-	struct rte_cryptodev *dev = opaque_arg;
+	struct rte_cryptodev *dev;
+	void *sess_private_data;
+	int index;
 
-	memset(sess, 0, mp->elt_size);
+	dev = rte_cryptodev_pmd_get_dev(dev_id);
 
-	sess->dev_id = dev->data->dev_id;
-	sess->dev_type = dev->dev_type;
-	sess->mp = mp;
+	/* FIXIT: for now, we're expecting not more than 32 device types
+	 *        for simplification */
+	index = dev->dev_type;
 
-	if (dev->dev_ops->session_initialize)
-		(*dev->dev_ops->session_initialize)(mp, sess);
+	if ((sess->sess_mask & (1 << index)) == 0) {
+		sess->sess_mask |= (1 << index);
+
+		if (rte_mempool_get(sess->mp, &sess_private_data)) {
+			CDEV_LOG_ERR("Couldn't get object from session mempool");
+			return -1;
+		}
+
+		if (dev->dev_ops->session_initialize)
+			(*dev->dev_ops->session_initialize)(sess->mp, sess);
+
+		//RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->session_configure, NULL);
+		if (dev->dev_ops->session_configure(dev, xforms,
+				sess_private_data) == NULL) {
+			CDEV_LOG_ERR("dev_id %d failed to configure session details",
+					dev_id);
+
+			/* Return session to mempool */
+			rte_mempool_put(sess->mp, sess_private_data);
+			return -1;
+		}
+
+		set_session_private_data(sess, dev->dev_type, sess_private_data);
+	}
+
+	return 0;
 }
 
-static int
-rte_cryptodev_sym_session_pool_create(struct rte_cryptodev *dev,
-		unsigned nb_objs, unsigned obj_cache_size, int socket_id)
-{
-	char mp_name[RTE_CRYPTODEV_NAME_MAX_LEN];
-	unsigned priv_sess_size;
+struct rte_mempool *
+rte_cryptodev_sym_session_pool_create(unsigned int nb_objs,
+			unsigned int *device_ids,
+			unsigned int nb_device_ids,
+			unsigned int obj_cache_size,
+			unsigned int socket_id) {
 
+	unsigned int max_priv_sess_size = sizeof(struct rte_cryptodev_sym_session);
+	unsigned priv_sess_size;
+	unsigned int dev_id, i;
+	struct rte_cryptodev *dev;
+	struct rte_mempool *mempool;
+
+	char mp_name[RTE_CRYPTODEV_NAME_MAX_LEN];
+
+	/* FIXIT: set the proper name for mempool! */
 	unsigned n = snprintf(mp_name, sizeof(mp_name), "cdev_%d_sess_mp",
-			dev->data->dev_id);
+			socket_id);
 	if (n > sizeof(mp_name)) {
 		CDEV_LOG_ERR("Unable to create unique name for session mempool");
-		return -ENOMEM;
+		return NULL;
 	}
 
-	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->session_get_size, -ENOTSUP);
-	priv_sess_size = (*dev->dev_ops->session_get_size)(dev);
-	if (priv_sess_size == 0) {
-		CDEV_LOG_ERR("%s returned and invalid private session size ",
+	if (device_ids == NULL) {
+
+		/* Walk through all devices */
+		for (dev_id = 0; dev_id < rte_cryptodev_globals->nb_devs;
+				dev_id++) {
+
+			if (!rte_cryptodev_pmd_is_valid_dev(dev_id))
+				continue;
+
+			dev = rte_cryptodev_pmd_get_dev(dev_id);
+
+			//RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->session_get_size, -ENOTSUP);
+			if (*dev->dev_ops->session_get_size == NULL)
+				continue;
+
+			priv_sess_size = (*dev->dev_ops->session_get_size)(dev);
+
+			if (priv_sess_size == 0) {
+				CDEV_LOG_ERR("%s returned and invalid private session size ",
 						dev->data->name);
-		return -ENOMEM;
+				return NULL;
+			}
+
+			if (max_priv_sess_size < priv_sess_size)
+				max_priv_sess_size = priv_sess_size;
+
+		}
+	} else {
+		for (i = 0; i < nb_device_ids; i++) {
+
+			if (!rte_cryptodev_pmd_is_valid_dev(device_ids[i]))
+				continue;
+
+			dev = rte_cryptodev_pmd_get_dev(device_ids[i]);
+
+			if (*dev->dev_ops->session_get_size == NULL)
+				continue;
+
+			priv_sess_size = (*dev->dev_ops->session_get_size)(dev);
+
+			if (priv_sess_size == 0) {
+				CDEV_LOG_ERR("%s returned and invalid private session size ",
+						dev->data->name);
+				return NULL;
+			}
+
+			if (max_priv_sess_size < priv_sess_size)
+				max_priv_sess_size = priv_sess_size;
+
+		}
 	}
 
-	unsigned elt_size = sizeof(struct rte_cryptodev_sym_session) +
-			priv_sess_size;
+	if (max_priv_sess_size == 0) {
+		CDEV_LOG_ERR("Cannot determinate maximal private data");
+		return NULL;
+	}
 
-	dev->data->session_pool = rte_mempool_lookup(mp_name);
-	if (dev->data->session_pool != NULL) {
-		if ((dev->data->session_pool->elt_size != elt_size) ||
-				(dev->data->session_pool->cache_size <
+	unsigned int elt_size = max_priv_sess_size;
+
+	mempool = rte_mempool_lookup(mp_name);
+	if (mempool != NULL) {
+		if ((mempool->elt_size != elt_size) ||
+				(mempool->cache_size <
 				obj_cache_size) ||
-				(dev->data->session_pool->size < nb_objs)) {
+				(mempool->size < nb_objs)) {
 
 			CDEV_LOG_ERR("%s mempool already exists with different"
 					" initialization parameters", mp_name);
-			dev->data->session_pool = NULL;
-			return -ENOMEM;
+			mempool = NULL;
+			return NULL;
 		}
 	} else {
-		dev->data->session_pool = rte_mempool_create(
+		mempool = rte_mempool_create(
 				mp_name, /* mempool name */
 				nb_objs, /* number of elements*/
 				elt_size, /* element size*/
@@ -1346,131 +1414,95 @@ rte_cryptodev_sym_session_pool_create(struct rte_cryptodev *dev,
 				0, /* private data size */
 				NULL, /* obj initialization constructor */
 				NULL, /* obj initialization constructor arg */
-				rte_cryptodev_sym_session_init,
+				NULL /* rte_crypto_sym_session_init */,
 				/**< obj constructor*/
-				dev, /* obj constructor arg */
+				NULL /* dev */, /* obj constructor arg */
 				socket_id, /* socket id */
 				0); /* flags */
 
-		if (dev->data->session_pool == NULL) {
+		if (mempool == NULL) {
 			CDEV_LOG_ERR("%s mempool allocation failed", mp_name);
-			return -ENOMEM;
+			return NULL;
 		}
 	}
 
 	CDEV_LOG_DEBUG("%s mempool created!", mp_name);
-	return 0;
+
+	return mempool;
 }
 
 struct rte_cryptodev_sym_session *
-rte_cryptodev_sym_session_create(uint8_t dev_id,
-		struct rte_crypto_sym_xform *xform)
-{
-	struct rte_cryptodev *dev;
+rte_cryptodev_sym_session_create(struct rte_mempool *mempool) {
 	struct rte_cryptodev_sym_session *sess;
 	void *_sess;
 
-	if (!rte_cryptodev_pmd_is_valid_dev(dev_id)) {
-		CDEV_LOG_ERR("Invalid dev_id=%d", dev_id);
-		return NULL;
-	}
-
-	dev = &rte_crypto_devices[dev_id];
-
 	/* Allocate a session structure from the session pool */
-	if (rte_mempool_get(dev->data->session_pool, &_sess)) {
+	if (rte_mempool_get(mempool, &_sess)) {
 		CDEV_LOG_ERR("Couldn't get object from session mempool");
 		return NULL;
 	}
 
 	sess = _sess;
-
-	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->session_configure, NULL);
-	if (dev->dev_ops->session_configure(dev, xform, sess->_private) ==
-			NULL) {
-		CDEV_LOG_ERR("dev_id %d failed to configure session details",
-				dev_id);
-
-		/* Return session to mempool */
-		rte_mempool_put(sess->mp, _sess);
-		return NULL;
-	}
+	sess->mp = mempool;
 
 	return sess;
 }
 
 int
-rte_cryptodev_queue_pair_attach_sym_session(uint16_t qp_id,
-		struct rte_cryptodev_sym_session *sess)
-{
-	struct rte_cryptodev *dev;
-
-	if (!rte_cryptodev_pmd_is_valid_dev(sess->dev_id)) {
-		CDEV_LOG_ERR("Invalid dev_id=%d", sess->dev_id);
-		return -EINVAL;
-	}
-
-	dev = &rte_crypto_devices[sess->dev_id];
-
-	/* The API is optional, not returning error if driver do not suuport */
-	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->qp_attach_session, 0);
-	if (dev->dev_ops->qp_attach_session(dev, qp_id, sess->_private)) {
-		CDEV_LOG_ERR("dev_id %d failed to attach qp: %d with session",
-				sess->dev_id, qp_id);
-		return -EPERM;
-	}
-
-	return 0;
-}
-
-int
-rte_cryptodev_queue_pair_detach_sym_session(uint16_t qp_id,
-		struct rte_cryptodev_sym_session *sess)
-{
-	struct rte_cryptodev *dev;
-
-	if (!rte_cryptodev_pmd_is_valid_dev(sess->dev_id)) {
-		CDEV_LOG_ERR("Invalid dev_id=%d", sess->dev_id);
-		return -EINVAL;
-	}
-
-	dev = &rte_crypto_devices[sess->dev_id];
-
-	/* The API is optional, not returning error if driver do not suuport */
-	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->qp_detach_session, 0);
-	if (dev->dev_ops->qp_detach_session(dev, qp_id, sess->_private)) {
-		CDEV_LOG_ERR("dev_id %d failed to detach qp: %d from session",
-				sess->dev_id, qp_id);
-		return -EPERM;
-	}
-
-	return 0;
-}
-struct rte_cryptodev_sym_session *
-rte_cryptodev_sym_session_free(uint8_t dev_id,
+rte_cryptodev_queue_pair_attach_sym_session(uint8_t dev_id, uint16_t qp_id,
 		struct rte_cryptodev_sym_session *sess)
 {
 	struct rte_cryptodev *dev;
 
 	if (!rte_cryptodev_pmd_is_valid_dev(dev_id)) {
 		CDEV_LOG_ERR("Invalid dev_id=%d", dev_id);
-		return sess;
+		return -EINVAL;
 	}
 
 	dev = &rte_crypto_devices[dev_id];
 
-	/* Check the session belongs to this device type */
-	if (sess->dev_type != dev->dev_type)
-		return sess;
+	/* The API is optional, not returning error if driver do not suuport */
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->qp_attach_session, 0);
+	if (dev->dev_ops->qp_attach_session(dev, qp_id,
+			rte_cryptodev_sym_sess_get_private_data(void, sess,
+					dev_id))) {
+		CDEV_LOG_ERR("dev_id %d failed to attach qp: %d with session",
+				dev_id, qp_id);
+		return -EPERM;
+	}
 
-	/* Let device implementation clear session material */
-	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->session_clear, sess);
-	dev->dev_ops->session_clear(dev, (void *)sess->_private);
+	return 0;
+}
 
-	/* Return session to mempool */
-	rte_mempool_put(sess->mp, (void *)sess);
+int
+rte_cryptodev_queue_pair_detach_sym_session(uint8_t dev_id, uint16_t qp_id,
+		struct rte_cryptodev_sym_session *sess)
+{
+	struct rte_cryptodev *dev;
 
-	return NULL;
+	if (!rte_cryptodev_pmd_is_valid_dev(dev_id)) {
+		CDEV_LOG_ERR("Invalid dev_id=%d", dev_id);
+		return -EINVAL;
+	}
+
+	dev = &rte_crypto_devices[dev_id];
+
+	/* The API is optional, not returning error if driver do not suuport */
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->qp_detach_session, 0);
+	if (dev->dev_ops->qp_detach_session(dev, qp_id,
+			rte_cryptodev_sym_sess_get_private_data(void, sess,
+					dev_id))) {
+		CDEV_LOG_ERR("dev_id %d failed to detach qp: %d from session",
+				dev_id, qp_id);
+		return -EPERM;
+	}
+
+	return 0;
+}
+
+void
+rte_cryptodev_sym_session_free(__rte_unused struct rte_cryptodev_sym_session *sess) {
+
 }
 
 /** Initialise rte_crypto_op mempool element */
