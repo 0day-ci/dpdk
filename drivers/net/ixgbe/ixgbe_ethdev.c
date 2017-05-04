@@ -1130,7 +1130,7 @@ ixgbe_swfw_lock_reset(struct ixgbe_hw *hw)
 static int
 eth_ixgbe_dev_init(struct rte_eth_dev *eth_dev)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(eth_dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(eth_dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	struct ixgbe_hw *hw =
 		IXGBE_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
@@ -1364,7 +1364,7 @@ eth_ixgbe_dev_init(struct rte_eth_dev *eth_dev)
 static int
 eth_ixgbe_dev_uninit(struct rte_eth_dev *eth_dev)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(eth_dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(eth_dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	struct ixgbe_hw *hw;
 
@@ -1597,7 +1597,7 @@ eth_ixgbevf_dev_init(struct rte_eth_dev *eth_dev)
 {
 	int diag;
 	uint32_t tc, tcs;
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(eth_dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(eth_dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	struct ixgbe_hw *hw =
 		IXGBE_DEV_PRIVATE_TO_HW(eth_dev->data->dev_private);
@@ -1746,7 +1746,7 @@ eth_ixgbevf_dev_init(struct rte_eth_dev *eth_dev)
 static int
 eth_ixgbevf_dev_uninit(struct rte_eth_dev *eth_dev)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(eth_dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(eth_dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	struct ixgbe_hw *hw;
 
@@ -2175,7 +2175,7 @@ ixgbe_vmdq_vlan_hw_filter_enable(struct rte_eth_dev *dev)
 static int
 ixgbe_check_vf_rss_rxq_num(struct rte_eth_dev *dev, uint16_t nb_rx_q)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 
 	switch (nb_rx_q) {
 	case 1:
@@ -2424,7 +2424,7 @@ ixgbe_set_vf_rate_limit(struct rte_eth_dev *dev, uint16_t vf,
 	uint16_t total_rate = 0;
 	struct rte_pci_device *pci_dev;
 
-	pci_dev = IXGBE_DEV_TO_PCI(dev);
+	pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	rte_eth_link_get_nowait(dev->data->port_id, &link);
 
 	if (vf >= pci_dev->max_vfs)
@@ -2495,7 +2495,7 @@ ixgbe_dev_start(struct rte_eth_dev *dev)
 		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct ixgbe_vf_info *vfinfo =
 		*IXGBE_DEV_PRIVATE_TO_P_VFDATA(dev->data->dev_private);
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	uint32_t intr_vector = 0;
 	int err, link_up = 0, negotiate = 0;
@@ -2713,7 +2713,7 @@ ixgbe_dev_stop(struct rte_eth_dev *dev)
 		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct ixgbe_vf_info *vfinfo =
 		*IXGBE_DEV_PRIVATE_TO_P_VFDATA(dev->data->dev_private);
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	int vf;
 
@@ -3581,7 +3581,7 @@ ixgbe_fw_version_get(struct rte_eth_dev *dev, char *fw_version, size_t fw_size)
 static void
 ixgbe_dev_info_get(struct rte_eth_dev *dev, struct rte_eth_dev_info *dev_info)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct rte_eth_conf *dev_conf = &dev->data->dev_conf;
 
@@ -3723,7 +3723,7 @@ static void
 ixgbevf_dev_info_get(struct rte_eth_dev *dev,
 		     struct rte_eth_dev_info *dev_info)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 
 	dev_info->pci_dev = pci_dev;
@@ -4034,7 +4034,7 @@ ixgbe_dev_interrupt_get_status(struct rte_eth_dev *dev)
 static void
 ixgbe_dev_link_status_print(struct rte_eth_dev *dev)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_eth_link link;
 
 	memset(&link, 0, sizeof(link));
@@ -4141,7 +4141,7 @@ static void
 ixgbe_dev_interrupt_delayed_handler(void *param)
 {
 	struct rte_eth_dev *dev = (struct rte_eth_dev *)param;
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	struct ixgbe_interrupt *intr =
 		IXGBE_DEV_PRIVATE_TO_INTR(dev->data->dev_private);
@@ -4793,7 +4793,7 @@ ixgbevf_dev_start(struct rte_eth_dev *dev)
 	struct ixgbe_hw *hw =
 		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	uint32_t intr_vector = 0;
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 
 	int err, mask = 0;
@@ -4857,7 +4857,7 @@ static void
 ixgbevf_dev_stop(struct rte_eth_dev *dev)
 {
 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 
 	PMD_INIT_FUNC_TRACE();
@@ -5330,7 +5330,7 @@ ixgbe_mirror_rule_reset(struct rte_eth_dev *dev, uint8_t rule_id)
 static int
 ixgbevf_dev_rx_queue_intr_enable(struct rte_eth_dev *dev, uint16_t queue_id)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	uint32_t mask;
 	struct ixgbe_hw *hw =
@@ -5364,7 +5364,7 @@ ixgbevf_dev_rx_queue_intr_disable(struct rte_eth_dev *dev, uint16_t queue_id)
 static int
 ixgbe_dev_rx_queue_intr_enable(struct rte_eth_dev *dev, uint16_t queue_id)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	uint32_t mask;
 	struct ixgbe_hw *hw =
@@ -5489,7 +5489,7 @@ ixgbe_set_ivar_map(struct ixgbe_hw *hw, int8_t direction,
 static void
 ixgbevf_configure_msix(struct rte_eth_dev *dev)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	struct ixgbe_hw *hw =
 		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
@@ -5523,7 +5523,7 @@ ixgbevf_configure_msix(struct rte_eth_dev *dev)
 static void
 ixgbe_configure_msix(struct rte_eth_dev *dev)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
 	struct ixgbe_hw *hw =
 		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
@@ -7516,7 +7516,7 @@ ixgbe_e_tag_insertion_en_dis(struct rte_eth_dev *dev,
 			     struct rte_eth_l2_tunnel_conf *l2_tunnel,
 			     bool en)
 {
-	struct rte_pci_device *pci_dev = IXGBE_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	int ret = 0;
 	uint32_t vmtir, vmvir;
 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);

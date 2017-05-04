@@ -1486,7 +1486,7 @@ static int
 sfc_eth_dev_init(struct rte_eth_dev *dev)
 {
 	struct sfc_adapter *sa = dev->data->dev_private;
-	struct rte_pci_device *pci_dev = SFC_DEV_TO_PCI(dev);
+	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	int rc;
 	const efx_nic_cfg_t *encp;
 	const struct ether_addr *from;
