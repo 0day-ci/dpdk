@@ -81,3 +81,6 @@ Deprecation Notices
 
   - ``rte_crpytodev_scheduler_mode_get``, replaced by ``rte_cryptodev_scheduler_mode_get``
   - ``rte_crpytodev_scheduler_mode_set``, replaced by ``rte_cryptodev_scheduler_mode_set``
+
+* cryptodev: All PMD names definitions will be moved to the individual PMDs
+  in 17.08.
