@@ -81,3 +81,11 @@ Deprecation Notices
 
   - ``rte_crpytodev_scheduler_mode_get``, replaced by ``rte_cryptodev_scheduler_mode_get``
   - ``rte_crpytodev_scheduler_mode_set``, replaced by ``rte_cryptodev_scheduler_mode_set``
+
+* cryptodev: The following changes will be done in in 17.08:
+
+  - the device type enumeration ``rte_cryptodev_type`` will be removed
+  - the following structures will be changed: ``rte_cryptodev_session``,
+    ``rte_cryptodev_sym_session``, ``rte_cryptodev_info``, ``rte_cryptodev``
+  - the function ``rte_cryptodev_count_devtype`` will be replaced by
+    ``rte_cryptodev_device_count_by_driver``
