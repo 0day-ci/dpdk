@@ -6,7 +6,6 @@ DPDK_16.04 {
 	rte_cryptodev_callback_unregister;
 	rte_cryptodev_close;
 	rte_cryptodev_count;
-	rte_cryptodev_count_devtype;
 	rte_cryptodev_configure;
 	rte_cryptodev_create_vdev;
 	rte_cryptodev_get_dev_id;
@@ -74,3 +73,12 @@ DPDK_17.05 {
 	rte_cryptodev_queue_pair_detach_sym_session;
 
 } DPDK_17.02;
+
+DPDK_17.08 {
+	global:
+
+	rte_cryptodev_device_count_by_driver;
+
+} DPDK_17.05;
+
+

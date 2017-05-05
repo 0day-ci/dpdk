@@ -73,21 +73,6 @@ extern "C" {
 #define CRYPTODEV_NAME_DPAA2_SEC_PMD	cryptodev_dpaa2_sec_pmd
 /**< NXP DPAA2 - SEC PMD device name */
 
-/** Crypto device type */
-enum rte_cryptodev_type {
-	RTE_CRYPTODEV_NULL_PMD = 1,	/**< Null crypto PMD */
-	RTE_CRYPTODEV_AESNI_GCM_PMD,	/**< AES-NI GCM PMD */
-	RTE_CRYPTODEV_AESNI_MB_PMD,	/**< AES-NI multi buffer PMD */
-	RTE_CRYPTODEV_QAT_SYM_PMD,	/**< QAT PMD Symmetric Crypto */
-	RTE_CRYPTODEV_SNOW3G_PMD,	/**< SNOW 3G PMD */
-	RTE_CRYPTODEV_KASUMI_PMD,	/**< KASUMI PMD */
-	RTE_CRYPTODEV_ZUC_PMD,		/**< ZUC PMD */
-	RTE_CRYPTODEV_OPENSSL_PMD,    /**<  OpenSSL PMD */
-	RTE_CRYPTODEV_ARMV8_PMD,	/**< ARMv8 crypto PMD */
-	RTE_CRYPTODEV_SCHEDULER_PMD,	/**< Crypto Scheduler PMD */
-	RTE_CRYPTODEV_DPAA2_SEC_PMD,    /**< NXP DPAA2 - SEC PMD */
-};
-
 extern const char **rte_cyptodev_names;
 
 /* Logging Macros */
@@ -321,7 +306,7 @@ rte_cryptodev_get_feature_name(uint64_t flag);
 /**  Crypto device information */
 struct rte_cryptodev_info {
 	const char *driver_name;		/**< Driver name. */
-	enum rte_cryptodev_type dev_type;	/**< Device type */
+	uint8_t driver_id;			/**< Driver identifier */
 	struct rte_pci_device *pci_dev;		/**< PCI information. */
 
 	uint64_t feature_flags;			/**< Feature flags */
@@ -454,13 +439,13 @@ rte_cryptodev_count(void);
 /**
  * Get number of crypto device defined type.
  *
- * @param	type	type of device.
+ * @param	driver_id	driver identifier.
  *
  * @return
  *   Returns number of crypto device.
  */
 extern uint8_t
-rte_cryptodev_count_devtype(enum rte_cryptodev_type type);
+rte_cryptodev_device_count_by_driver(uint8_t driver_id);
 
 /**
  * Get number and identifiers of attached crypto device.
@@ -475,6 +460,7 @@ rte_cryptodev_count_devtype(enum rte_cryptodev_type type);
 uint8_t
 rte_cryptodev_devices_get(const char *dev_name, uint8_t *devices,
 		uint8_t nb_devices);
+
 /*
  * Return the NUMA socket to which a device is connected
  *
@@ -732,8 +718,8 @@ struct rte_cryptodev {
 	struct rte_device *device;
 	/**< Backing device */
 
-	enum rte_cryptodev_type dev_type;
-	/**< Crypto device type */
+	uint8_t driver_id;
+	/**< Crypto driver identifier*/
 
 	struct rte_cryptodev_cb_list link_intr_cbs;
 	/**< User application callback for interrupts if present */
@@ -870,8 +856,8 @@ struct rte_cryptodev_sym_session {
 	struct {
 		uint8_t dev_id;
 		/**< Device Id */
-		enum rte_cryptodev_type dev_type;
-		/** Crypto Device type session created on */
+		uint8_t driver_id;
+		/** Crypto driver identifier session created on */
 		struct rte_mempool *mp;
 		/**< Mempool session allocated from */
 	} __rte_aligned(8);
@@ -951,6 +937,44 @@ rte_cryptodev_queue_pair_attach_sym_session(uint16_t qp_id,
 int
 rte_cryptodev_queue_pair_detach_sym_session(uint16_t qp_id,
 		struct rte_cryptodev_sym_session *session);
+
+/**
+ * Provide driver identifier.
+ *
+ * @param name
+ *   The pointer to a driver name.
+ * @return
+ *  The driver type identifier or 0 if no driver found
+ */
+uint8_t rte_cryptodev_driver_id_get(const char *name);
+
+/**
+ * Provide driver name.
+ *
+ * @param driver_id
+ *   The driver identifier.
+ * @return
+ *  The driver name or null if no driver found
+ */
+char *rte_cryptodev_driver_name_get(uint8_t driver_id);
+
+/**
+ * Allocate driver identifier.
+ *
+ * @param name
+ *   The pointer to a driver name to be initialized.
+ * @return
+ *  The driver type identifier
+ */
+uint8_t rte_cryptodev_allocate_driver_id(const char *name);
+
+
+#define RTE_PMD_REGISTER_CRYPTO_DRIVER(name, driver_id)\
+RTE_INIT(init_ ##driver_id);\
+static void init_ ##driver_id(void)\
+{\
+	driver_id = rte_cryptodev_allocate_driver_id(RTE_STR(name));\
+}
 
 
 #ifdef __cplusplus

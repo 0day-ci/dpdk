@@ -509,12 +509,12 @@ rte_cryptodev_count(void)
 }
 
 uint8_t
-rte_cryptodev_count_devtype(enum rte_cryptodev_type type)
+rte_cryptodev_device_count_by_driver(uint8_t driver_id)
 {
 	uint8_t i, dev_count = 0;
 
 	for (i = 0; i < rte_cryptodev_globals->max_devs; i++)
-		if (rte_cryptodev_globals->devs[i].dev_type == type &&
+		if (rte_cryptodev_globals->devs[i].driver_id == driver_id &&
 			rte_cryptodev_globals->devs[i].attached ==
 					RTE_CRYPTODEV_ATTACHED)
 			dev_count++;
@@ -1293,7 +1293,7 @@ rte_cryptodev_sym_session_init(struct rte_mempool *mp,
 	memset(sess, 0, mp->elt_size);
 
 	sess->dev_id = dev->data->dev_id;
-	sess->dev_type = dev->dev_type;
+	sess->driver_id = dev->driver_id;
 	sess->mp = mp;
 
 	if (dev->dev_ops->session_initialize)
@@ -1460,7 +1460,7 @@ rte_cryptodev_sym_session_free(uint8_t dev_id,
 	dev = &rte_crypto_devices[dev_id];
 
 	/* Check the session belongs to this device type */
-	if (sess->dev_type != dev->dev_type)
+	if (sess->driver_id != dev->driver_id)
 		return sess;
 
 	/* Let device implementation clear session material */
@@ -1571,4 +1571,35 @@ rte_cryptodev_pmd_create_dev_name(char *name, const char *dev_name_prefix)
 	}
 
 	return -1;
+}
+
+static struct {
+	char name[RTE_CRYPTODEV_NAME_LEN];
+} rte_cryptodev_registered_drivers[RTE_CRYPTO_MAX_DEVS];
+
+static uint8_t rte_cryptodev_driver_id;
+
+uint8_t
+rte_cryptodev_driver_id_get(const char *name)
+{
+	for (uint8_t id = 0; id < rte_cryptodev_driver_id; id++)
+		if (strcmp(name, rte_cryptodev_registered_drivers[id].name)
+				== 0)
+			return id;
+	return 0;
+}
+
+char *
+rte_cryptodev_driver_name_get(uint8_t driver_id)
+{
+	return rte_cryptodev_registered_drivers[driver_id].name;
+}
+
+uint8_t
+rte_cryptodev_allocate_driver_id(const char *name)
+{
+	rte_cryptodev_driver_id++;
+	strcpy(rte_cryptodev_registered_drivers
+			[rte_cryptodev_driver_id].name, name);
+	return rte_cryptodev_driver_id;
 }

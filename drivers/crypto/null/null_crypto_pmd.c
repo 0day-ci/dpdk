@@ -95,7 +95,9 @@ get_session(struct null_crypto_qp *qp, struct rte_crypto_sym_op *op)
 
 	if (op->sess_type == RTE_CRYPTO_SYM_OP_WITH_SESSION) {
 		if (unlikely(op->session == NULL ||
-			     op->session->dev_type != RTE_CRYPTODEV_NULL_PMD))
+			     op->session->driver_id !=
+					     rte_cryptodev_driver_id_get(
+				RTE_STR(RTE_CRYPTODEV_NULL_PMD))))
 			return NULL;
 
 		sess = (struct null_crypto_session *)op->session->_private;
@@ -183,7 +185,8 @@ cryptodev_null_create(const char *name,
 		goto init_error;
 	}
 
-	dev->dev_type = RTE_CRYPTODEV_NULL_PMD;
+	dev->driver_id = rte_cryptodev_driver_id_get(
+			RTE_STR(RTE_CRYPTODEV_NULL_PMD));
 	dev->dev_ops = null_crypto_pmd_ops;
 
 	/* register rx/tx burst functions for data path */

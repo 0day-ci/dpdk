@@ -448,8 +448,9 @@ get_session(struct openssl_qp *qp, struct rte_crypto_op *op)
 	if (op->sym->sess_type == RTE_CRYPTO_SYM_OP_WITH_SESSION) {
 		/* get existing session */
 		if (likely(op->sym->session != NULL &&
-				op->sym->session->dev_type ==
-				RTE_CRYPTODEV_OPENSSL_PMD))
+				op->sym->session->driver_id ==
+						rte_cryptodev_driver_id_get(
+				RTE_STR(CRYPTODEV_NAME_OPENSSL_PMD))))
 			sess = (struct openssl_session *)
 				op->sym->session->_private;
 	} else  {
@@ -1283,7 +1284,8 @@ cryptodev_openssl_create(const char *name,
 		goto init_error;
 	}
 
-	dev->dev_type = RTE_CRYPTODEV_OPENSSL_PMD;
+	dev->driver_id = rte_cryptodev_driver_id_get(
+			RTE_STR(CRYPTODEV_NAME_OPENSSL_PMD));
 	dev->dev_ops = rte_openssl_pmd_ops;
 
 	/* register rx/tx burst functions for data path */
@@ -1366,9 +1368,14 @@ static struct rte_vdev_driver cryptodev_openssl_pmd_drv = {
 	.remove = cryptodev_openssl_remove
 };
 
+static uint8_t cryptodev_openssl_driver_id;
+
 RTE_PMD_REGISTER_VDEV(CRYPTODEV_NAME_OPENSSL_PMD,
 	cryptodev_openssl_pmd_drv);
 RTE_PMD_REGISTER_PARAM_STRING(CRYPTODEV_NAME_OPENSSL_PMD,
 	"max_nb_queue_pairs=<int> "
 	"max_nb_sessions=<int> "
 	"socket_id=<int>");
+RTE_PMD_REGISTER_CRYPTO_DRIVER(CRYPTODEV_NAME_OPENSSL_PMD,
+	cryptodev_openssl_driver_id);
+
