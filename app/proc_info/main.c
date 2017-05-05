@@ -75,7 +75,7 @@ static uint32_t enable_xstats;
 /**< Enable collectd format*/
 static uint32_t enable_collectd_format;
 /**< FD to send collectd format messages to STDOUT*/
-static int stdout_fd;
+static int stdout_fd = -1;
 /**< Host id process is running on */
 static char host_id[MAX_LONG_OPT_SZ];
 /**< Enable metrics. */
@@ -637,28 +637,37 @@ main(int argc, char **argv)
 	argc += 3;
 
 	ret = rte_eal_init(argc, argp);
-	if (ret < 0)
+	if (ret < 0) {
+		close(stdout_fd);
 		rte_panic("Cannot init EAL\n");
+	}
 
 	argc -= ret;
 	argv += (ret - 3);
 
-	if (!rte_eal_primary_proc_alive(NULL))
+	if (!rte_eal_primary_proc_alive(NULL)) {
+		close(stdout_fd);
 		rte_exit(EXIT_FAILURE, "No primary DPDK process is running.\n");
+	}
 
 	/* parse app arguments */
 	ret = proc_info_parse_args(argc, argv);
-	if (ret < 0)
+	if (ret < 0) {
+		close(stdout_fd);
 		rte_exit(EXIT_FAILURE, "Invalid argument\n");
+	}
 
 	if (mem_info) {
 		meminfo_display();
+		close(stdout_fd);
 		return 0;
 	}
 
 	nb_ports = rte_eth_dev_count();
-	if (nb_ports == 0)
+	if (nb_ports == 0) {
+		close(stdout_fd);
 		rte_exit(EXIT_FAILURE, "No Ethernet ports - bye\n");
+	}
 
 	/* If no port mask was specified*/
 	if (enabled_port_mask == 0)
@@ -687,6 +696,8 @@ main(int argc, char **argv)
 	/* print port independent stats */
 	if (enable_metrics)
 		metrics_display(RTE_METRICS_GLOBAL);
+
+	close(stdout_fd);
 
 	return 0;
 }
