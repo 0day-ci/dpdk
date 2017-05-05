@@ -96,6 +96,7 @@ static int
 test_multi_alarms(void)
 {
 	int rm_count = 0;
+	int count = 0;
 	cb_count.cnt = 0;
 
 	printf("Expect 6 callbacks in order...\n");
@@ -169,7 +170,10 @@ test_multi_alarms(void)
 		printf("Error, cancelling head-of-list leads to premature callback\n");
 		return -1;
 	}
-	rte_delay_ms(10);
+
+	while (flag != 2 && count++ < 6)
+		rte_delay_ms(10);
+
 	if (flag != 2) {
 		printf("Error - expected callback not called\n");
 		rte_eal_alarm_cancel(test_remove_in_callback, (void *)-1);
@@ -212,7 +216,7 @@ test_alarm(void)
 		printf("fail to set alarm callback\n");
 		return -1;
 	}
-	while (flag == 0 && count ++ < 6)
+	while (flag == 0 && count++ < 20)
 		rte_delay_ms(RTE_TEST_CHECK_PERIOD);
 
 	if (flag == 0){
