@@ -493,7 +493,6 @@ uint16_t
 mlx5_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 {
 	struct txq *txq = (struct txq *)dpdk_txq;
-	uint16_t elts_head = txq->elts_head;
 	const unsigned int elts_n = 1 << txq->elts_n;
 	unsigned int i = 0;
 	unsigned int j = 0;
@@ -504,6 +503,7 @@ mlx5_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 	uint16_t max_wqe;
 	unsigned int comp;
 	volatile struct mlx5_wqe_v *wqe = NULL;
+	volatile struct mlx5_wqe_ctrl *last_wqe = NULL;
 	unsigned int segs_n = 0;
 	struct rte_mbuf *buf = NULL;
 	uint8_t *raw;
@@ -514,7 +514,7 @@ mlx5_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 	rte_prefetch0(*pkts);
 	/* Start processing. */
 	txq_complete(txq);
-	max = (elts_n - (elts_head - txq->elts_tail));
+	max = (elts_n - (txq->elts_head - txq->elts_tail));
 	if (max > elts_n)
 		max -= elts_n;
 	max_wqe = (1u << txq->wqe_n) - (txq->wqe_ci - txq->wqe_pi);
@@ -524,8 +524,10 @@ mlx5_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 		volatile rte_v128u32_t *dseg = NULL;
 		uint32_t length;
 		unsigned int ds = 0;
+		unsigned int sg = 0;
 		uintptr_t addr;
 		uint64_t naddr;
+		uint16_t elts_head = (txq->elts_head + i + j) & (elts_n - 1);
 		uint16_t pkt_inline_sz = MLX5_WQE_DWORD_SIZE + 2;
 		uint16_t tso_header_sz = 0;
 		uint16_t ehdr;
@@ -536,7 +538,7 @@ mlx5_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 #endif
 
 		/* first_seg */
-		buf = *(pkts++);
+		buf = *(pkts + i);
 		segs_n = buf->nb_segs;
 		/*
 		 * Make sure there is enough room to store this packet and
@@ -547,15 +549,13 @@ mlx5_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 			break;
 		max -= segs_n;
 		--segs_n;
-		if (!segs_n)
-			--pkts_n;
 		if (unlikely(--max_wqe == 0))
 			break;
 		wqe = (volatile struct mlx5_wqe_v *)
 			tx_mlx5_wqe(txq, txq->wqe_ci);
 		rte_prefetch0(tx_mlx5_wqe(txq, txq->wqe_ci + 1));
-		if (pkts_n > 1)
-			rte_prefetch0(*pkts);
+		if (pkts_n - i > 1)
+			rte_prefetch0(*(pkts + i + 1));
 		addr = rte_pktmbuf_mtod(buf, uintptr_t);
 		length = DATA_LEN(buf);
 		ehdr = (((uint8_t *)addr)[1] << 8) |
@@ -567,14 +567,10 @@ mlx5_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 			break;
 		/* Update element. */
 		(*txq->elts)[elts_head] = buf;
-		elts_head = (elts_head + 1) & (elts_n - 1);
 		/* Prefetch next buffer data. */
-		if (pkts_n > 1) {
-			volatile void *pkt_addr;
-
-			pkt_addr = rte_pktmbuf_mtod(*pkts, volatile void *);
-			rte_prefetch0(pkt_addr);
-		}
+		if (pkts_n - i > 1)
+			rte_prefetch0(
+			    rte_pktmbuf_mtod(*(pkts + i + 1), volatile void *));
 		/* Should we enable HW CKSUM offload */
 		if (buf->ol_flags &
 		    (PKT_TX_IP_CKSUM | PKT_TX_TCP_CKSUM | PKT_TX_UDP_CKSUM)) {
@@ -677,10 +673,6 @@ mlx5_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 					};
 					ds = 1;
 					total_length = 0;
-					pkts--;
-					pkts_n++;
-					elts_head = (elts_head - 1) &
-						    (elts_n - 1);
 					k++;
 					goto next_wqe;
 				}
@@ -813,14 +805,15 @@ next_seg:
 			naddr,
 			naddr >> 32,
 		};
-		(*txq->elts)[elts_head] = buf;
 		elts_head = (elts_head + 1) & (elts_n - 1);
-		++j;
+		(*txq->elts)[elts_head] = buf;
+		++sg;
 		--segs_n;
+		/* Advance counter only if all segs are successfully posted. */
 		if (segs_n)
 			goto next_seg;
 		else
-			--pkts_n;
+			j += sg;
 next_pkt:
 		++i;
 		/* Initialize known and common part of the WQE structure. */
@@ -853,24 +846,24 @@ next_pkt:
 		}
 next_wqe:
 		txq->wqe_ci += (ds + 3) / 4;
+		/* Save the last successful WQE for completion request */
+		last_wqe = (volatile struct mlx5_wqe_ctrl *)wqe;
 #ifdef MLX5_PMD_SOFT_COUNTERS
 		/* Increment sent bytes counter. */
 		txq->stats.obytes += total_length;
 #endif
-	} while (pkts_n);
+	} while (i < pkts_n);
 	/* Take a shortcut if nothing must be sent. */
 	if (unlikely((i + k) == 0))
 		return 0;
+	txq->elts_head = (txq->elts_head + i + j) & (elts_n - 1);
 	/* Check whether completion threshold has been reached. */
 	comp = txq->elts_comp + i + j + k;
 	if (comp >= MLX5_TX_COMP_THRESH) {
-		volatile struct mlx5_wqe_ctrl *w =
-			(volatile struct mlx5_wqe_ctrl *)wqe;
-
 		/* Request completion on last WQE. */
-		w->ctrl2 = htonl(8);
+		last_wqe->ctrl2 = htonl(8);
 		/* Save elts_head in unused "immediate" field of WQE. */
-		w->ctrl3 = elts_head;
+		last_wqe->ctrl3 = txq->elts_head;
 		txq->elts_comp = 0;
 	} else {
 		txq->elts_comp = comp;
@@ -880,8 +873,7 @@ next_wqe:
 	txq->stats.opackets += i;
 #endif
 	/* Ring QP doorbell. */
-	mlx5_tx_dbrec(txq, (volatile struct mlx5_wqe *)wqe);
-	txq->elts_head = elts_head;
+	mlx5_tx_dbrec(txq, (volatile struct mlx5_wqe *)last_wqe);
 	return i;
 }
 
