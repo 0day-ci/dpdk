@@ -227,7 +227,6 @@ contigmem_mmap_single(struct cdev *cdev, vm_ooffset_t *offset, vm_size_t size,
 	if (buffer_index >= contigmem_num_buffers)
 		return EINVAL;
 
-	memset(contigmem_buffers[buffer_index], 0, contigmem_buffer_size);
 	*offset = (vm_ooffset_t)vtophys(contigmem_buffers[buffer_index]);
 	*obj = vm_pager_allocate(OBJT_DEVICE, cdev, size, nprot, *offset,
 			curthread->td_ucred);

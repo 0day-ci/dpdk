@@ -36,6 +36,7 @@
 #include <sys/sysctl.h>
 #include <inttypes.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include <rte_eal.h>
 #include <rte_eal_memconfig.h>
@@ -120,6 +121,8 @@ rte_eal_hugepage_init(void)
 			seg->nchannel = mcfg->nchannel;
 			seg->nrank = mcfg->nrank;
 			seg->socket_id = 0;
+
+			memset(seg->addr, 0, seg->len);
 
 			RTE_LOG(INFO, EAL, "Mapped memory segment %u @ %p: physaddr:0x%"
 					PRIx64", len %zu\n",
