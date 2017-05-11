@@ -77,7 +77,8 @@ There are many libraries, so their headers may be grouped by topics:
   [SIMD]               (@ref rte_vect.h),
   [byte order]         (@ref rte_byteorder.h),
   [CPU flags]          (@ref rte_cpuflags.h),
-  [I/O access]         (@ref rte_io.h)
+  [I/O access]         (@ref rte_io.h),
+  [cpu pause]          (@ref rte_pause.h)
 
 - **CPU multicore**:
   [interrupts]         (@ref rte_interrupts.h),
