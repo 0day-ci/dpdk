@@ -294,21 +294,6 @@ rte_align64pow2(uint64_t v)
 
 /*********** Other general functions / macros ********/
 
-#ifdef __SSE2__
-#include <emmintrin.h>
-/**
- * PAUSE instruction for tight loops (avoid busy waiting)
- */
-static inline void
-rte_pause (void)
-{
-	_mm_pause();
-}
-#else
-static inline void
-rte_pause(void) {}
-#endif
-
 /**
  * Searches the input parameter for the least significant set bit
  * (starting from zero).
