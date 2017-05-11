@@ -354,7 +354,8 @@ pmd_set_arg(char *arg, char *val)
 			o->v.INT = atoll(val);
 			break;
 		case OTSTRING:
-			strncpy(o->v.STR, val, ARK_MAX_STR_LEN);
+			strncpy(o->v.STR, val, ARK_MAX_STR_LEN - 1);
+			o->v.STR[ARK_MAX_STR_LEN - 1] = 0;
 			break;
 		}
 		return 1;
