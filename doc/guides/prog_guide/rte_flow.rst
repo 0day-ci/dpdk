@@ -181,6 +181,18 @@ directions. At least one direction must be specified.
 Specifying both directions at once for a given rule is not recommended but
 may be valid in a few cases (e.g. shared counters).
 
+Attribute: Match hint
+^^^^^^^^^^^^^^^^^^^^^
+
+This is a attribute to hint different pattern match accuracy.
+
+Perfect match:
+- Actions will be taken if input packet's pattern matches flow's pattern.
+
+Signature match:
+- Actions will be taken if the signature of input packet's pattern matches
+  the signature of flow's pattern.
+
 Pattern item
 ~~~~~~~~~~~~
 
