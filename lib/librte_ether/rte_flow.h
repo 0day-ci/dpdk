@@ -95,7 +95,8 @@ struct rte_flow_attr {
 	uint32_t priority; /**< Priority level within group. */
 	uint32_t ingress:1; /**< Rule applies to ingress traffic. */
 	uint32_t egress:1; /**< Rule applies to egress traffic. */
-	uint32_t reserved:30; /**< Reserved, must be zero. */
+	uint32_t sig_match:1; /**< only use hash signagure to match. */
+	uint32_t reserved:29; /**< Reserved, must be zero. */
 };
 
 /**

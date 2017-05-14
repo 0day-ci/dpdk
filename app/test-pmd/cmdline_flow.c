@@ -95,6 +95,7 @@ enum index {
 	PRIORITY,
 	INGRESS,
 	EGRESS,
+	SIG_MATCH,
 
 	/* Validate/create pattern. */
 	PATTERN,
@@ -397,6 +398,7 @@ static const enum index next_vc_attr[] = {
 	PRIORITY,
 	INGRESS,
 	EGRESS,
+	SIG_MATCH,
 	PATTERN,
 	ZERO,
 };
@@ -893,6 +895,12 @@ static const struct token token_list[] = {
 	[EGRESS] = {
 		.name = "egress",
 		.help = "affect rule to egress",
+		.next = NEXT(next_vc_attr),
+		.call = parse_vc,
+	},
+	[SIG_MATCH] = {
+		.name = "sig_match",
+		.help = "affect rule to match",
 		.next = NEXT(next_vc_attr),
 		.call = parse_vc,
 	},
@@ -1727,6 +1735,9 @@ parse_vc(struct context *ctx, const struct token *token,
 		return len;
 	case EGRESS:
 		out->args.vc.attr.egress = 1;
+		return len;
+	case SIG_MATCH:
+		out->args.vc.attr.sig_match = 1;
 		return len;
 	case PATTERN:
 		out->args.vc.pattern =
