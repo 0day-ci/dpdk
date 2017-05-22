@@ -61,6 +61,7 @@
 #include <fslmc_vfio.h>
 #include "dpaa2_hw_pvt.h"
 #include "dpaa2_hw_dpio.h"
+#include <mc/fsl_dpmng.h>
 
 #define NUM_HOST_CPUS RTE_MAX_LCORE
 
@@ -77,6 +78,10 @@ static uint32_t io_space_count;
 /*Stashing Macros default for LS208x*/
 static int dpaa2_core_cluster_base = 0x04;
 static int dpaa2_cluster_sz = 2;
+
+#define SVR_LS1080A             0x87030000
+#define SVR_LS2080A             0x87010000
+#define SVR_LS2088A             0x87090000
 
 /* For LS208X platform There are four clusters with following mapping:
  * Cluster 1 (ID = x04) : CPU0, CPU1;
@@ -179,6 +184,22 @@ dpaa2_configure_stashing(struct dpaa2_dpio_dev *dpio_dev)
 {
 	int sdest;
 	int cpu_id, ret;
+	static int first_time;
+
+	/* find the SoC type for the first time */
+	if (!first_time) {
+		struct mc_soc_version mc_plat_info = {0};
+
+		if (mc_get_soc_version(dpio_dev->dpio,
+				       CMD_PRI_LOW, &mc_plat_info)) {
+			PMD_INIT_LOG(ERR, "\tmc_get_soc_version failed\n");
+		} else if ((mc_plat_info.svr & 0xffff0000) == SVR_LS1080A) {
+			dpaa2_core_cluster_base = 0x02;
+			dpaa2_cluster_sz = 4;
+			PMD_INIT_LOG(DEBUG, "\tLS108x (A53) Platform Detected");
+		}
+		first_time = 1;
+	}
 
 	/* Set the Stashing Destination */
 	cpu_id = rte_lcore_id();
@@ -191,8 +212,6 @@ dpaa2_configure_stashing(struct dpaa2_dpio_dev *dpio_dev)
 	}
 	/* Set the STASH Destination depending on Current CPU ID.
 	 * Valid values of SDEST are 4,5,6,7. Where,
-	 * CPU 0-1 will have SDEST 4
-	 * CPU 2-3 will have SDEST 5.....and so on.
 	 */
 
 	sdest = dpaa2_core_cluster_sdest(cpu_id);
