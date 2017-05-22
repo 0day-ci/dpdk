@@ -820,6 +820,45 @@ static const struct rte_ixgbe_xstats_name_off rte_ixgbevf_stats_strings[] = {
 #define IXGBEVF_NB_XSTATS (sizeof(rte_ixgbevf_stats_strings) /	\
 		sizeof(rte_ixgbevf_stats_strings[0]))
 
+static const struct rte_ixgbe_xstats_name_off ixgbe_if_mib_strings[] = {
+	{"ifNumber", offsetof(struct ixgbe_if_mib_stats, if_number)},
+	{"ifIndex", offsetof(struct ixgbe_if_mib_stats, if_index)},
+	{"ifType", offsetof(struct ixgbe_if_mib_stats, if_type)},
+	{"ifMtu", offsetof(struct ixgbe_if_mib_stats, if_mtu)},
+	{"ifSpeed", offsetof(struct ixgbe_if_mib_stats, if_speed)},
+	{"ifPhysAddress", offsetof(struct ixgbe_if_mib_stats, if_phys_address)},
+	{"ifOperStatus", offsetof(struct ixgbe_if_mib_stats, if_oper_status)},
+	{"ifLastChange", offsetof(struct ixgbe_if_mib_stats, if_last_change)},
+	{"ifHighSpeed", offsetof(struct ixgbe_if_mib_stats, if_high_speed)},
+	{"ifConnectorPresent", offsetof(struct ixgbe_if_mib_stats,
+			if_connector_present)},
+	{"ifCounterDiscontinuityTime", offsetof(struct ixgbe_if_mib_stats,
+			if_counter_discontinuity_time)},
+};
+
+#define IXGBE_NB_IF_MIB_XSTATS (sizeof(ixgbe_if_mib_strings) / \
+		sizeof(ixgbe_if_mib_strings[0]))
+
+static const struct rte_ixgbe_xstats_name_off ixgbe_ether_like_mib_strings[] = {
+	{"dot3PauseOperMode", offsetof(struct ixgbe_ether_like_mib_stats,
+			dot3_pause_oper_mode)},
+	{"dot3StatsDuplexStatus", offsetof(struct ixgbe_ether_like_mib_stats,
+			dot3_stats_duplex_status)},
+	{"dot3StatsRateControlAbility", offsetof(
+			struct ixgbe_ether_like_mib_stats,
+			dot3_stats_rate_control_ability)},
+	{"dot3StatsRateControlStatus", offsetof(
+			struct ixgbe_ether_like_mib_stats,
+			dot3_stats_rate_control_status)},
+	{"dot3ControlFunctionsSupported", offsetof(
+			struct ixgbe_ether_like_mib_stats,
+			dot3_control_functions_supported)},
+};
+
+#define IXGBE_NB_ETHER_LIKE_MIB_XSTATS \
+		(sizeof(ixgbe_ether_like_mib_strings) / \
+		sizeof(ixgbe_ether_like_mib_strings[0]))
+
 /**
  * Atomically reads the link status information from global
  * structure rte_eth_dev.
@@ -1145,6 +1184,8 @@ eth_ixgbe_dev_init(struct rte_eth_dev *eth_dev)
 		IXGBE_DEV_PRIVATE_TO_FILTER_INFO(eth_dev->data->dev_private);
 	struct ixgbe_bw_conf *bw_conf =
 		IXGBE_DEV_PRIVATE_TO_BW_CONF(eth_dev->data->dev_private);
+	struct ixgbe_adapter *adapter =
+			(struct ixgbe_adapter *)eth_dev->data->dev_private;
 	uint32_t ctrl_ext;
 	uint16_t csum;
 	int diag, i;
@@ -1326,6 +1367,11 @@ eth_ixgbe_dev_init(struct rte_eth_dev *eth_dev)
 	PMD_INIT_LOG(DEBUG, "port %d vendorID=0x%x deviceID=0x%x",
 		     eth_dev->data->port_id, pci_dev->id.vendor_id,
 		     pci_dev->id.device_id);
+
+	/* indicate sysUpTime start */
+	adapter->sys_up_time_start = rte_rdtsc();
+	adapter->if_last_change = 0;
+	adapter->if_counter_discontinuity_time = 0;
 
 	rte_intr_callback_register(intr_handle,
 				   ixgbe_dev_interrupt_handler, eth_dev);
@@ -1607,6 +1653,8 @@ eth_ixgbevf_dev_init(struct rte_eth_dev *eth_dev)
 	struct ixgbe_hwstrip *hwstrip =
 		IXGBE_DEV_PRIVATE_TO_HWSTRIP_BITMAP(eth_dev->data->dev_private);
 	struct ether_addr *perm_addr = (struct ether_addr *) hw->mac.perm_addr;
+	struct ixgbe_adapter *adapter =
+			(struct ixgbe_adapter *)eth_dev->data->dev_private;
 
 	PMD_INIT_FUNC_TRACE();
 
@@ -1729,6 +1777,11 @@ eth_ixgbevf_dev_init(struct rte_eth_dev *eth_dev)
 		PMD_INIT_LOG(ERR, "VF Initialization Failure: %d", diag);
 		return -EIO;
 	}
+
+	/* indicate sysUpTime start */
+	adapter->sys_up_time_start = rte_rdtsc();
+	adapter->if_last_change = 0;
+	adapter->if_counter_discontinuity_time = 0;
 
 	rte_intr_callback_register(intr_handle,
 				   ixgbevf_dev_interrupt_handler, eth_dev);
@@ -3121,12 +3174,17 @@ ixgbe_dev_stats_reset(struct rte_eth_dev *dev)
 {
 	struct ixgbe_hw_stats *stats =
 			IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct ixgbe_adapter *adapter =
+			(struct ixgbe_adapter *)dev->data->dev_private;
 
 	/* HW registers are cleared on read */
 	ixgbe_dev_stats_get(dev, NULL);
 
 	/* Reset software totals */
 	memset(stats, 0, sizeof(*stats));
+
+	adapter->if_counter_discontinuity_time =
+			rte_rdtsc() - adapter->sys_up_time_start;
 }
 
 /* This function calculates the number of xstats based on the current config */
@@ -3134,7 +3192,8 @@ static unsigned
 ixgbe_xstats_calc_num(void) {
 	return IXGBE_NB_HW_STATS + IXGBE_NB_MACSEC_STATS +
 		(IXGBE_NB_RXQ_PRIO_STATS * IXGBE_NB_RXQ_PRIO_VALUES) +
-		(IXGBE_NB_TXQ_PRIO_STATS * IXGBE_NB_TXQ_PRIO_VALUES);
+		(IXGBE_NB_TXQ_PRIO_STATS * IXGBE_NB_TXQ_PRIO_VALUES) +
+		IXGBE_NB_IF_MIB_XSTATS + IXGBE_NB_ETHER_LIKE_MIB_XSTATS;
 }
 
 static int ixgbe_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
@@ -3189,8 +3248,30 @@ static int ixgbe_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 				count++;
 			}
 		}
+
+		/* Get stats from IF-MIB objects */
+		for (i = 0; i < IXGBE_NB_IF_MIB_XSTATS; i++) {
+			snprintf(xstats_names[count].name,
+				sizeof(xstats_names[count].name),
+				 "%s", ixgbe_if_mib_strings[i].name);
+			count++;
+		}
+
+		/* Get stats from Ethernet-like-MIB objects */
+		for (i = 0; i < IXGBE_NB_ETHER_LIKE_MIB_XSTATS; i++) {
+			snprintf(xstats_names[count].name,
+				sizeof(xstats_names[count].name),
+				 "%s", ixgbe_ether_like_mib_strings[i].name);
+			count++;
+		}
 	}
 	return cnt_stats;
+}
+
+static unsigned int
+ixgbevf_xstats_calc_num(void) {
+	return IXGBEVF_NB_XSTATS + IXGBE_NB_IF_MIB_XSTATS +
+		IXGBE_NB_ETHER_LIKE_MIB_XSTATS;
 }
 
 static int ixgbe_dev_xstats_get_names_by_id(
@@ -3272,19 +3353,117 @@ static int ixgbe_dev_xstats_get_names_by_id(
 }
 
 static int ixgbevf_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
-	struct rte_eth_xstat_name *xstats_names, unsigned limit)
+	struct rte_eth_xstat_name *xstats_names,
+	__rte_unused unsigned int limit)
 {
-	unsigned i;
+	unsigned int i, count = 0;
 
-	if (limit < IXGBEVF_NB_XSTATS && xstats_names != NULL)
-		return -ENOMEM;
+	if (xstats_names == NULL)
+		return ixgbevf_xstats_calc_num();
 
-	if (xstats_names != NULL)
-		for (i = 0; i < IXGBEVF_NB_XSTATS; i++)
-			snprintf(xstats_names[i].name,
-				sizeof(xstats_names[i].name),
-				"%s", rte_ixgbevf_stats_strings[i].name);
-	return IXGBEVF_NB_XSTATS;
+	for (i = 0; i < IXGBEVF_NB_XSTATS; i++) {
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name),
+			"%s", rte_ixgbevf_stats_strings[i].name);
+		count++;
+	}
+
+	/* Get stats from IF-MIB objects */
+	for (i = 0; i < IXGBE_NB_IF_MIB_XSTATS; i++) {
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name),
+			 "%s", ixgbe_if_mib_strings[i].name);
+		count++;
+	}
+
+	/* Get stats from Ethernet-like-MIB objects */
+	for (i = 0; i < IXGBE_NB_ETHER_LIKE_MIB_XSTATS; i++) {
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name),
+			 "%s", ixgbe_ether_like_mib_strings[i].name);
+		count++;
+	}
+
+	return count;
+}
+
+static void
+ixgbe_read_if_mib(struct rte_eth_dev *dev, struct ixgbe_if_mib_stats *stats)
+{
+	struct rte_eth_dev_data *data = dev->data;
+	struct rte_device *device = dev->device;
+	struct ixgbe_adapter *adapter =
+			(struct ixgbe_adapter *)dev->data->dev_private;
+
+	stats->if_number = rte_eth_dev_count();
+	stats->if_index = data->port_id + 1;
+	stats->if_type = IXGBE_MIB_IF_TYPE_ETHERNETCSMACD;
+	stats->if_mtu = data->mtu;
+	stats->if_speed = (data->dev_link.link_speed < (UINT32_MAX / 1000000)) ?
+			(data->dev_link.link_speed * 1000000) : UINT32_MAX;
+	stats->if_phys_address = 0;
+	ether_addr_copy(data->mac_addrs,
+			(struct ether_addr *)&stats->if_phys_address);
+	stats->if_oper_status = data->dev_link.link_status ?
+			ixgbe_mib_truth_true : ixgbe_mib_truth_false;
+	stats->if_last_change = adapter->if_last_change /
+			(rte_get_tsc_hz() * 100);
+	stats->if_high_speed = data->dev_link.link_speed;
+	if (device->devargs)
+		stats->if_connector_present =
+				(device->devargs->type == RTE_DEVTYPE_VIRTUAL) ?
+						ixgbe_mib_truth_false :
+						ixgbe_mib_truth_true;
+	else
+		stats->if_connector_present = 0;
+	stats->if_counter_discontinuity_time =
+			adapter->if_counter_discontinuity_time /
+			(rte_get_tsc_hz() * 100);
+}
+
+static void
+ixgbe_read_ether_like_mib(struct rte_eth_dev *dev,
+		struct ixgbe_ether_like_mib_stats *stats)
+{
+	struct rte_eth_dev_data *data = dev->data;
+	struct ixgbe_hw *hw =
+			IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+
+	switch (hw->fc.current_mode) {
+	case ixgbe_fc_none:
+		stats->dot3_pause_oper_mode = ixgbe_dot3_pause_disabled;
+		break;
+	case ixgbe_fc_rx_pause:
+		stats->dot3_pause_oper_mode = ixgbe_dot3_pause_enabledrcv;
+		break;
+	case ixgbe_fc_tx_pause:
+		stats->dot3_pause_oper_mode = ixgbe_dot3_pause_enabledxmit;
+		break;
+	case ixgbe_fc_full:
+		stats->dot3_pause_oper_mode =
+				ixgbe_dot3_pause_enabledxmitandrcv;
+		break;
+	default:
+		stats->dot3_pause_oper_mode = 0;
+		break;
+	}
+
+	switch (data->dev_link.link_duplex) {
+	case ETH_LINK_FULL_DUPLEX:
+		stats->dot3_stats_duplex_status = ixgbe_dot3_duplex_fullduplex;
+		break;
+	case ETH_LINK_HALF_DUPLEX:
+		stats->dot3_stats_duplex_status = ixgbe_dot3_duplex_halfduplex;
+		break;
+	default:
+		stats->dot3_stats_duplex_status = ixgbe_dot3_duplex_unknown;
+		break;
+	}
+
+	stats->dot3_stats_rate_control_ability = ixgbe_mib_truth_false;
+	stats->dot3_stats_rate_control_status = ixgbe_dot3_rate_control_off;
+	stats->dot3_control_functions_supported = IXGBE_DOT3_CF_PAUSE |
+			IXGBE_DOT3_CF_PFC;
 }
 
 static int
@@ -3298,6 +3477,8 @@ ixgbe_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 	struct ixgbe_macsec_stats *macsec_stats =
 			IXGBE_DEV_PRIVATE_TO_MACSEC_STATS(
 				dev->data->dev_private);
+	struct ixgbe_if_mib_stats if_mib_stats;
+	struct ixgbe_ether_like_mib_stats ether_like_mib_stats;
 	uint64_t total_missed_rx, total_qbrc, total_qprc, total_qprdc;
 	unsigned i, stat, count = 0;
 
@@ -3313,6 +3494,9 @@ ixgbe_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 
 	ixgbe_read_stats_registers(hw, hw_stats, macsec_stats, &total_missed_rx,
 			&total_qbrc, &total_qprc, &total_qprdc);
+
+	ixgbe_read_if_mib(dev, &if_mib_stats);
+	ixgbe_read_ether_like_mib(dev, &ether_like_mib_stats);
 
 	/* If this is a reset xstats is NULL, and we have cleared the
 	 * registers by reading them.
@@ -3357,6 +3541,23 @@ ixgbe_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 			xstats[count].id = count;
 			count++;
 		}
+	}
+
+/* Get stats from IF-MIB objects */
+	for (i = 0; i < IXGBE_NB_IF_MIB_XSTATS; i++) {
+		xstats[count].value = *(uint64_t *)(((char *)&if_mib_stats) +
+			ixgbe_if_mib_strings[i].offset);
+		xstats[count].id = count;
+		count++;
+	}
+
+	/* Get stats from Ethernet-like-MIB objects */
+	for (i = 0; i < IXGBE_NB_ETHER_LIKE_MIB_XSTATS; i++) {
+		xstats[count].value =
+			*(uint64_t *)(((char *)&ether_like_mib_stats) +
+			ixgbe_ether_like_mib_strings[i].offset);
+		xstats[count].id = count;
+		count++;
 	}
 	return count;
 }
@@ -3460,6 +3661,8 @@ ixgbe_dev_xstats_reset(struct rte_eth_dev *dev)
 	struct ixgbe_macsec_stats *macsec_stats =
 			IXGBE_DEV_PRIVATE_TO_MACSEC_STATS(
 				dev->data->dev_private);
+	struct ixgbe_adapter *adapter =
+			(struct ixgbe_adapter *)dev->data->dev_private;
 
 	unsigned count = ixgbe_xstats_calc_num();
 
@@ -3469,6 +3672,9 @@ ixgbe_dev_xstats_reset(struct rte_eth_dev *dev)
 	/* Reset software totals */
 	memset(stats, 0, sizeof(*stats));
 	memset(macsec_stats, 0, sizeof(*macsec_stats));
+
+	adapter->if_counter_discontinuity_time =
+			rte_rdtsc() - adapter->sys_up_time_start;
 }
 
 static void
@@ -3505,24 +3711,50 @@ ixgbevf_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 {
 	struct ixgbevf_hw_stats *hw_stats = (struct ixgbevf_hw_stats *)
 			IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
-	unsigned i;
+	struct ixgbe_if_mib_stats if_mib_stats;
+	struct ixgbe_ether_like_mib_stats ether_like_mib_stats;
+	unsigned int i, count;
 
-	if (n < IXGBEVF_NB_XSTATS)
-		return IXGBEVF_NB_XSTATS;
+	count = ixgbevf_xstats_calc_num();
+	if (n < count)
+		return count;
 
 	ixgbevf_update_stats(dev);
+
+	ixgbe_read_if_mib(dev, &if_mib_stats);
+	ixgbe_read_ether_like_mib(dev, &ether_like_mib_stats);
 
 	if (!xstats)
 		return 0;
 
+	count = 0;
+
 	/* Extended stats */
 	for (i = 0; i < IXGBEVF_NB_XSTATS; i++) {
-		xstats[i].id = i;
-		xstats[i].value = *(uint64_t *)(((char *)hw_stats) +
+		xstats[count].value = *(uint64_t *)(((char *)hw_stats) +
 			rte_ixgbevf_stats_strings[i].offset);
+		xstats[count].id = count;
+		count++;
 	}
 
-	return IXGBEVF_NB_XSTATS;
+	/* Get stats from IF-MIB objects */
+	for (i = 0; i < IXGBE_NB_IF_MIB_XSTATS; i++) {
+		xstats[count].value = *(uint64_t *)(((char *)&if_mib_stats) +
+			ixgbe_if_mib_strings[i].offset);
+		xstats[count].id = count;
+		count++;
+	}
+
+	/* Get stats from Ethernet-like-MIB objects */
+	for (i = 0; i < IXGBE_NB_ETHER_LIKE_MIB_XSTATS; i++) {
+		xstats[count].value =
+			*(uint64_t *)(((char *)&ether_like_mib_stats) +
+			ixgbe_ether_like_mib_strings[i].offset);
+		xstats[count].id = count;
+		count++;
+	}
+
+	return count;
 }
 
 static void
@@ -3547,6 +3779,8 @@ ixgbevf_dev_stats_reset(struct rte_eth_dev *dev)
 {
 	struct ixgbevf_hw_stats *hw_stats = (struct ixgbevf_hw_stats *)
 			IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct ixgbe_adapter *adapter =
+			(struct ixgbe_adapter *)dev->data->dev_private;
 
 	/* Sync HW register to the last stats */
 	ixgbevf_dev_stats_get(dev, NULL);
@@ -3556,6 +3790,9 @@ ixgbevf_dev_stats_reset(struct rte_eth_dev *dev)
 	hw_stats->vfgorc = 0;
 	hw_stats->vfgptc = 0;
 	hw_stats->vfgotc = 0;
+
+	adapter->if_counter_discontinuity_time =
+			rte_rdtsc() - adapter->sys_up_time_start;
 }
 
 static int
@@ -3781,6 +4018,8 @@ static int
 ixgbe_dev_link_update(struct rte_eth_dev *dev, int wait_to_complete)
 {
 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct ixgbe_adapter *adapter =
+			(struct ixgbe_adapter *)dev->data->dev_private;
 	struct rte_eth_link link, old;
 	ixgbe_link_speed link_speed = IXGBE_LINK_SPEED_UNKNOWN;
 	struct ixgbe_interrupt *intr =
@@ -3855,6 +4094,8 @@ ixgbe_dev_link_update(struct rte_eth_dev *dev, int wait_to_complete)
 
 	if (link.link_status == old.link_status)
 		return -1;
+
+	adapter->if_last_change = rte_rdtsc() - adapter->sys_up_time_start;
 
 	return 0;
 }

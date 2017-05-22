@@ -429,6 +429,62 @@ struct ixgbe_macsec_stats {
 	uint64_t in_pkts_notusingsa;
 };
 
+#define IXGBE_MIB_IF_TYPE_ETHERNETCSMACD	6
+
+enum ixgbe_mib_truth_value {
+	ixgbe_mib_truth_true = 1,
+	ixgbe_mib_truth_false
+};
+
+/* IF-MIB statistics */
+struct ixgbe_if_mib_stats {
+	uint64_t if_number;			/* ifNumber */
+	uint64_t if_index;			/* ifIndex */
+	uint64_t if_type;			/* ifType */
+	uint64_t if_mtu;			/* ifMtu */
+	uint64_t if_speed;			/* ifSpeed */
+	uint64_t if_phys_address;		/* ifPhysAddress */
+	uint64_t if_oper_status;		/* ifOperStatus */
+	uint64_t if_last_change;		/* ifLastChange */
+	uint64_t if_high_speed;			/* ifHighSpeed */
+	uint64_t if_connector_present;		/* ifConnectorPresent */
+	uint64_t if_counter_discontinuity_time;	/* ifCounterDiscontinuityTime */
+};
+
+enum ixgbe_dot3_pause_oper_mode {
+	ixgbe_dot3_pause_disabled = 1,
+	ixgbe_dot3_pause_enabledxmit,
+	ixgbe_dot3_pause_enabledrcv,
+	ixgbe_dot3_pause_enabledxmitandrcv
+};
+
+enum ixgbe_dot3_stats_duplex_status {
+	ixgbe_dot3_duplex_unknown = 1,
+	ixgbe_dot3_duplex_halfduplex,
+	ixgbe_dot3_duplex_fullduplex
+};
+
+enum ixgbe_dot3_stats_rate_control_status {
+	ixgbe_dot3_rate_control_off = 1,
+	ixgbe_dot3_rate_control_on,
+	ixgbe_dot3_rate_control_unknown
+};
+
+#define IXGBE_DOT3_CF_PAUSE	(1 << 0) /* PAUSE command implemented */
+#define IXGBE_DOT3_CF_MPCP	(1 << 1) /* MPCP implemented */
+#define IXGBE_DOT3_CF_PFC	(1 << 2) /* PFC implemented */
+
+/* Ethernet-like-MIB statistics */
+struct ixgbe_ether_like_mib_stats {
+	uint64_t dot3_pause_oper_mode;		/* dot3PauseOperMode */
+	uint64_t dot3_stats_duplex_status;	/* dot3StatsDuplexStatus */
+	uint64_t dot3_stats_rate_control_ability;
+	/* dot3StatsRateControlAbility */
+	uint64_t dot3_stats_rate_control_status;/* dot3StatsRateControlStatus */
+	uint64_t dot3_control_functions_supported;
+	/* dot3ControlFunctionsSupported */
+};
+
 /* The configuration of bandwidth */
 struct ixgbe_bw_conf {
 	uint8_t tc_num; /* Number of TCs. */
@@ -462,6 +518,9 @@ struct ixgbe_adapter {
 	struct rte_timecounter      systime_tc;
 	struct rte_timecounter      rx_tstamp_tc;
 	struct rte_timecounter      tx_tstamp_tc;
+	uint64_t                    sys_up_time_start;
+	uint64_t                    if_last_change;
+	uint64_t                    if_counter_discontinuity_time;
 };
 
 #define IXGBE_DEV_TO_PCI(eth_dev) \
