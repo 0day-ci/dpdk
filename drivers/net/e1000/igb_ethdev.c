@@ -560,6 +560,45 @@ static const struct rte_igb_xstats_name_off rte_igbvf_stats_strings[] = {
 #define IGBVF_NB_XSTATS (sizeof(rte_igbvf_stats_strings) / \
 		sizeof(rte_igbvf_stats_strings[0]))
 
+static const struct rte_igb_xstats_name_off igb_if_mib_strings[] = {
+	{"ifNumber", offsetof(struct e1000_if_mib_stats, if_number)},
+	{"ifIndex", offsetof(struct e1000_if_mib_stats, if_index)},
+	{"ifType", offsetof(struct e1000_if_mib_stats, if_type)},
+	{"ifMtu", offsetof(struct e1000_if_mib_stats, if_mtu)},
+	{"ifSpeed", offsetof(struct e1000_if_mib_stats, if_speed)},
+	{"ifPhysAddress", offsetof(struct e1000_if_mib_stats, if_phys_address)},
+	{"ifOperStatus", offsetof(struct e1000_if_mib_stats, if_oper_status)},
+	{"ifLastChange", offsetof(struct e1000_if_mib_stats, if_last_change)},
+	{"ifHighSpeed", offsetof(struct e1000_if_mib_stats, if_high_speed)},
+	{"ifConnectorPresent", offsetof(struct e1000_if_mib_stats,
+			if_connector_present)},
+	{"ifCounterDiscontinuityTime", offsetof(struct e1000_if_mib_stats,
+			if_counter_discontinuity_time)},
+};
+
+#define IGB_NB_IF_MIB_XSTATS (sizeof(igb_if_mib_strings) / \
+		sizeof(igb_if_mib_strings[0]))
+
+static const struct rte_igb_xstats_name_off igb_ether_like_mib_strings[] = {
+	{"dot3PauseOperMode", offsetof(struct e1000_ether_like_mib_stats,
+			dot3_pause_oper_mode)},
+	{"dot3StatsDuplexStatus", offsetof(struct e1000_ether_like_mib_stats,
+			dot3_stats_duplex_status)},
+	{"dot3StatsRateControlAbility", offsetof(
+			struct e1000_ether_like_mib_stats,
+			dot3_stats_rate_control_ability)},
+	{"dot3StatsRateControlStatus", offsetof(
+			struct e1000_ether_like_mib_stats,
+			dot3_stats_rate_control_status)},
+	{"dot3ControlFunctionsSupported", offsetof(
+			struct e1000_ether_like_mib_stats,
+			dot3_control_functions_supported)},
+};
+
+#define IGB_NB_ETHER_LIKE_MIB_XSTATS \
+		(sizeof(igb_ether_like_mib_strings) / \
+		sizeof(igb_ether_like_mib_strings[0]))
+
 /**
  * Atomically reads the link status information from global
  * structure rte_eth_dev.
@@ -896,6 +935,11 @@ eth_igb_dev_init(struct rte_eth_dev *eth_dev)
 		     eth_dev->data->port_id, pci_dev->id.vendor_id,
 		     pci_dev->id.device_id);
 
+	/* indicate sysUpTime start */
+	adapter->sys_up_time_start = rte_rdtsc();
+	adapter->if_last_change = 0;
+	adapter->if_counter_discontinuity_time = 0;
+
 	rte_intr_callback_register(&pci_dev->intr_handle,
 				   eth_igb_interrupt_handler,
 				   (void *)eth_dev);
@@ -1058,6 +1102,11 @@ eth_igbvf_dev_init(struct rte_eth_dev *eth_dev)
 		     "mac.type=%s",
 		     eth_dev->data->port_id, pci_dev->id.vendor_id,
 		     pci_dev->id.device_id, "igb_mac_82576_vf");
+
+	/* indicate sysUpTime start */
+	adapter->sys_up_time_start = rte_rdtsc();
+	adapter->if_last_change = 0;
+	adapter->if_counter_discontinuity_time = 0;
 
 	intr_handle = &pci_dev->intr_handle;
 	rte_intr_callback_register(intr_handle,
@@ -1830,12 +1879,17 @@ eth_igb_stats_reset(struct rte_eth_dev *dev)
 {
 	struct e1000_hw_stats *hw_stats =
 			E1000_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct e1000_adapter *adapter =
+		E1000_DEV_PRIVATE(dev->data->dev_private);
 
 	/* HW registers are cleared on read */
 	eth_igb_stats_get(dev, NULL);
 
 	/* Reset software totals */
 	memset(hw_stats, 0, sizeof(*hw_stats));
+
+	adapter->if_counter_discontinuity_time =
+			rte_rdtsc() - adapter->sys_up_time_start;
 }
 
 static void
@@ -1843,31 +1897,138 @@ eth_igb_xstats_reset(struct rte_eth_dev *dev)
 {
 	struct e1000_hw_stats *stats =
 			E1000_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct e1000_adapter *adapter =
+		E1000_DEV_PRIVATE(dev->data->dev_private);
 
 	/* HW registers are cleared on read */
 	eth_igb_xstats_get(dev, NULL, IGB_NB_XSTATS);
 
 	/* Reset software totals */
 	memset(stats, 0, sizeof(*stats));
+
+	adapter->if_counter_discontinuity_time =
+			rte_rdtsc() - adapter->sys_up_time_start;
+}
+
+static unsigned int
+igb_xstats_calc_num(void)
+{
+	return IGB_NB_XSTATS + IGB_NB_IF_MIB_XSTATS +
+		IGB_NB_ETHER_LIKE_MIB_XSTATS;
 }
 
 static int eth_igb_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 	struct rte_eth_xstat_name *xstats_names,
 	__rte_unused unsigned int size)
 {
-	unsigned i;
+	unsigned int i, count = 0;
 
 	if (xstats_names == NULL)
-		return IGB_NB_XSTATS;
+		return igb_xstats_calc_num();
 
 	/* Note: limit checked in rte_eth_xstats_names() */
 
 	for (i = 0; i < IGB_NB_XSTATS; i++) {
-		snprintf(xstats_names[i].name, sizeof(xstats_names[i].name),
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name),
 			 "%s", rte_igb_stats_strings[i].name);
+		count++;
 	}
 
-	return IGB_NB_XSTATS;
+	/* Get stats from IF-MIB objects */
+	for (i = 0; i < IGB_NB_IF_MIB_XSTATS; i++) {
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name),
+			 "%s", igb_if_mib_strings[i].name);
+		count++;
+	}
+
+	/* Get stats from Ethernet-like-MIB objects */
+	for (i = 0; i < IGB_NB_ETHER_LIKE_MIB_XSTATS; i++) {
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name),
+			 "%s", igb_ether_like_mib_strings[i].name);
+		count++;
+	}
+
+	return count;
+}
+
+static void
+igb_read_if_mib(struct rte_eth_dev *dev, struct e1000_if_mib_stats *stats)
+{
+	struct rte_eth_dev_data *data = dev->data;
+	struct rte_device *device = dev->device;
+	struct e1000_adapter *adapter =
+			E1000_DEV_PRIVATE(dev->data->dev_private);
+
+	stats->if_number = rte_eth_dev_count();
+	stats->if_index = data->port_id + 1;
+	stats->if_type = E1000_MIB_IF_TYPE_ETHERNETCSMACD;
+	stats->if_mtu = data->mtu;
+	stats->if_speed = (data->dev_link.link_speed < (UINT32_MAX / 1000000)) ?
+			(data->dev_link.link_speed * 1000000) : UINT32_MAX;
+	stats->if_phys_address = 0;
+	ether_addr_copy(data->mac_addrs,
+			(struct ether_addr *)&stats->if_phys_address);
+	stats->if_oper_status = data->dev_link.link_status ?
+			e1000_mib_truth_true : e1000_mib_truth_false;
+	stats->if_last_change = adapter->if_last_change /
+			(rte_get_tsc_hz() * 100);
+	stats->if_high_speed = data->dev_link.link_speed;
+	if (device->devargs)
+		stats->if_connector_present =
+				(device->devargs->type == RTE_DEVTYPE_VIRTUAL) ?
+						e1000_mib_truth_false :
+						e1000_mib_truth_true;
+	else
+		stats->if_connector_present = 0;
+	stats->if_counter_discontinuity_time =
+			adapter->if_counter_discontinuity_time /
+			(rte_get_tsc_hz() * 100);
+}
+
+static void
+igb_read_ether_like_mib(struct rte_eth_dev *dev,
+		struct e1000_ether_like_mib_stats *stats)
+{
+	struct rte_eth_dev_data *data = dev->data;
+	struct e1000_hw *hw = E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+
+	switch (hw->fc.current_mode) {
+	case e1000_fc_none:
+		stats->dot3_pause_oper_mode = e1000_dot3_pause_disabled;
+		break;
+	case e1000_fc_rx_pause:
+		stats->dot3_pause_oper_mode = e1000_dot3_pause_enabledrcv;
+		break;
+	case e1000_fc_tx_pause:
+		stats->dot3_pause_oper_mode = e1000_dot3_pause_enabledxmit;
+		break;
+	case e1000_fc_full:
+		stats->dot3_pause_oper_mode =
+				e1000_dot3_pause_enabledxmitandrcv;
+		break;
+	default:
+		stats->dot3_pause_oper_mode = 0;
+		break;
+	}
+
+	switch (data->dev_link.link_duplex) {
+	case ETH_LINK_FULL_DUPLEX:
+		stats->dot3_stats_duplex_status = e1000_dot3_duplex_fullduplex;
+		break;
+	case ETH_LINK_HALF_DUPLEX:
+		stats->dot3_stats_duplex_status = e1000_dot3_duplex_halfduplex;
+		break;
+	default:
+		stats->dot3_stats_duplex_status = e1000_dot3_duplex_unknown;
+		break;
+	}
+
+	stats->dot3_stats_rate_control_ability = e1000_mib_truth_false;
+	stats->dot3_stats_rate_control_status = e1000_dot3_rate_control_off;
+	stats->dot3_control_functions_supported = E1000_DOT3_CF_PAUSE;
 }
 
 static int eth_igb_xstats_get_names_by_id(struct rte_eth_dev *dev,
@@ -1912,12 +2073,18 @@ eth_igb_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 	struct e1000_hw *hw = E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct e1000_hw_stats *hw_stats =
 			E1000_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
-	unsigned i;
+	struct e1000_if_mib_stats if_mib_stats;
+	struct e1000_ether_like_mib_stats ether_like_mib_stats;
+	unsigned int i, count;
 
-	if (n < IGB_NB_XSTATS)
-		return IGB_NB_XSTATS;
+	count = igb_xstats_calc_num();
+	if (n < count)
+		return count;
 
 	igb_read_stats_registers(hw, hw_stats);
+
+	igb_read_if_mib(dev, &if_mib_stats);
+	igb_read_ether_like_mib(dev, &ether_like_mib_stats);
 
 	/* If this is a reset xstats is NULL, and we have cleared the
 	 * registers by reading them.
@@ -1925,14 +2092,34 @@ eth_igb_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 	if (!xstats)
 		return 0;
 
+	count = 0;
+
 	/* Extended stats */
 	for (i = 0; i < IGB_NB_XSTATS; i++) {
-		xstats[i].id = i;
-		xstats[i].value = *(uint64_t *)(((char *)hw_stats) +
+		xstats[count].id = count;
+		xstats[count].value = *(uint64_t *)(((char *)hw_stats) +
 			rte_igb_stats_strings[i].offset);
+		count++;
 	}
 
-	return IGB_NB_XSTATS;
+	/* Get stats from IF-MIB objects */
+	for (i = 0; i < IGB_NB_IF_MIB_XSTATS; i++) {
+		xstats[count].value = *(uint64_t *)(((char *)&if_mib_stats) +
+			igb_if_mib_strings[i].offset);
+		xstats[count].id = count;
+		count++;
+	}
+
+	/* Get stats from Ethernet-like-MIB objects */
+	for (i = 0; i < IGB_NB_ETHER_LIKE_MIB_XSTATS; i++) {
+		xstats[count].value =
+			*(uint64_t *)(((char *)&ether_like_mib_stats) +
+			igb_ether_like_mib_strings[i].offset);
+		xstats[count].id = count;
+		count++;
+	}
+
+	return count;
 }
 
 static int
@@ -2022,19 +2209,46 @@ igbvf_read_stats_registers(struct e1000_hw *hw, struct e1000_vf_stats *hw_stats)
 	    hw_stats->last_gotlbc, hw_stats->gotlbc);
 }
 
+static unsigned int
+igbvf_xstats_calc_num(void)
+{
+	return IGBVF_NB_XSTATS + IGB_NB_IF_MIB_XSTATS +
+		IGB_NB_ETHER_LIKE_MIB_XSTATS;
+}
+
 static int eth_igbvf_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 				     struct rte_eth_xstat_name *xstats_names,
 				     __rte_unused unsigned limit)
 {
-	unsigned i;
+	unsigned int i, count = 0;
 
-	if (xstats_names != NULL)
-		for (i = 0; i < IGBVF_NB_XSTATS; i++) {
-			snprintf(xstats_names[i].name,
-				sizeof(xstats_names[i].name), "%s",
-				rte_igbvf_stats_strings[i].name);
-		}
-	return IGBVF_NB_XSTATS;
+	if (xstats_names == NULL)
+		return igbvf_xstats_calc_num();
+
+	for (i = 0; i < IGBVF_NB_XSTATS; i++) {
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name), "%s",
+			rte_igbvf_stats_strings[i].name);
+		count++;
+	}
+
+	/* Get stats from IF-MIB objects */
+	for (i = 0; i < IGB_NB_IF_MIB_XSTATS; i++) {
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name),
+			 "%s", igb_if_mib_strings[i].name);
+		count++;
+	}
+
+	/* Get stats from Ethernet-like-MIB objects */
+	for (i = 0; i < IGB_NB_ETHER_LIKE_MIB_XSTATS; i++) {
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name),
+			 "%s", igb_ether_like_mib_strings[i].name);
+		count++;
+	}
+
+	return count;
 }
 
 static int
@@ -2044,23 +2258,49 @@ eth_igbvf_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 	struct e1000_hw *hw = E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct e1000_vf_stats *hw_stats = (struct e1000_vf_stats *)
 			E1000_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
-	unsigned i;
+	struct e1000_if_mib_stats if_mib_stats;
+	struct e1000_ether_like_mib_stats ether_like_mib_stats;
+	unsigned int i, count;
 
-	if (n < IGBVF_NB_XSTATS)
-		return IGBVF_NB_XSTATS;
+	count = igbvf_xstats_calc_num();
+	if (n < count)
+		return count;
 
 	igbvf_read_stats_registers(hw, hw_stats);
+
+	igb_read_if_mib(dev, &if_mib_stats);
+	igb_read_ether_like_mib(dev, &ether_like_mib_stats);
 
 	if (!xstats)
 		return 0;
 
+	count = 0;
+
 	for (i = 0; i < IGBVF_NB_XSTATS; i++) {
-		xstats[i].id = i;
-		xstats[i].value = *(uint64_t *)(((char *)hw_stats) +
+		xstats[count].id = count;
+		xstats[count].value = *(uint64_t *)(((char *)hw_stats) +
 			rte_igbvf_stats_strings[i].offset);
+		count++;
 	}
 
-	return IGBVF_NB_XSTATS;
+	/* Get stats from IF-MIB objects */
+	for (i = 0; i < IGB_NB_IF_MIB_XSTATS; i++) {
+		xstats[count].value = *(uint64_t *)(((char *)&if_mib_stats) +
+			igb_if_mib_strings[i].offset);
+		xstats[count].id = count;
+		count++;
+	}
+
+	/* Get stats from Ethernet-like-MIB objects */
+	for (i = 0; i < IGB_NB_ETHER_LIKE_MIB_XSTATS; i++) {
+		xstats[count].value =
+			*(uint64_t *)(((char *)&ether_like_mib_stats) +
+			igb_ether_like_mib_strings[i].offset);
+		xstats[count].id = count;
+		count++;
+	}
+
+	return count;
 }
 
 static void
@@ -2086,6 +2326,8 @@ eth_igbvf_stats_reset(struct rte_eth_dev *dev)
 {
 	struct e1000_vf_stats *hw_stats = (struct e1000_vf_stats*)
 			E1000_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct e1000_adapter *adapter =
+		E1000_DEV_PRIVATE(dev->data->dev_private);
 
 	/* Sync HW register to the last stats */
 	eth_igbvf_stats_get(dev, NULL);
@@ -2093,6 +2335,9 @@ eth_igbvf_stats_reset(struct rte_eth_dev *dev)
 	/* reset HW current stats*/
 	memset(&hw_stats->gprc, 0, sizeof(*hw_stats) -
 	       offsetof(struct e1000_vf_stats, gprc));
+
+	adapter->if_counter_discontinuity_time =
+			rte_rdtsc() - adapter->sys_up_time_start;
 }
 
 static int
@@ -2338,6 +2583,8 @@ eth_igb_link_update(struct rte_eth_dev *dev, int wait_to_complete)
 {
 	struct e1000_hw *hw =
 		E1000_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct e1000_adapter *adapter =
+		E1000_DEV_PRIVATE(dev->data->dev_private);
 	struct rte_eth_link link, old;
 	int link_check, count;
 
@@ -2406,6 +2653,7 @@ eth_igb_link_update(struct rte_eth_dev *dev, int wait_to_complete)
 		return -1;
 
 	/* changed */
+	adapter->if_last_change = rte_rdtsc() - adapter->sys_up_time_start;
 	return 0;
 }
 

@@ -254,6 +254,62 @@ struct e1000_filter_info {
 	struct e1000_2tuple_filter_list twotuple_list;
 };
 
+#define E1000_MIB_IF_TYPE_ETHERNETCSMACD	6
+
+enum e1000_mib_truth_value {
+	e1000_mib_truth_true = 1,
+	e1000_mib_truth_false
+};
+
+/* IF-MIB statistics */
+struct e1000_if_mib_stats {
+	uint64_t if_number;			/* ifNumber */
+	uint64_t if_index;			/* ifIndex */
+	uint64_t if_type;			/* ifType */
+	uint64_t if_mtu;			/* ifMtu */
+	uint64_t if_speed;			/* ifSpeed */
+	uint64_t if_phys_address;		/* ifPhysAddress */
+	uint64_t if_oper_status;		/* ifOperStatus */
+	uint64_t if_last_change;		/* ifLastChange */
+	uint64_t if_high_speed;			/* ifHighSpeed */
+	uint64_t if_connector_present;		/* ifConnectorPresent */
+	uint64_t if_counter_discontinuity_time;	/* ifCounterDiscontinuityTime */
+};
+
+enum e1000_dot3_pause_oper_mode {
+	e1000_dot3_pause_disabled = 1,
+	e1000_dot3_pause_enabledxmit,
+	e1000_dot3_pause_enabledrcv,
+	e1000_dot3_pause_enabledxmitandrcv
+};
+
+enum e1000_dot3_stats_duplex_status {
+	e1000_dot3_duplex_unknown = 1,
+	e1000_dot3_duplex_halfduplex,
+	e1000_dot3_duplex_fullduplex
+};
+
+enum e1000_dot3_stats_rate_control_status {
+	e1000_dot3_rate_control_off = 1,
+	e1000_dot3_rate_control_on,
+	e1000_dot3_rate_control_unknown
+};
+
+#define E1000_DOT3_CF_PAUSE	(1 << 0) /* PAUSE command implemented */
+#define E1000_DOT3_CF_MPCP	(1 << 1) /* MPCP implemented */
+#define E1000_DOT3_CF_PFC	(1 << 2) /* PFC implemented */
+
+/* Ethernet-like-MIB statistics */
+struct e1000_ether_like_mib_stats {
+	uint64_t dot3_pause_oper_mode;		/* dot3PauseOperMode */
+	uint64_t dot3_stats_duplex_status;	/* dot3StatsDuplexStatus */
+	uint64_t dot3_stats_rate_control_ability;
+	/* dot3StatsRateControlAbility */
+	uint64_t dot3_stats_rate_control_status;/* dot3StatsRateControlStatus */
+	uint64_t dot3_control_functions_supported;
+	/* dot3ControlFunctionsSupported */
+};
+
 /*
  * Structure to store private data for each driver instance (for each port).
  */
@@ -268,6 +324,9 @@ struct e1000_adapter {
 	struct rte_timecounter  systime_tc;
 	struct rte_timecounter  rx_tstamp_tc;
 	struct rte_timecounter  tx_tstamp_tc;
+	uint64_t                sys_up_time_start;
+	uint64_t                if_last_change;
+	uint64_t                if_counter_discontinuity_time;
 };
 
 #define E1000_DEV_PRIVATE(adapter) \
