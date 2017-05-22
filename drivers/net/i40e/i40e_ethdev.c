@@ -630,6 +630,45 @@ static const struct rte_i40e_xstats_name_off rte_i40e_txq_prio_strings[] = {
 #define I40E_NB_TXQ_PRIO_XSTATS (sizeof(rte_i40e_txq_prio_strings) / \
 		sizeof(rte_i40e_txq_prio_strings[0]))
 
+static const struct rte_i40e_xstats_name_off i40e_if_mib_strings[] = {
+	{"ifNumber", offsetof(struct i40e_if_mib_stats, if_number)},
+	{"ifIndex", offsetof(struct i40e_if_mib_stats, if_index)},
+	{"ifType", offsetof(struct i40e_if_mib_stats, if_type)},
+	{"ifMtu", offsetof(struct i40e_if_mib_stats, if_mtu)},
+	{"ifSpeed", offsetof(struct i40e_if_mib_stats, if_speed)},
+	{"ifPhysAddress", offsetof(struct i40e_if_mib_stats, if_phys_address)},
+	{"ifOperStatus", offsetof(struct i40e_if_mib_stats, if_oper_status)},
+	{"ifLastChange", offsetof(struct i40e_if_mib_stats, if_last_change)},
+	{"ifHighSpeed", offsetof(struct i40e_if_mib_stats, if_high_speed)},
+	{"ifConnectorPresent", offsetof(struct i40e_if_mib_stats,
+			if_connector_present)},
+	{"ifCounterDiscontinuityTime", offsetof(struct i40e_if_mib_stats,
+			if_counter_discontinuity_time)},
+};
+
+#define I40E_NB_IF_MIB_XSTATS (sizeof(i40e_if_mib_strings) / \
+		sizeof(i40e_if_mib_strings[0]))
+
+static const struct rte_i40e_xstats_name_off i40e_ether_like_mib_strings[] = {
+	{"dot3PauseOperMode", offsetof(struct i40e_ether_like_mib_stats,
+			dot3_pause_oper_mode)},
+	{"dot3StatsDuplexStatus", offsetof(struct i40e_ether_like_mib_stats,
+			dot3_stats_duplex_status)},
+	{"dot3StatsRateControlAbility", offsetof(
+			struct i40e_ether_like_mib_stats,
+			dot3_stats_rate_control_ability)},
+	{"dot3StatsRateControlStatus", offsetof(
+			struct i40e_ether_like_mib_stats,
+			dot3_stats_rate_control_status)},
+	{"dot3ControlFunctionsSupported", offsetof(
+			struct i40e_ether_like_mib_stats,
+			dot3_control_functions_supported)},
+};
+
+#define I40E_NB_ETHER_LIKE_MIB_XSTATS \
+		(sizeof(i40e_ether_like_mib_strings) / \
+		sizeof(i40e_ether_like_mib_strings[0]))
+
 static int eth_i40e_pci_probe(struct rte_pci_driver *pci_drv __rte_unused,
 	struct rte_pci_device *pci_dev)
 {
@@ -1272,6 +1311,11 @@ eth_i40e_dev_init(struct rte_eth_dev *dev)
 
 	/* initialize pf host driver to setup SRIOV resource if applicable */
 	i40e_pf_host_init(dev);
+
+	/* indicate sysUpTime start */
+	pf->adapter->sys_up_time_start = rte_rdtsc();
+	pf->adapter->if_last_change = 0;
+	pf->adapter->if_counter_discontinuity_time = 0;
 
 	/* register callback func to eal lib */
 	rte_intr_callback_register(intr_handle,
@@ -2235,6 +2279,8 @@ i40e_dev_link_update(struct rte_eth_dev *dev,
 #define CHECK_INTERVAL 100  /* 100ms */
 #define MAX_REPEAT_TIME 10  /* 1s (10 * 100ms) in total */
 	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct i40e_adapter *adapter =
+		I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
 	struct i40e_link_status link_status;
 	struct rte_eth_link link, old;
 	int status;
@@ -2303,6 +2349,7 @@ out:
 	if (link.link_status == old.link_status)
 		return -1;
 
+	adapter->if_last_change = rte_rdtsc() - adapter->sys_up_time_start;
 	i40e_notify_all_vfs_link_status(dev);
 
 	return 0;
@@ -2683,6 +2730,9 @@ i40e_dev_stats_reset(struct rte_eth_dev *dev)
 
 	/* read the stats, reading current register values into offset */
 	i40e_read_stats_registers(pf, hw);
+
+	pf->adapter->if_counter_discontinuity_time =
+			rte_rdtsc() - pf->adapter->sys_up_time_start;
 }
 
 static uint32_t
@@ -2690,7 +2740,8 @@ i40e_xstats_calc_num(void)
 {
 	return I40E_NB_ETH_XSTATS + I40E_NB_HW_PORT_XSTATS +
 		(I40E_NB_RXQ_PRIO_XSTATS * 8) +
-		(I40E_NB_TXQ_PRIO_XSTATS * 8);
+		(I40E_NB_TXQ_PRIO_XSTATS * 8) +
+		I40E_NB_IF_MIB_XSTATS + I40E_NB_ETHER_LIKE_MIB_XSTATS;
 }
 
 static int i40e_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
@@ -2740,7 +2791,103 @@ static int i40e_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 			count++;
 		}
 	}
+
+	/* Get stats from IF-MIB objects */
+	for (i = 0; i < I40E_NB_IF_MIB_XSTATS; i++) {
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name),
+			 "%s", i40e_if_mib_strings[i].name);
+		count++;
+	}
+
+	/* Get stats from Ethernet-like-MIB objects */
+	for (i = 0; i < I40E_NB_ETHER_LIKE_MIB_XSTATS; i++) {
+		snprintf(xstats_names[count].name,
+			sizeof(xstats_names[count].name),
+			 "%s", i40e_ether_like_mib_strings[i].name);
+		count++;
+	}
+
 	return count;
+}
+
+static void
+i40e_read_if_mib(struct rte_eth_dev *dev, struct i40e_if_mib_stats *stats)
+{
+	struct rte_eth_dev_data *data = dev->data;
+	struct rte_device *device = dev->device;
+	struct i40e_adapter *adapter =
+			I40E_DEV_PRIVATE_TO_ADAPTER(dev->data->dev_private);
+
+	stats->if_number = rte_eth_dev_count();
+	stats->if_index = data->port_id + 1;
+	stats->if_type = I40E_MIB_IF_TYPE_ETHERNETCSMACD;
+	stats->if_mtu = data->mtu;
+	stats->if_speed = (data->dev_link.link_speed < (UINT32_MAX / 1000000)) ?
+			(data->dev_link.link_speed * 1000000) : UINT32_MAX;
+	stats->if_phys_address = 0;
+	ether_addr_copy(data->mac_addrs,
+			(struct ether_addr *)&stats->if_phys_address);
+	stats->if_oper_status = data->dev_link.link_status ?
+			i40e_mib_truth_true : i40e_mib_truth_false;
+	stats->if_last_change = adapter->if_last_change /
+			(rte_get_tsc_hz() * 100);
+	stats->if_high_speed = data->dev_link.link_speed;
+	if (device->devargs)
+		stats->if_connector_present =
+				(device->devargs->type == RTE_DEVTYPE_VIRTUAL) ?
+						i40e_mib_truth_false :
+						i40e_mib_truth_true;
+	else
+		stats->if_connector_present = 0;
+	stats->if_counter_discontinuity_time =
+			adapter->if_counter_discontinuity_time /
+			(rte_get_tsc_hz() * 100);
+}
+
+static void
+i40e_read_ether_like_mib(struct rte_eth_dev *dev,
+		struct i40e_ether_like_mib_stats *stats)
+{
+	struct rte_eth_dev_data *data = dev->data;
+	struct i40e_hw *hw =
+			I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+
+	switch (hw->fc.current_mode) {
+	case I40E_FC_NONE:
+		stats->dot3_pause_oper_mode = i40e_dot3_pause_disabled;
+		break;
+	case I40E_FC_RX_PAUSE:
+		stats->dot3_pause_oper_mode = i40e_dot3_pause_enabledrcv;
+		break;
+	case I40E_FC_TX_PAUSE:
+		stats->dot3_pause_oper_mode = i40e_dot3_pause_enabledxmit;
+		break;
+	case I40E_FC_FULL:
+		stats->dot3_pause_oper_mode =
+				i40e_dot3_pause_enabledxmitandrcv;
+		break;
+	default:
+		stats->dot3_pause_oper_mode = 0;
+		break;
+	}
+
+	switch (data->dev_link.link_duplex) {
+	case ETH_LINK_FULL_DUPLEX:
+		stats->dot3_stats_duplex_status = i40e_dot3_duplex_fullduplex;
+		break;
+	case ETH_LINK_HALF_DUPLEX:
+		stats->dot3_stats_duplex_status = i40e_dot3_duplex_halfduplex;
+		break;
+	default:
+		stats->dot3_stats_duplex_status = i40e_dot3_duplex_unknown;
+		break;
+	}
+
+	stats->dot3_stats_rate_control_ability = i40e_mib_truth_false;
+	stats->dot3_stats_rate_control_status = i40e_dot3_rate_control_off;
+	stats->dot3_control_functions_supported = I40E_DOT3_CF_PAUSE |
+			I40E_DOT3_CF_PFC;
 }
 
 static int
@@ -2751,12 +2898,17 @@ i40e_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	unsigned i, count, prio;
 	struct i40e_hw_port_stats *hw_stats = &pf->stats;
+	struct i40e_if_mib_stats if_mib_stats;
+	struct i40e_ether_like_mib_stats ether_like_mib_stats;
 
 	count = i40e_xstats_calc_num();
 	if (n < count)
 		return count;
 
 	i40e_read_stats_registers(pf, hw);
+
+	i40e_read_if_mib(dev, &if_mib_stats);
+	i40e_read_ether_like_mib(dev, &ether_like_mib_stats);
 
 	if (xstats == NULL)
 		return 0;
@@ -2799,6 +2951,23 @@ i40e_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 			xstats[count].id = count;
 			count++;
 		}
+	}
+
+	/* Get stats from IF-MIB objects */
+	for (i = 0; i < I40E_NB_IF_MIB_XSTATS; i++) {
+		xstats[count].value = *(uint64_t *)(((char *)&if_mib_stats) +
+			i40e_if_mib_strings[i].offset);
+		xstats[count].id = count;
+		count++;
+	}
+
+	/* Get stats from Ethernet-like-MIB objects */
+	for (i = 0; i < I40E_NB_ETHER_LIKE_MIB_XSTATS; i++) {
+		xstats[count].value =
+			*(uint64_t *)(((char *)&ether_like_mib_stats) +
+			i40e_ether_like_mib_strings[i].offset);
+		xstats[count].id = count;
+		count++;
 	}
 
 	return count;

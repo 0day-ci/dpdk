@@ -625,6 +625,62 @@ struct rte_flow {
 
 TAILQ_HEAD(i40e_flow_list, rte_flow);
 
+#define I40E_MIB_IF_TYPE_ETHERNETCSMACD		6
+
+enum i40e_mib_truth_value {
+	i40e_mib_truth_true = 1,
+	i40e_mib_truth_false
+};
+
+/* IF-MIB statistics */
+struct i40e_if_mib_stats {
+	uint64_t if_number;			/* ifNumber */
+	uint64_t if_index;			/* ifIndex */
+	uint64_t if_type;			/* ifType */
+	uint64_t if_mtu;			/* ifMtu */
+	uint64_t if_speed;			/* ifSpeed */
+	uint64_t if_phys_address;		/* ifPhysAddress */
+	uint64_t if_oper_status;		/* ifOperStatus */
+	uint64_t if_last_change;		/* ifLastChange */
+	uint64_t if_high_speed;			/* ifHighSpeed */
+	uint64_t if_connector_present;		/* ifConnectorPresent */
+	uint64_t if_counter_discontinuity_time;	/* ifCounterDiscontinuityTime */
+};
+
+enum i40e_dot3_pause_oper_mode {
+	i40e_dot3_pause_disabled = 1,
+	i40e_dot3_pause_enabledxmit,
+	i40e_dot3_pause_enabledrcv,
+	i40e_dot3_pause_enabledxmitandrcv
+};
+
+enum i40e_dot3_stats_duplex_status {
+	i40e_dot3_duplex_unknown = 1,
+	i40e_dot3_duplex_halfduplex,
+	i40e_dot3_duplex_fullduplex
+};
+
+enum i40e_dot3_stats_rate_control_status {
+	i40e_dot3_rate_control_off = 1,
+	i40e_dot3_rate_control_on,
+	i40e_dot3_rate_control_unknown
+};
+
+#define I40E_DOT3_CF_PAUSE	(1 << 0) /* PAUSE command implemented */
+#define I40E_DOT3_CF_MPCP	(1 << 1) /* MPCP implemented */
+#define I40E_DOT3_CF_PFC	(1 << 2) /* PFC implemented */
+
+/* Ethernet-like-MIB statistics */
+struct i40e_ether_like_mib_stats {
+	uint64_t dot3_pause_oper_mode;		/* dot3PauseOperMode */
+	uint64_t dot3_stats_duplex_status;	/* dot3StatsDuplexStatus */
+	uint64_t dot3_stats_rate_control_ability;
+	/* dot3StatsRateControlAbility */
+	uint64_t dot3_stats_rate_control_status;/* dot3StatsRateControlStatus */
+	uint64_t dot3_control_functions_supported;
+	/* dot3ControlFunctionsSupported */
+};
+
 /*
  * Structure to store private data specific for PF instance.
  */
@@ -777,6 +833,10 @@ struct i40e_adapter {
 	struct rte_timecounter systime_tc;
 	struct rte_timecounter rx_tstamp_tc;
 	struct rte_timecounter tx_tstamp_tc;
+
+	uint64_t sys_up_time_start;
+	uint64_t if_last_change;
+	uint64_t if_counter_discontinuity_time;
 
 	/* ptype mapping table */
 	uint32_t ptype_tbl[I40E_MAX_PKT_TYPE] __rte_cache_min_aligned;
