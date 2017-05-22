@@ -475,3 +475,26 @@ rte_vhost_log_used_vring(int vid, uint16_t vring_idx,
 
 	vhost_log_used_vring(dev, vq, offset, len);
 }
+
+uint32_t
+rte_vhost_rx_queue_count(int vid, uint16_t qid)
+{
+	struct virtio_net *dev;
+	struct vhost_virtqueue *vq;
+
+	dev = get_device(vid);
+	if (!dev)
+		return 0;
+
+	if (unlikely(qid >= dev->nr_vring || (qid & 1) == 0)) {
+		RTE_LOG(ERR, VHOST_DATA, "(%d) %s: invalid virtqueue idx %d.\n",
+			dev->vid, __func__, qid);
+		return 0;
+	}
+
+	vq = dev->virtqueue[qid];
+	if (unlikely(vq->enabled == 0))
+		return 0;
+
+	return *((volatile uint16_t *)&vq->avail->idx) - vq->last_avail_idx;
+}
