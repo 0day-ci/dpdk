@@ -148,6 +148,18 @@ enum rte_flow_item_type {
 	RTE_FLOW_ITEM_TYPE_INVERT,
 
 	/**
+	 * [META]
+	 *
+	 * Roughly matching, not perfect matching
+	 *
+	 * This is for device that support no-perfect matching option.
+	 * Usually a no-perfect matching is fast but the cost is accuracy.
+	 *
+	 * See struct rte_flow_item_roughly
+	 */
+	RTE_FLOW_ITEM_TYPE_ROUGHLY,
+
+	/**
 	 * Matches any protocol in place of the current layer, a single ANY
 	 * may also stand for several protocol layers.
 	 *
@@ -297,6 +309,24 @@ enum rte_flow_item_type {
 	 * See struct rte_flow_item_gre.
 	 */
 	RTE_FLOW_ITEM_TYPE_GRE,
+};
+
+/**
+ * RTE_FLOW_ITEM_TYPE_ROUGHLY
+ *
+ * Roughly matching, not perfect match.
+ *
+ * This is for device that support no-perfect match option.
+ * Usually a no-perfect match is fast but the cost is accuracy.
+ * i.e. Signature Match only match pattern's hash value, but it is
+ * possible two different patterns have the same hash value.
+ *
+ * Matching accuracy level can be configure by threshold.
+ * Driver can divide the range of threshold and map to different
+ * accuracy levels that device support.
+ */
+struct rte_flow_item_roughly {
+	uint32_t threshold; /**< accuracy threshold*/
 };
 
 /**

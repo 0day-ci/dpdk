@@ -491,8 +491,58 @@ Usage example, matching non-TCPv4 packets only:
 
    +-------+----------+
    | Index | Item     |
+
    +=======+==========+
    | 0     | INVERT   |
+   +-------+----------+
+   | 1     | Ethernet |
+   +-------+----------+
+   | 2     | IPv4     |
+   +-------+----------+
+   | 3     | TCP      |
+   +-------+----------+
+   | 4     | END      |
+   +-------+----------+
+
+Item: ``ROUGHLY``
+^^^^^^^^^^^^^^^^^
+
+Roughly matching, not perfect match.
+
+This is for device that support no-perfect match option.
+Usually a no-perfect match is fast but the cost is accuracy.
+i.e. Signature Match only match pattern's hash value, but it is
+possible two different patterns have the same hash value.
+
+Matching accuracy level can be configure by threshold.
+Driver can divide the range of threshold and map to different
+accuracy levels that device support.
+
+.. _table_rte_flow_item_roughly:
+
+.. table:: ROUGHLY
+
+   +----------+---------------+--------------------------------------------------+
+   | Field    |   Subfield    | Value                                            |
+   +==========+===========+======================================================+
+   | ``spec`` | ``threshold`` | 0 as perfect match, 0xffffffff as roughest match |
+   +----------+---------------+--------------------------------------------------+
+   | ``last`` | ``threshold`` | ignored                                          |
+   +----------+-----------+------------------------------------------------------+
+   | ``mask`` | ``threshold`` | ignored                                          |
+   +----------+-----------+------------------------------------------------------+
+
+
+Usage example, roughly match a TCPv4 packets:
+
+.. _table_rte_flow_item_roughly_example:
+
+.. table:: Roughly matching
+
+   +-------+----------+
+   | Index | Item     |
+   +=======+==========+
+   | 0     | ROUGHLY  |
    +-------+----------+
    | 1     | Ethernet |
    +-------+----------+

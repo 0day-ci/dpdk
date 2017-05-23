@@ -107,6 +107,8 @@ enum index {
 	ITEM_END,
 	ITEM_VOID,
 	ITEM_INVERT,
+	ITEM_ROUGHLY,
+	ITEM_ROUGHLY_THRESHOLD,
 	ITEM_ANY,
 	ITEM_ANY_NUM,
 	ITEM_PF,
@@ -426,6 +428,7 @@ static const enum index next_item[] = {
 	ITEM_END,
 	ITEM_VOID,
 	ITEM_INVERT,
+	ITEM_ROUGHLY,
 	ITEM_ANY,
 	ITEM_PF,
 	ITEM_VF,
@@ -444,6 +447,12 @@ static const enum index next_item[] = {
 	ITEM_NVGRE,
 	ITEM_MPLS,
 	ITEM_GRE,
+	ZERO,
+};
+
+static const enum index item_roughly[] = {
+	ITEM_ROUGHLY_THRESHOLD,
+	ITEM_NEXT,
 	ZERO,
 };
 
@@ -953,6 +962,21 @@ static const struct token token_list[] = {
 		.priv = PRIV_ITEM(INVERT, 0),
 		.next = NEXT(NEXT_ENTRY(ITEM_NEXT)),
 		.call = parse_vc,
+	},
+	[ITEM_ROUGHLY] = {
+		.name = "roughly",
+		.help = "match the pattern roughly",
+		.priv = PRIV_ITEM(ROUGHLY,
+				sizeof(struct rte_flow_item_roughly)),
+		.next = NEXT(item_roughly),
+		.call = parse_vc,
+	},
+	[ITEM_ROUGHLY_THRESHOLD] = {
+		.name = "threshold",
+		.help = "match accuracy threshold",
+		.next = NEXT(item_roughly, NEXT_ENTRY(UNSIGNED), item_param),
+		.args = ARGS(ARGS_ENTRY(struct rte_flow_item_roughly,
+					threshold)),
 	},
 	[ITEM_ANY] = {
 		.name = "any",
