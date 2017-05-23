@@ -63,6 +63,8 @@ ifdef T
 ifeq ("$(origin T)", "command line")
 RTE_CONFIG_TEMPLATE := $(RTE_SRCDIR)/config/defconfig_$(T)
 endif
+else ifdef RTE_TARGET
+RTE_CONFIG_TEMPLATE := $(RTE_SRCDIR)/config/defconfig_$(RTE_TARGET)
 endif
 export RTE_CONFIG_TEMPLATE
 
