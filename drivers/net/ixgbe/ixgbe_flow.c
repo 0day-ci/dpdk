@@ -1549,13 +1549,7 @@ ixgbe_parse_fdir_filter_normal(const struct rte_flow_attr *attr,
 		 */
 		index++;
 		NEXT_ITEM_OF_PATTERN(item, pattern, index);
-		if (item->type == RTE_FLOW_ITEM_TYPE_VLAN) {
-			memset(rule, 0, sizeof(struct ixgbe_fdir_rule));
-			rte_flow_error_set(error, EINVAL,
-				RTE_FLOW_ERROR_TYPE_ITEM,
-				item, "Not supported by fdir filter");
-			return -rte_errno;
-		} else if (item->type != RTE_FLOW_ITEM_TYPE_END) {
+		if (item->type != RTE_FLOW_ITEM_TYPE_END) {
 			memset(rule, 0, sizeof(struct ixgbe_fdir_rule));
 			rte_flow_error_set(error, EINVAL,
 				RTE_FLOW_ERROR_TYPE_ITEM,
