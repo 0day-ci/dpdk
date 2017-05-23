@@ -309,8 +309,8 @@ rte_dpaa2_mbuf_alloc_bulk(struct rte_mempool *pool,
 
 #ifdef RTE_LIBRTE_DPAA2_DEBUG_DRIVER
 	alloc += n;
-	PMD_TX_LOG(DEBUG, "Total = %d , req = %d done = %d",
-		   alloc, count, n);
+	PMD_DRV_LOG(DEBUG, "Total = %d , req = %d done = %d",
+		    alloc, count, n);
 #endif
 	return 0;
 }
@@ -320,6 +320,9 @@ rte_hw_mbuf_free_bulk(struct rte_mempool *pool,
 		  void * const *obj_table, unsigned int n)
 {
 	struct dpaa2_bp_info *bp_info;
+#ifdef RTE_LIBRTE_DPAA2_DEBUG_DRIVER
+	static int freed;
+#endif
 
 	bp_info = mempool_to_bpinfo(pool);
 	if (!(bp_info->bp_list)) {
@@ -329,6 +332,11 @@ rte_hw_mbuf_free_bulk(struct rte_mempool *pool,
 	rte_dpaa2_mbuf_release(pool, obj_table, bp_info->bpid,
 			   bp_info->meta_data_size, n);
 
+#ifdef RTE_LIBRTE_DPAA2_DEBUG_DRIVER
+	freed += n;
+	PMD_DRV_LOG(DEBUG, "Total = %d , done = %d",
+		    freed, n);
+#endif
 	return 0;
 }
 
