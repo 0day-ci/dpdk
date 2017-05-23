@@ -60,16 +60,25 @@ showconfigs:
 
 .PHONY: notemplate
 notemplate:
-	@printf "No template specified. "
-	@echo "Use T=template among the following list:"
+	@printf "No template specified. Use 'make defconfig' or "
+	@echo "use T=template from the following list:"
 	@$(MAKE) -rR showconfigs | sed 's,^,  ,'
+
+
+.PHONY: defconfig
+defconfig:
+	@$(MAKE) config T=$(shell uname -m)-native-$(shell uname | \
+		awk '{ if ($$0 == "Linux") {print "linuxapp"} else \
+		{print "bsdapp"} }')-$(shell ${CC} -v 2>&1 \
+		| grep " version " | cut -d ' ' -f 1)
 
 .PHONY: config
 ifeq ($(RTE_CONFIG_TEMPLATE),)
 config: notemplate
 else
 config: $(RTE_OUTPUT)/include/rte_config.h $(RTE_OUTPUT)/Makefile
-	@echo "Configuration done"
+	@echo "Configuration done using "$(shell basename \
+		$(RTE_CONFIG_TEMPLATE) | sed "s/defconfig_//g")
 endif
 
 $(RTE_OUTPUT):
