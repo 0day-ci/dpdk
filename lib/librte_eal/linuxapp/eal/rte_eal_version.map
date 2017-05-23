@@ -198,3 +198,11 @@ DPDK_17.05 {
 	vfio_get_group_no;
 
 } DPDK_17.02;
+
+DPDK_17.08 {
+	global:
+
+	rte_iommu_dma_map;
+	rte_iommu_dma_unmap;
+
+} DPDK_17.05

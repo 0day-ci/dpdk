@@ -39,6 +39,7 @@
 #include <rte_log.h>
 #include <rte_memory.h>
 #include <rte_eal_memconfig.h>
+#include <rte_iommu.h>
 
 #include "eal_filesystem.h"
 #include "eal_vfio.h"
@@ -50,17 +51,34 @@
 static struct vfio_config vfio_cfg;
 
 static int vfio_type1_dma_map(int);
+static int vfio_type1_dma_mem_map(int, uint64_t, uint64_t, uint64_t, int);
 static int vfio_spapr_dma_map(int);
 static int vfio_noiommu_dma_map(int);
+static int vfio_noiommu_dma_mem_map(int, uint64_t, uint64_t, uint64_t, int);
 
 /* IOMMU types we support */
 static const struct vfio_iommu_type iommu_types[] = {
 	/* x86 IOMMU, otherwise known as type 1 */
-	{ RTE_VFIO_TYPE1, "Type 1", &vfio_type1_dma_map},
+	{
+		.type_id = RTE_VFIO_TYPE1,
+		.name = "Type 1",
+		.dma_map_func = &vfio_type1_dma_map,
+		.dma_user_map_func = &vfio_type1_dma_mem_map
+	},
 	/* ppc64 IOMMU, otherwise known as spapr */
-	{ RTE_VFIO_SPAPR, "sPAPR", &vfio_spapr_dma_map},
+	{
+		.type_id = RTE_VFIO_SPAPR,
+		.name = "sPAPR",
+		.dma_map_func = &vfio_spapr_dma_map,
+		.dma_user_map_func = NULL
+	},
 	/* IOMMU-less mode */
-	{ RTE_VFIO_NOIOMMU, "No-IOMMU", &vfio_noiommu_dma_map},
+	{
+		.type_id = RTE_VFIO_NOIOMMU,
+		.name = "No-IOMMU",
+		.dma_map_func = &vfio_noiommu_dma_map,
+		.dma_user_map_func = &vfio_noiommu_dma_mem_map
+	},
 };
 
 int
@@ -378,6 +396,8 @@ vfio_setup_device(const char *sysfs_base, const char *dev_addr,
 				clear_group(vfio_group_fd);
 				return -1;
 			}
+
+			vfio_cfg.vfio_iommu_type = t;
 		}
 	}
 
@@ -690,33 +710,61 @@ vfio_get_group_no(const char *sysfs_base,
 }
 
 static int
-vfio_type1_dma_map(int vfio_container_fd)
+vfio_type1_dma_mem_map(int vfio_container_fd, uint64_t vaddr, uint64_t iova,
+		       uint64_t len, int do_map)
 {
-	const struct rte_memseg *ms = rte_eal_get_physmem_layout();
-	int i, ret;
+	struct vfio_iommu_type1_dma_map dma_map;
+	struct vfio_iommu_type1_dma_unmap dma_unmap;
+	int ret;
 
-	/* map all DPDK segments for DMA. use 1:1 PA to IOVA mapping */
-	for (i = 0; i < RTE_MAX_MEMSEG; i++) {
-		struct vfio_iommu_type1_dma_map dma_map;
-
-		if (ms[i].addr == NULL)
-			break;
-
+	if (do_map != 0) {
 		memset(&dma_map, 0, sizeof(dma_map));
 		dma_map.argsz = sizeof(struct vfio_iommu_type1_dma_map);
-		dma_map.vaddr = ms[i].addr_64;
-		dma_map.size = ms[i].len;
-		dma_map.iova = ms[i].phys_addr;
+		dma_map.vaddr = vaddr;
+		dma_map.size = len;
+		dma_map.iova = iova;
 		dma_map.flags = VFIO_DMA_MAP_FLAG_READ | VFIO_DMA_MAP_FLAG_WRITE;
 
 		ret = ioctl(vfio_container_fd, VFIO_IOMMU_MAP_DMA, &dma_map);
-
 		if (ret) {
 			RTE_LOG(ERR, EAL, "  cannot set up DMA remapping, "
 					  "error %i (%s)\n", errno,
 					  strerror(errno));
 			return -1;
 		}
+
+	} else {
+		memset(&dma_unmap, 0, sizeof(dma_unmap));
+		dma_unmap.argsz = sizeof(struct vfio_iommu_type1_dma_unmap);
+		dma_unmap.size = len;
+		dma_unmap.iova = iova;
+
+		ret = ioctl(vfio_container_fd, VFIO_IOMMU_UNMAP_DMA, &dma_unmap);
+		if (ret) {
+			RTE_LOG(ERR, EAL, "  cannot clear DMA remapping, "
+					  "error %i (%s)\n", errno,
+					  strerror(errno));
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static int
+vfio_type1_dma_map(int vfio_container_fd)
+{
+	const struct rte_memseg *ms = rte_eal_get_physmem_layout();
+	int i;
+
+	/* map all DPDK segments for DMA. use 1:1 PA to IOVA mapping */
+	for (i = 0; i < RTE_MAX_MEMSEG; i++) {
+		if (ms[i].addr == NULL)
+			break;
+
+		if (vfio_type1_dma_mem_map(vfio_container_fd, ms[i].addr_64,
+					   ms[i].phys_addr, ms[i].len, 1))
+			return 1;
 	}
 
 	return 0;
@@ -813,6 +861,66 @@ static int
 vfio_noiommu_dma_map(int __rte_unused vfio_container_fd)
 {
 	/* No-IOMMU mode does not need DMA mapping */
+	return 0;
+}
+
+static int
+vfio_noiommu_dma_mem_map(int __rte_unused vfio_container_fd,
+			 uint64_t __rte_unused vaddr,
+			 uint64_t __rte_unused iova, uint64_t __rte_unused len,
+			 int __rte_unused do_map)
+{
+	/* No-IOMMU mode does not need DMA mapping */
+	return 0;
+}
+
+static int
+vfio_dma_mem_map(uint64_t vaddr, uint64_t iova,
+		       uint64_t len, int do_map)
+{
+	const struct vfio_iommu_type *t = vfio_cfg.vfio_iommu_type;
+
+	if (!t) {
+		RTE_LOG(ERR, EAL, "  VFIO support not initialized\n");
+		return -1;
+	}
+
+	if (!t->dma_user_map_func) {
+		RTE_LOG(ERR, EAL,
+			"  VFIO custom DMA region maping not supported by IOMMU %s\n",
+			t->name);
+		return -1;
+	}
+
+	return t->dma_user_map_func(vfio_cfg.vfio_container_fd, vaddr, iova,
+				    len, do_map);
+}
+
+int
+rte_iommu_dma_map(uint64_t vaddr, uint64_t iova, uint64_t len)
+{
+	return vfio_dma_mem_map(vaddr, iova, len, 1);
+}
+
+int
+rte_iommu_dma_unmap(uint64_t vaddr, uint64_t iova, uint64_t len)
+{
+	return vfio_dma_mem_map(vaddr, iova, len, 0);
+}
+
+#else
+
+int
+rte_iommu_dma_map(uint64_t __rte_unused vaddr, __rte_unused uint64_t iova,
+		  __rte_unused uint64_t len)
+{
+	return 0;
+}
+
+int
+rte_iommu_dma_unmap(uint64_t __rte_unused vaddr, uint64_t __rte_unused iova,
+		    __rte_unused uint64_t len)
+{
 	return 0;
 }
 

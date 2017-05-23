@@ -141,6 +141,7 @@ struct vfio_config {
 	int vfio_enabled;
 	int vfio_container_fd;
 	int vfio_active_groups;
+	const struct vfio_iommu_type *vfio_iommu_type;
 	struct vfio_group vfio_groups[VFIO_MAX_GROUPS];
 };
 
@@ -157,10 +158,19 @@ struct vfio_config {
  * */
 typedef int (*vfio_dma_func_t)(int);
 
+/* Custom memory region DMA mapping function prototype.
+ * Takes VFIO container fd, virtual address, phisical address, length and
+ * operation type (0 to unmap 1 for map) as a parameters.
+ * Returns 0 on success, -1 on error.
+ **/
+typedef int (*vfio_dma_user_func_t)(int fd, uint64_t vaddr, uint64_t iova,
+				   uint64_t len, int do_map);
+
 struct vfio_iommu_type {
 	int type_id;
 	const char *name;
 	vfio_dma_func_t dma_map_func;
+	vfio_dma_user_func_t dma_user_map_func;
 };
 
 /* pick IOMMU type. returns a pointer to vfio_iommu_type or NULL for error */
