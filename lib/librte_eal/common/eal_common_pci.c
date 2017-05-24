@@ -512,10 +512,24 @@ rte_pci_remove_device(struct rte_pci_device *pci_dev)
 	TAILQ_REMOVE(&rte_pci_bus.device_list, pci_dev, next);
 }
 
+static struct rte_device *
+pci_find_device(int (*match)(const struct rte_device *dev, const void *data),
+		const void *data)
+{
+	struct rte_pci_device *dev;
+
+	FOREACH_DEVICE_ON_PCIBUS(dev) {
+		if (match(&dev->device, data))
+			return &dev->device;
+	}
+	return NULL;
+}
+
 struct rte_pci_bus rte_pci_bus = {
 	.bus = {
 		.scan = rte_pci_scan,
 		.probe = rte_pci_probe,
+		.find_device = pci_find_device,
 	},
 	.device_list = TAILQ_HEAD_INITIALIZER(rte_pci_bus.device_list),
 	.driver_list = TAILQ_HEAD_INITIALIZER(rte_pci_bus.driver_list),
