@@ -109,6 +109,8 @@ struct sub_device {
 	struct rte_eth_dev *fs_dev;
 	/* flag calling for recollection */
 	volatile unsigned int remove:1;
+	/* flow isolation state */
+	int flow_isolated:1;
 };
 
 struct fs_priv {
@@ -140,6 +142,8 @@ struct fs_priv {
 	 */
 	enum dev_state state;
 	unsigned int pending_alarm:1; /* An alarm is pending */
+	/* flow isolation state */
+	int flow_isolated:1;
 };
 
 /* MISC */

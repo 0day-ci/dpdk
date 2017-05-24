@@ -218,6 +218,18 @@ fs_eth_dev_conf_apply(struct rte_eth_dev *dev,
 		DEBUG("VLAN filter already set");
 	}
 	/* rte_flow */
+	if (!PRIV(dev)->flow_isolated) {
+		DEBUG("Flow isolation already disabled");
+	} else {
+		DEBUG("Enabling flow isolation");
+		ret = rte_flow_isolate(PORT_ID(sdev),
+				       PRIV(dev)->flow_isolated,
+				       &ferror);
+		if (ret) {
+			fs_flow_complain(&ferror);
+			return ret;
+		}
+	}
 	if (TAILQ_EMPTY(&PRIV(dev)->flow_list)) {
 		DEBUG("rte_flow already set");
 	} else {
