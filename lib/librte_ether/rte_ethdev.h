@@ -1652,6 +1652,7 @@ struct rte_eth_rxtx_callback {
 enum rte_eth_dev_state {
 	RTE_ETH_DEV_UNUSED = 0,
 	RTE_ETH_DEV_ATTACHED,
+	RTE_ETH_DEV_DEFERRED,
 };
 
 /**
