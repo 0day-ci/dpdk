@@ -95,6 +95,7 @@ eal_long_options[] = {
 	{OPT_VFIO_INTR,         1, NULL, OPT_VFIO_INTR_NUM        },
 	{OPT_VMWARE_TSC_MAP,    0, NULL, OPT_VMWARE_TSC_MAP_NUM   },
 	{OPT_XEN_DOM0,          0, NULL, OPT_XEN_DOM0_NUM         },
+	{OPT_IOVA_AS_VA,        0, NULL, OPT_IOVA_AS_VA_NUM       },
 	{0,                     0, NULL, 0                        }
 };
 
@@ -876,6 +877,10 @@ eal_parse_common_option(int opt, const char *optarg,
 		conf->no_pci = 1;
 		break;
 
+	case OPT_IOVA_AS_VA_NUM:
+		conf->iova_va = 1;
+		break;
+
 	case OPT_NO_HPET_NUM:
 		conf->no_hpet = 1;
 		break;
@@ -1083,5 +1088,6 @@ eal_common_usage(void)
 	       "  --"OPT_NO_PCI"            Disable PCI\n"
 	       "  --"OPT_NO_HPET"           Disable HPET\n"
 	       "  --"OPT_NO_SHCONF"         No shared config (mmap'd files)\n"
+	       "  --"OPT_IOVA_AS_VA"        Use va addr as iova\n"
 	       "\n", RTE_MAX_LCORE);
 }

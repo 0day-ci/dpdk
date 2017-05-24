@@ -47,6 +47,12 @@
 
 #define EAL_PAGE_SIZE (sysconf(_SC_PAGESIZE))
 
+int __rte_unused
+rte_mem_is_iova_as_va(void)
+{
+	return internal_config.iova_va;
+}
+
 /*
  * Get physical address of any mapped virtual address in the current process.
  */

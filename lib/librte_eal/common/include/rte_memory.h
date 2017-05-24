@@ -258,6 +258,9 @@ rte_mem_phy2mch(int32_t memseg_id __rte_unused, const phys_addr_t phy_addr)
 }
 #endif
 
+int
+rte_mem_is_iova_as_va(void);
+
 #ifdef __cplusplus
 }
 #endif

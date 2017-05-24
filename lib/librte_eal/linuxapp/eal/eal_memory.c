@@ -109,6 +109,12 @@ int rte_xen_dom0_supported(void)
 }
 #endif
 
+int
+rte_mem_is_iova_as_va(void)
+{
+	return internal_config.iova_va;
+}
+
 /**
  * @file
  * Huge page mapping under linux
@@ -168,6 +174,9 @@ rte_mem_virt2phy(const void *virtaddr)
 	unsigned long virt_pfn;
 	int page_size;
 	off_t offset;
+
+	if (rte_mem_is_iova_as_va())
+		return (uintptr_t)virtaddr;
 
 	/* when using dom0, /proc/self/pagemap always returns 0, check in
 	 * dpdk memory by browsing the memsegs */
@@ -480,6 +489,9 @@ map_all_hugepages(struct hugepage_file *hugepg_tbl,
 		}
 		else {
 			hugepg_tbl[i].final_va = virtaddr;
+
+			if (rte_mem_is_iova_as_va())
+				hugepg_tbl[i].physaddr = (uintptr_t)virtaddr;
 		}
 
 		if (orig) {
