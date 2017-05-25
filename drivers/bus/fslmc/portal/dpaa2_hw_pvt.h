@@ -34,6 +34,8 @@
 #ifndef _DPAA2_HW_PVT_H_
 #define _DPAA2_HW_PVT_H_
 
+#include <rte_eventdev.h>
+
 #include <mc/fsl_mc_sys.h>
 #include <fsl_qbman_portal.h>
 
@@ -97,6 +99,8 @@ struct dpaa2_dpio_dev {
 	uintptr_t ci_size; /**< Size of the CI region */
 	int32_t	vfio_fd; /**< File descriptor received via VFIO */
 	int32_t hw_id; /**< An unique ID of this DPIO device instance */
+	uint64_t dqrr_held;
+	uint8_t dqrr_size;
 };
 
 struct dpaa2_dpbp_dev {
@@ -112,6 +116,11 @@ struct queue_storage_info_t {
 	struct qbman_result *dq_storage[NUM_DQS_PER_QUEUE];
 };
 
+typedef void (dpaa2_queue_cb_dqrr_t)(struct qbman_swp *swp,
+		const struct qbman_fd *fd,
+		const struct qbman_result *dq,
+		struct rte_event *ev);
+
 struct dpaa2_queue {
 	struct rte_mempool *mb_pool; /**< mbuf pool to populate RX ring. */
 	void *dev;
@@ -123,6 +132,7 @@ struct dpaa2_queue {
 	uint64_t tx_pkts;
 	uint64_t err_pkts;
 	struct queue_storage_info_t *q_storage;
+	dpaa2_queue_cb_dqrr_t *cb;
 };
 
 struct dpaa2_dpci_dev {
