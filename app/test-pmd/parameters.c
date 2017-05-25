@@ -623,6 +623,7 @@ launch_args_parse(int argc, char** argv)
 		{ "tx-queue-stats-mapping",	1, 0, 0 },
 		{ "rx-queue-stats-mapping",	1, 0, 0 },
 		{ "no-flush-rx",	0, 0, 0 },
+		{ "isolated-mode",	        0, 0, 0 },
 		{ "txpkts",			1, 0, 0 },
 		{ "disable-link-check",		0, 0, 0 },
 		{ "no-lsc-interrupt",		0, 0, 0 },
@@ -1081,6 +1082,8 @@ launch_args_parse(int argc, char** argv)
 				lsc_interrupt = 0;
 			if (!strcmp(lgopts[opt_idx].name, "no-rmv-interrupt"))
 				rmv_interrupt = 0;
+                       if (!strcmp(lgopts[opt_idx].name, "isolated-mode"))
+                               isolated_mode = 1;
 			if (!strcmp(lgopts[opt_idx].name, "print-event"))
 				if (parse_event_printing_config(optarg, 1)) {
 					rte_exit(EXIT_FAILURE,
