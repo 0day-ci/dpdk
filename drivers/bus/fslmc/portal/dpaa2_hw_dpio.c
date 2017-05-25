@@ -172,13 +172,11 @@ configure_dpio_qbman_swp(struct dpaa2_dpio_dev *dpio_dev)
 }
 
 static int
-dpaa2_configure_stashing(struct dpaa2_dpio_dev *dpio_dev)
+dpaa2_configure_stashing(struct dpaa2_dpio_dev *dpio_dev, int cpu_id)
 {
-	int sdest;
-	int cpu_id, ret;
+	int sdest, ret;
 
 	/* Set the Stashing Destination */
-	cpu_id = rte_lcore_id();
 	if (cpu_id < 0) {
 		cpu_id = rte_get_master_lcore();
 		if (cpu_id < 0) {
@@ -206,7 +204,7 @@ dpaa2_configure_stashing(struct dpaa2_dpio_dev *dpio_dev)
 	return 0;
 }
 
-static inline struct dpaa2_dpio_dev *dpaa2_get_qbman_swp(void)
+struct dpaa2_dpio_dev *dpaa2_get_qbman_swp(int cpu_id)
 {
 	struct dpaa2_dpio_dev *dpio_dev = NULL;
 	int ret;
@@ -222,7 +220,7 @@ static inline struct dpaa2_dpio_dev *dpaa2_get_qbman_swp(void)
 	PMD_DRV_LOG(DEBUG, "New Portal=0x%x (%d) affined thread - %lu",
 		    dpio_dev, dpio_dev->index, syscall(SYS_gettid));
 
-	ret = dpaa2_configure_stashing(dpio_dev);
+	ret = dpaa2_configure_stashing(dpio_dev, cpu_id);
 	if (ret)
 		PMD_DRV_LOG(ERR, "dpaa2_configure_stashing failed");
 
@@ -262,7 +260,7 @@ dpaa2_affine_qbman_swp(void)
 	}
 
 	/* Populate the dpaa2_io_portal structure */
-	dpaa2_io_portal[lcore_id].dpio_dev = dpaa2_get_qbman_swp();
+	dpaa2_io_portal[lcore_id].dpio_dev = dpaa2_get_qbman_swp(lcore_id);
 
 	if (dpaa2_io_portal[lcore_id].dpio_dev) {
 		RTE_PER_LCORE(_dpaa2_io).dpio_dev
@@ -308,7 +306,7 @@ dpaa2_affine_qbman_swp_sec(void)
 	}
 
 	/* Populate the dpaa2_io_portal structure */
-	dpaa2_io_portal[lcore_id].sec_dpio_dev = dpaa2_get_qbman_swp();
+	dpaa2_io_portal[lcore_id].sec_dpio_dev = dpaa2_get_qbman_swp(lcore_id);
 
 	if (dpaa2_io_portal[lcore_id].sec_dpio_dev) {
 		RTE_PER_LCORE(_dpaa2_io).sec_dpio_dev
