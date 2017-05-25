@@ -55,5 +55,13 @@ DPDK_17.08 {
 
 	dpcon_open;
 	dpcon_get_attributes;
+	qbman_eq_desc_set_dca;
+	qbman_get_dqrr_from_idx;
+	qbman_get_dqrr_idx;
+	qbman_result_DQ_fqd_ctx;
+	qbman_swp_dqrr_consume;
+	qbman_swp_dqrr_next;
+	qbman_swp_push_set;
+	rte_dpaa2_alloc_dpci_dev;
 	rte_fslmc_object_register;
 } DPDK_17.05;
