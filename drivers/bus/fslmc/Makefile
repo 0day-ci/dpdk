@@ -65,7 +65,8 @@ SRCS-$(CONFIG_RTE_LIBRTE_FSLMC_BUS) += \
 SRCS-$(CONFIG_RTE_LIBRTE_FSLMC_BUS) += \
         mc/dpbp.c \
         mc/dpio.c \
-        mc/mc_sys.c
+        mc/mc_sys.c \
+	mc/dpcon.c \
 
 SRCS-$(CONFIG_RTE_LIBRTE_FSLMC_BUS) += portal/dpaa2_hw_dpio.c
 SRCS-$(CONFIG_RTE_LIBRTE_FSLMC_BUS) += portal/dpaa2_hw_dpbp.c
