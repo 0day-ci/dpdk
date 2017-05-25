@@ -83,6 +83,10 @@ mlx4_flow_destroy(struct rte_eth_dev *dev,
 int
 mlx4_flow_flush(struct rte_eth_dev *dev,
 		struct rte_flow_error *error);
+int
+mlx4_flow_isolate(struct rte_eth_dev *dev,
+		  int enable,
+		  struct rte_flow_error *error);
 
 /** Structure to pass to the conversion function. */
 struct mlx4_flow {
