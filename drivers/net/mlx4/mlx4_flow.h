@@ -97,7 +97,8 @@ struct mlx4_flow {
 struct mlx4_flow_action {
 	uint32_t drop:1; /**< Target is a drop queue. */
 	uint32_t queue:1; /**< Target is a receive queue. */
-	uint32_t queue_id; /**< Identifier of the queue. */
+	uint16_t queues[RTE_MAX_QUEUES_PER_PORT]; /**< Queue indices to use. */
+	uint16_t queues_n; /**< Number of entries in queue[] */
 };
 
 int mlx4_priv_flow_start(struct priv *priv);

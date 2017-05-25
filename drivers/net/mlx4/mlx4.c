@@ -556,7 +556,7 @@ rxq_cleanup(struct rxq *rxq);
  * @return
  *   0 on success, negative errno value on failure.
  */
-static int
+int
 priv_create_parent(struct priv *priv,
 		   uint16_t queues[],
 		   uint16_t children_n)
