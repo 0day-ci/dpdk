@@ -49,3 +49,9 @@ DPDK_17.05 {
 
 	local: *;
 };
+
+DPDK_17.08 {
+	global:
+
+	rte_fslmc_object_register;
+} DPDK_17.05;
