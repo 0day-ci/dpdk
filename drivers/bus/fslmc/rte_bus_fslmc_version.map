@@ -53,6 +53,7 @@ DPDK_17.05 {
 DPDK_17.08 {
 	global:
 
+	dpci_set_rx_queue;
 	dpcon_open;
 	dpcon_get_attributes;
 	qbman_eq_desc_set_dca;
