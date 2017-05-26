@@ -69,6 +69,14 @@ EAL
 Drivers
 ~~~~~~~
 
+* **Updated bnxt PMD.**
+
+  Major enhancements include:
+  * Support MTU modification.
+  * Support LRO.
+  * Support VLAN filter and strip functionality.
+  * Other enhancements to add support for more dev_ops.
+  * Add PMD specific APIs mainly to control VF from PF.
 
 Libraries
 ~~~~~~~~~
