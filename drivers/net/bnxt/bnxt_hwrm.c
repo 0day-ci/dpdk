@@ -1152,20 +1152,51 @@ int bnxt_hwrm_vnic_plcmode_cfg(struct bnxt *bp,
 	HWRM_PREP(req, VNIC_PLCMODES_CFG, -1, resp);
 
 	req.flags = rte_cpu_to_le_32(
-//			HWRM_VNIC_PLCMODES_CFG_INPUT_FLAGS_REGULAR_PLACEMENT |
 			HWRM_VNIC_PLCMODES_CFG_INPUT_FLAGS_JUMBO_PLACEMENT);
-//			HWRM_VNIC_PLCMODES_CFG_INPUT_FLAGS_HDS_IPV4 | //TODO
-//			HWRM_VNIC_PLCMODES_CFG_INPUT_FLAGS_HDS_IPV6);
+
 	req.enables = rte_cpu_to_le_32(
 		HWRM_VNIC_PLCMODES_CFG_INPUT_ENABLES_JUMBO_THRESH_VALID);
-//		HWRM_VNIC_PLCMODES_CFG_INPUT_ENABLES_HDS_THRESHOLD_VALID);
 
 	size = rte_pktmbuf_data_room_size(bp->rx_queues[0]->mb_pool);
 	size -= RTE_PKTMBUF_HEADROOM;
 
 	req.jumbo_thresh = rte_cpu_to_le_16(size);
-//	req.hds_threshold = rte_cpu_to_le_16(size);
 	req.vnic_id = rte_cpu_to_le_32(vnic->fw_vnic_id);
+
+	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
+
+	HWRM_CHECK_RESULT;
+
+	return rc;
+}
+
+int bnxt_hwrm_vnic_tpa_cfg(struct bnxt *bp,
+			struct bnxt_vnic_info *vnic, bool enable)
+{
+	int rc = 0;
+	struct hwrm_vnic_tpa_cfg_input req = {.req_type = 0 };
+	struct hwrm_vnic_tpa_cfg_output *resp = bp->hwrm_cmd_resp_addr;
+
+	HWRM_PREP(req, VNIC_TPA_CFG, -1, resp);
+
+	if (enable) {
+		req.enables = rte_cpu_to_le_32(
+				HWRM_VNIC_TPA_CFG_INPUT_ENABLES_MAX_AGG_SEGS |
+				HWRM_VNIC_TPA_CFG_INPUT_ENABLES_MAX_AGGS |
+				HWRM_VNIC_TPA_CFG_INPUT_ENABLES_MIN_AGG_LEN);
+		req.flags = rte_cpu_to_le_32(
+				HWRM_VNIC_TPA_CFG_INPUT_FLAGS_TPA |
+				HWRM_VNIC_TPA_CFG_INPUT_FLAGS_ENCAP_TPA |
+				HWRM_VNIC_TPA_CFG_INPUT_FLAGS_RSC_WND_UPDATE |
+				HWRM_VNIC_TPA_CFG_INPUT_FLAGS_GRO |
+				HWRM_VNIC_TPA_CFG_INPUT_FLAGS_AGG_WITH_ECN |
+			HWRM_VNIC_TPA_CFG_INPUT_FLAGS_AGG_WITH_SAME_GRE_SEQ);
+		req.vnic_id = rte_cpu_to_le_32(vnic->fw_vnic_id);
+		req.max_agg_segs = rte_cpu_to_le_16(5);
+		req.max_aggs =
+			rte_cpu_to_le_16(HWRM_VNIC_TPA_CFG_INPUT_MAX_AGGS_MAX);
+		req.min_agg_len = rte_cpu_to_le_32(512);
+	}
 
 	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
 
@@ -1493,6 +1524,9 @@ void bnxt_free_all_hwrm_resources(struct bnxt *bp)
 		bnxt_clear_hwrm_vnic_filters(bp, vnic);
 
 		bnxt_hwrm_vnic_ctx_free(bp, vnic);
+
+		bnxt_hwrm_vnic_tpa_cfg(bp, vnic, false);
+
 		bnxt_hwrm_vnic_free(bp, vnic);
 	}
 	/* Ring resources */
