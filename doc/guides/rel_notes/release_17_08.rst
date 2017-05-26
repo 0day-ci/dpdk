@@ -41,6 +41,14 @@ New Features
      Also, make sure to start the actual text at the margin.
      =========================================================
 
+**Updated the AES-NI GCM PMD.**
+
+  The AES-NI GCM PMD was migrated from the ISA-L library to the Multi Buffer
+  library, as the latter library has Scatter Gather List support
+  now. The migration entailed adding additional support for:
+
+  * 192-bit key.
+
 
 Resolved Issues
 ---------------

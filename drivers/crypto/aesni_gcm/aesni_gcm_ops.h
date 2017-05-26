@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2016 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2016-2017 Intel Corporation. All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
  *   modification, are permitted provided that the following conditions
@@ -37,7 +37,32 @@
 #define LINUX
 #endif
 
-#include <isa-l_crypto/aes_gcm.h>
+#include <gcm_defines.h>
+#include <aux_funcs.h>
+
+/** Supported vector modes */
+enum aesni_gcm_vector_mode {
+	RTE_AESNI_GCM_NOT_SUPPORTED = 0,
+	RTE_AESNI_GCM_SSE,
+	RTE_AESNI_GCM_AVX,
+	RTE_AESNI_GCM_AVX2,
+	RTE_AESNI_GCM_VECTOR_NUM
+};
+
+enum aesni_gcm_key {
+	AESNI_GCM_KEY_128,
+	AESNI_GCM_KEY_192,
+	AESNI_GCM_KEY_256,
+	AESNI_GCM_KEY_NUM
+};
+
+
+typedef void (*aesni_gcm_t)(struct gcm_data *my_ctx_data, uint8_t *out,
+		const uint8_t *in, uint64_t plaintext_len, uint8_t *iv,
+		const uint8_t *aad, uint64_t aad_len,
+		uint8_t *auth_tag, uint64_t auth_tag_len);
+
+typedef void (*aesni_gcm_precomp_t)(const void *key, struct gcm_data *my_ctx_data);
 
 typedef void (*aesni_gcm_init_t)(struct gcm_data *my_ctx_data,
 		uint8_t *iv,
@@ -53,10 +78,109 @@ typedef void (*aesni_gcm_finalize_t)(struct gcm_data *my_ctx_data,
 		uint8_t *auth_tag,
 		uint64_t auth_tag_len);
 
+/** GCM library function pointer table */
 struct aesni_gcm_ops {
+	aesni_gcm_t enc;        /**< GCM encode function pointer */
+	aesni_gcm_t dec;        /**< GCM decode function pointer */
+	aesni_gcm_precomp_t precomp;    /**< GCM pre-compute */
 	aesni_gcm_init_t init;
-	aesni_gcm_update_t update;
+	aesni_gcm_update_t update_enc;
+	aesni_gcm_update_t update_dec;
 	aesni_gcm_finalize_t finalize;
 };
 
+static const struct aesni_gcm_ops gcm_ops[RTE_AESNI_GCM_VECTOR_NUM][AESNI_GCM_KEY_NUM] = {
+	[RTE_AESNI_GCM_NOT_SUPPORTED] = {
+		[AESNI_GCM_KEY_128] = {NULL},
+		[AESNI_GCM_KEY_192] = {NULL},
+		[AESNI_GCM_KEY_256] = {NULL}
+	},
+	[RTE_AESNI_GCM_SSE] = {
+		[AESNI_GCM_KEY_128] = {
+			aesni_gcm128_enc_sse,
+			aesni_gcm128_dec_sse,
+			aesni_gcm128_pre_sse,
+			aesni_gcm128_init_sse,
+			aesni_gcm128_enc_update_sse,
+			aesni_gcm128_dec_update_sse,
+			aesni_gcm128_enc_finalize_sse
+		},
+		[AESNI_GCM_KEY_192] = {
+			aesni_gcm192_enc_sse,
+			aesni_gcm192_dec_sse,
+			aesni_gcm192_pre_sse,
+			aesni_gcm192_init_sse,
+			aesni_gcm192_enc_update_sse,
+			aesni_gcm192_dec_update_sse,
+			aesni_gcm192_enc_finalize_sse
+		},
+		[AESNI_GCM_KEY_256] = {
+			aesni_gcm256_enc_sse,
+			aesni_gcm256_dec_sse,
+			aesni_gcm256_pre_sse,
+			aesni_gcm256_init_sse,
+			aesni_gcm256_enc_update_sse,
+			aesni_gcm256_dec_update_sse,
+			aesni_gcm256_enc_finalize_sse
+		}
+	},
+	[RTE_AESNI_GCM_AVX] = {
+		[AESNI_GCM_KEY_128] = {
+			aesni_gcm128_enc_avx_gen2,
+			aesni_gcm128_dec_avx_gen2,
+			aesni_gcm128_pre_avx_gen2,
+			aesni_gcm128_init_avx_gen2,
+			aesni_gcm128_enc_update_avx_gen2,
+			aesni_gcm128_dec_update_avx_gen2,
+			aesni_gcm128_enc_finalize_avx_gen2
+		},
+		[AESNI_GCM_KEY_192] = {
+			aesni_gcm192_enc_avx_gen2,
+			aesni_gcm192_dec_avx_gen2,
+			aesni_gcm192_pre_avx_gen2,
+			aesni_gcm192_init_avx_gen2,
+			aesni_gcm192_enc_update_avx_gen2,
+			aesni_gcm192_dec_update_avx_gen2,
+			aesni_gcm192_enc_finalize_avx_gen2
+		},
+		[AESNI_GCM_KEY_256] = {
+			aesni_gcm256_enc_avx_gen2,
+			aesni_gcm256_dec_avx_gen2,
+			aesni_gcm256_pre_avx_gen2,
+			aesni_gcm256_init_avx_gen2,
+			aesni_gcm256_enc_update_avx_gen2,
+			aesni_gcm256_dec_update_avx_gen2,
+			aesni_gcm256_enc_finalize_avx_gen2
+		}
+	},
+	[RTE_AESNI_GCM_AVX2] = {
+		[AESNI_GCM_KEY_128] = {
+			aesni_gcm128_enc_avx_gen4,
+			aesni_gcm128_dec_avx_gen4,
+			aesni_gcm128_pre_avx_gen4,
+			aesni_gcm128_init_avx_gen4,
+			aesni_gcm128_enc_update_avx_gen4,
+			aesni_gcm128_dec_update_avx_gen4,
+			aesni_gcm128_enc_finalize_avx_gen4
+		},
+		[AESNI_GCM_KEY_192] = {
+			aesni_gcm192_enc_avx_gen4,
+			aesni_gcm192_dec_avx_gen4,
+			aesni_gcm192_pre_avx_gen4,
+			aesni_gcm192_init_avx_gen4,
+			aesni_gcm192_enc_update_avx_gen4,
+			aesni_gcm192_dec_update_avx_gen4,
+			aesni_gcm192_enc_finalize_avx_gen4
+		},
+		[AESNI_GCM_KEY_256] = {
+			aesni_gcm256_enc_avx_gen4,
+			aesni_gcm256_dec_avx_gen4,
+			aesni_gcm256_pre_avx_gen4,
+			aesni_gcm256_init_avx_gen4,
+			aesni_gcm256_enc_update_avx_gen4,
+			aesni_gcm256_dec_update_avx_gen4,
+			aesni_gcm256_enc_finalize_avx_gen4
+		}
+	}
+};
 #endif /* _AESNI_GCM_OPS_H_ */

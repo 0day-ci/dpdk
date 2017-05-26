@@ -1,5 +1,5 @@
 ..  BSD LICENSE
-    Copyright(c) 2016 Intel Corporation. All rights reserved.
+    Copyright(c) 2016-2017 Intel Corporation. All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -32,8 +32,8 @@ AES-NI GCM Crypto Poll Mode Driver
 
 
 The AES-NI GCM PMD (**librte_pmd_aesni_gcm**) provides poll mode crypto driver
-support for utilizing Intel ISA-L crypto library, which provides operation acceleration
-through the AES-NI instruction sets for AES-GCM authenticated cipher algorithm.
+support for utilizing Intel multi buffer library (see AES-NI Multi-buffer PMD documentation
+to learn more about it, including installation).
 
 Features
 --------
@@ -49,19 +49,15 @@ Authentication algorithms:
 * RTE_CRYPTO_AUTH_AES_GCM
 * RTE_CRYPTO_AUTH_AES_GMAC
 
-Installation
-------------
-
-To build DPDK with the AESNI_GCM_PMD the user is required to install
-the ``libisal_crypto`` library in the build environment.
-For download and more details please visit `<https://github.com/01org/isa-l_crypto>`_.
-
 Initialization
 --------------
 
 In order to enable this virtual crypto PMD, user must:
 
-* Install the ISA-L crypto library (explained in Installation section).
+* Export the environmental variable AESNI_MULTI_BUFFER_LIB_PATH with the path where
+  the library was extracted.
+
+* Build the multi buffer library (go to Installation section in AES-NI MB PMD documentation).
 
 * Set CONFIG_RTE_LIBRTE_PMD_AESNI_GCM=y in config/common_base.
 
