@@ -486,6 +486,11 @@ M: Tetsuya Mukawa <mtetsuyah@gmail.com>
 F: drivers/net/null/
 F: doc/guides/nics/features/null.ini
 
+Softnic PMD
+M: Jasvinder Singh <jasvinder.singh@intel.com>
+M: Cristian Dumitrescu <cristian.dumitrescu@intel.com>
+F: drivers/net/softnic
+
 
 Crypto Drivers
 --------------

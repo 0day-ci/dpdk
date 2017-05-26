@@ -1,0 +1,7 @@
+DPDK_17.08 {
+	global:
+	rte_eth_softnic_create;
+	rte_eth_softnic_run;
+
+	local: *;
+};
