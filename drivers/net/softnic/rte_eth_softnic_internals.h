@@ -38,8 +38,24 @@
 
 #include <rte_mbuf.h>
 #include <rte_ethdev.h>
+#include <rte_sched.h>
 
 #include "rte_eth_softnic.h"
+
+#ifndef TM_MAX_SUBPORTS
+#define TM_MAX_SUBPORTS					8
+#endif
+
+#ifndef TM_MAX_PIPES_PER_SUBPORT
+#define TM_MAX_PIPES_PER_SUBPORT				4096
+#endif
+
+struct tm_params {
+	struct rte_sched_port_params port_params;
+	struct rte_sched_subport_params subport_params[TM_MAX_SUBPORTS];
+	struct rte_sched_pipe_params pipe_profiles[RTE_SCHED_PIPE_PROFILES_PER_PORT];
+	int pipe_to_profile[TM_MAX_SUBPORTS * TM_MAX_PIPES_PER_SUBPORT];
+};
 
 struct pmd_internals {
 	/* Devices */
@@ -54,9 +70,19 @@ struct pmd_internals {
 
 	/* Operation */
 	struct rte_mbuf *pkts[RTE_ETH_SOFTNIC_DEQ_BSZ_MAX];
+	struct tm_params tm_params;
+	struct rte_sched_port *sched;
 	uint32_t deq_bsz;
 	uint32_t txq_id;
 };
+
+extern const struct rte_tm_ops pmd_tm_ops;
+
+int
+tm_init(struct pmd_internals *p);
+
+void
+tm_free(struct pmd_internals *p);
 
 void
 pmd_ops_inherit(struct eth_dev_ops *o, const struct eth_dev_ops *u);

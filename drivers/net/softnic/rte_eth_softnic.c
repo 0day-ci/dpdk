@@ -41,6 +41,8 @@
 #include <rte_vdev.h>
 #include <rte_kvargs.h>
 #include <rte_errno.h>
+#include <rte_tm_driver.h>
+#include <rte_sched.h>
 
 #include "rte_eth_softnic.h"
 #include "rte_eth_softnic_internals.h"
@@ -57,6 +59,10 @@ static const char *pmd_valid_args[] = {
 };
 
 static struct rte_vdev_driver pmd_drv;
+
+#ifndef TM
+#define TM						1
+#endif
 
 static int
 pmd_eth_dev_configure(struct rte_eth_dev *dev)
@@ -113,6 +119,13 @@ pmd_eth_dev_start(struct rte_eth_dev *dev)
 {
 	struct pmd_internals *p = dev->data->dev_private;
 
+#if TM
+	/* Initialize the Traffic Manager for the overlay device */
+	int status = tm_init(p);
+	if (status)
+		return status;
+#endif
+
 	/* Clone dev->data from underlay to overlay */
 	memcpy(dev->data->mac_pool_sel,
 		p->udev->data->mac_pool_sel,
@@ -132,6 +145,10 @@ pmd_eth_dev_stop(struct rte_eth_dev *dev)
 	/* Call the current function for the underlay device */
 	rte_eth_dev_stop(p->uport_id);
 
+#if TM
+	/* Free the Traffic Manager for the overlay device */
+	tm_free(p);
+#endif
 }
 
 static void
@@ -249,6 +266,14 @@ pmd_eth_dev_mac_addr_remove(struct rte_eth_dev *dev, uint32_t index)
 	rte_eth_dev_mac_addr_remove(p->uport_id, &dev->data->mac_addrs[index]);
 }
 
+static int
+pmd_eth_dev_tm_ops_get(struct rte_eth_dev *dev __rte_unused, void *arg)
+{
+	*(const struct rte_tm_ops **) arg	= &pmd_tm_ops;
+
+	return 0;
+}
+
 static uint16_t
 pmd_eth_dev_tx_burst(void *txq,
 	struct rte_mbuf **tx_pkts,
@@ -256,13 +281,30 @@ pmd_eth_dev_tx_burst(void *txq,
 {
 	struct pmd_internals *p = txq;
 
-	return rte_eth_tx_burst(p->uport_id, p->txq_id, tx_pkts, nb_pkts);
+#if TM
+	rte_sched_port_enqueue(p->sched, tx_pkts, nb_pkts);
 
+	return nb_pkts;
+#else
+	return rte_eth_tx_burst(p->uport_id, p->txq_id, tx_pkts, nb_pkts);
+#endif
 }
 
 int
-rte_eth_softnic_run(uint8_t port_id __rte_unused)
+rte_eth_softnic_run(uint8_t port_id)
 {
+	struct rte_eth_dev *odev = &rte_eth_devices[port_id];
+	struct pmd_internals *p = odev->data->dev_private;
+	uint32_t n_pkts, n_pkts_deq;
+
+	n_pkts_deq = rte_sched_port_dequeue(p->sched, p->pkts, p->deq_bsz);
+
+	for (n_pkts = 0; n_pkts < n_pkts_deq;)
+		n_pkts += rte_eth_tx_burst(p->uport_id,
+			p->txq_id,
+			&p->pkts[n_pkts],
+			(uint16_t) (n_pkts_deq - n_pkts));
+
 	return 0;
 }
 
@@ -287,6 +329,7 @@ pmd_ops_build(struct eth_dev_ops *o, const struct eth_dev_ops *u)
 	o->mac_addr_set = pmd_eth_dev_mac_addr_set;
 	o->mac_addr_add = pmd_eth_dev_mac_addr_add;
 	o->mac_addr_remove = pmd_eth_dev_mac_addr_remove;
+	o->tm_ops_get = pmd_eth_dev_tm_ops_get;
 }
 
 int
