@@ -53,7 +53,6 @@ failover_slave_enqueue(struct scheduler_slave *slave, uint8_t slave_idx,
 		struct rte_crypto_op **ops, uint16_t nb_ops)
 {
 	uint16_t i, processed_ops;
-	struct rte_cryptodev_sym_session *sessions[nb_ops];
 	struct scheduler_session *sess0, *sess1, *sess2, *sess3;
 
 	for (i = 0; i < nb_ops && i < 4; i++)
@@ -74,11 +73,6 @@ failover_slave_enqueue(struct scheduler_slave *slave, uint8_t slave_idx,
 		sess3 = (struct scheduler_session *)
 				ops[i+3]->sym->session->_private;
 
-		sessions[i] = ops[i]->sym->session;
-		sessions[i + 1] = ops[i + 1]->sym->session;
-		sessions[i + 2] = ops[i + 2]->sym->session;
-		sessions[i + 3] = ops[i + 3]->sym->session;
-
 		ops[i]->sym->session = sess0->sessions[slave_idx];
 		ops[i + 1]->sym->session = sess1->sessions[slave_idx];
 		ops[i + 2]->sym->session = sess2->sessions[slave_idx];
@@ -88,7 +82,6 @@ failover_slave_enqueue(struct scheduler_slave *slave, uint8_t slave_idx,
 	for (; i < nb_ops; i++) {
 		sess0 = (struct scheduler_session *)
 				ops[i]->sym->session->_private;
-		sessions[i] = ops[i]->sym->session;
 		ops[i]->sym->session = sess0->sessions[slave_idx];
 	}
 
@@ -96,9 +89,7 @@ failover_slave_enqueue(struct scheduler_slave *slave, uint8_t slave_idx,
 			slave->qp_id, ops, nb_ops);
 	slave->nb_inflight_cops += processed_ops;
 
-	if (unlikely(processed_ops < nb_ops))
-		for (i = processed_ops; i < nb_ops; i++)
-			ops[i]->sym->session = sessions[i];
+	RTE_ASSERT(prcessed_ops == nb_ops);
 
 	return processed_ops;
 }
@@ -106,22 +97,22 @@ failover_slave_enqueue(struct scheduler_slave *slave, uint8_t slave_idx,
 static uint16_t
 schedule_enqueue(void *qp, struct rte_crypto_op **ops, uint16_t nb_ops)
 {
-	struct fo_scheduler_qp_ctx *qp_ctx =
-			((struct scheduler_qp_ctx *)qp)->private_qp_ctx;
-	uint16_t enqueued_ops;
+	struct scheduler_qp_ctx *qp_ctx = qp;
+	struct fo_scheduler_qp_ctx *fo_qp_ctx = qp_ctx->private_qp_ctx;
 
 	if (unlikely(nb_ops == 0))
 		return 0;
 
-	enqueued_ops = failover_slave_enqueue(&qp_ctx->primary_slave,
-			PRIMARY_SLAVE_IDX, ops, nb_ops);
+	if (fo_qp_ctx->primary_slave.nb_inflight_cops + nb_ops <
+				qp_ctx->max_nb_objs)
+		return failover_slave_enqueue(&fo_qp_ctx->primary_slave,
+				PRIMARY_SLAVE_IDX, ops, nb_ops);
 
-	if (enqueued_ops < nb_ops)
-		enqueued_ops += failover_slave_enqueue(&qp_ctx->secondary_slave,
-				SECONDARY_SLAVE_IDX, &ops[enqueued_ops],
-				nb_ops - enqueued_ops);
-
-	return enqueued_ops;
+	return failover_slave_enqueue(&fo_qp_ctx->secondary_slave,
+			SECONDARY_SLAVE_IDX, ops, (fo_qp_ctx->secondary_slave.
+			nb_inflight_cops + nb_ops <= qp_ctx->max_nb_objs) ?
+			nb_ops : qp_ctx->max_nb_objs -
+			fo_qp_ctx->secondary_slave.nb_inflight_cops);
 }
 
 
