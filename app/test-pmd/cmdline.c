@@ -523,7 +523,7 @@ static void cmd_help_long_parsed(void *parsed_result,
 			"   Flush (default) or don't flush RX streams before"
 			" forwarding. Mainly used with PCAP drivers.\n\n"
 
-			#ifdef RTE_NIC_BYPASS
+#if defined(RTE_NIC_BYPASS) && defined(RTE_LIBRTE_IXGBE_PMD)
 			"set bypass mode (normal|bypass|isolate) (port_id)\n"
 			"   Set the bypass mode for the lowest port on bypass enabled"
 			" NIC.\n\n"
@@ -3904,7 +3904,7 @@ cmdline_parse_inst_t cmd_set_link_check = {
 	},
 };
 
-#ifdef RTE_NIC_BYPASS
+#if defined(RTE_NIC_BYPASS) && defined(RTE_LIBRTE_IXGBE_PMD)
 /* *** SET NIC BYPASS MODE *** */
 struct cmd_set_bypass_mode_result {
 	cmdline_fixed_string_t set;
@@ -3921,19 +3921,18 @@ cmd_set_bypass_mode_parsed(void *parsed_result,
 {
 	struct cmd_set_bypass_mode_result *res = parsed_result;
 	portid_t port_id = res->port_id;
-	uint32_t bypass_mode = RTE_BYPASS_MODE_NORMAL;
+	uint32_t bypass_mode = RTE_PMD_IXGBE_BYPASS_MODE_NORMAL;
 
 	if (!strcmp(res->value, "bypass"))
-		bypass_mode = RTE_BYPASS_MODE_BYPASS;
+		bypass_mode = RTE_PMD_IXGBE_BYPASS_MODE_BYPASS;
 	else if (!strcmp(res->value, "isolate"))
-		bypass_mode = RTE_BYPASS_MODE_ISOLATE;
+		bypass_mode = RTE_PMD_IXGBE_BYPASS_MODE_ISOLATE;
 	else
-		bypass_mode = RTE_BYPASS_MODE_NORMAL;
+		bypass_mode = RTE_PMD_IXGBE_BYPASS_MODE_NORMAL;
 
 	/* Set the bypass mode for the relevant port. */
-	if (0 != rte_eth_dev_bypass_state_set(port_id, &bypass_mode)) {
+	if (rte_pmd_ixgbe_bypass_state_set(port_id, &bypass_mode) != 0)
 		printf("\t Failed to set bypass mode for port = %d.\n", port_id);
-	}
 }
 
 cmdline_parse_token_string_t cmd_setbypass_mode_set =
@@ -3986,46 +3985,49 @@ cmd_set_bypass_event_parsed(void *parsed_result,
 	int32_t rc;
 	struct cmd_set_bypass_event_result *res = parsed_result;
 	portid_t port_id = res->port_id;
-	uint32_t bypass_event = RTE_BYPASS_EVENT_NONE;
-	uint32_t bypass_mode = RTE_BYPASS_MODE_NORMAL;
+	uint32_t bypass_event = RTE_PMD_IXGBE_BYPASS_EVENT_NONE;
+	uint32_t bypass_mode = RTE_PMD_IXGBE_BYPASS_MODE_NORMAL;
 
 	if (!strcmp(res->event_value, "timeout"))
-		bypass_event = RTE_BYPASS_EVENT_TIMEOUT;
+		bypass_event = RTE_PMD_IXGBE_BYPASS_EVENT_TIMEOUT;
 	else if (!strcmp(res->event_value, "os_on"))
-		bypass_event = RTE_BYPASS_EVENT_OS_ON;
+		bypass_event = RTE_PMD_IXGBE_BYPASS_EVENT_OS_ON;
 	else if (!strcmp(res->event_value, "os_off"))
-		bypass_event = RTE_BYPASS_EVENT_OS_OFF;
+		bypass_event = RTE_PMD_IXGBE_BYPASS_EVENT_OS_OFF;
 	else if (!strcmp(res->event_value, "power_on"))
-		bypass_event = RTE_BYPASS_EVENT_POWER_ON;
+		bypass_event = RTE_PMD_IXGBE_BYPASS_EVENT_POWER_ON;
 	else if (!strcmp(res->event_value, "power_off"))
-		bypass_event = RTE_BYPASS_EVENT_POWER_OFF;
+		bypass_event = RTE_PMD_IXGBE_BYPASS_EVENT_POWER_OFF;
 	else
-		bypass_event = RTE_BYPASS_EVENT_NONE;
+		bypass_event = RTE_PMD_IXGBE_BYPASS_EVENT_NONE;
 
 	if (!strcmp(res->mode_value, "bypass"))
-		bypass_mode = RTE_BYPASS_MODE_BYPASS;
+		bypass_mode = RTE_PMD_IXGBE_BYPASS_MODE_BYPASS;
 	else if (!strcmp(res->mode_value, "isolate"))
-		bypass_mode = RTE_BYPASS_MODE_ISOLATE;
+		bypass_mode = RTE_PMD_IXGBE_BYPASS_MODE_ISOLATE;
 	else
-		bypass_mode = RTE_BYPASS_MODE_NORMAL;
+		bypass_mode = RTE_PMD_IXGBE_BYPASS_MODE_NORMAL;
 
 	/* Set the watchdog timeout. */
-	if (bypass_event == RTE_BYPASS_EVENT_TIMEOUT) {
+	if (bypass_event == RTE_PMD_IXGBE_BYPASS_EVENT_TIMEOUT) {
 
 		rc = -EINVAL;
-		if (!RTE_BYPASS_TMT_VALID(bypass_timeout) ||
-				(rc = rte_eth_dev_wd_timeout_store(port_id,
-				bypass_timeout)) != 0) {
+		if (RTE_PMD_IXGBE_BYPASS_TMT_VALID(bypass_timeout)) {
+			rc = rte_pmd_ixgbe_bypass_wd_timeout_store(port_id,
+							   bypass_timeout);
+		}
+		if (rc != 0) {
 			printf("Failed to set timeout value %u "
-				"for port %d, errto code: %d.\n",
-				bypass_timeout, port_id, rc);
+			"for port %d, errto code: %d.\n",
+			bypass_timeout, port_id, rc);
 		}
 	}
 
 	/* Set the bypass event to transition to bypass mode. */
-	if (0 != rte_eth_dev_bypass_event_store(port_id,
-			bypass_event, bypass_mode)) {
-		printf("\t Failed to set bypass event for port = %d.\n", port_id);
+	if (rte_pmd_ixgbe_bypass_event_store(port_id, bypass_event,
+					     bypass_mode) != 0) {
+		printf("\t Failed to set bypass event for port = %d.\n",
+		       port_id);
 	}
 
 }
@@ -4087,21 +4089,21 @@ cmd_set_bypass_timeout_parsed(void *parsed_result,
 	struct cmd_set_bypass_timeout_result *res = parsed_result;
 
 	if (!strcmp(res->value, "1.5"))
-		bypass_timeout = RTE_BYPASS_TMT_1_5_SEC;
+		bypass_timeout = RTE_PMD_IXGBE_BYPASS_TMT_1_5_SEC;
 	else if (!strcmp(res->value, "2"))
-		bypass_timeout = RTE_BYPASS_TMT_2_SEC;
+		bypass_timeout = RTE_PMD_IXGBE_BYPASS_TMT_2_SEC;
 	else if (!strcmp(res->value, "3"))
-		bypass_timeout = RTE_BYPASS_TMT_3_SEC;
+		bypass_timeout = RTE_PMD_IXGBE_BYPASS_TMT_3_SEC;
 	else if (!strcmp(res->value, "4"))
-		bypass_timeout = RTE_BYPASS_TMT_4_SEC;
+		bypass_timeout = RTE_PMD_IXGBE_BYPASS_TMT_4_SEC;
 	else if (!strcmp(res->value, "8"))
-		bypass_timeout = RTE_BYPASS_TMT_8_SEC;
+		bypass_timeout = RTE_PMD_IXGBE_BYPASS_TMT_8_SEC;
 	else if (!strcmp(res->value, "16"))
-		bypass_timeout = RTE_BYPASS_TMT_16_SEC;
+		bypass_timeout = RTE_PMD_IXGBE_BYPASS_TMT_16_SEC;
 	else if (!strcmp(res->value, "32"))
-		bypass_timeout = RTE_BYPASS_TMT_32_SEC;
+		bypass_timeout = RTE_PMD_IXGBE_BYPASS_TMT_32_SEC;
 	else
-		bypass_timeout = RTE_BYPASS_TMT_OFF;
+		bypass_timeout = RTE_PMD_IXGBE_BYPASS_TMT_OFF;
 }
 
 cmdline_parse_token_string_t cmd_setbypass_timeout_set =
@@ -4151,11 +4153,11 @@ cmd_show_bypass_config_parsed(void *parsed_result,
 	uint32_t timeout = bypass_timeout;
 	int i;
 
-	static const char * const timeouts[RTE_BYPASS_TMT_NUM] =
+	static const char * const timeouts[RTE_PMD_IXGBE_BYPASS_TMT_NUM] =
 		{"off", "1.5", "2", "3", "4", "8", "16", "32"};
-	static const char * const modes[RTE_BYPASS_MODE_NUM] =
+	static const char * const modes[RTE_PMD_IXGBE_BYPASS_MODE_NUM] =
 		{"UNKNOWN", "normal", "bypass", "isolate"};
-	static const char * const events[RTE_BYPASS_EVENT_NUM] = {
+	static const char * const events[RTE_PMD_IXGBE_BYPASS_EVENT_NUM] = {
 		"NONE",
 		"OS/board on",
 		"power supply on",
@@ -4165,32 +4167,32 @@ cmd_show_bypass_config_parsed(void *parsed_result,
 	int num_events = (sizeof events) / (sizeof events[0]);
 
 	/* Display the bypass mode.*/
-	if (0 != rte_eth_dev_bypass_state_show(port_id, &bypass_mode)) {
+	if (rte_pmd_ixgbe_bypass_state_show(port_id, &bypass_mode) != 0) {
 		printf("\tFailed to get bypass mode for port = %d\n", port_id);
 		return;
 	}
 	else {
-		if (!RTE_BYPASS_MODE_VALID(bypass_mode))
-			bypass_mode = RTE_BYPASS_MODE_NONE;
+		if (!RTE_PMD_IXGBE_BYPASS_MODE_VALID(bypass_mode))
+			bypass_mode = RTE_PMD_IXGBE_BYPASS_MODE_NONE;
 
 		printf("\tbypass mode    = %s\n",  modes[bypass_mode]);
 	}
 
 	/* Display the bypass timeout.*/
-	if (!RTE_BYPASS_TMT_VALID(timeout))
-		timeout = RTE_BYPASS_TMT_OFF;
+	if (!RTE_PMD_IXGBE_BYPASS_TMT_VALID(timeout))
+		timeout = RTE_PMD_IXGBE_BYPASS_TMT_OFF;
 
 	printf("\tbypass timeout = %s\n", timeouts[timeout]);
 
 	/* Display the bypass events and associated modes. */
-	for (i = RTE_BYPASS_EVENT_START; i < num_events; i++) {
+	for (i = RTE_PMD_IXGBE_BYPASS_EVENT_START; i < num_events; i++) {
 
-		if (0 != rte_eth_dev_bypass_event_show(port_id, i, &event_mode)) {
+		if (rte_pmd_ixgbe_bypass_event_show(port_id, i, &event_mode)) {
 			printf("\tFailed to get bypass mode for event = %s\n",
 				events[i]);
 		} else {
-			if (!RTE_BYPASS_MODE_VALID(event_mode))
-				event_mode = RTE_BYPASS_MODE_NONE;
+			if (!RTE_PMD_IXGBE_BYPASS_MODE_VALID(event_mode))
+				event_mode = RTE_PMD_IXGBE_BYPASS_MODE_NONE;
 
 			printf("\tbypass event: %-16s = %s\n", events[i],
 				modes[event_mode]);
@@ -13597,7 +13599,7 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_set_allmulti_mode_all,
 	(cmdline_parse_inst_t *)&cmd_set_flush_rx,
 	(cmdline_parse_inst_t *)&cmd_set_link_check,
-#ifdef RTE_NIC_BYPASS
+#if defined(RTE_NIC_BYPASS) && defined(RTE_LIBRTE_IXGBE_PMD)
 	(cmdline_parse_inst_t *)&cmd_set_bypass_mode,
 	(cmdline_parse_inst_t *)&cmd_set_bypass_event,
 	(cmdline_parse_inst_t *)&cmd_set_bypass_timeout,

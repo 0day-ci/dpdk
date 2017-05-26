@@ -575,17 +575,6 @@ static const struct eth_dev_ops ixgbe_eth_dev_ops = {
 	.set_queue_rate_limit = ixgbe_set_queue_rate_limit,
 	.reta_update          = ixgbe_dev_rss_reta_update,
 	.reta_query           = ixgbe_dev_rss_reta_query,
-#ifdef RTE_NIC_BYPASS
-	.bypass_init          = ixgbe_bypass_init,
-	.bypass_state_set     = ixgbe_bypass_state_store,
-	.bypass_state_show    = ixgbe_bypass_state_show,
-	.bypass_event_set     = ixgbe_bypass_event_store,
-	.bypass_event_show    = ixgbe_bypass_event_show,
-	.bypass_wd_timeout_set  = ixgbe_bypass_wd_timeout_store,
-	.bypass_wd_timeout_show = ixgbe_bypass_wd_timeout_show,
-	.bypass_ver_show      = ixgbe_bypass_ver_show,
-	.bypass_wd_reset      = ixgbe_bypass_wd_reset,
-#endif /* RTE_NIC_BYPASS */
 	.rss_hash_update      = ixgbe_dev_rss_hash_update,
 	.rss_hash_conf_get    = ixgbe_dev_rss_hash_conf_get,
 	.filter_ctrl          = ixgbe_dev_filter_ctrl,
