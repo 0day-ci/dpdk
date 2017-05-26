@@ -14,6 +14,7 @@ DPDK_17.08 {
 	rte_pmd_bnxt_get_vf_rx_status;
 	rte_pmd_bnxt_get_vf_tx_drop_count;
 	rte_pmd_bnxt_get_tx_drop_count;
+	rte_pmd_bnxt_mac_addr_add;
 	rte_pmd_bnxt_set_vf_mac_addr;
 	rte_pmd_bnxt_set_vf_mac_anti_spoof;
 	rte_pmd_bnxt_set_vf_rate_limit;
