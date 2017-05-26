@@ -175,6 +175,7 @@ struct mode8023ad_private {
 	uint64_t update_timeout_us;
 	rte_eth_bond_8023ad_ext_slowrx_fn slowrx_cb;
 	uint8_t external_sm;
+	enum rte_bond_8023ad_agg_selection agg_selection;
 };
 
 /**
