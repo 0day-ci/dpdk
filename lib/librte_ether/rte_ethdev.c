@@ -961,6 +961,20 @@ rte_eth_dev_mtu_restore(uint8_t port_id)
 }
 
 static void
+rte_eth_dev_mc_addr_list_restore(uint8_t port_id)
+{
+	struct rte_eth_dev *dev;
+
+	dev = &rte_eth_devices[port_id];
+
+	if (dev->data->mc_addr_count == 0)
+		return;
+
+	rte_eth_dev_set_mc_addr_list(port_id, dev->data->mc_addr_list,
+		dev->data->mc_addr_count);
+}
+
+static void
 rte_eth_dev_config_restore(uint8_t port_id)
 {
 	struct rte_eth_dev *dev;
@@ -1023,6 +1037,8 @@ rte_eth_dev_config_restore(uint8_t port_id)
 	rte_eth_dev_link_status_restore(port_id);
 
 	rte_eth_dev_mtu_restore(port_id);
+
+	rte_eth_dev_mc_addr_list_restore(port_id);
 }
 
 int
@@ -3423,12 +3439,25 @@ rte_eth_dev_set_mc_addr_list(uint8_t port_id,
 			     uint32_t nb_mc_addr)
 {
 	struct rte_eth_dev *dev;
+	int ret;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
 
 	dev = &rte_eth_devices[port_id];
 	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->set_mc_addr_list, -ENOTSUP);
-	return dev->dev_ops->set_mc_addr_list(dev, mc_addr_set, nb_mc_addr);
+	ret = dev->dev_ops->set_mc_addr_list(dev, mc_addr_set, nb_mc_addr);
+	if (!ret) {
+		if (dev->data->mc_addr_list != NULL)
+			rte_free(dev->data->mc_addr_list);
+		dev->data->mc_addr_list = rte_zmalloc("dev->mc_addr_list",
+				sizeof(struct ether_addr) * nb_mc_addr, 0);
+		if (dev->data->mc_addr_list != NULL) {
+			rte_memcpy(dev->data->mc_addr_list, mc_addr_set,
+				   sizeof(struct ether_addr) * nb_mc_addr);
+			dev->data->mc_addr_count = nb_mc_addr;
+		}
+	}
+	return ret;
 }
 
 int

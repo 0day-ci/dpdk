@@ -1771,6 +1771,8 @@ struct rte_eth_dev_data {
 
 	struct rte_eth_rx_queue_conf *rxq_conf;
 	struct rte_eth_tx_queue_conf *txq_conf;
+	uint32_t mc_addr_count;
+	struct ether_addr *mc_addr_list;
 };
 
 /** Device supports hotplug detach */
