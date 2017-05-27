@@ -46,11 +46,16 @@ static int i40e_shaper_profile_add(struct rte_eth_dev *dev,
 static int i40e_shaper_profile_del(struct rte_eth_dev *dev,
 				   uint32_t shaper_profile_id,
 				   struct rte_tm_error *error);
+static int i40e_node_add(struct rte_eth_dev *dev, uint32_t node_id,
+			 uint32_t parent_node_id, uint32_t priority,
+			 uint32_t weight, struct rte_tm_node_params *params,
+			 struct rte_tm_error *error);
 
 const struct rte_tm_ops i40e_tm_ops = {
 	.capabilities_get = i40e_tm_capabilities_get,
 	.shaper_profile_add = i40e_shaper_profile_add,
 	.shaper_profile_delete = i40e_shaper_profile_del,
+	.node_add = i40e_node_add,
 };
 
 int
@@ -72,6 +77,11 @@ i40e_tm_conf_init(struct rte_eth_dev *dev)
 
 	/* initialize shaper profile list */
 	TAILQ_INIT(&pf->tm_conf.shaper_profile_list);
+
+	/* initialize node configuration */
+	pf->tm_conf.root = NULL;
+	TAILQ_INIT(&pf->tm_conf.tc_list);
+	pf->tm_conf.nb_tc_node = 0;
 }
 
 void
@@ -79,6 +89,18 @@ i40e_tm_conf_uninit(struct rte_eth_dev *dev)
 {
 	struct i40e_pf *pf = I40E_DEV_PRIVATE_TO_PF(dev->data->dev_private);
 	struct i40e_tm_shaper_profile *shaper_profile;
+	struct i40e_tm_node *tc;
+
+	/* clear node configuration */
+	while ((tc = TAILQ_FIRST(&pf->tm_conf.tc_list))) {
+		TAILQ_REMOVE(&pf->tm_conf.tc_list, tc, node);
+		rte_free(tc);
+	}
+	pf->tm_conf.nb_tc_node = 0;
+	if (pf->tm_conf.root) {
+		rte_free(pf->tm_conf.root);
+		pf->tm_conf.root = NULL;
+	}
 
 	/* Remove all shaper profiles */
 	while ((shaper_profile =
@@ -269,6 +291,207 @@ i40e_shaper_profile_del(struct rte_eth_dev *dev,
 
 	TAILQ_REMOVE(&pf->tm_conf.shaper_profile_list, shaper_profile, node);
 	rte_free(shaper_profile);
+
+	return 0;
+}
+
+static inline struct i40e_tm_node *
+i40e_tm_node_search(struct rte_eth_dev *dev,
+		    uint32_t node_id, enum i40e_tm_node_type *node_type)
+{
+	struct i40e_pf *pf = I40E_DEV_PRIVATE_TO_PF(dev->data->dev_private);
+	struct i40e_tm_node_list *tc_list = &pf->tm_conf.tc_list;
+	struct i40e_tm_node *tm_node;
+
+	if (pf->tm_conf.root && pf->tm_conf.root->id == node_id) {
+		*node_type = I40E_TM_NODE_TYPE_PORT;
+		return pf->tm_conf.root;
+	}
+
+	TAILQ_FOREACH(tm_node, tc_list, node) {
+		if (tm_node->id == node_id) {
+			*node_type = I40E_TM_NODE_TYPE_TC;
+			return tm_node;
+		}
+	}
+
+	return NULL;
+}
+
+static int
+i40e_node_add(struct rte_eth_dev *dev, uint32_t node_id,
+	      uint32_t parent_node_id, uint32_t priority,
+	      uint32_t weight, struct rte_tm_node_params *params,
+	      struct rte_tm_error *error)
+{
+	struct i40e_pf *pf = I40E_DEV_PRIVATE_TO_PF(dev->data->dev_private);
+	enum i40e_tm_node_type node_type = I40E_TM_NODE_TYPE_MAX;
+	struct i40e_tm_shaper_profile *shaper_profile;
+	struct i40e_tm_node *tm_node;
+	uint16_t tc_nb = 0;
+
+	if (!params || !error)
+		return -EINVAL;
+
+	if (node_id == RTE_TM_NODE_ID_NULL) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_ID;
+		error->message = "invalid node id";
+		return -EINVAL;
+	}
+
+	if (priority) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PRIORITY;
+		error->message = "priority not supported";
+		return -EINVAL;
+	}
+
+	if (weight) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_WEIGHT;
+		error->message = "weight not supported";
+		return -EINVAL;
+	}
+
+	/* check if the node ID is already used */
+	if (i40e_tm_node_search(dev, node_id, &node_type)) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_ID;
+		error->message = "node id already used";
+		return -EINVAL;
+	}
+
+	/* check the shaper profile id */
+	shaper_profile = i40e_shaper_profile_search(dev,
+						    params->shaper_profile_id);
+	if (!shaper_profile) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARAMS_SHAPER_PROFILE_ID;
+		error->message = "shaper profile not exist";
+		return -EINVAL;
+	}
+
+	/* not support shared shaper */
+	if (params->shared_shaper_id) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARAMS_SHARED_SHAPER_ID;
+		error->message = "shared shaper not supported";
+		return -EINVAL;
+	}
+	if (params->n_shared_shapers) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARAMS_N_SHARED_SHAPERS;
+		error->message = "shared shaper not supported";
+		return -EINVAL;
+	}
+
+	/* root node if not have a parent */
+	if (parent_node_id == RTE_TM_NODE_ID_NULL) {
+		/* check the unsupported parameters */
+		if (params->nonleaf.wfq_weight_mode) {
+			error->type =
+				RTE_TM_ERROR_TYPE_NODE_PARAMS_WFQ_WEIGHT_MODE;
+			error->message = "WFQ not supported";
+			return -EINVAL;
+		}
+		if (params->nonleaf.n_sp_priorities) {
+			error->type =
+				RTE_TM_ERROR_TYPE_NODE_PARAMS_N_SP_PRIORITIES;
+			error->message = "SP priority not supported";
+			return -EINVAL;
+		}
+
+		/* obviously no more than one root */
+		if (pf->tm_conf.root) {
+			error->type = RTE_TM_ERROR_TYPE_NODE_PARENT_NODE_ID;
+			error->message = "already have a root";
+			return -EINVAL;
+		}
+
+		/* add the root node */
+		tm_node = rte_zmalloc("i40e_tm_node",
+				      sizeof(struct i40e_tm_node),
+				      0);
+		if (!tm_node)
+			return -ENOMEM;
+		tm_node->id = node_id;
+		tm_node->priority = priority;
+		tm_node->weight = weight;
+		tm_node->reference_count = 0;
+		tm_node->parent = NULL;
+		tm_node->shaper_profile = shaper_profile;
+		(void)rte_memcpy(&tm_node->params, params,
+				 sizeof(struct rte_tm_node_params));
+		pf->tm_conf.root = tm_node;
+
+		/* increase the reference counter of the shaper profile */
+		shaper_profile->reference_count++;
+
+		return 0;
+	}
+
+	/* TC node */
+	/* check the unsupported parameters */
+	if (params->leaf.cman) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARAMS_CMAN;
+		error->message = "Congestion management not supported";
+		return -EINVAL;
+	}
+	if (params->leaf.wred.wred_profile_id !=
+	    RTE_TM_WRED_PROFILE_ID_NONE) {
+		error->type =
+			RTE_TM_ERROR_TYPE_NODE_PARAMS_WRED_PROFILE_ID;
+		error->message = "WRED not supported";
+		return -EINVAL;
+	}
+	if (params->leaf.wred.shared_wred_context_id) {
+		error->type =
+			RTE_TM_ERROR_TYPE_NODE_PARAMS_SHARED_WRED_CONTEXT_ID;
+		error->message = "WRED not supported";
+		return -EINVAL;
+	}
+	if (params->leaf.wred.n_shared_wred_contexts) {
+		error->type =
+			RTE_TM_ERROR_TYPE_NODE_PARAMS_N_SHARED_WRED_CONTEXTS;
+		error->message = "WRED not supported";
+		return -EINVAL;
+	}
+
+	/* should have a root first */
+	if (!pf->tm_conf.root) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARENT_NODE_ID;
+		error->message = "no root yet";
+		return -EINVAL;
+	}
+	if (pf->tm_conf.root->id != parent_node_id) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARENT_NODE_ID;
+		error->message = "parent id doesn't belong to the root";
+		return -EINVAL;
+	}
+
+	/* check the TC number */
+	tc_nb = i40e_tc_nb_get(dev);
+	if (pf->tm_conf.nb_tc_node >= tc_nb) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_ID;
+		error->message = "too much TC";
+		return -EINVAL;
+	}
+
+	/* add the TC node */
+	tm_node = rte_zmalloc("i40e_tm_node",
+			      sizeof(struct i40e_tm_node),
+			      0);
+	if (!tm_node)
+		return -ENOMEM;
+	tm_node->id = node_id;
+	tm_node->priority = priority;
+	tm_node->weight = weight;
+	tm_node->reference_count = 0;
+	tm_node->parent = pf->tm_conf.root;
+	tm_node->shaper_profile = shaper_profile;
+	(void)rte_memcpy(&tm_node->params, params,
+			 sizeof(struct rte_tm_node_params));
+	TAILQ_INSERT_TAIL(&pf->tm_conf.tc_list,
+			  tm_node, node);
+	tm_node->parent->reference_count++;
+	pf->tm_conf.nb_tc_node++;
+
+	/* increase the reference counter of the shaper profile */
+	shaper_profile->reference_count++;
 
 	return 0;
 }
