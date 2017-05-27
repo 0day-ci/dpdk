@@ -330,7 +330,7 @@ dpaa_eth_queue_tx(void *q, struct rte_mbuf **bufs, uint16_t nb_bufs)
 					if (mbuf->ol_flags & DPAA_TX_CKSUM_OFFLOAD_MASK) {
 						if (mbuf->data_off < DEFAULT_TX_ICEOF +
 							sizeof(struct dpaa_eth_parse_results_t)) {
-							PMD_DRV_LOG(DEBUG, "Checksum offload Err: "
+							PMD_DRV_LOG(ERR, "Checksum offload Err: "
 								"Not enough Headroom "
 								"space for correct Checksum offload."
 								"So Calculating checksum in Software.");
