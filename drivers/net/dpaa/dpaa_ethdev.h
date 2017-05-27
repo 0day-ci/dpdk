@@ -38,6 +38,13 @@
 #include <rte_ethdev.h>
 
 #include <rte_dpaa_logs.h>
+#include <dpaa_mempool.h>
+
+#include <fsl_usd.h>
+#include <fsl_qman.h>
+#include <fsl_bman.h>
+#include <of.h>
+#include <netcfg.h>
 
 #define FSL_CLASS_ID		0
 #define FSL_VENDOR_ID		0x1957
