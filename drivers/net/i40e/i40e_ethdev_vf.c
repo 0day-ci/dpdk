@@ -163,6 +163,9 @@ static void i40evf_handle_pf_event(__rte_unused struct rte_eth_dev *dev,
 				   uint8_t *msg,
 				   uint16_t msglen);
 
+static int i40evf_dev_init(struct rte_eth_dev *eth_dev);
+static int i40evf_dev_uninit(struct rte_eth_dev *eth_dev);
+
 /* Default hash key buffer for RSS */
 static uint32_t rss_key_default[I40E_VFQF_HKEY_MAX_INDEX + 1];
 
@@ -194,6 +197,8 @@ static const struct eth_dev_ops i40evf_eth_dev_ops = {
 	.dev_configure        = i40evf_dev_configure,
 	.dev_start            = i40evf_dev_start,
 	.dev_stop             = i40evf_dev_stop,
+	.dev_init             = i40evf_dev_init,
+	.dev_uninit           = i40evf_dev_uninit,
 	.promiscuous_enable   = i40evf_dev_promiscuous_enable,
 	.promiscuous_disable  = i40evf_dev_promiscuous_disable,
 	.allmulticast_enable  = i40evf_dev_allmulticast_enable,
