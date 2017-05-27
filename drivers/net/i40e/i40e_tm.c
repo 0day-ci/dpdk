@@ -52,6 +52,8 @@ static int i40e_node_add(struct rte_eth_dev *dev, uint32_t node_id,
 			 struct rte_tm_error *error);
 static int i40e_node_delete(struct rte_eth_dev *dev, uint32_t node_id,
 			    struct rte_tm_error *error);
+static int i40e_node_type_get(struct rte_eth_dev *dev, uint32_t node_id,
+			      int *is_leaf, struct rte_tm_error *error);
 
 const struct rte_tm_ops i40e_tm_ops = {
 	.capabilities_get = i40e_tm_capabilities_get,
@@ -59,6 +61,7 @@ const struct rte_tm_ops i40e_tm_ops = {
 	.shaper_profile_delete = i40e_shaper_profile_del,
 	.node_add = i40e_node_add,
 	.node_delete = i40e_node_delete,
+	.node_type_get = i40e_node_type_get,
 };
 
 int
@@ -546,6 +549,38 @@ i40e_node_delete(struct rte_eth_dev *dev, uint32_t node_id,
 	TAILQ_REMOVE(&pf->tm_conf.tc_list, tm_node, node);
 	rte_free(tm_node);
 	pf->tm_conf.nb_tc_node--;
+
+	return 0;
+}
+
+static int
+i40e_node_type_get(struct rte_eth_dev *dev, uint32_t node_id,
+		   int *is_leaf, struct rte_tm_error *error)
+{
+	enum i40e_tm_node_type node_type;
+	struct i40e_tm_node *tm_node;
+
+	if (!is_leaf || !error)
+		return -EINVAL;
+
+	if (node_id == RTE_TM_NODE_ID_NULL) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_ID;
+		error->message = "invalid node id";
+		return -EINVAL;
+	}
+
+	/* check if the node id exists */
+	tm_node = i40e_tm_node_search(dev, node_id, &node_type);
+	if (!tm_node) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_ID;
+		error->message = "no such node";
+		return -EINVAL;
+	}
+
+	if (tm_node->reference_count)
+		*is_leaf = false;
+	else
+		*is_leaf = true;
 
 	return 0;
 }
