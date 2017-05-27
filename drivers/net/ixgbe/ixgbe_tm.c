@@ -45,11 +45,16 @@ static int ixgbe_shaper_profile_add(struct rte_eth_dev *dev,
 static int ixgbe_shaper_profile_del(struct rte_eth_dev *dev,
 				    uint32_t shaper_profile_id,
 				    struct rte_tm_error *error);
+static int ixgbe_node_add(struct rte_eth_dev *dev, uint32_t node_id,
+			  uint32_t parent_node_id, uint32_t priority,
+			  uint32_t weight, struct rte_tm_node_params *params,
+			  struct rte_tm_error *error);
 
 const struct rte_tm_ops ixgbe_tm_ops = {
 	.capabilities_get = ixgbe_tm_capabilities_get,
 	.shaper_profile_add = ixgbe_shaper_profile_add,
 	.shaper_profile_delete = ixgbe_shaper_profile_del,
+	.node_add = ixgbe_node_add,
 };
 
 int
@@ -72,6 +77,13 @@ ixgbe_tm_conf_init(struct rte_eth_dev *dev)
 
 	/* initialize shaper profile list */
 	TAILQ_INIT(&tm_conf->shaper_profile_list);
+
+	/* initialize node configuration */
+	tm_conf->root = NULL;
+	TAILQ_INIT(&tm_conf->queue_list);
+	TAILQ_INIT(&tm_conf->tc_list);
+	tm_conf->nb_tc_node = 0;
+	tm_conf->nb_queue_node = 0;
 }
 
 void
@@ -80,6 +92,23 @@ ixgbe_tm_conf_uninit(struct rte_eth_dev *dev)
 	struct ixgbe_tm_conf *tm_conf =
 		IXGBE_DEV_PRIVATE_TO_TM_CONF(dev->data->dev_private);
 	struct ixgbe_tm_shaper_profile *shaper_profile;
+	struct ixgbe_tm_node *tm_node;
+
+	/* clear node configuration */
+	while ((tm_node = TAILQ_FIRST(&tm_conf->queue_list))) {
+		TAILQ_REMOVE(&tm_conf->queue_list, tm_node, node);
+		rte_free(tm_node);
+	}
+	tm_conf->nb_queue_node = 0;
+	while ((tm_node = TAILQ_FIRST(&tm_conf->tc_list))) {
+		TAILQ_REMOVE(&tm_conf->tc_list, tm_node, node);
+		rte_free(tm_node);
+	}
+	tm_conf->nb_tc_node = 0;
+	if (tm_conf->root) {
+		rte_free(tm_conf->root);
+		tm_conf->root = NULL;
+	}
 
 	/* Remove all shaper profiles */
 	while ((shaper_profile =
@@ -281,6 +310,236 @@ ixgbe_shaper_profile_del(struct rte_eth_dev *dev,
 
 	TAILQ_REMOVE(&tm_conf->shaper_profile_list, shaper_profile, node);
 	rte_free(shaper_profile);
+
+	return 0;
+}
+
+static inline struct ixgbe_tm_node *
+ixgbe_tm_node_search(struct rte_eth_dev *dev,
+		     uint32_t node_id, enum ixgbe_tm_node_type *node_type)
+{
+	struct ixgbe_tm_conf *tm_conf =
+		IXGBE_DEV_PRIVATE_TO_TM_CONF(dev->data->dev_private);
+	struct ixgbe_tm_node *tm_node;
+
+	if (tm_conf->root && tm_conf->root->id == node_id) {
+		*node_type = IXGBE_TM_NODE_TYPE_PORT;
+		return tm_conf->root;
+	}
+
+	TAILQ_FOREACH(tm_node, &tm_conf->tc_list, node) {
+		if (tm_node->id == node_id) {
+			*node_type = IXGBE_TM_NODE_TYPE_TC;
+			return tm_node;
+		}
+	}
+
+	TAILQ_FOREACH(tm_node, &tm_conf->queue_list, node) {
+		if (tm_node->id == node_id) {
+			*node_type = IXGBE_TM_NODE_TYPE_QUEUE;
+			return tm_node;
+		}
+	}
+
+	return NULL;
+}
+
+static int
+ixgbe_node_add(struct rte_eth_dev *dev, uint32_t node_id,
+	       uint32_t parent_node_id, uint32_t priority,
+	       uint32_t weight, struct rte_tm_node_params *params,
+	       struct rte_tm_error *error)
+{
+	struct ixgbe_tm_conf *tm_conf =
+		IXGBE_DEV_PRIVATE_TO_TM_CONF(dev->data->dev_private);
+	enum ixgbe_tm_node_type node_type = IXGBE_TM_NODE_TYPE_MAX;
+	enum ixgbe_tm_node_type parent_node_type = IXGBE_TM_NODE_TYPE_MAX;
+	struct ixgbe_tm_shaper_profile *shaper_profile;
+	struct ixgbe_tm_node *tm_node;
+	struct ixgbe_tm_node *parent_node;
+	uint8_t nb_tcs;
+
+	if (!params || !error)
+		return -EINVAL;
+
+	if (node_id == RTE_TM_NODE_ID_NULL) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_ID;
+		error->message = "invalid node id";
+		return -EINVAL;
+	}
+
+	if (priority) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PRIORITY;
+		error->message = "priority not supported";
+		return -EINVAL;
+	}
+
+	if (weight) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_WEIGHT;
+		error->message = "weight not supported";
+		return -EINVAL;
+	}
+
+	/* check if the node ID is already used */
+	if (ixgbe_tm_node_search(dev, node_id, &node_type)) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_ID;
+		error->message = "node id already used";
+		return -EINVAL;
+	}
+
+	/* check the shaper profile id */
+	shaper_profile = ixgbe_shaper_profile_search(dev,
+						     params->shaper_profile_id);
+	if (!shaper_profile) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARAMS_SHAPER_PROFILE_ID;
+		error->message = "shaper profile not exist";
+		return -EINVAL;
+	}
+
+	/* not support shared shaper */
+	if (params->shared_shaper_id) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARAMS_SHARED_SHAPER_ID;
+		error->message = "shared shaper not supported";
+		return -EINVAL;
+	}
+	if (params->n_shared_shapers) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARAMS_N_SHARED_SHAPERS;
+		error->message = "shared shaper not supported";
+		return -EINVAL;
+	}
+
+	/* root node if not have a parent */
+	if (parent_node_id == RTE_TM_NODE_ID_NULL) {
+		/* check the unsupported parameters */
+		if (params->nonleaf.wfq_weight_mode) {
+			error->type =
+				RTE_TM_ERROR_TYPE_NODE_PARAMS_WFQ_WEIGHT_MODE;
+			error->message = "WFQ not supported";
+			return -EINVAL;
+		}
+		if (params->nonleaf.n_sp_priorities) {
+			error->type =
+				RTE_TM_ERROR_TYPE_NODE_PARAMS_N_SP_PRIORITIES;
+			error->message = "SP priority not supported";
+			return -EINVAL;
+		}
+
+		/* obviously no more than one root */
+		if (tm_conf->root) {
+			error->type = RTE_TM_ERROR_TYPE_NODE_PARENT_NODE_ID;
+			error->message = "already have a root";
+			return -EINVAL;
+		}
+
+		/* add the root node */
+		tm_node = rte_zmalloc("ixgbe_tm_node",
+				      sizeof(struct ixgbe_tm_node),
+				      0);
+		if (!tm_node)
+			return -ENOMEM;
+		tm_node->id = node_id;
+		tm_node->priority = priority;
+		tm_node->weight = weight;
+		tm_node->reference_count = 0;
+		tm_node->parent = NULL;
+		tm_node->shaper_profile = shaper_profile;
+		(void)rte_memcpy(&tm_node->params, params,
+				 sizeof(struct rte_tm_node_params));
+		tm_conf->root = tm_node;
+
+		/* increase the reference counter of the shaper profile */
+		shaper_profile->reference_count++;
+
+		return 0;
+	}
+
+	/* TC node */
+	/* check the unsupported parameters */
+	if (params->leaf.cman) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARAMS_CMAN;
+		error->message = "Congestion management not supported";
+		return -EINVAL;
+	}
+	if (params->leaf.wred.wred_profile_id !=
+	    RTE_TM_WRED_PROFILE_ID_NONE) {
+		error->type =
+			RTE_TM_ERROR_TYPE_NODE_PARAMS_WRED_PROFILE_ID;
+		error->message = "WRED not supported";
+		return -EINVAL;
+	}
+	if (params->leaf.wred.shared_wred_context_id) {
+		error->type =
+			RTE_TM_ERROR_TYPE_NODE_PARAMS_SHARED_WRED_CONTEXT_ID;
+		error->message = "WRED not supported";
+		return -EINVAL;
+	}
+	if (params->leaf.wred.n_shared_wred_contexts) {
+		error->type =
+			RTE_TM_ERROR_TYPE_NODE_PARAMS_N_SHARED_WRED_CONTEXTS;
+		error->message = "WRED not supported";
+		return -EINVAL;
+	}
+
+	/* check the parent node */
+	parent_node = ixgbe_tm_node_search(dev, parent_node_id,
+					   &parent_node_type);
+	if (!parent_node) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARENT_NODE_ID;
+		error->message = "parent not exist";
+		return -EINVAL;
+	}
+	if (parent_node_type != IXGBE_TM_NODE_TYPE_PORT &&
+	    parent_node_type != IXGBE_TM_NODE_TYPE_TC) {
+		error->type = RTE_TM_ERROR_TYPE_NODE_PARENT_NODE_ID;
+		error->message = "parent is not port or TC";
+		return -EINVAL;
+	}
+
+	/* check the node number */
+	if (parent_node_type == IXGBE_TM_NODE_TYPE_PORT) {
+		/* check TC number */
+		nb_tcs = ixgbe_tc_nb_get(dev);
+		if (tm_conf->nb_tc_node >= nb_tcs) {
+			error->type = RTE_TM_ERROR_TYPE_NODE_ID;
+			error->message = "too much TC";
+			return -EINVAL;
+		}
+	} else {
+		/* check queue number */
+		if (tm_conf->nb_queue_node >= dev->data->nb_tx_queues) {
+			error->type = RTE_TM_ERROR_TYPE_NODE_ID;
+			error->message = "too much queue";
+			return -EINVAL;
+		}
+	}
+
+	/* add the TC node */
+	tm_node = rte_zmalloc("ixgbe_tm_node",
+			      sizeof(struct ixgbe_tm_node),
+			      0);
+	if (!tm_node)
+		return -ENOMEM;
+	tm_node->id = node_id;
+	tm_node->priority = priority;
+	tm_node->weight = weight;
+	tm_node->reference_count = 0;
+	tm_node->parent = parent_node;
+	tm_node->shaper_profile = shaper_profile;
+	(void)rte_memcpy(&tm_node->params, params,
+			 sizeof(struct rte_tm_node_params));
+	if (parent_node_type == IXGBE_TM_NODE_TYPE_PORT) {
+		TAILQ_INSERT_TAIL(&tm_conf->tc_list,
+				  tm_node, node);
+		tm_conf->nb_tc_node++;
+	} else {
+		TAILQ_INSERT_TAIL(&tm_conf->queue_list,
+				  tm_node, node);
+		tm_conf->nb_queue_node++;
+	}
+	tm_node->parent->reference_count++;
+
+	/* increase the reference counter of the shaper profile */
+	shaper_profile->reference_count++;
 
 	return 0;
 }
