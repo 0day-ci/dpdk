@@ -36,6 +36,12 @@
 #include <rte_bus.h>
 #include <rte_mempool.h>
 
+#include <fsl_usd.h>
+#include <fsl_qman.h>
+#include <fsl_bman.h>
+#include <of.h>
+#include <netcfg.h>
+
 #define FSL_CLASS_ID		0
 #define FSL_VENDOR_ID		0x1957
 #define FSL_DEVICE_ID		0x410	 /* custom */
