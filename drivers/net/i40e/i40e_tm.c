@@ -54,6 +54,10 @@ static int i40e_node_delete(struct rte_eth_dev *dev, uint32_t node_id,
 			    struct rte_tm_error *error);
 static int i40e_node_type_get(struct rte_eth_dev *dev, uint32_t node_id,
 			      int *is_leaf, struct rte_tm_error *error);
+static int i40e_level_capabilities_get(struct rte_eth_dev *dev,
+				       uint32_t level_id,
+				       struct rte_tm_level_capabilities *cap,
+				       struct rte_tm_error *error);
 
 const struct rte_tm_ops i40e_tm_ops = {
 	.capabilities_get = i40e_tm_capabilities_get,
@@ -62,6 +66,7 @@ const struct rte_tm_ops i40e_tm_ops = {
 	.node_add = i40e_node_add,
 	.node_delete = i40e_node_delete,
 	.node_type_get = i40e_node_type_get,
+	.level_capabilities_get = i40e_level_capabilities_get,
 };
 
 int
@@ -581,6 +586,68 @@ i40e_node_type_get(struct rte_eth_dev *dev, uint32_t node_id,
 		*is_leaf = false;
 	else
 		*is_leaf = true;
+
+	return 0;
+}
+
+static int
+i40e_level_capabilities_get(struct rte_eth_dev *dev,
+			    uint32_t level_id,
+			    struct rte_tm_level_capabilities *cap,
+			    struct rte_tm_error *error)
+{
+	uint16_t nb_tc = 0;
+
+	if (!cap || !error)
+		return -EINVAL;
+
+	if (level_id >= I40E_TM_NODE_TYPE_MAX) {
+		error->type = RTE_TM_ERROR_TYPE_LEVEL_ID;
+		error->message = "too deep level";
+		return -EINVAL;
+	}
+
+	nb_tc = i40e_tc_nb_get(dev);
+
+	/* root node */
+	if (level_id == I40E_TM_NODE_TYPE_PORT) {
+		cap->n_nodes_max = 1;
+		cap->n_nodes_nonleaf_max = 1;
+		cap->n_nodes_leaf_max = 0;
+		cap->non_leaf_nodes_identical = false;
+		cap->leaf_nodes_identical = false;
+		cap->nonleaf.shaper_private_supported = true;
+		cap->nonleaf.shaper_private_dual_rate_supported = false;
+		cap->nonleaf.shaper_private_rate_min = 0;
+		/* 40Gbps -> 5GBps */
+		cap->nonleaf.shaper_private_rate_max = 5000000000ull;
+		cap->nonleaf.shaper_shared_n_max = 0;
+		cap->nonleaf.sched_n_children_max = nb_tc;
+		cap->nonleaf.sched_sp_n_priorities_max = 0;
+		cap->nonleaf.sched_wfq_n_children_per_group_max = 0;
+		cap->nonleaf.sched_wfq_n_groups_max = 0;
+		cap->nonleaf.sched_wfq_weight_max = 0;
+		cap->nonleaf.stats_mask = 0;
+
+		return 0;
+	}
+
+	/* TC node */
+	cap->n_nodes_max = nb_tc;
+	cap->n_nodes_nonleaf_max = 0;
+	cap->n_nodes_leaf_max = nb_tc;
+	cap->non_leaf_nodes_identical = false;
+	cap->leaf_nodes_identical = true;
+	cap->leaf.shaper_private_supported = true;
+	cap->leaf.shaper_private_dual_rate_supported = false;
+	cap->leaf.shaper_private_rate_min = 0;
+	/* 40Gbps -> 5GBps */
+	cap->leaf.shaper_private_rate_max = 5000000000ull;
+	cap->leaf.shaper_shared_n_max = 0;
+	cap->leaf.cman_head_drop_supported = false;
+	cap->leaf.cman_wred_context_private_supported = false;
+	cap->leaf.cman_wred_context_shared_n_max = 0;
+	cap->leaf.stats_mask = 0;
 
 	return 0;
 }
