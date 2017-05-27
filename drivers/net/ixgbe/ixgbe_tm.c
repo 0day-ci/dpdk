@@ -61,6 +61,9 @@ static int ixgbe_node_capabilities_get(struct rte_eth_dev *dev,
 				       uint32_t node_id,
 				       struct rte_tm_node_capabilities *cap,
 				       struct rte_tm_error *error);
+static int ixgbe_hierarchy_commit(struct rte_eth_dev *dev,
+				  int clear_on_fail,
+				  struct rte_tm_error *error);
 
 const struct rte_tm_ops ixgbe_tm_ops = {
 	.capabilities_get = ixgbe_tm_capabilities_get,
@@ -71,6 +74,7 @@ const struct rte_tm_ops ixgbe_tm_ops = {
 	.node_type_get = ixgbe_node_type_get,
 	.level_capabilities_get = ixgbe_level_capabilities_get,
 	.node_capabilities_get = ixgbe_node_capabilities_get,
+	.hierarchy_commit = ixgbe_hierarchy_commit,
 };
 
 int
@@ -778,4 +782,69 @@ ixgbe_node_capabilities_get(struct rte_eth_dev *dev,
 	cap->stats_mask = 0;
 
 	return 0;
+}
+
+static int
+ixgbe_hierarchy_commit(struct rte_eth_dev *dev,
+		       int clear_on_fail,
+		       struct rte_tm_error *error)
+{
+	struct ixgbe_tm_conf *tm_conf =
+		IXGBE_DEV_PRIVATE_TO_TM_CONF(dev->data->dev_private);
+	struct ixgbe_tm_node *tm_node;
+	uint64_t bw;
+	int ret;
+	int i;
+
+	if (!error)
+		return -EINVAL;
+
+	/* check the setting */
+	if (tm_conf->root)
+		return 0;
+
+	/* not support port max bandwidth yet */
+	if (tm_conf->root->shaper_profile->profile.peak.rate) {
+		error->type = RTE_TM_ERROR_TYPE_SHAPER_PROFILE;
+		error->message = "no port max bandwidth";
+		goto fail_clear;
+	}
+
+	/* HW not support TC max bandwidth */
+	TAILQ_FOREACH(tm_node, &tm_conf->tc_list, node) {
+		if (tm_node->shaper_profile->profile.peak.rate) {
+			error->type = RTE_TM_ERROR_TYPE_SHAPER_PROFILE;
+			error->message = "no TC max bandwidth";
+			goto fail_clear;
+		}
+	}
+
+	/* queue max bandwidth */
+	i = 0;
+	TAILQ_FOREACH(tm_node, &tm_conf->queue_list, node) {
+		bw = tm_node->shaper_profile->profile.peak.rate;
+		if (bw) {
+			/* interpret Bps to Mbps */
+			bw = bw * 8 / 1000 / 1000;
+			ret = ixgbe_set_queue_rate_limit(dev, i, bw);
+			if (ret) {
+				error->type = RTE_TM_ERROR_TYPE_SHAPER_PROFILE;
+				error->message =
+					"failed to set queue max bandwidth";
+				goto fail_clear;
+			}
+		}
+
+		i++;
+	}
+
+	return 0;
+
+fail_clear:
+	/* clear all the traffic manager configuration */
+	if (clear_on_fail) {
+		ixgbe_tm_conf_uninit(dev);
+		ixgbe_tm_conf_init(dev);
+	}
+	return -EINVAL;
 }
