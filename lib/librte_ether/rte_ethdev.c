@@ -923,6 +923,28 @@ rte_eth_dev_tx_queue_restore(uint8_t port_id, uint16_t queue_id)
 }
 
 static void
+rte_eth_dev_link_status_restore(uint8_t port_id)
+{
+	struct rte_eth_dev *dev;
+
+	dev = &rte_eth_devices[port_id];
+
+	if (dev->data->in_restoration == 0) {
+		dev->data->restore_link.link_status =
+			dev->data->dev_link.link_status;
+		return;
+	}
+
+	if (dev->data->restore_link.link_status
+	    != dev->data->dev_link.link_status) {
+		if (dev->data->restore_link.link_status != 0)
+			rte_eth_dev_set_link_up(port_id);
+		else
+			rte_eth_dev_set_link_down(port_id);
+	}
+}
+
+static void
 rte_eth_dev_config_restore(uint8_t port_id)
 {
 	struct rte_eth_dev *dev;
@@ -982,6 +1004,7 @@ rte_eth_dev_config_restore(uint8_t port_id)
 	for (q = 0; q < dev->data->nb_tx_queues; q++)
 		rte_eth_dev_tx_queue_restore(port_id, q);
 
+	rte_eth_dev_link_status_restore(port_id);
 }
 
 int
@@ -1014,6 +1037,8 @@ rte_eth_dev_start(uint8_t port_id)
 	if (dev->data->dev_conf.intr_conf.lsc == 0) {
 		RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->link_update, -ENOTSUP);
 		(*dev->dev_ops->link_update)(dev, 0);
+		dev->data->restore_link.link_status =
+			dev->data->dev_link.link_status;
 	}
 	return 0;
 }
@@ -1043,26 +1068,34 @@ int
 rte_eth_dev_set_link_up(uint8_t port_id)
 {
 	struct rte_eth_dev *dev;
+	int ret;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
 	dev = &rte_eth_devices[port_id];
 
 	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->dev_set_link_up, -ENOTSUP);
-	return (*dev->dev_ops->dev_set_link_up)(dev);
+	ret = (*dev->dev_ops->dev_set_link_up)(dev);
+	if (!ret)
+		dev->data->restore_link.link_status = 1;
+	return ret;
 }
 
 int
 rte_eth_dev_set_link_down(uint8_t port_id)
 {
 	struct rte_eth_dev *dev;
+	int ret;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
 	dev = &rte_eth_devices[port_id];
 
 	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->dev_set_link_down, -ENOTSUP);
-	return (*dev->dev_ops->dev_set_link_down)(dev);
+	ret = (*dev->dev_ops->dev_set_link_down)(dev);
+	if (!ret)
+		dev->data->restore_link.link_status = 0;
+	return ret;
 }
 
 void

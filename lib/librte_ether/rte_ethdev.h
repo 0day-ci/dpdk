@@ -1734,6 +1734,7 @@ struct rte_eth_dev_data {
 	void *dev_private;              /**< PMD-specific private data */
 
 	struct rte_eth_link dev_link;
+	struct rte_eth_link restore_link;
 	/**< Link-level information & status */
 
 	struct rte_eth_conf dev_conf;   /**< Configuration applied to device. */
