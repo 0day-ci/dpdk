@@ -1523,6 +1523,9 @@ i40e_add_rm_profile_info(struct i40e_hw *hw, uint8_t *profile_info_sec)
 #define I40E_PROFILE_INFO_SIZE 48
 #define I40E_MAX_PROFILE_NUM 16
 
+#define I40E_DDP_TRACKID_INVALID 0xFFFFFFFF
+#define SECTION_TYPE_RB_MMIO 0x00001800
+
 /* Check if the profile info exists */
 static int
 i40e_check_profile_info(uint8_t port, uint8_t *profile_info_sec)
@@ -1557,11 +1560,7 @@ i40e_check_profile_info(uint8_t port, uint8_t *profile_info_sec)
 			     sizeof(struct i40e_profile_section_header));
 	for (i = 0; i < p_list->p_count; i++) {
 		p = &p_list->p_info[i];
-		if ((pinfo->track_id == p->track_id) &&
-		    !memcmp(&pinfo->version, &p->version,
-			    sizeof(struct i40e_ddp_version)) &&
-		    !memcmp(&pinfo->name, &p->name,
-			    I40E_DDP_NAME_SIZE)) {
+		if (pinfo->track_id == p->track_id) {
 			PMD_DRV_LOG(INFO, "Profile exists.");
 			rte_free(buff);
 			return 1;
@@ -1570,6 +1569,88 @@ i40e_check_profile_info(uint8_t port, uint8_t *profile_info_sec)
 
 	rte_free(buff);
 	return 0;
+}
+
+/**
+ * i40e_rollback_profile
+ * @hw: pointer to the hardware structure
+ * @profile: pointer to the profile segment of the package to be removed
+ * @track_id: package tracking id
+ *
+ * Rolls back previously loaded package.
+ */
+static enum i40e_status_code
+i40e_rollback_profile(struct i40e_hw *hw, struct i40e_profile_segment *profile,
+		   u32 track_id)
+{
+	enum i40e_status_code status = I40E_SUCCESS;
+	struct i40e_section_table *sec_tbl;
+	struct i40e_profile_section_header *sec = NULL;
+	u32 dev_cnt;
+	u32 vendor_dev_id;
+	u32 *nvm;
+	u32 section_size = 0;
+	u32 offset = 0, info = 0;
+	u32 i, n;
+
+	if (track_id == I40E_DDP_TRACKID_INVALID) {
+		PMD_DRV_LOG(ERR, "Invalid track_id");
+		return I40E_NOT_SUPPORTED;
+	}
+
+	dev_cnt = profile->device_table_count;
+
+	for (i = 0; i < dev_cnt; i++) {
+		vendor_dev_id = profile->device_table[i].vendor_dev_id;
+		if ((vendor_dev_id >> 16) == I40E_INTEL_VENDOR_ID)
+			if (hw->device_id == (vendor_dev_id & 0xFFFF))
+				break;
+	}
+	if (dev_cnt && (i == dev_cnt)) {
+		PMD_DRV_LOG(ERR, "Device doesn't support DDP");
+		return I40E_ERR_DEVICE_NOT_SUPPORTED;
+	}
+
+	nvm = (u32 *)&profile->device_table[dev_cnt];
+	sec_tbl = (struct i40e_section_table *)&nvm[nvm[0] + 1];
+
+	for (i = 0; i < sec_tbl->section_count; i++) {
+		sec = (struct i40e_profile_section_header *)((u8 *)profile +
+			sec_tbl->section_offset[i]);
+		if (sec->section.type == SECTION_TYPE_AQ) {
+			PMD_DRV_LOG(ERR, "Rollback not supported for AQ sections");
+			return I40E_NOT_SUPPORTED;
+		}
+		if (sec->section.type == SECTION_TYPE_MMIO) {
+			PMD_DRV_LOG(ERR, "Not a roll-back package");
+			return I40E_NOT_SUPPORTED;
+		}
+	}
+
+	for (i = 0; i < sec_tbl->section_count; i++) {
+		/* For rollback write sections in reverse */
+		n = sec_tbl->section_count - i - 1;
+		sec = (struct i40e_profile_section_header *)((u8 *)profile +
+					     sec_tbl->section_offset[n]);
+
+		/* Skip any non-rollback sections */
+		if (sec->section.type != SECTION_TYPE_RB_MMIO)
+			continue;
+
+		section_size = sec->section.size +
+			sizeof(struct i40e_profile_section_header);
+
+		/* Write roll-back MMIO section */
+		status = i40e_aq_write_ddp(hw, (void *)sec, (u16)section_size,
+					   track_id, &offset, &info, NULL);
+		if (status) {
+			PMD_DRV_LOG(ERR,
+				   "Failed to write profile: section %d, offset %d, info %d",
+				   n, offset, info);
+			break;
+		}
+	}
+	return status;
 }
 
 int
@@ -1586,6 +1667,13 @@ rte_pmd_i40e_process_ddp_package(uint8_t port, uint8_t *buff,
 	uint8_t *profile_info_sec;
 	int is_exist;
 	enum i40e_status_code status = I40E_SUCCESS;
+
+	if (op != RTE_PMD_I40E_PKG_OP_WR_ADD &&
+		op != RTE_PMD_I40E_PKG_OP_WR_ONLY &&
+		op != RTE_PMD_I40E_PKG_OP_WR_DEL) {
+		PMD_DRV_LOG(ERR, "Operation not supported.");
+		return -ENOTSUP;
+	}
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port, -ENODEV);
 
@@ -1623,6 +1711,10 @@ rte_pmd_i40e_process_ddp_package(uint8_t port, uint8_t *buff,
 		return -EINVAL;
 	}
 	track_id = ((struct i40e_metadata_segment *)metadata_seg_hdr)->track_id;
+	if (track_id == I40E_DDP_TRACKID_INVALID) {
+		PMD_DRV_LOG(ERR, "Invalid track_id");
+		return -EINVAL;
+	}
 
 	/* Find profile segment */
 	profile_seg_hdr = i40e_find_segment_in_package(SEGMENT_TYPE_I40E,
@@ -1642,40 +1734,55 @@ rte_pmd_i40e_process_ddp_package(uint8_t port, uint8_t *buff,
 		return -EINVAL;
 	}
 
+	/* Check if the profile already loaded */
+	i40e_generate_profile_info_sec(
+		((struct i40e_profile_segment *)profile_seg_hdr)->name,
+		&((struct i40e_profile_segment *)profile_seg_hdr)->version,
+		track_id, profile_info_sec,
+		op == RTE_PMD_I40E_PKG_OP_WR_ADD);
+	is_exist = i40e_check_profile_info(port, profile_info_sec);
+	if (is_exist < 0) {
+		PMD_DRV_LOG(ERR, "Failed to check profile.");
+		rte_free(profile_info_sec);
+		return -EINVAL;
+	}
+
 	if (op == RTE_PMD_I40E_PKG_OP_WR_ADD) {
-		/* Check if the profile exists */
-		i40e_generate_profile_info_sec(
-		     ((struct i40e_profile_segment *)profile_seg_hdr)->name,
-		     &((struct i40e_profile_segment *)profile_seg_hdr)->version,
-		     track_id, profile_info_sec, 1);
-		is_exist = i40e_check_profile_info(port, profile_info_sec);
-		if (is_exist > 0) {
+		if (is_exist) {
 			PMD_DRV_LOG(ERR, "Profile already exists.");
 			rte_free(profile_info_sec);
-			return 1;
-		} else if (is_exist < 0) {
-			PMD_DRV_LOG(ERR, "Failed to check profile.");
-			rte_free(profile_info_sec);
-			return -EINVAL;
+			return -EEXIST;
 		}
+	} else if (op == RTE_PMD_I40E_PKG_OP_WR_DEL) {
+		if (!is_exist) {
+			PMD_DRV_LOG(ERR, "Profile does not exist.");
+			rte_free(profile_info_sec);
+			return -EACCES;
+		}
+	}
 
-		/* Write profile to HW */
+	if (op == RTE_PMD_I40E_PKG_OP_WR_DEL)
+		status = i40e_rollback_profile(
+			hw,
+			(struct i40e_profile_segment *)profile_seg_hdr,
+			track_id);
+	else
 		status = i40e_write_profile(
-				hw,
-				(struct i40e_profile_segment *)profile_seg_hdr,
-				track_id);
-		if (status) {
-			PMD_DRV_LOG(ERR, "Failed to write profile.");
-			rte_free(profile_info_sec);
-			return status;
-		}
+			hw,
+			(struct i40e_profile_segment *)profile_seg_hdr,
+			track_id);
 
-		/* Add profile info to info list */
+	if (status) {
+		PMD_DRV_LOG(ERR, "Failed to write profile.");
+		rte_free(profile_info_sec);
+		return status;
+	}
+
+	if (track_id && (op != RTE_PMD_I40E_PKG_OP_WR_ONLY)) {
+		/* Modify loaded profiles info list */
 		status = i40e_add_rm_profile_info(hw, profile_info_sec);
 		if (status)
-			PMD_DRV_LOG(ERR, "Failed to add profile info.");
-	} else {
-		PMD_DRV_LOG(ERR, "Operation not supported.");
+			PMD_DRV_LOG(ERR, "Failed to modify profile info list.");
 	}
 
 	rte_free(profile_info_sec);
