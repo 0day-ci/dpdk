@@ -53,6 +53,10 @@ static int ixgbe_node_delete(struct rte_eth_dev *dev, uint32_t node_id,
 			     struct rte_tm_error *error);
 static int ixgbe_node_type_get(struct rte_eth_dev *dev, uint32_t node_id,
 			       int *is_leaf, struct rte_tm_error *error);
+static int ixgbe_level_capabilities_get(struct rte_eth_dev *dev,
+					uint32_t level_id,
+					struct rte_tm_level_capabilities *cap,
+					struct rte_tm_error *error);
 
 const struct rte_tm_ops ixgbe_tm_ops = {
 	.capabilities_get = ixgbe_tm_capabilities_get,
@@ -61,6 +65,7 @@ const struct rte_tm_ops ixgbe_tm_ops = {
 	.node_add = ixgbe_node_add,
 	.node_delete = ixgbe_node_delete,
 	.node_type_get = ixgbe_node_type_get,
+	.level_capabilities_get = ixgbe_level_capabilities_get,
 };
 
 int
@@ -635,6 +640,79 @@ ixgbe_node_type_get(struct rte_eth_dev *dev, uint32_t node_id,
 		*is_leaf = false;
 	else
 		*is_leaf = true;
+
+	return 0;
+}
+
+static int
+ixgbe_level_capabilities_get(struct rte_eth_dev *dev,
+			     uint32_t level_id,
+			     struct rte_tm_level_capabilities *cap,
+			     struct rte_tm_error *error)
+{
+	uint8_t nb_tc = 0;
+	uint8_t nb_queue = 0;
+
+	if (!cap || !error)
+		return -EINVAL;
+
+	if (level_id >= IXGBE_TM_NODE_TYPE_MAX) {
+		error->type = RTE_TM_ERROR_TYPE_LEVEL_ID;
+		error->message = "too deep level";
+		return -EINVAL;
+	}
+
+	nb_tc = ixgbe_tc_nb_get(dev);
+	nb_queue = dev->data->nb_tx_queues;
+
+	/* root node */
+	if (level_id == IXGBE_TM_NODE_TYPE_PORT) {
+		cap->n_nodes_max = 1;
+		cap->n_nodes_nonleaf_max = 1;
+		cap->n_nodes_leaf_max = 0;
+		cap->non_leaf_nodes_identical = false;
+		cap->leaf_nodes_identical = false;
+		cap->nonleaf.shaper_private_supported = true;
+		cap->nonleaf.shaper_private_dual_rate_supported = false;
+		cap->nonleaf.shaper_private_rate_min = 0;
+		/* 10Gbps -> 1.25GBps */
+		cap->nonleaf.shaper_private_rate_max = 1250000000ull;
+		cap->nonleaf.shaper_shared_n_max = 0;
+		cap->nonleaf.sched_n_children_max = nb_tc;
+		cap->nonleaf.sched_sp_n_priorities_max = 0;
+		cap->nonleaf.sched_wfq_n_children_per_group_max = 0;
+		cap->nonleaf.sched_wfq_n_groups_max = 0;
+		cap->nonleaf.sched_wfq_weight_max = 0;
+		cap->nonleaf.stats_mask = 0;
+
+		return 0;
+	}
+
+	/* TC or queue node */
+	if (level_id == IXGBE_TM_NODE_TYPE_TC) {
+		/* TC */
+		cap->n_nodes_max = nb_tc;
+		cap->n_nodes_nonleaf_max = nb_tc;
+		cap->n_nodes_leaf_max = nb_tc;
+		cap->non_leaf_nodes_identical = true;
+	} else {
+		/* queue */
+		cap->n_nodes_max = nb_queue;
+		cap->n_nodes_nonleaf_max = 0;
+		cap->n_nodes_leaf_max = nb_queue;
+		cap->non_leaf_nodes_identical = false;
+	}
+	cap->leaf_nodes_identical = true;
+	cap->leaf.shaper_private_supported = true;
+	cap->leaf.shaper_private_dual_rate_supported = false;
+	cap->leaf.shaper_private_rate_min = 0;
+	/* 10Gbps -> 1.25GBps */
+	cap->leaf.shaper_private_rate_max = 1250000000ull;
+	cap->leaf.shaper_shared_n_max = 0;
+	cap->leaf.cman_head_drop_supported = false;
+	cap->leaf.cman_wred_context_private_supported = false;
+	cap->leaf.cman_wred_context_shared_n_max = 0;
+	cap->leaf.stats_mask = 0;
 
 	return 0;
 }
