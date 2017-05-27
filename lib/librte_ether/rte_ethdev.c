@@ -795,17 +795,39 @@ rte_eth_dev_configure(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 	/*
 	 * Setup new number of RX/TX queues and reconfigure device.
 	 */
+	if (dev->data->rxq_conf == NULL) {
+		dev->data->rxq_conf = rte_zmalloc("ethdev->rxq_conf",
+				sizeof(struct rte_eth_rx_queue_conf) * nb_rx_q,
+				RTE_CACHE_LINE_SIZE);
+		if (dev->data->rxq_conf == NULL)
+			return -ENOMEM;
+	}
+
 	diag = rte_eth_dev_rx_queue_config(dev, nb_rx_q);
 	if (diag != 0) {
 		RTE_PMD_DEBUG_TRACE("port%d rte_eth_dev_rx_queue_config = %d\n",
 				port_id, diag);
+		rte_free(dev->data->rxq_conf);
 		return diag;
+	}
+
+	if (dev->data->txq_conf == NULL) {
+		dev->data->txq_conf = rte_zmalloc("ethdev->txq_conf",
+				sizeof(struct rte_eth_tx_queue_conf) * nb_tx_q,
+				RTE_CACHE_LINE_SIZE);
+		if (dev->data->txq_conf == NULL) {
+			rte_free(dev->data->rxq_conf);
+			rte_eth_dev_rx_queue_config(dev, 0);
+			return -ENOMEM;
+		}
 	}
 
 	diag = rte_eth_dev_tx_queue_config(dev, nb_tx_q);
 	if (diag != 0) {
 		RTE_PMD_DEBUG_TRACE("port%d rte_eth_dev_tx_queue_config = %d\n",
 				port_id, diag);
+		rte_free(dev->data->rxq_conf);
+		rte_free(dev->data->txq_conf);
 		rte_eth_dev_rx_queue_config(dev, 0);
 		return diag;
 	}
@@ -814,6 +836,8 @@ rte_eth_dev_configure(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 	if (diag != 0) {
 		RTE_PMD_DEBUG_TRACE("port%d dev_configure = %d\n",
 				port_id, diag);
+		rte_free(dev->data->rxq_conf);
+		rte_free(dev->data->txq_conf);
 		rte_eth_dev_rx_queue_config(dev, 0);
 		rte_eth_dev_tx_queue_config(dev, 0);
 		return diag;
@@ -1005,6 +1029,7 @@ rte_eth_rx_queue_setup(uint8_t port_id, uint16_t rx_queue_id,
 	struct rte_eth_dev *dev;
 	struct rte_eth_dev_info dev_info;
 	void **rxq;
+	struct rte_eth_rx_queue_conf *rxq_conf;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
@@ -1080,6 +1105,12 @@ rte_eth_rx_queue_setup(uint8_t port_id, uint16_t rx_queue_id,
 		if (!dev->data->min_rx_buf_size ||
 		    dev->data->min_rx_buf_size > mbp_buf_size)
 			dev->data->min_rx_buf_size = mbp_buf_size;
+
+		rxq_conf = &dev->data->rxq_conf[rx_queue_id];
+		rxq_conf->nb_rx_desc = nb_rx_desc;
+		rxq_conf->socket_id = socket_id;
+		rxq_conf->rx_conf = *rx_conf;
+		rxq_conf->mp = mp;
 	}
 
 	return ret;
@@ -1093,6 +1124,8 @@ rte_eth_tx_queue_setup(uint8_t port_id, uint16_t tx_queue_id,
 	struct rte_eth_dev *dev;
 	struct rte_eth_dev_info dev_info;
 	void **txq;
+	int ret;
+	struct rte_eth_tx_queue_conf *txq_conf;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
@@ -1136,8 +1169,16 @@ rte_eth_tx_queue_setup(uint8_t port_id, uint16_t tx_queue_id,
 	if (tx_conf == NULL)
 		tx_conf = &dev_info.default_txconf;
 
-	return (*dev->dev_ops->tx_queue_setup)(dev, tx_queue_id, nb_tx_desc,
-					       socket_id, tx_conf);
+	ret = (*dev->dev_ops->tx_queue_setup)(dev, tx_queue_id, nb_tx_desc,
+					      socket_id, tx_conf);
+	if (!ret) {
+		txq_conf = &dev->data->txq_conf[tx_queue_id];
+		txq_conf->nb_tx_desc = nb_tx_desc;
+		txq_conf->socket_id = socket_id;
+		txq_conf->tx_conf = *tx_conf;
+	}
+
+	return ret;
 }
 
 void
@@ -3471,4 +3512,61 @@ rte_eth_dev_l2_tunnel_offload_set(uint8_t port_id,
 	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->l2_tunnel_offload_set,
 				-ENOTSUP);
 	return (*dev->dev_ops->l2_tunnel_offload_set)(dev, l2_tunnel, mask, en);
+}
+
+int
+rte_eth_dev_restore(uint8_t port_id)
+{
+	struct rte_eth_dev *dev;
+	int ret;
+	uint16_t q;
+	struct rte_eth_rx_queue_conf *rxq_conf;
+	struct rte_eth_tx_queue_conf *txq_conf;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
+	dev = &rte_eth_devices[port_id];
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->dev_uninit, -ENOTSUP);
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->dev_init, -ENOTSUP);
+
+	rte_eth_dev_stop(port_id);
+
+	ret = dev->dev_ops->dev_uninit(dev);
+	if (ret)
+		return ret;
+
+	ret = dev->dev_ops->dev_init(dev);
+	if (ret)
+		return ret;
+
+	ret = rte_eth_dev_configure(port_id, dev->data->nb_rx_queues,
+			dev->data->nb_tx_queues, &dev->data->dev_conf);
+	if (ret)
+		return ret;
+
+	for (q = 0; q < dev->data->nb_rx_queues; q++) {
+		rxq_conf = &dev->data->rxq_conf[q];
+		ret = rte_eth_rx_queue_setup(port_id, q, rxq_conf->nb_rx_desc,
+					     rxq_conf->socket_id,
+					     &rxq_conf->rx_conf,
+					     rxq_conf->mp);
+		if (!ret)
+			return ret;
+	}
+
+	for (q = 0; q < dev->data->nb_tx_queues; q++) {
+		txq_conf = &dev->data->txq_conf[q];
+		ret = rte_eth_tx_queue_setup(port_id, q, txq_conf->nb_tx_desc,
+					     txq_conf->socket_id,
+					     &txq_conf->tx_conf);
+		if (!ret)
+			return ret;
+	}
+
+	ret = rte_eth_dev_start(port_id);
+
+	if (dev->dev_ops->dev_restore)
+		ret = dev->dev_ops->dev_restore(dev);
+
+	return ret;
 }
