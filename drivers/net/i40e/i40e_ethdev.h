@@ -39,6 +39,7 @@
 #include <rte_kvargs.h>
 #include <rte_hash.h>
 #include <rte_flow_driver.h>
+#include <rte_tm_driver.h>
 
 #define I40E_VLAN_TAG_SIZE        4
 
@@ -892,6 +893,7 @@ int i40e_add_macvlan_filters(struct i40e_vsi *vsi,
 			     struct i40e_macvlan_filter *filter,
 			     int total);
 bool is_i40e_supported(struct rte_eth_dev *dev);
+int i40e_tm_ops_get(struct rte_eth_dev *dev, void *ops);
 
 #define I40E_DEV_TO_PCI(eth_dev) \
 	RTE_DEV_TO_PCI((eth_dev)->device)

@@ -109,6 +109,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_I40E_PMD) += i40e_pf.c
 SRCS-$(CONFIG_RTE_LIBRTE_I40E_PMD) += i40e_fdir.c
 SRCS-$(CONFIG_RTE_LIBRTE_I40E_PMD) += i40e_flow.c
 SRCS-$(CONFIG_RTE_LIBRTE_I40E_PMD) += rte_pmd_i40e.c
+SRCS-$(CONFIG_RTE_LIBRTE_I40E_PMD) += i40e_tm.c
 
 # vector PMD driver needs SSE4.1 support
 ifeq ($(findstring RTE_MACHINE_CPUFLAG_SSE4_1,$(CFLAGS)),)
