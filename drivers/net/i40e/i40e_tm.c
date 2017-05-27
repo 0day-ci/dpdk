@@ -34,8 +34,12 @@
 #include "base/i40e_prototype.h"
 #include "i40e_ethdev.h"
 
+static int i40e_tm_capabilities_get(struct rte_eth_dev *dev,
+				    struct rte_tm_capabilities *cap,
+				    struct rte_tm_error *error);
+
 const struct rte_tm_ops i40e_tm_ops = {
-	NULL,
+	.capabilities_get = i40e_tm_capabilities_get,
 };
 
 int
@@ -46,6 +50,82 @@ i40e_tm_ops_get(struct rte_eth_dev *dev __rte_unused,
 		return -EINVAL;
 
 	*(const void **)arg = &i40e_tm_ops;
+
+	return 0;
+}
+
+static inline uint16_t
+i40e_tc_nb_get(struct rte_eth_dev *dev)
+{
+	struct i40e_pf *pf = I40E_DEV_PRIVATE_TO_PF(dev->data->dev_private);
+	struct i40e_vsi *main_vsi = pf->main_vsi;
+	uint16_t sum = 0;
+	int i;
+
+	for (i = 0; i < I40E_MAX_TRAFFIC_CLASS; i++) {
+		if (main_vsi->enabled_tc & BIT_ULL(i))
+			sum++;
+	}
+
+	return sum;
+}
+
+static int
+i40e_tm_capabilities_get(struct rte_eth_dev *dev,
+			 struct rte_tm_capabilities *cap,
+			 struct rte_tm_error *error)
+{
+	uint16_t tc_nb = 0;
+
+	if (!cap || !error)
+		return -EINVAL;
+
+	error->type = RTE_TM_ERROR_TYPE_NONE;
+
+	/* set all the parameters to 0 first. */
+	memset(cap, 0, sizeof(struct rte_tm_capabilities));
+
+	/* only support port + TCs */
+	tc_nb = i40e_tc_nb_get(dev);
+	cap->n_nodes_max = tc_nb + 1;
+	cap->n_levels_max = 2;
+	cap->non_leaf_nodes_identical = 0;
+	cap->leaf_nodes_identical = 0;
+	cap->shaper_n_max = cap->n_nodes_max;
+	cap->shaper_private_n_max = cap->n_nodes_max;
+	cap->shaper_private_dual_rate_n_max = 0;
+	cap->shaper_private_rate_min = 0;
+	/* 40Gbps -> 5GBps */
+	cap->shaper_private_rate_max = 5000000000ull;
+	cap->shaper_shared_n_max = 0;
+	cap->shaper_shared_n_nodes_per_shaper_max = 0;
+	cap->shaper_shared_n_shapers_per_node_max = 0;
+	cap->shaper_shared_dual_rate_n_max = 0;
+	cap->shaper_shared_rate_min = 0;
+	cap->shaper_shared_rate_max = 0;
+	cap->sched_n_children_max = tc_nb;
+	cap->sched_sp_n_priorities_max = 0;
+	cap->sched_wfq_n_children_per_group_max = 0;
+	cap->sched_wfq_n_groups_max = 0;
+	cap->sched_wfq_weight_max = 0;
+	cap->cman_head_drop_supported = 0;
+	cap->dynamic_update_mask = 0;
+
+	/**
+	 * not supported parameters are 0, below,
+	 * shaper_pkt_length_adjust_min
+	 * shaper_pkt_length_adjust_max
+	 * cman_wred_context_n_max
+	 * cman_wred_context_private_n_max
+	 * cman_wred_context_shared_n_max
+	 * cman_wred_context_shared_n_nodes_per_context_max
+	 * cman_wred_context_shared_n_contexts_per_node_max
+	 * mark_vlan_dei_supported
+	 * mark_ip_ecn_tcp_supported
+	 * mark_ip_ecn_sctp_supported
+	 * mark_ip_dscp_supported
+	 * stats_mask
+	 */
 
 	return 0;
 }
