@@ -87,6 +87,7 @@
 #include <cmdline.h>
 #ifdef RTE_LIBRTE_PMD_BOND
 #include <rte_eth_bond.h>
+#include <rte_eth_bond_8023ad.h>
 #endif
 #ifdef RTE_LIBRTE_IXGBE_PMD
 #include <rte_pmd_ixgbe.h>
@@ -4275,6 +4276,62 @@ cmdline_parse_inst_t cmd_set_bonding_mode = {
 				(void *) &cmd_setbonding_mode_mode,
 				(void *) &cmd_setbonding_mode_value,
 				(void *) &cmd_setbonding_mode_port,
+				NULL
+		}
+};
+
+/* *** SET BONDING SLOW_QUEUE SW/HW *** */
+struct cmd_set_bonding_slow_queue_result {
+	cmdline_fixed_string_t set;
+	cmdline_fixed_string_t bonding;
+	cmdline_fixed_string_t slow_queue;
+	uint8_t port_id;
+	cmdline_fixed_string_t mode;
+};
+
+static void cmd_set_bonding_slow_queue_parsed(void *parsed_result,
+		__attribute__((unused))  struct cmdline *cl,
+		__attribute__((unused)) void *data)
+{
+	struct cmd_set_bonding_slow_queue_result *res = parsed_result;
+	portid_t port_id = res->port_id;
+
+	if (!strcmp(res->mode, "hw")) {
+		rte_eth_bond_8023ad_slow_queue_enable(port_id);
+		printf("Hardware slow queue enabled\n");
+	} else if (!strcmp(res->mode, "sw")) {
+		rte_eth_bond_8023ad_slow_queue_disable(port_id);
+	}
+}
+
+cmdline_parse_token_string_t cmd_setbonding_slow_queue_set =
+TOKEN_STRING_INITIALIZER(struct cmd_set_bonding_slow_queue_result,
+		set, "set");
+cmdline_parse_token_string_t cmd_setbonding_slow_queue_bonding =
+TOKEN_STRING_INITIALIZER(struct cmd_set_bonding_slow_queue_result,
+		bonding, "bonding");
+cmdline_parse_token_string_t cmd_setbonding_slow_queue_slow_queue =
+TOKEN_STRING_INITIALIZER(struct cmd_set_bonding_slow_queue_result,
+		slow_queue, "slow_queue");
+cmdline_parse_token_num_t cmd_setbonding_slow_queue_port =
+TOKEN_NUM_INITIALIZER(struct cmd_set_bonding_slow_queue_result,
+		port_id, UINT8);
+cmdline_parse_token_string_t cmd_setbonding_slow_queue_mode =
+TOKEN_STRING_INITIALIZER(struct cmd_set_bonding_slow_queue_result,
+		mode, "sw#hw");
+
+cmdline_parse_inst_t cmd_set_slow_queue = {
+		.f = cmd_set_bonding_slow_queue_parsed,
+		.help_str = "set bonding slow_queue <port_id> "
+			"sw|hw: "
+			"Set the bonding slow queue acceleration for port_id",
+		.data = NULL,
+		.tokens = {
+				(void *)&cmd_setbonding_slow_queue_set,
+				(void *)&cmd_setbonding_slow_queue_bonding,
+				(void *)&cmd_setbonding_slow_queue_slow_queue,
+				(void *)&cmd_setbonding_slow_queue_port,
+				(void *)&cmd_setbonding_slow_queue_mode,
 				NULL
 		}
 };
@@ -13613,6 +13670,7 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *) &cmd_set_bond_mac_addr,
 	(cmdline_parse_inst_t *) &cmd_set_balance_xmit_policy,
 	(cmdline_parse_inst_t *) &cmd_set_bond_mon_period,
+	(cmdline_parse_inst_t *) &cmd_set_slow_queue,
 #endif
 	(cmdline_parse_inst_t *)&cmd_vlan_offload,
 	(cmdline_parse_inst_t *)&cmd_vlan_tpid,
