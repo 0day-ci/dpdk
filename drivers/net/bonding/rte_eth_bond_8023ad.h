@@ -302,4 +302,10 @@ int
 rte_eth_bond_8023ad_ext_slowtx(uint8_t port_id, uint8_t slave_id,
 		struct rte_mbuf *lacp_pkt);
 
+int
+rte_eth_bond_8023ad_slow_queue_enable(uint8_t port_id);
+
+int
+rte_eth_bond_8023ad_slow_queue_disable(uint8_t port_id);
+
 #endif /* RTE_ETH_BOND_8023AD_H_ */
