@@ -1739,6 +1739,7 @@ struct rte_eth_dev_data {
 
 	struct rte_eth_conf dev_conf;   /**< Configuration applied to device. */
 	uint16_t mtu;                   /**< Maximum Transmission Unit. */
+	uint16_t restore_mtu;
 
 	uint32_t min_rx_buf_size;
 	/**< Common rx buffer size handled by all queues */

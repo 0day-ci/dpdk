@@ -945,6 +945,22 @@ rte_eth_dev_link_status_restore(uint8_t port_id)
 }
 
 static void
+rte_eth_dev_mtu_restore(uint8_t port_id)
+{
+	struct rte_eth_dev *dev;
+
+	dev = &rte_eth_devices[port_id];
+
+	if (dev->data->in_restoration == 0) {
+		dev->data->restore_mtu = dev->data->mtu;
+		return;
+	}
+
+	if (dev->data->restore_mtu != dev->data->mtu)
+		rte_eth_dev_set_mtu(port_id, dev->data->restore_mtu);
+}
+
+static void
 rte_eth_dev_config_restore(uint8_t port_id)
 {
 	struct rte_eth_dev *dev;
@@ -1005,6 +1021,8 @@ rte_eth_dev_config_restore(uint8_t port_id)
 		rte_eth_dev_tx_queue_restore(port_id, q);
 
 	rte_eth_dev_link_status_restore(port_id);
+
+	rte_eth_dev_mtu_restore(port_id);
 }
 
 int
@@ -2106,9 +2124,10 @@ rte_eth_dev_set_mtu(uint8_t port_id, uint16_t mtu)
 	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->mtu_set, -ENOTSUP);
 
 	ret = (*dev->dev_ops->mtu_set)(dev, mtu);
-	if (!ret)
+	if (!ret) {
 		dev->data->mtu = mtu;
-
+		dev->data->restore_mtu = mtu;
+	}
 	return ret;
 }
 
