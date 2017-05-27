@@ -112,6 +112,27 @@ dpaa_eth_dev_configure(struct rte_eth_dev *dev)
 	return 0;
 }
 
+static const uint32_t *
+dpaa_supported_ptypes_get(struct rte_eth_dev *dev)
+{
+	static const uint32_t ptypes[] = {
+		/*todo -= add more types */
+		RTE_PTYPE_L2_ETHER,
+		RTE_PTYPE_L3_IPV4,
+		RTE_PTYPE_L3_IPV4_EXT,
+		RTE_PTYPE_L3_IPV6,
+		RTE_PTYPE_L3_IPV6_EXT,
+		RTE_PTYPE_L4_TCP,
+		RTE_PTYPE_L4_UDP,
+		RTE_PTYPE_L4_SCTP
+	};
+
+	PMD_INIT_FUNC_TRACE();
+
+	if (dev->rx_pkt_burst == dpaa_eth_queue_rx)
+		return ptypes;
+	return NULL;
+}
 
 static int dpaa_eth_dev_start(struct rte_eth_dev *dev)
 {
@@ -394,6 +415,7 @@ static struct eth_dev_ops dpaa_devops = {
 	.dev_stop		  = dpaa_eth_dev_stop,
 	.dev_close		  = dpaa_eth_dev_close,
 	.dev_infos_get		  = dpaa_eth_dev_info,
+	.dev_supported_ptypes_get = dpaa_supported_ptypes_get,
 
 	.rx_queue_setup		  = dpaa_eth_rx_queue_setup,
 	.tx_queue_setup		  = dpaa_eth_tx_queue_setup,
