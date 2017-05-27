@@ -504,6 +504,7 @@ int
 rte_eth_dev_rx_queue_start(uint8_t port_id, uint16_t rx_queue_id)
 {
 	struct rte_eth_dev *dev;
+	int ret;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
@@ -522,14 +523,18 @@ rte_eth_dev_rx_queue_start(uint8_t port_id, uint16_t rx_queue_id)
 		return 0;
 	}
 
-	return dev->dev_ops->rx_queue_start(dev, rx_queue_id);
-
+	ret = dev->dev_ops->rx_queue_start(dev, rx_queue_id);
+	if (!ret)
+		dev->data->rxq_restore_state[rx_queue_id] =
+			RTE_ETH_QUEUE_STATE_STARTED;
+	return ret;
 }
 
 int
 rte_eth_dev_rx_queue_stop(uint8_t port_id, uint16_t rx_queue_id)
 {
 	struct rte_eth_dev *dev;
+	int ret;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
@@ -548,14 +553,18 @@ rte_eth_dev_rx_queue_stop(uint8_t port_id, uint16_t rx_queue_id)
 		return 0;
 	}
 
-	return dev->dev_ops->rx_queue_stop(dev, rx_queue_id);
-
+	ret = dev->dev_ops->rx_queue_stop(dev, rx_queue_id);
+	if (!ret)
+		dev->data->rxq_restore_state[rx_queue_id] =
+			RTE_ETH_QUEUE_STATE_STOPPED;
+	return ret;
 }
 
 int
 rte_eth_dev_tx_queue_start(uint8_t port_id, uint16_t tx_queue_id)
 {
 	struct rte_eth_dev *dev;
+	int ret;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
@@ -574,14 +583,18 @@ rte_eth_dev_tx_queue_start(uint8_t port_id, uint16_t tx_queue_id)
 		return 0;
 	}
 
-	return dev->dev_ops->tx_queue_start(dev, tx_queue_id);
-
+	ret = dev->dev_ops->tx_queue_start(dev, tx_queue_id);
+	if (!ret)
+		dev->data->txq_restore_state[tx_queue_id] =
+			RTE_ETH_QUEUE_STATE_STARTED;
+	return ret;
 }
 
 int
 rte_eth_dev_tx_queue_stop(uint8_t port_id, uint16_t tx_queue_id)
 {
 	struct rte_eth_dev *dev;
+	int ret;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
@@ -600,8 +613,11 @@ rte_eth_dev_tx_queue_stop(uint8_t port_id, uint16_t tx_queue_id)
 		return 0;
 	}
 
-	return dev->dev_ops->tx_queue_stop(dev, tx_queue_id);
-
+	ret = dev->dev_ops->tx_queue_stop(dev, tx_queue_id);
+	if (!ret)
+		dev->data->txq_restore_state[tx_queue_id] =
+			RTE_ETH_QUEUE_STATE_STOPPED;
+	return ret;
 }
 
 static int
@@ -863,6 +879,50 @@ _rte_eth_dev_reset(struct rte_eth_dev *dev)
 }
 
 static void
+rte_eth_dev_rx_queue_restore(uint8_t port_id, uint16_t queue_id)
+{
+	struct rte_eth_dev *dev;
+	uint16_t q = queue_id;
+
+	dev = &rte_eth_devices[port_id];
+
+	if (dev->data->in_restoration == 0) {
+		dev->data->rxq_restore_state[q] = dev->data->rx_queue_state[q];
+		return;
+	}
+
+	if (dev->data->rxq_restore_state[q] != dev->data->rx_queue_state[q]) {
+		if (dev->data->rxq_restore_state[q]
+		    == RTE_ETH_QUEUE_STATE_STARTED)
+			rte_eth_dev_rx_queue_start(port_id, q);
+		else
+			rte_eth_dev_rx_queue_stop(port_id, q);
+	}
+}
+
+static void
+rte_eth_dev_tx_queue_restore(uint8_t port_id, uint16_t queue_id)
+{
+	struct rte_eth_dev *dev;
+	uint16_t q = queue_id;
+
+	dev = &rte_eth_devices[port_id];
+
+	if (dev->data->in_restoration == 0) {
+		dev->data->txq_restore_state[q] = dev->data->tx_queue_state[q];
+		return;
+	}
+
+	if (dev->data->txq_restore_state[q] != dev->data->tx_queue_state[q]) {
+		if (dev->data->txq_restore_state[q]
+		    == RTE_ETH_QUEUE_STATE_STARTED)
+			rte_eth_dev_tx_queue_start(port_id, q);
+		else
+			rte_eth_dev_tx_queue_stop(port_id, q);
+	}
+}
+
+static void
 rte_eth_dev_config_restore(uint8_t port_id)
 {
 	struct rte_eth_dev *dev;
@@ -871,6 +931,7 @@ rte_eth_dev_config_restore(uint8_t port_id)
 	uint16_t i;
 	uint32_t pool = 0;
 	uint64_t pool_mask;
+	uint16_t q;
 
 	dev = &rte_eth_devices[port_id];
 
@@ -915,6 +976,12 @@ rte_eth_dev_config_restore(uint8_t port_id)
 		rte_eth_allmulticast_enable(port_id);
 	else if (rte_eth_allmulticast_get(port_id) == 0)
 		rte_eth_allmulticast_disable(port_id);
+
+	for (q = 0; q < dev->data->nb_rx_queues; q++)
+		rte_eth_dev_rx_queue_restore(port_id, q);
+	for (q = 0; q < dev->data->nb_tx_queues; q++)
+		rte_eth_dev_tx_queue_restore(port_id, q);
+
 }
 
 int
@@ -3531,6 +3598,8 @@ rte_eth_dev_restore(uint8_t port_id)
 
 	rte_eth_dev_stop(port_id);
 
+	dev->data->in_restoration = 1;
+
 	ret = dev->dev_ops->dev_uninit(dev);
 	if (ret)
 		return ret;
@@ -3567,6 +3636,8 @@ rte_eth_dev_restore(uint8_t port_id)
 
 	if (dev->dev_ops->dev_restore)
 		ret = dev->dev_ops->dev_restore(dev);
+
+	dev->data->in_restoration = 0;
 
 	return ret;
 }

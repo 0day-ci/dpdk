@@ -1754,10 +1754,13 @@ struct rte_eth_dev_data {
 		scattered_rx : 1,  /**< RX of scattered packets is ON(1) / OFF(0) */
 		all_multicast : 1, /**< RX all multicast mode ON(1) / OFF(0). */
 		dev_started : 1,   /**< Device state: STARTED(1) / STOPPED(0). */
-		lro         : 1;   /**< RX LRO is ON(1) / OFF(0) */
+		lro         : 1,   /**< RX LRO is ON(1) / OFF(0) */
+		in_restoration : 1; /**< In Restoration Yes(1) / NO(0) */
 	uint8_t rx_queue_state[RTE_MAX_QUEUES_PER_PORT];
+	uint8_t rxq_restore_state[RTE_MAX_QUEUES_PER_PORT];
 	/** Queues state: STARTED(1) / STOPPED(0) */
 	uint8_t tx_queue_state[RTE_MAX_QUEUES_PER_PORT];
+	uint8_t txq_restore_state[RTE_MAX_QUEUES_PER_PORT];
 	/** Queues state: STARTED(1) / STOPPED(0) */
 	uint32_t dev_flags; /**< Capabilities */
 	enum rte_kernel_driver kdrv;    /**< Kernel driver passthrough */
