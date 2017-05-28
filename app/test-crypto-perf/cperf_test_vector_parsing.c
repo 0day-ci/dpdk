@@ -303,7 +303,6 @@ parse_entry(char *entry, struct cperf_test_vector *vector,
 	} else if (strstr(key_token, "iv")) {
 		rte_free(vector->iv.data);
 		vector->iv.data = data;
-		vector->iv.phys_addr = rte_malloc_virt2phy(vector->iv.data);
 		if (tc_found)
 			vector->iv.length = data_length;
 		else {

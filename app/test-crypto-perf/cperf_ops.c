@@ -40,7 +40,8 @@ cperf_set_ops_null_cipher(struct rte_crypto_op **ops,
 		struct rte_mbuf **bufs_in, struct rte_mbuf **bufs_out,
 		uint16_t nb_ops, struct rte_cryptodev_sym_session *sess,
 		const struct cperf_options *options,
-		const struct cperf_test_vector *test_vector __rte_unused)
+		const struct cperf_test_vector *test_vector __rte_unused,
+		uint16_t iv_offset __rte_unused)
 {
 	uint16_t i;
 
@@ -65,7 +66,8 @@ cperf_set_ops_null_auth(struct rte_crypto_op **ops,
 		struct rte_mbuf **bufs_in, struct rte_mbuf **bufs_out,
 		uint16_t nb_ops, struct rte_cryptodev_sym_session *sess,
 		const struct cperf_options *options,
-		const struct cperf_test_vector *test_vector __rte_unused)
+		const struct cperf_test_vector *test_vector __rte_unused,
+		uint16_t iv_offset __rte_unused)
 {
 	uint16_t i;
 
@@ -90,7 +92,8 @@ cperf_set_ops_cipher(struct rte_crypto_op **ops,
 		struct rte_mbuf **bufs_in, struct rte_mbuf **bufs_out,
 		uint16_t nb_ops, struct rte_cryptodev_sym_session *sess,
 		const struct cperf_options *options,
-		const struct cperf_test_vector *test_vector)
+		const struct cperf_test_vector *test_vector,
+		uint16_t iv_offset)
 {
 	uint16_t i;
 
@@ -103,9 +106,14 @@ cperf_set_ops_cipher(struct rte_crypto_op **ops,
 		sym_op->m_dst = bufs_out[i];
 
 		/* cipher parameters */
-		sym_op->cipher.iv.data = test_vector->iv.data;
-		sym_op->cipher.iv.phys_addr = test_vector->iv.phys_addr;
+		sym_op->cipher.iv.data = rte_crypto_op_ctod_offset(ops[i],
+							uint8_t *, iv_offset);
+		sym_op->cipher.iv.phys_addr = rte_crypto_op_ctophys_offset(ops[i],
+							iv_offset);
 		sym_op->cipher.iv.length = test_vector->iv.length;
+		memcpy(sym_op->cipher.iv.data,
+				test_vector->iv.data,
+				test_vector->iv.length);
 
 		if (options->cipher_algo == RTE_CRYPTO_CIPHER_SNOW3G_UEA2 ||
 				options->cipher_algo == RTE_CRYPTO_CIPHER_KASUMI_F8 ||
@@ -125,7 +133,8 @@ cperf_set_ops_auth(struct rte_crypto_op **ops,
 		struct rte_mbuf **bufs_in, struct rte_mbuf **bufs_out,
 		uint16_t nb_ops, struct rte_cryptodev_sym_session *sess,
 		const struct cperf_options *options,
-		const struct cperf_test_vector *test_vector)
+		const struct cperf_test_vector *test_vector,
+		uint16_t iv_offset __rte_unused)
 {
 	uint16_t i;
 
@@ -188,7 +197,8 @@ cperf_set_ops_cipher_auth(struct rte_crypto_op **ops,
 		struct rte_mbuf **bufs_in, struct rte_mbuf **bufs_out,
 		uint16_t nb_ops, struct rte_cryptodev_sym_session *sess,
 		const struct cperf_options *options,
-		const struct cperf_test_vector *test_vector)
+		const struct cperf_test_vector *test_vector,
+		uint16_t iv_offset)
 {
 	uint16_t i;
 
@@ -201,9 +211,14 @@ cperf_set_ops_cipher_auth(struct rte_crypto_op **ops,
 		sym_op->m_dst = bufs_out[i];
 
 		/* cipher parameters */
-		sym_op->cipher.iv.data = test_vector->iv.data;
-		sym_op->cipher.iv.phys_addr = test_vector->iv.phys_addr;
+		sym_op->cipher.iv.data = rte_crypto_op_ctod_offset(ops[i],
+							uint8_t *, iv_offset);
+		sym_op->cipher.iv.phys_addr = rte_crypto_op_ctophys_offset(ops[i],
+							iv_offset);
 		sym_op->cipher.iv.length = test_vector->iv.length;
+		memcpy(sym_op->cipher.iv.data,
+				test_vector->iv.data,
+				test_vector->iv.length);
 
 		if (options->cipher_algo == RTE_CRYPTO_CIPHER_SNOW3G_UEA2 ||
 				options->cipher_algo == RTE_CRYPTO_CIPHER_KASUMI_F8 ||
@@ -264,7 +279,8 @@ cperf_set_ops_aead(struct rte_crypto_op **ops,
 		struct rte_mbuf **bufs_in, struct rte_mbuf **bufs_out,
 		uint16_t nb_ops, struct rte_cryptodev_sym_session *sess,
 		const struct cperf_options *options,
-		const struct cperf_test_vector *test_vector)
+		const struct cperf_test_vector *test_vector,
+		uint16_t iv_offset)
 {
 	uint16_t i;
 
@@ -277,9 +293,14 @@ cperf_set_ops_aead(struct rte_crypto_op **ops,
 		sym_op->m_dst = bufs_out[i];
 
 		/* cipher parameters */
-		sym_op->cipher.iv.data = test_vector->iv.data;
-		sym_op->cipher.iv.phys_addr = test_vector->iv.phys_addr;
+		sym_op->cipher.iv.data = rte_crypto_op_ctod_offset(ops[i],
+							uint8_t *, iv_offset);
+		sym_op->cipher.iv.phys_addr = rte_crypto_op_ctophys_offset(ops[i],
+							iv_offset);
 		sym_op->cipher.iv.length = test_vector->iv.length;
+		memcpy(sym_op->cipher.iv.data,
+				test_vector->iv.data,
+				test_vector->iv.length);
 
 		sym_op->cipher.data.length = options->test_buffer_size;
 		sym_op->cipher.data.offset =
