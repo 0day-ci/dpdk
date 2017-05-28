@@ -790,6 +790,12 @@ M: Reshma Pattan <reshma.pattan@intel.com>
 F: app/proc_info/
 F: doc/guides/tools/proc_info.rst
 
+Eventdev test application
+M: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+F: app/test-eventdev/
+F: doc/guides/tools/testeventdev.rst
+F: doc/guides/tools/img/eventdev_*
+
 
 Other Example Applications
 --------------------------
