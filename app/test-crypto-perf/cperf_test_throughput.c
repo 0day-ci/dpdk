@@ -502,6 +502,8 @@ cperf_throughput_test_runner(void *test_ctx)
 
 	}
 
+	rte_cryptodev_stop(ctx->dev_id);
+
 	return 0;
 }
 

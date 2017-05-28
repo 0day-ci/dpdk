@@ -46,6 +46,7 @@ struct scheduler_init_params {
 	uint32_t nb_slaves;
 	enum rte_cryptodev_scheduler_mode mode;
 	uint32_t enable_ordering;
+	uint64_t wcmask;
 	char slave_names[RTE_CRYPTODEV_SCHEDULER_MAX_NB_SLAVES]
 			[RTE_CRYPTODEV_SCHEDULER_NAME_MAX_LEN];
 };
@@ -57,6 +58,8 @@ struct scheduler_init_params {
 #define RTE_CRYPTODEV_VDEV_MAX_NB_QP_ARG	("max_nb_queue_pairs")
 #define RTE_CRYPTODEV_VDEV_MAX_NB_SESS_ARG	("max_nb_sessions")
 #define RTE_CRYPTODEV_VDEV_SOCKET_ID		("socket_id")
+#define RTE_CRYPTODEV_VDEV_COREMASK			("coremask")
+#define RTE_CRYPTODEV_VDEV_CORELIST			("corelist")
 
 const char *scheduler_valid_params[] = {
 	RTE_CRYPTODEV_VDEV_NAME,
@@ -65,7 +68,9 @@ const char *scheduler_valid_params[] = {
 	RTE_CRYPTODEV_VDEV_ORDERING,
 	RTE_CRYPTODEV_VDEV_MAX_NB_QP_ARG,
 	RTE_CRYPTODEV_VDEV_MAX_NB_SESS_ARG,
-	RTE_CRYPTODEV_VDEV_SOCKET_ID
+	RTE_CRYPTODEV_VDEV_SOCKET_ID,
+	RTE_CRYPTODEV_VDEV_COREMASK,
+	RTE_CRYPTODEV_VDEV_CORELIST
 };
 
 struct scheduler_parse_map {
@@ -79,7 +84,9 @@ const struct scheduler_parse_map scheduler_mode_map[] = {
 	{RTE_STR(SCHEDULER_MODE_NAME_PKT_SIZE_DISTR),
 			CDEV_SCHED_MODE_PKT_SIZE_DISTR},
 	{RTE_STR(SCHEDULER_MODE_NAME_FAIL_OVER),
-			CDEV_SCHED_MODE_FAILOVER}
+			CDEV_SCHED_MODE_FAILOVER},
+	{RTE_STR(SCHEDULER_MODE_NAME_MULTI_CORE),
+			CDEV_SCHED_MODE_MULTICORE}
 };
 
 const struct scheduler_parse_map scheduler_ordering_map[] = {
@@ -116,6 +123,17 @@ cryptodev_scheduler_create(const char *name,
 	sched_ctx = dev->data->dev_private;
 	sched_ctx->max_nb_queue_pairs =
 			init_params->def_p.max_nb_queue_pairs;
+
+	if (init_params->mode == CDEV_SCHED_MODE_MULTICORE) {
+		sched_ctx->nb_wc = 0;
+		for (uint16_t i = 0; i < MAX_NB_WORKER_CORES; i++) {
+			if (init_params->wcmask & (1ULL << i)) {
+				sched_ctx->wc_pool[sched_ctx->nb_wc++] = i;
+				RTE_LOG(INFO, PMD, "  Worker core[%u]=%u added\n",
+						sched_ctx->nb_wc-1, i);
+			}
+		}
+	}
 
 	if (init_params->mode > CDEV_SCHED_MODE_USERDEFINED &&
 			init_params->mode < CDEV_SCHED_MODE_COUNT) {
@@ -251,6 +269,42 @@ parse_integer_arg(const char *key __rte_unused,
 	return 0;
 }
 
+/** Parse integer from hexadecimal integer argument */
+static int
+parse_coremask_arg(const char *key __rte_unused,
+		const char *value, void *extra_args)
+{
+	struct scheduler_init_params *params = extra_args;
+
+	params->wcmask = strtoull(value, NULL, 16);
+
+	return 0;
+}
+
+/** Parse integer from list of integers argument */
+static int
+parse_corelist_arg(const char *key __rte_unused,
+		const char *value, void *extra_args)
+{
+	struct scheduler_init_params *params = extra_args;
+
+	params->wcmask = 0ULL;
+
+	const char *token = value;
+	while (isdigit(token[0])) {
+		char *rval;
+		unsigned int core = strtoul(token, &rval, 10);
+
+		params->wcmask |= 1ULL << core;
+		token = (const char *)rval;
+		if (token[0] == '\0')
+			break;
+		token++;
+	}
+
+	return 0;
+}
+
 /** Parse name */
 static int
 parse_name_arg(const char *key __rte_unused,
@@ -370,6 +424,18 @@ scheduler_parse_init_params(struct scheduler_init_params *params,
 		if (ret < 0)
 			goto free_kvlist;
 
+		ret = rte_kvargs_process(kvlist, RTE_CRYPTODEV_VDEV_COREMASK,
+				&parse_coremask_arg,
+				params);
+		if (ret < 0)
+			goto free_kvlist;
+
+		ret = rte_kvargs_process(kvlist, RTE_CRYPTODEV_VDEV_CORELIST,
+				&parse_corelist_arg,
+				params);
+		if (ret < 0)
+			goto free_kvlist;
+
 		ret = rte_kvargs_process(kvlist, RTE_CRYPTODEV_VDEV_NAME,
 				&parse_name_arg,
 				&params->def_p);
@@ -437,6 +503,9 @@ cryptodev_scheduler_probe(struct rte_vdev_device *vdev)
 	if (init_params.def_p.name[0] != '\0')
 		RTE_LOG(INFO, PMD, "  User defined name = %s\n",
 			init_params.def_p.name);
+	if (init_params.wcmask != 0)
+		RTE_LOG(INFO, PMD, "  workers core mask = %lx\n",
+			init_params.wcmask);
 
 	return cryptodev_scheduler_create(name,
 					&init_params);

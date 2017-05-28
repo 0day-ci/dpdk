@@ -58,6 +58,8 @@
 #define CS_LOG_DBG(fmt, args...)
 #endif
 
+#define MAX_NB_WORKER_CORES	64
+
 struct scheduler_slave {
 	uint8_t dev_id;
 	uint16_t qp_id;
@@ -86,6 +88,8 @@ struct scheduler_ctx {
 
 	char name[RTE_CRYPTODEV_SCHEDULER_NAME_MAX_LEN];
 	char description[RTE_CRYPTODEV_SCHEDULER_DESC_MAX_LEN];
+	uint16_t wc_pool[MAX_NB_WORKER_CORES];
+	uint16_t nb_wc;
 
 	char *init_slave_names[RTE_CRYPTODEV_SCHEDULER_MAX_NB_SLAVES];
 	int nb_init_slaves;

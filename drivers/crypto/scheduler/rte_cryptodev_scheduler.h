@@ -64,6 +64,8 @@ extern "C" {
 #define SCHEDULER_MODE_NAME_PKT_SIZE_DISTR	packet-size-distr
 /** Fail-over scheduling mode string */
 #define SCHEDULER_MODE_NAME_FAIL_OVER		fail-over
+/** multi-core scheduling mode string */
+#define SCHEDULER_MODE_NAME_MULTI_CORE		multi-core
 
 /**
  * Crypto scheduler PMD operation modes
@@ -78,6 +80,8 @@ enum rte_cryptodev_scheduler_mode {
 	CDEV_SCHED_MODE_PKT_SIZE_DISTR,
 	/** Fail-over mode */
 	CDEV_SCHED_MODE_FAILOVER,
+	/** multi-core mode */
+	CDEV_SCHED_MODE_MULTICORE,
 
 	CDEV_SCHED_MODE_COUNT /**< number of modes */
 };
@@ -327,6 +331,8 @@ extern struct rte_cryptodev_scheduler *roundrobin_scheduler;
 extern struct rte_cryptodev_scheduler *pkt_size_based_distr_scheduler;
 /** Fail-over mode scheduler */
 extern struct rte_cryptodev_scheduler *failover_scheduler;
+/** multi-core mode scheduler */
+extern struct rte_cryptodev_scheduler *multicore_scheduler;
 
 #ifdef __cplusplus
 }
