@@ -2749,7 +2749,6 @@ test_perf_create_snow3g_session(uint8_t dev_id, enum chain_mode chain,
 	auth_xform.auth.op = RTE_CRYPTO_AUTH_OP_GENERATE;
 	auth_xform.auth.algo = auth_algo;
 
-	auth_xform.auth.add_auth_data_length = SNOW3G_CIPHER_IV_LENGTH;
 	auth_xform.auth.key.data = snow3g_hash_key;
 	auth_xform.auth.key.length =  get_auth_key_max_length(auth_algo);
 	auth_xform.auth.digest_length = get_auth_digest_length(auth_algo);

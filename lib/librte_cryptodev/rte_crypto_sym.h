@@ -315,35 +315,6 @@ struct rte_crypto_auth_xform {
 	 * If the value is less than the maximum length allowed by the hash,
 	 * the result shall be truncated.
 	 */
-
-	uint32_t add_auth_data_length;
-	/**< The length of the additional authenticated data (AAD) in bytes.
-	 * The maximum permitted value is 65535 (2^16 - 1) bytes, unless
-	 * otherwise specified below.
-	 *
-	 * This field must be specified when the hash algorithm is one of the
-	 * following:
-	 *
-	 * - For SNOW 3G (@ref RTE_CRYPTO_AUTH_SNOW3G_UIA2), this is the
-	 *   length of the IV (which should be 16).
-	 *
-	 * - For GCM (@ref RTE_CRYPTO_AUTH_AES_GCM).  In this case, this is
-	 *   the length of the Additional Authenticated Data (called A, in NIST
-	 *   SP800-38D).
-	 *
-	 * - For CCM (@ref RTE_CRYPTO_AUTH_AES_CCM).  In this case, this is
-	 *   the length of the associated data (called A, in NIST SP800-38C).
-	 *   Note that this does NOT include the length of any padding, or the
-	 *   18 bytes reserved at the start of the above field to store the
-	 *   block B0 and the encoded length.  The maximum permitted value in
-	 *   this case is 222 bytes.
-	 *
-	 * @note
-	 *  For AES-GMAC (@ref RTE_CRYPTO_AUTH_AES_GMAC) mode of operation
-	 *  this field is not used and should be set to 0. Instead the length
-	 *  of the AAD data is specified in additional authentication data
-	 *  length field of the rte_crypto_sym_op_data structure
-	 */
 };
 
 /** Crypto transformation types */

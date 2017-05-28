@@ -1778,7 +1778,7 @@ test_AES_chain_armv8_all(void)
 static int
 create_wireless_algo_hash_session(uint8_t dev_id,
 	const uint8_t *key, const uint8_t key_len,
-	const uint8_t aad_len, const uint8_t auth_len,
+	const uint8_t auth_len,
 	enum rte_crypto_auth_operation op,
 	enum rte_crypto_auth_algorithm algo)
 {
@@ -1799,7 +1799,6 @@ create_wireless_algo_hash_session(uint8_t dev_id,
 	ut_params->auth_xform.auth.key.length = key_len;
 	ut_params->auth_xform.auth.key.data = hash_key;
 	ut_params->auth_xform.auth.digest_length = auth_len;
-	ut_params->auth_xform.auth.add_auth_data_length = aad_len;
 	ut_params->sess = rte_cryptodev_sym_session_create(dev_id,
 				&ut_params->auth_xform);
 	TEST_ASSERT_NOT_NULL(ut_params->sess, "Session creation failed");
@@ -1938,7 +1937,7 @@ create_wireless_algo_cipher_auth_session(uint8_t dev_id,
 		enum rte_crypto_auth_algorithm auth_algo,
 		enum rte_crypto_cipher_algorithm cipher_algo,
 		const uint8_t *key, const uint8_t key_len,
-		const uint8_t aad_len, const uint8_t auth_len)
+		const uint8_t auth_len)
 
 {
 	uint8_t cipher_auth_key[key_len];
@@ -1957,7 +1956,6 @@ create_wireless_algo_cipher_auth_session(uint8_t dev_id,
 	/* Hash key = cipher key */
 	ut_params->auth_xform.auth.key.data = cipher_auth_key;
 	ut_params->auth_xform.auth.digest_length = auth_len;
-	ut_params->auth_xform.auth.add_auth_data_length = aad_len;
 
 	/* Setup Cipher Parameters */
 	ut_params->cipher_xform.type = RTE_CRYPTO_SYM_XFORM_CIPHER;
@@ -1991,7 +1989,6 @@ create_wireless_cipher_auth_session(uint8_t dev_id,
 
 	struct crypto_unittest_params *ut_params = &unittest_params;
 	const uint8_t *key = tdata->key.data;
-	const uint8_t aad_len = tdata->aad.len;
 	const uint8_t auth_len = tdata->digest.len;
 
 	memcpy(cipher_auth_key, key, key_len);
@@ -2006,7 +2003,6 @@ create_wireless_cipher_auth_session(uint8_t dev_id,
 	/* Hash key = cipher key */
 	ut_params->auth_xform.auth.key.data = cipher_auth_key;
 	ut_params->auth_xform.auth.digest_length = auth_len;
-	ut_params->auth_xform.auth.add_auth_data_length = aad_len;
 
 	/* Setup Cipher Parameters */
 	ut_params->cipher_xform.type = RTE_CRYPTO_SYM_XFORM_CIPHER;
@@ -2044,7 +2040,7 @@ create_wireless_algo_auth_cipher_session(uint8_t dev_id,
 		enum rte_crypto_auth_algorithm auth_algo,
 		enum rte_crypto_cipher_algorithm cipher_algo,
 		const uint8_t *key, const uint8_t key_len,
-		const uint8_t aad_len, const uint8_t auth_len)
+		const uint8_t auth_len)
 {
 	uint8_t auth_cipher_key[key_len];
 
@@ -2060,7 +2056,6 @@ create_wireless_algo_auth_cipher_session(uint8_t dev_id,
 	ut_params->auth_xform.auth.key.length = key_len;
 	ut_params->auth_xform.auth.key.data = auth_cipher_key;
 	ut_params->auth_xform.auth.digest_length = auth_len;
-	ut_params->auth_xform.auth.add_auth_data_length = aad_len;
 
 	/* Setup Cipher Parameters */
 	ut_params->cipher_xform.type = RTE_CRYPTO_SYM_XFORM_CIPHER;
@@ -2480,7 +2475,7 @@ test_snow3g_authentication(const struct snow3g_hash_test_data *tdata)
 	/* Create SNOW 3G session */
 	retval = create_wireless_algo_hash_session(ts_params->valid_devs[0],
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->digest.len,
+			tdata->digest.len,
 			RTE_CRYPTO_AUTH_OP_GENERATE,
 			RTE_CRYPTO_AUTH_SNOW3G_UIA2);
 	if (retval < 0)
@@ -2541,7 +2536,7 @@ test_snow3g_authentication_verify(const struct snow3g_hash_test_data *tdata)
 	/* Create SNOW 3G session */
 	retval = create_wireless_algo_hash_session(ts_params->valid_devs[0],
 				tdata->key.data, tdata->key.len,
-				tdata->aad.len, tdata->digest.len,
+				tdata->digest.len,
 				RTE_CRYPTO_AUTH_OP_VERIFY,
 				RTE_CRYPTO_AUTH_SNOW3G_UIA2);
 	if (retval < 0)
@@ -2602,7 +2597,7 @@ test_kasumi_authentication(const struct kasumi_hash_test_data *tdata)
 	/* Create KASUMI session */
 	retval = create_wireless_algo_hash_session(ts_params->valid_devs[0],
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->digest.len,
+			tdata->digest.len,
 			RTE_CRYPTO_AUTH_OP_GENERATE,
 			RTE_CRYPTO_AUTH_KASUMI_F9);
 	if (retval < 0)
@@ -2663,7 +2658,7 @@ test_kasumi_authentication_verify(const struct kasumi_hash_test_data *tdata)
 	/* Create KASUMI session */
 	retval = create_wireless_algo_hash_session(ts_params->valid_devs[0],
 				tdata->key.data, tdata->key.len,
-				tdata->aad.len, tdata->digest.len,
+				tdata->digest.len,
 				RTE_CRYPTO_AUTH_OP_VERIFY,
 				RTE_CRYPTO_AUTH_KASUMI_F9);
 	if (retval < 0)
@@ -3844,7 +3839,7 @@ test_snow3g_cipher_auth(const struct snow3g_test_data *tdata)
 			RTE_CRYPTO_AUTH_SNOW3G_UIA2,
 			RTE_CRYPTO_CIPHER_SNOW3G_UEA2,
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->digest.len);
+			tdata->digest.len);
 	if (retval < 0)
 		return retval;
 	ut_params->ibuf = rte_pktmbuf_alloc(ts_params->mbuf_pool);
@@ -3927,7 +3922,7 @@ test_snow3g_auth_cipher(const struct snow3g_test_data *tdata)
 			RTE_CRYPTO_AUTH_SNOW3G_UIA2,
 			RTE_CRYPTO_CIPHER_SNOW3G_UEA2,
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->digest.len);
+			tdata->digest.len);
 	if (retval < 0)
 		return retval;
 
@@ -4014,7 +4009,7 @@ test_kasumi_auth_cipher(const struct kasumi_test_data *tdata)
 			RTE_CRYPTO_AUTH_KASUMI_F9,
 			RTE_CRYPTO_CIPHER_KASUMI_F8,
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->digest.len);
+			tdata->digest.len);
 	if (retval < 0)
 		return retval;
 	ut_params->ibuf = rte_pktmbuf_alloc(ts_params->mbuf_pool);
@@ -4097,7 +4092,7 @@ test_kasumi_cipher_auth(const struct kasumi_test_data *tdata)
 			RTE_CRYPTO_AUTH_KASUMI_F9,
 			RTE_CRYPTO_CIPHER_KASUMI_F8,
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->digest.len);
+			tdata->digest.len);
 	if (retval < 0)
 		return retval;
 
@@ -4349,7 +4344,7 @@ test_zuc_authentication(const struct wireless_test_data *tdata)
 	/* Create ZUC session */
 	retval = create_wireless_algo_hash_session(ts_params->valid_devs[0],
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->digest.len,
+			tdata->digest.len,
 			RTE_CRYPTO_AUTH_OP_GENERATE,
 			RTE_CRYPTO_AUTH_ZUC_EIA3);
 	if (retval < 0)
@@ -4816,7 +4811,7 @@ test_3DES_cipheronly_openssl_all(void)
 static int
 create_gcm_session(uint8_t dev_id, enum rte_crypto_cipher_operation op,
 		const uint8_t *key, const uint8_t key_len,
-		const uint8_t aad_len, const uint8_t auth_len,
+		const uint8_t auth_len,
 		enum rte_crypto_auth_operation auth_op)
 {
 	uint8_t cipher_key[key_len];
@@ -4844,7 +4839,6 @@ create_gcm_session(uint8_t dev_id, enum rte_crypto_cipher_operation op,
 	ut_params->auth_xform.auth.algo = RTE_CRYPTO_AUTH_AES_GCM;
 
 	ut_params->auth_xform.auth.digest_length = auth_len;
-	ut_params->auth_xform.auth.add_auth_data_length = aad_len;
 	ut_params->auth_xform.auth.key.length = 0;
 	ut_params->auth_xform.auth.key.data = NULL;
 
@@ -4869,7 +4863,7 @@ static int
 create_gcm_xforms(struct rte_crypto_op *op,
 		enum rte_crypto_cipher_operation cipher_op,
 		uint8_t *key, const uint8_t key_len,
-		const uint8_t aad_len, const uint8_t auth_len,
+		const uint8_t auth_len,
 		enum rte_crypto_auth_operation auth_op)
 {
 	TEST_ASSERT_NOT_NULL(rte_crypto_op_sym_xforms_alloc(op, 2),
@@ -4891,7 +4885,6 @@ create_gcm_xforms(struct rte_crypto_op *op,
 	sym_op->xform->next->auth.algo = RTE_CRYPTO_AUTH_AES_GCM;
 	sym_op->xform->next->auth.op = auth_op;
 	sym_op->xform->next->auth.digest_length = auth_len;
-	sym_op->xform->next->auth.add_auth_data_length = aad_len;
 	sym_op->xform->next->auth.key.length = 0;
 	sym_op->xform->next->auth.key.data = NULL;
 	sym_op->xform->next->next = NULL;
@@ -5048,7 +5041,7 @@ test_mb_AES_GCM_authenticated_encryption(const struct gcm_test_data *tdata)
 	retval = create_gcm_session(ts_params->valid_devs[0],
 			RTE_CRYPTO_CIPHER_OP_ENCRYPT,
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->auth_tag.len,
+			tdata->auth_tag.len,
 			RTE_CRYPTO_AUTH_OP_GENERATE);
 	if (retval < 0)
 		return retval;
@@ -5225,7 +5218,7 @@ test_mb_AES_GCM_authenticated_decryption(const struct gcm_test_data *tdata)
 	retval = create_gcm_session(ts_params->valid_devs[0],
 			RTE_CRYPTO_CIPHER_OP_DECRYPT,
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->auth_tag.len,
+			tdata->auth_tag.len,
 			RTE_CRYPTO_AUTH_OP_VERIFY);
 	if (retval < 0)
 		return retval;
@@ -5391,7 +5384,7 @@ test_AES_GCM_authenticated_encryption_oop(const struct gcm_test_data *tdata)
 	retval = create_gcm_session(ts_params->valid_devs[0],
 			RTE_CRYPTO_CIPHER_OP_ENCRYPT,
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->auth_tag.len,
+			tdata->auth_tag.len,
 			RTE_CRYPTO_AUTH_OP_GENERATE);
 	if (retval < 0)
 		return retval;
@@ -5467,7 +5460,7 @@ test_AES_GCM_authenticated_decryption_oop(const struct gcm_test_data *tdata)
 	retval = create_gcm_session(ts_params->valid_devs[0],
 			RTE_CRYPTO_CIPHER_OP_DECRYPT,
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->auth_tag.len,
+			tdata->auth_tag.len,
 			RTE_CRYPTO_AUTH_OP_VERIFY);
 	if (retval < 0)
 		return retval;
@@ -5550,7 +5543,7 @@ test_AES_GCM_authenticated_encryption_sessionless(
 	retval = create_gcm_xforms(ut_params->op,
 			RTE_CRYPTO_CIPHER_OP_ENCRYPT,
 			key, tdata->key.len,
-			tdata->aad.len, tdata->auth_tag.len,
+			tdata->auth_tag.len,
 			RTE_CRYPTO_AUTH_OP_GENERATE);
 	if (retval < 0)
 		return retval;
@@ -5630,7 +5623,7 @@ test_AES_GCM_authenticated_decryption_sessionless(
 	retval = create_gcm_xforms(ut_params->op,
 			RTE_CRYPTO_CIPHER_OP_DECRYPT,
 			key, tdata->key.len,
-			tdata->aad.len, tdata->auth_tag.len,
+			tdata->auth_tag.len,
 			RTE_CRYPTO_AUTH_OP_VERIFY);
 	if (retval < 0)
 		return retval;
@@ -5750,7 +5743,6 @@ static int MD5_HMAC_create_session(struct crypto_testsuite_params *ts_params,
 	ut_params->auth_xform.auth.algo = RTE_CRYPTO_AUTH_MD5_HMAC;
 
 	ut_params->auth_xform.auth.digest_length = MD5_DIGEST_LEN;
-	ut_params->auth_xform.auth.add_auth_data_length = 0;
 	ut_params->auth_xform.auth.key.length = test_case->key.len;
 	ut_params->auth_xform.auth.key.data = key;
 
@@ -6560,7 +6552,6 @@ static int create_gmac_session(uint8_t dev_id,
 	ut_params->auth_xform.auth.algo = RTE_CRYPTO_AUTH_AES_GMAC;
 	ut_params->auth_xform.auth.op = auth_op;
 	ut_params->auth_xform.auth.digest_length = tdata->gmac_tag.len;
-	ut_params->auth_xform.auth.add_auth_data_length = 0;
 	ut_params->auth_xform.auth.key.length = 0;
 	ut_params->auth_xform.auth.key.data = NULL;
 
@@ -6909,7 +6900,6 @@ create_auth_session(struct crypto_unittest_params *ut_params,
 	ut_params->auth_xform.auth.key.length = reference->auth_key.len;
 	ut_params->auth_xform.auth.key.data = auth_key;
 	ut_params->auth_xform.auth.digest_length = reference->digest.len;
-	ut_params->auth_xform.auth.add_auth_data_length = reference->aad.len;
 
 	/* Create Crypto session*/
 	ut_params->sess = rte_cryptodev_sym_session_create(dev_id,
@@ -6942,7 +6932,6 @@ create_auth_cipher_session(struct crypto_unittest_params *ut_params,
 	ut_params->auth_xform.auth.key.length = reference->auth_key.len;
 	ut_params->auth_xform.auth.key.data = auth_key;
 	ut_params->auth_xform.auth.digest_length = reference->digest.len;
-	ut_params->auth_xform.auth.add_auth_data_length = reference->aad.len;
 
 	/* Setup Cipher Parameters */
 	ut_params->cipher_xform.type = RTE_CRYPTO_SYM_XFORM_CIPHER;
@@ -7466,7 +7455,7 @@ test_AES_GCM_authenticated_encryption_SGL(const struct gcm_test_data *tdata,
 	retval = create_gcm_session(ts_params->valid_devs[0],
 			RTE_CRYPTO_CIPHER_OP_ENCRYPT,
 			tdata->key.data, tdata->key.len,
-			tdata->aad.len, tdata->auth_tag.len,
+			tdata->auth_tag.len,
 			RTE_CRYPTO_AUTH_OP_GENERATE);
 	if (retval < 0)
 		return retval;

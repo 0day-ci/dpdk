@@ -376,14 +376,11 @@ cperf_create_session(uint8_t dev_id,
 		if (options->auth_algo != RTE_CRYPTO_AUTH_NULL) {
 			auth_xform.auth.digest_length =
 					options->auth_digest_sz;
-			auth_xform.auth.add_auth_data_length =
-					options->auth_aad_sz;
 			auth_xform.auth.key.length =
 					test_vector->auth_key.length;
 			auth_xform.auth.key.data = test_vector->auth_key.data;
 		} else {
 			auth_xform.auth.digest_length = 0;
-			auth_xform.auth.add_auth_data_length = 0;
 			auth_xform.auth.key.length = 0;
 			auth_xform.auth.key.data = NULL;
 		}
@@ -426,8 +423,6 @@ cperf_create_session(uint8_t dev_id,
 		/* auth different than null */
 		if (options->auth_algo != RTE_CRYPTO_AUTH_NULL) {
 			auth_xform.auth.digest_length = options->auth_digest_sz;
-			auth_xform.auth.add_auth_data_length =
-					options->auth_aad_sz;
 			/* auth options for aes gcm */
 			if (options->cipher_algo == RTE_CRYPTO_CIPHER_AES_GCM &&
 				options->auth_algo == RTE_CRYPTO_AUTH_AES_GCM) {
@@ -441,7 +436,6 @@ cperf_create_session(uint8_t dev_id,
 			}
 		} else {
 			auth_xform.auth.digest_length = 0;
-			auth_xform.auth.add_auth_data_length = 0;
 			auth_xform.auth.key.length = 0;
 			auth_xform.auth.key.data = NULL;
 		}

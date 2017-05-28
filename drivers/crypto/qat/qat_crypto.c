@@ -586,7 +586,6 @@ qat_crypto_sym_configure_session_auth(struct rte_cryptodev *dev,
 		if (qat_alg_aead_session_create_content_desc_auth(session,
 				cipher_xform->key.data,
 				cipher_xform->key.length,
-				auth_xform->add_auth_data_length,
 				auth_xform->digest_length,
 				auth_xform->op))
 			goto error_out;
@@ -594,7 +593,6 @@ qat_crypto_sym_configure_session_auth(struct rte_cryptodev *dev,
 		if (qat_alg_aead_session_create_content_desc_auth(session,
 				auth_xform->key.data,
 				auth_xform->key.length,
-				auth_xform->add_auth_data_length,
 				auth_xform->digest_length,
 				auth_xform->op))
 			goto error_out;
@@ -1027,6 +1025,15 @@ qat_write_hw_desc_entry(struct rte_crypto_op *op, uint8_t *out_msg,
 					ICP_QAT_HW_AUTH_ALGO_GALOIS_64) {
 			auth_ofs = op->sym->cipher.data.offset;
 			auth_len = op->sym->cipher.data.length;
+			/*
+			 * Write (the length of AAD) into bytes 16-19 of state2
+			 * in big-endian format. This field is 8 bytes
+			 */
+			auth_param->u2.aad_sz =
+					RTE_ALIGN_CEIL(op->sym->auth.aad.length, 16);
+			auth_param->hash_state_sz = (auth_param->u2.aad_sz) >> 3;
+
+			*(ctx->aad_len) = rte_bswap32(op->sym->auth.aad.length);
 		} else {
 			auth_ofs = op->sym->auth.data.offset;
 			auth_len = op->sym->auth.data.length;

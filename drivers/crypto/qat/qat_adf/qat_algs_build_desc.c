@@ -661,7 +661,6 @@ int qat_alg_aead_session_create_content_desc_cipher(struct qat_session *cdesc,
 int qat_alg_aead_session_create_content_desc_auth(struct qat_session *cdesc,
 						uint8_t *authkey,
 						uint32_t authkeylen,
-						uint32_t add_auth_data_length,
 						uint32_t digestsize,
 						unsigned int operation)
 {
@@ -679,7 +678,6 @@ int qat_alg_aead_session_create_content_desc_auth(struct qat_session *cdesc,
 		sizeof(struct icp_qat_fw_la_cipher_req_params));
 	uint16_t state1_size = 0, state2_size = 0;
 	uint16_t hash_offset, cd_size;
-	uint32_t *aad_len = NULL;
 	uint32_t wordIndex  = 0;
 	uint32_t *pTempKey;
 	enum qat_crypto_proto_flag qat_proto_flag =
@@ -805,18 +803,10 @@ int qat_alg_aead_session_create_content_desc_auth(struct qat_session *cdesc,
 			PMD_DRV_LOG(ERR, "(GCM)precompute failed");
 			return -EFAULT;
 		}
-		/*
-		 * Write (the length of AAD) into bytes 16-19 of state2
-		 * in big-endian format. This field is 8 bytes
-		 */
-		auth_param->u2.aad_sz =
-				RTE_ALIGN_CEIL(add_auth_data_length, 16);
-		auth_param->hash_state_sz = (auth_param->u2.aad_sz) >> 3;
 
-		aad_len = (uint32_t *)(cdesc->cd_cur_ptr +
+		cdesc->aad_len = (uint32_t *)(cdesc->cd_cur_ptr +
 					ICP_QAT_HW_GALOIS_128_STATE1_SZ +
 					ICP_QAT_HW_GALOIS_H_SZ);
-		*aad_len = rte_bswap32(add_auth_data_length);
 		break;
 	case ICP_QAT_HW_AUTH_ALGO_SNOW_3G_UIA2:
 		qat_proto_flag = QAT_CRYPTO_PROTO_FLAG_SNOW3G;
@@ -837,8 +827,8 @@ int qat_alg_aead_session_create_content_desc_auth(struct qat_session *cdesc,
 				0, ICP_QAT_HW_SNOW_3G_UEA2_IV_SZ);
 		cdesc->cd_cur_ptr += sizeof(struct icp_qat_hw_cipher_config) +
 				authkeylen + ICP_QAT_HW_SNOW_3G_UEA2_IV_SZ;
-		auth_param->hash_state_sz =
-				RTE_ALIGN_CEIL(add_auth_data_length, 16) >> 3;
+		/* IV = 16 bytes for SNOW3G */
+		auth_param->hash_state_sz = (16 >> 3);
 		break;
 	case ICP_QAT_HW_AUTH_ALGO_ZUC_3G_128_EIA3:
 		hash->auth_config.config =
@@ -854,8 +844,8 @@ int qat_alg_aead_session_create_content_desc_auth(struct qat_session *cdesc,
 		memcpy(cdesc->cd_cur_ptr + state1_size, authkey, authkeylen);
 		cdesc->cd_cur_ptr += state1_size + state2_size
 			+ ICP_QAT_HW_ZUC_3G_EEA3_IV_SZ;
-		auth_param->hash_state_sz =
-				RTE_ALIGN_CEIL(add_auth_data_length, 16) >> 3;
+		/* IV = 16 bytes for ZUC */
+		auth_param->hash_state_sz = 16 >> 3;
 
 		break;
 	case ICP_QAT_HW_AUTH_ALGO_MD5:

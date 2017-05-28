@@ -125,7 +125,7 @@ struct qat_session {
 	uint8_t *cd_cur_ptr;
 	phys_addr_t cd_paddr;
 	struct icp_qat_fw_la_bulk_req fw_req;
-	uint8_t aad_len;
+	uint32_t *aad_len;
 	struct qat_crypto_instance *inst;
 	rte_spinlock_t lock;	/* protects this struct */
 };
@@ -147,7 +147,6 @@ int qat_alg_aead_session_create_content_desc_cipher(struct qat_session *cd,
 int qat_alg_aead_session_create_content_desc_auth(struct qat_session *cdesc,
 						uint8_t *authkey,
 						uint32_t authkeylen,
-						uint32_t add_auth_data_length,
 						uint32_t digestsize,
 						unsigned int operation);
 
