@@ -41,6 +41,11 @@ New Features
      Also, make sure to start the actual text at the margin.
      =========================================================
 
+   * **Added support for Rx interrupts on mlx4 driver.**
+
+     Rx queues can be armed with an interrupt which will trigger on the
+     next packet arrival.
+
 
 Resolved Issues
 ---------------
