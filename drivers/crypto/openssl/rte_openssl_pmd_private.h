@@ -157,6 +157,9 @@ struct openssl_session {
 				/**< pointer to EVP context structure */
 			} hmac;
 		};
+
+		uint16_t digest_length;
+		/**< digest length */
 	} auth;
 
 } __rte_cache_aligned;

@@ -142,7 +142,6 @@ cperf_set_ops_auth(struct rte_crypto_op **ops,
 			sym_op->auth.digest.data = test_vector->digest.data;
 			sym_op->auth.digest.phys_addr =
 					test_vector->digest.phys_addr;
-			sym_op->auth.digest.length = options->auth_digest_sz;
 		} else {
 
 			uint32_t offset = options->test_buffer_size;
@@ -165,7 +164,6 @@ cperf_set_ops_auth(struct rte_crypto_op **ops,
 					uint8_t *, offset);
 			sym_op->auth.digest.phys_addr =
 					rte_pktmbuf_mtophys_offset(buf,	offset);
-			sym_op->auth.digest.length = options->auth_digest_sz;
 			sym_op->auth.aad.phys_addr = test_vector->aad.phys_addr;
 			sym_op->auth.aad.data = test_vector->aad.data;
 			sym_op->auth.aad.length = options->auth_aad_sz;
@@ -221,7 +219,6 @@ cperf_set_ops_cipher_auth(struct rte_crypto_op **ops,
 			sym_op->auth.digest.data = test_vector->digest.data;
 			sym_op->auth.digest.phys_addr =
 					test_vector->digest.phys_addr;
-			sym_op->auth.digest.length = options->auth_digest_sz;
 		} else {
 
 			uint32_t offset = options->test_buffer_size;
@@ -244,7 +241,6 @@ cperf_set_ops_cipher_auth(struct rte_crypto_op **ops,
 					uint8_t *, offset);
 			sym_op->auth.digest.phys_addr =
 					rte_pktmbuf_mtophys_offset(buf,	offset);
-			sym_op->auth.digest.length = options->auth_digest_sz;
 			sym_op->auth.aad.phys_addr = test_vector->aad.phys_addr;
 			sym_op->auth.aad.data = test_vector->aad.data;
 			sym_op->auth.aad.length = options->auth_aad_sz;
@@ -298,7 +294,6 @@ cperf_set_ops_aead(struct rte_crypto_op **ops,
 			sym_op->auth.digest.data = test_vector->digest.data;
 			sym_op->auth.digest.phys_addr =
 					test_vector->digest.phys_addr;
-			sym_op->auth.digest.length = options->auth_digest_sz;
 		} else {
 
 			uint32_t offset = sym_op->cipher.data.length +
@@ -322,8 +317,6 @@ cperf_set_ops_aead(struct rte_crypto_op **ops,
 					uint8_t *, offset);
 			sym_op->auth.digest.phys_addr =
 					rte_pktmbuf_mtophys_offset(buf,	offset);
-
-			sym_op->auth.digest.length = options->auth_digest_sz;
 		}
 
 		sym_op->auth.data.length = options->test_buffer_size;

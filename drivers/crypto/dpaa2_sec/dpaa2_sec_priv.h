@@ -187,6 +187,7 @@ typedef struct dpaa2_sec_session_entry {
 		uint8_t *data;	/**< pointer to key data */
 		size_t length;	/**< key length in bytes */
 	} auth_key;
+	uint16_t digest_length;
 	uint8_t status;
 	union {
 		struct dpaa2_sec_cipher_ctxt cipher_ctxt;

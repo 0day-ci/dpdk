@@ -365,6 +365,8 @@ openssl_set_session_auth_parameters(struct openssl_session *sess,
 		return -EINVAL;
 	}
 
+	sess->auth.digest_length = xform->auth.digest_length;
+
 	return 0;
 }
 
@@ -1116,7 +1118,7 @@ process_openssl_auth_op
 
 	if (sess->auth.operation == RTE_CRYPTO_AUTH_OP_VERIFY)
 		dst = (uint8_t *)rte_pktmbuf_append(mbuf_src,
-				op->sym->auth.digest.length);
+				sess->auth.digest_length);
 	else {
 		dst = op->sym->auth.digest.data;
 		if (dst == NULL)
@@ -1144,11 +1146,11 @@ process_openssl_auth_op
 
 	if (sess->auth.operation == RTE_CRYPTO_AUTH_OP_VERIFY) {
 		if (memcmp(dst, op->sym->auth.digest.data,
-				op->sym->auth.digest.length) != 0) {
+				sess->auth.digest_length) != 0) {
 			op->status = RTE_CRYPTO_OP_STATUS_AUTH_FAILED;
 		}
 		/* Trim area used for digest from mbuf. */
-		rte_pktmbuf_trim(mbuf_src, op->sym->auth.digest.length);
+		rte_pktmbuf_trim(mbuf_src, sess->auth.digest_length);
 	}
 
 	if (status != 0)

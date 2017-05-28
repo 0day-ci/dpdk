@@ -1188,7 +1188,7 @@ qat_write_hw_desc_entry(struct rte_crypto_op *op, uint8_t *out_msg,
 	rte_hexdump(stdout, "iv:", op->sym->cipher.iv.data,
 			op->sym->cipher.iv.length);
 	rte_hexdump(stdout, "digest:", op->sym->auth.digest.data,
-			op->sym->auth.digest.length);
+			ctx->digest_length);
 	rte_hexdump(stdout, "aad:", op->sym->auth.aad.data,
 			op->sym->auth.aad.length);
 #endif
