@@ -66,6 +66,8 @@
 #include "i40e_pf.h"
 #include "i40e_regs.h"
 
+extern int hotplug_fd;
+
 #define ETH_I40E_FLOATING_VEB_ARG	"enable_floating_veb"
 #define ETH_I40E_FLOATING_VEB_LIST_ARG	"floating_veb_list"
 
@@ -5808,7 +5810,20 @@ i40e_dev_interrupt_handler(void *param)
 {
 	struct rte_eth_dev *dev = (struct rte_eth_dev *)param;
 	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct rte_uevent event;
 	uint32_t icr0;
+
+	/* check device  uevent */
+	while (rte_get_uevent(hotplug_fd, &event) > 0) {
+		if (event.subsystem == 1) {
+			if (event.action == RTE_UEVENT_ADD) {
+				//do nothing here
+			} else if (event.action == RTE_UEVENT_REMOVE) {
+				_rte_eth_dev_callback_process(dev,
+					RTE_ETH_EVENT_INTR_RMV, NULL);
+			}
+		}
+	}
 
 	/* Disable interrupt */
 	i40e_pf_disable_irq0(hw);

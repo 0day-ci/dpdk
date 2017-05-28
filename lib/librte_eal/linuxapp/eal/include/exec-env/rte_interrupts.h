@@ -99,6 +99,16 @@ struct rte_intr_handle {
 	int *intr_vec;                 /**< intr vector number array */
 };
 
+enum rte_uevent_action {
+	RTE_UEVENT_ADD = 0,		/**< uevent type of device add */
+	RTE_UEVENT_REMOVE = 1,	/**< uevent type of device remove*/
+};
+
+struct rte_uevent {
+	enum rte_uevent_action action;	/**< uevent action type */
+	int subsystem;				/**< subsystem id */
+};
+
 #define RTE_EPOLL_PER_THREAD        -1  /**< to hint using per thread epfd */
 
 /**
@@ -235,5 +245,27 @@ rte_intr_allow_others(struct rte_intr_handle *intr_handle);
  */
 int
 rte_intr_cap_multiple(struct rte_intr_handle *intr_handle);
+
+/**
+ * It read out the uevent from the specific file descriptor.
+ *
+ * @param fd
+ *   The fd which the uevent  associated to
+ * @param uevent
+ *   Pointer to the uevent which read from the monitoring fd.
+ * @return
+ *   - On success, one.
+ *   - On failure, zeor or a negative value.
+ */
+int
+rte_get_uevent(int fd, struct rte_uevent *uevent);
+
+/**
+ * Connect to the device uevent file descriptor.
+ * @return
+ *   return the connected uevent fd.
+ */
+int
+rte_uevent_connect(void);
 
 #endif /* _RTE_LINUXAPP_INTERRUPTS_H_ */
