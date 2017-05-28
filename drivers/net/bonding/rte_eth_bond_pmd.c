@@ -1292,6 +1292,12 @@ bond_ethdev_mode_set(struct rte_eth_dev *eth_dev, int mode)
 		eth_dev->rx_pkt_burst = bond_ethdev_rx_burst;
 		break;
 	case BONDING_MODE_8023AD:
+		if (check_for_master_bonded_ethdev(eth_dev) == 1) {
+			RTE_BOND_LOG(ERR, "One or more slaves is a bond device,"
+					" there 802.3ad mode can not be"
+					" supported on this bond device.");
+			return -1;
+		}
 		if (bond_mode_8023ad_enable(eth_dev) != 0)
 			return -1;
 

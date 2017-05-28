@@ -184,6 +184,9 @@ extern const struct eth_dev_ops default_dev_ops;
 int
 check_for_bonded_ethdev(const struct rte_eth_dev *eth_dev);
 
+int
+check_for_master_bonded_ethdev(const struct rte_eth_dev *eth_dev);
+
 /* Search given slave array to find possition of given id.
  * Return slave pos or slaves_count if not found. */
 static inline uint8_t
@@ -205,7 +208,7 @@ int
 valid_bonded_port_id(uint8_t port_id);
 
 int
-valid_slave_port_id(uint8_t port_id);
+valid_slave_port_id(uint8_t port_id, uint8_t mode);
 
 void
 deactivate_slave(struct rte_eth_dev *eth_dev, uint8_t port_id);
