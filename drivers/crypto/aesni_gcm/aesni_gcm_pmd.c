@@ -138,16 +138,17 @@ aesni_gcm_set_session_parameters(struct aesni_gcm_session *sess,
 
 /** Get gcm session */
 static struct aesni_gcm_session *
-aesni_gcm_get_session(struct aesni_gcm_qp *qp, struct rte_crypto_sym_op *op)
+aesni_gcm_get_session(struct aesni_gcm_qp *qp, struct rte_crypto_op *op)
 {
 	struct aesni_gcm_session *sess = NULL;
+	struct rte_crypto_sym_op *sym_op = op->sym;
 
-	if (op->sess_type == RTE_CRYPTO_SYM_OP_WITH_SESSION) {
-		if (unlikely(op->session->dev_type
+	if (op->sess_type == RTE_CRYPTO_OP_WITH_SESSION) {
+		if (unlikely(sym_op->session->dev_type
 					!= RTE_CRYPTODEV_AESNI_GCM_PMD))
 			return sess;
 
-		sess = (struct aesni_gcm_session *)op->session->_private;
+		sess = (struct aesni_gcm_session *)sym_op->session->_private;
 	} else  {
 		void *_sess;
 
@@ -158,7 +159,7 @@ aesni_gcm_get_session(struct aesni_gcm_qp *qp, struct rte_crypto_sym_op *op)
 			((struct rte_cryptodev_sym_session *)_sess)->_private;
 
 		if (unlikely(aesni_gcm_set_session_parameters(sess,
-				op->xform) != 0)) {
+				sym_op->xform) != 0)) {
 			rte_mempool_put(qp->sess_mp, _sess);
 			sess = NULL;
 		}
@@ -371,7 +372,7 @@ handle_completed_gcm_crypto_op(struct aesni_gcm_qp *qp,
 	post_process_gcm_crypto_op(op);
 
 	/* Free session if a session-less crypto op */
-	if (op->sym->sess_type == RTE_CRYPTO_SYM_OP_SESSIONLESS) {
+	if (op->sess_type == RTE_CRYPTO_OP_SESSIONLESS) {
 		rte_mempool_put(qp->sess_mp, op->sym->session);
 		op->sym->session = NULL;
 	}
@@ -392,7 +393,7 @@ aesni_gcm_pmd_dequeue_burst(void *queue_pair,
 
 	for (i = 0; i < nb_dequeued; i++) {
 
-		sess = aesni_gcm_get_session(qp, ops[i]->sym);
+		sess = aesni_gcm_get_session(qp, ops[i]);
 		if (unlikely(sess == NULL)) {
 			ops[i]->status = RTE_CRYPTO_OP_STATUS_INVALID_ARGS;
 			qp->qp_stats.dequeue_err_count++;
