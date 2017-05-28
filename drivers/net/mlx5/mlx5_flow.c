@@ -994,6 +994,11 @@ priv_flow_create_action_queue_drop(struct priv *priv,
 {
 	struct rte_flow *rte_flow;
 
+#ifdef HAVE_VERBS_IBV_EXP_FLOW_SPEC_ACTION_DROP
+	struct ibv_exp_flow_spec_action_drop *drop;
+	unsigned int size = sizeof(struct ibv_exp_flow_spec_action_drop);
+#endif
+
 	assert(priv->pd);
 	assert(priv->ctx);
 	rte_flow = rte_calloc(__func__, 1, sizeof(*rte_flow), 0);
@@ -1007,6 +1012,15 @@ priv_flow_create_action_queue_drop(struct priv *priv,
 	rte_flow->qp = priv->flow_drop_queue->qp;
 	if (!priv->started)
 		return rte_flow;
+#ifdef HAVE_VERBS_IBV_EXP_FLOW_SPEC_ACTION_DROP
+	drop = (void *)((uintptr_t)flow->ibv_attr + flow->offset);
+	*drop = (struct ibv_exp_flow_spec_action_drop){
+			.type = IBV_EXP_FLOW_SPEC_ACTION_DROP,
+			.size = size,
+	};
+	++flow->ibv_attr->num_of_specs;
+	flow->offset += sizeof(struct ibv_exp_flow_spec_action_drop);
+#endif
 	rte_flow->ibv_flow = ibv_exp_create_flow(rte_flow->qp,
 						 rte_flow->ibv_attr);
 	if (!rte_flow->ibv_flow) {
@@ -1370,7 +1384,9 @@ static int
 priv_flow_create_drop_queue(struct priv *priv)
 {
 	struct rte_flow_drop *fdq = NULL;
+#ifndef HAVE_VERBS_IBV_EXP_FLOW_SPEC_ACTION_DROP
 	unsigned int i;
+#endif
 
 	assert(priv->pd);
 	assert(priv->ctx);
@@ -1387,6 +1403,7 @@ priv_flow_create_drop_queue(struct priv *priv)
 		WARN("cannot allocate CQ for drop queue");
 		goto error;
 	}
+#ifndef HAVE_VERBS_IBV_EXP_FLOW_SPEC_ACTION_DROP
 	for (i = 0; i != MLX5_DROP_WQ_N; ++i) {
 		fdq->wqs[i] = ibv_exp_create_wq(priv->ctx,
 				&(struct ibv_exp_wq_init_attr){
@@ -1401,6 +1418,20 @@ priv_flow_create_drop_queue(struct priv *priv)
 			goto error;
 		}
 	}
+#else
+	fdq->wqs[0] = ibv_exp_create_wq(priv->ctx,
+			&(struct ibv_exp_wq_init_attr){
+			.wq_type = IBV_EXP_WQT_RQ,
+			.max_recv_wr = 1,
+			.max_recv_sge = 1,
+			.pd = priv->pd,
+			.cq = fdq->cq,
+			});
+	if (!fdq->wqs[0]) {
+		WARN("cannot allocate WQ for drop queue");
+		goto error;
+	}
+#endif
 	fdq->ind_table = ibv_exp_create_rwq_ind_table(priv->ctx,
 			&(struct ibv_exp_rwq_ind_table_init_attr){
 			.pd = priv->pd,
@@ -1441,10 +1472,15 @@ error:
 		claim_zero(ibv_destroy_qp(fdq->qp));
 	if (fdq->ind_table)
 		claim_zero(ibv_exp_destroy_rwq_ind_table(fdq->ind_table));
+#ifndef HAVE_VERBS_IBV_EXP_FLOW_SPEC_ACTION_DROP
 	for (i = 0; i != MLX5_DROP_WQ_N; ++i) {
 		if (fdq->wqs[i])
 			claim_zero(ibv_exp_destroy_wq(fdq->wqs[i]));
 	}
+#else
+	if (fdq->wqs[0])
+		claim_zero(ibv_exp_destroy_wq(fdq->wqs[0]));
+#endif
 	if (fdq->cq)
 		claim_zero(ibv_destroy_cq(fdq->cq));
 	if (fdq)
@@ -1463,7 +1499,9 @@ static void
 priv_flow_delete_drop_queue(struct priv *priv)
 {
 	struct rte_flow_drop *fdq = priv->flow_drop_queue;
+#ifndef HAVE_VERBS_IBV_EXP_FLOW_SPEC_ACTION_DROP
 	unsigned int i;
+#endif
 
 	if (!fdq)
 		return;
@@ -1471,10 +1509,15 @@ priv_flow_delete_drop_queue(struct priv *priv)
 		claim_zero(ibv_destroy_qp(fdq->qp));
 	if (fdq->ind_table)
 		claim_zero(ibv_exp_destroy_rwq_ind_table(fdq->ind_table));
+#ifndef HAVE_VERBS_IBV_EXP_FLOW_SPEC_ACTION_DROP
 	for (i = 0; i != MLX5_DROP_WQ_N; ++i) {
 		if (fdq->wqs[i])
 			claim_zero(ibv_exp_destroy_wq(fdq->wqs[i]));
 	}
+#else
+	if (fdq->wqs[0])
+		claim_zero(ibv_exp_destroy_wq(fdq->wqs[0]));
+#endif
 	if (fdq->cq)
 		claim_zero(ibv_destroy_cq(fdq->cq));
 	rte_free(fdq);
