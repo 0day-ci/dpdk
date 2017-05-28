@@ -60,6 +60,7 @@ CFLAGS += -D_DEFAULT_SOURCE
 CFLAGS += -D_XOPEN_SOURCE=600
 CFLAGS += $(WERROR_FLAGS)
 CFLAGS += -Wno-strict-prototypes
+CFLAGS += -msse4.1
 LDLIBS += -libverbs
 
 # A few warnings cannot be avoided in external headers.

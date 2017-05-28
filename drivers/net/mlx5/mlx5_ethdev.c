@@ -723,7 +723,11 @@ mlx5_dev_supported_ptypes_get(struct rte_eth_dev *dev)
 
 	};
 
+#ifdef MLX5_VECTORIZED_RX
+	if (dev->rx_pkt_burst == mlx5_rx_burst_vec)
+#else
 	if (dev->rx_pkt_burst == mlx5_rx_burst)
+#endif
 		return ptypes;
 	return NULL;
 }
@@ -1605,5 +1609,9 @@ priv_select_tx_function(struct priv *priv)
 void
 priv_select_rx_function(struct priv *priv)
 {
+#ifdef MLX5_VECTORIZED_RX
+	priv->dev->rx_pkt_burst = mlx5_rx_burst_vec;
+#else
 	priv->dev->rx_pkt_burst = mlx5_rx_burst;
+#endif
 }

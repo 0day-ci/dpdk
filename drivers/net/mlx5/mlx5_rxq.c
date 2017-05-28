@@ -652,7 +652,20 @@ rxq_alloc_elts(struct rxq_ctrl *rxq_ctrl, unsigned int elts_n,
 	const unsigned int sges_n = 1 << rxq_ctrl->rxq.sges_n;
 	unsigned int i;
 	int ret = 0;
+#ifdef MLX5_VECTORIZED_RX
+	uintptr_t p;
+	struct rte_mbuf mb_def = { .buf_addr = 0 }; /* zeroed mbuf */
 
+	/* Initialize default mbuf fields for vPMD */
+	mb_def.nb_segs = 1;
+	rte_pktmbuf_reset_headroom(&mb_def);
+	mb_def.port = rxq_ctrl->rxq.port_id;
+	rte_mbuf_refcnt_set(&mb_def, 1);
+	/* prevent compiler reordering: rearm_data covers previous fields */
+	rte_compiler_barrier();
+	p = (uintptr_t)&mb_def.rearm_data;
+	rxq_ctrl->rxq.mbuf_initializer = *(uint64_t *)p;
+#endif
 	/* Iterate on segments. */
 	for (i = 0; (i != elts_n); ++i) {
 		struct rte_mbuf *buf;
@@ -854,6 +867,9 @@ rxq_setup(struct rxq_ctrl *tmpl)
 	tmpl->rxq.cqe_n = log2above(ibcq->cqe);
 	tmpl->rxq.cq_ci = 0;
 	tmpl->rxq.rq_ci = 0;
+#ifdef MLX5_VECTORIZED_RX
+	tmpl->rxq.rq_pi = 0;
+#endif
 	tmpl->rxq.cq_db = cq->dbrec;
 	tmpl->rxq.wqes =
 		(volatile struct mlx5_wqe_data_seg (*)[])
@@ -908,6 +924,9 @@ rxq_ctrl_setup(struct rte_eth_dev *dev, struct rxq_ctrl *rxq_ctrl,
 	unsigned int mb_len = rte_pktmbuf_data_room_size(mp);
 	unsigned int cqe_n = desc - 1;
 	struct rte_mbuf *(*elts)[desc] = NULL;
+#ifdef MLX5_VECTORIZED_RX
+	int i;
+#endif
 	int ret = 0;
 
 	(void)conf; /* Thresholds configuration (ignored). */
@@ -987,7 +1006,11 @@ rxq_ctrl_setup(struct rte_eth_dev *dev, struct rxq_ctrl *rxq_ctrl,
 	if (priv->cqe_comp) {
 		attr.cq.comp_mask |= IBV_EXP_CQ_INIT_ATTR_FLAGS;
 		attr.cq.flags |= IBV_EXP_CQ_COMPRESSED_CQE;
+#ifdef MLX5_VECTORIZED_RX
+		cqe_n = desc - 1;
+#else
 		cqe_n = (desc * 2) - 1; /* Double the number of CQEs. */
+#endif
 	}
 	tmpl.cq = ibv_exp_create_cq(priv->ctx, cqe_n, NULL, tmpl.channel, 0,
 				    &attr.cq);
@@ -1117,6 +1140,10 @@ rxq_ctrl_setup(struct rte_eth_dev *dev, struct rxq_ctrl *rxq_ctrl,
 	rte_free(tmpl.rxq.elts);
 	tmpl.rxq.elts = elts;
 	*rxq_ctrl = tmpl;
+#ifdef MLX5_VECTORIZED_RX
+	for (i = 0; i < MLX5_VPMD_DESCS_PER_LOOP; ++i)
+		(*elts)[desc + i] = &rxq_ctrl->rxq.fake_mbuf;
+#endif
 	/* Update doorbell counter. */
 	rxq_ctrl->rxq.rq_ci = desc >> rxq_ctrl->rxq.sges_n;
 	rte_wmb();
@@ -1192,7 +1219,12 @@ mlx5_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 		if (rxq_ctrl->rxq.elts_n != log2above(desc)) {
 			rxq_ctrl = rte_realloc(rxq_ctrl,
 					       sizeof(*rxq_ctrl) +
+#ifdef MLX5_VECTORIZED_RX
+					       (desc + MLX5_VPMD_DESCS_PER_LOOP) *
+					        sizeof(struct rte_mbuf *),
+#else
 					       desc * sizeof(struct rte_mbuf *),
+#endif
 					       RTE_CACHE_LINE_SIZE);
 			if (!rxq_ctrl) {
 				ERROR("%p: unable to reallocate queue index %u",
@@ -1203,7 +1235,12 @@ mlx5_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 		}
 	} else {
 		rxq_ctrl = rte_calloc_socket("RXQ", 1, sizeof(*rxq_ctrl) +
+#ifdef MLX5_VECTORIZED_RX
+					     (desc + MLX5_VPMD_DESCS_PER_LOOP) *
+					     sizeof(struct rte_mbuf *),
+#else
 					     desc * sizeof(struct rte_mbuf *),
+#endif
 					     0, socket);
 		if (rxq_ctrl == NULL) {
 			ERROR("%p: unable to allocate queue index %u",

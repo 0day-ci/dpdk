@@ -89,4 +89,10 @@
 /* Maximum Packet headers size (L2+L3+L4) for TSO. */
 #define MLX5_MAX_TSO_HEADER 128
 
+/* Parameters for Vectorized PMD */
+#undef MLX5_VECTORIZED_RX
+#define MLX5_VPMD_RXQ_RPLNSH_THRESH   32U
+#define MLX5_VPMD_MAX_RX_BURST        MLX5_VPMD_RXQ_RPLNSH_THRESH
+#define MLX5_VPMD_DESCS_PER_LOOP      4
+
 #endif /* RTE_PMD_MLX5_DEFS_H_ */

@@ -119,6 +119,9 @@ struct rxq {
 	volatile uint32_t *rq_db;
 	volatile uint32_t *cq_db;
 	uint16_t rq_ci;
+#ifdef MLX5_VECTORIZED_RX
+	uint16_t rq_pi;
+#endif
 	uint16_t cq_ci;
 	volatile struct mlx5_wqe_data_seg(*wqes)[];
 	volatile struct mlx5_cqe(*cqes)[];
@@ -126,6 +129,10 @@ struct rxq {
 	struct rte_mbuf *(*elts)[];
 	struct rte_mempool *mp;
 	struct mlx5_rxq_stats stats;
+#ifdef MLX5_VECTORIZED_RX
+	uint64_t mbuf_initializer;
+	struct rte_mbuf fake_mbuf;
+#endif
 } __rte_cache_aligned;
 
 /* RX queue control descriptor. */
@@ -328,6 +335,9 @@ uint16_t mlx5_tx_burst(void *, struct rte_mbuf **, uint16_t);
 uint16_t mlx5_tx_burst_mpw(void *, struct rte_mbuf **, uint16_t);
 uint16_t mlx5_tx_burst_mpw_inline(void *, struct rte_mbuf **, uint16_t);
 uint16_t mlx5_tx_burst_empw(void *, struct rte_mbuf **, uint16_t);
+#ifdef MLX5_VECTORIZED_RX
+uint16_t mlx5_rx_burst_vec(void *, struct rte_mbuf **, uint16_t);
+#endif
 uint16_t mlx5_rx_burst(void *, struct rte_mbuf **, uint16_t);
 uint16_t removed_tx_burst(void *, struct rte_mbuf **, uint16_t);
 uint16_t removed_rx_burst(void *, struct rte_mbuf **, uint16_t);
