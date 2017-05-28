@@ -317,11 +317,50 @@ struct rte_crypto_auth_xform {
 	 */
 };
 
+
+/** Symmetric AEAD Algorithms */
+enum rte_crypto_aead_algorithm {
+	RTE_CRYPTO_AEAD_AES_CCM = 1,
+	RTE_CRYPTO_AEAD_AES_GCM,
+	RTE_CRYPTO_AEAD_LIST_END
+};
+
+/** AEAD algorithm name strings */
+extern const char *
+rte_crypto_aead_algorithm_strings[];
+
+/** Symmetric AEAD Operations */
+enum rte_crypto_aead_operation {
+	RTE_CRYPTO_AEAD_OP_ENCRYPT,
+	/**< Encrypt and generate digest */
+	RTE_CRYPTO_AEAD_OP_DECRYPT
+	/**< Verify digest and decrypt */
+};
+
+/** Authentication operation name strings */
+extern const char *
+rte_crypto_aead_operation_strings[];
+
+struct rte_crypto_aead_xform {
+	enum rte_crypto_aead_operation op;
+	/**< AEAD operation type */
+	enum rte_crypto_aead_algorithm algo;
+	/**< AEAD algorithm selection */
+
+	struct {
+		uint8_t *data;  /**< pointer to key data */
+		size_t length;   /**< key length in bytes */
+	} key;
+
+	uint32_t digest_length;
+};
+
 /** Crypto transformation types */
 enum rte_crypto_sym_xform_type {
 	RTE_CRYPTO_SYM_XFORM_NOT_SPECIFIED = 0,	/**< No xform specified */
 	RTE_CRYPTO_SYM_XFORM_AUTH,		/**< Authentication xform */
-	RTE_CRYPTO_SYM_XFORM_CIPHER		/**< Cipher xform  */
+	RTE_CRYPTO_SYM_XFORM_CIPHER,		/**< Cipher xform  */
+	RTE_CRYPTO_SYM_XFORM_AEAD		/**< AEAD xform  */
 };
 
 /**
@@ -344,6 +383,8 @@ struct rte_crypto_sym_xform {
 		/**< Authentication / hash xform */
 		struct rte_crypto_cipher_xform cipher;
 		/**< Cipher xform */
+		struct rte_crypto_aead_xform aead;
+		/**< AEAD xform */
 	};
 	struct {
 		uint16_t offset;
