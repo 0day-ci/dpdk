@@ -95,6 +95,7 @@ uint16_t verbose_level = 0; /**< Silent by default. */
 /* use master core for command line ? */
 uint8_t interactive = 0;
 uint8_t auto_start = 0;
+uint8_t tx_first;
 char cmdline_filename[PATH_MAX] = {0};
 
 /*
@@ -2339,7 +2340,7 @@ main(int argc, char** argv)
 	if (interactive == 1) {
 		if (auto_start) {
 			printf("Start automatic packet forwarding\n");
-			start_packet_forwarding(0);
+			start_packet_forwarding(tx_first);
 		}
 		prompt();
 		pmd_test_exit();
@@ -2350,7 +2351,7 @@ main(int argc, char** argv)
 		int rc;
 
 		printf("No commandline core given, start packet forwarding\n");
-		start_packet_forwarding(0);
+		start_packet_forwarding(tx_first);
 		printf("Press enter to exit\n");
 		rc = read(0, &c, 1);
 		pmd_test_exit();

@@ -188,6 +188,10 @@ The commandline options are:
 
     Start forwarding on initialization.
 
+*   ``--tx-first``
+
+    Start forwarding, after sending a burst of packets first.
+
 *   ``--nb-cores=N``
 
     Set the number of forwarding cores,

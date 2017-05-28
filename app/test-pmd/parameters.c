@@ -89,6 +89,7 @@ usage(char* progname)
 	       "[--cmdline-file=FILENAME] "
 #endif
 	       "[--help|-h] | [--auto-start|-a] | ["
+	       "--tx-first"
 	       "--coremask=COREMASK --portmask=PORTMASK --numa "
 	       "--mbuf-size= | --total-num-mbufs= | "
 	       "--nb-cores= | --nb-ports= | "
@@ -673,6 +674,10 @@ launch_args_parse(int argc, char** argv)
 			if (!strcmp(lgopts[opt_idx].name, "auto-start")) {
 				printf("Auto-start selected\n");
 				auto_start = 1;
+			}
+			if (!strcmp(lgopts[opt_idx].name, "tx-first")) {
+				printf("Start TX first\n");
+				tx_first = 1;
 			}
 			if (!strcmp(lgopts[opt_idx].name,
 				    "eth-peers-configfile")) {
