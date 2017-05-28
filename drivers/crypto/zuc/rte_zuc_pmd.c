@@ -218,7 +218,8 @@ process_zuc_cipher_op(struct rte_crypto_op **ops,
 				(ops[i]->sym->cipher.data.offset >> 3) :
 			rte_pktmbuf_mtod(ops[i]->sym->m_src, uint8_t *) +
 				(ops[i]->sym->cipher.data.offset >> 3);
-		IV[i] = ops[i]->sym->cipher.iv.data;
+		IV[i] = rte_crypto_op_ctod_offset(ops[i], uint8_t *,
+				ops[i]->sym->cipher.iv.offset);
 		num_bytes[i] = ops[i]->sym->cipher.data.length >> 3;
 
 		cipher_keys[i] = session->pKey_cipher;

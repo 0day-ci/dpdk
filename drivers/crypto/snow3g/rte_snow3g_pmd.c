@@ -197,7 +197,8 @@ process_snow3g_cipher_op(struct rte_crypto_op **ops,
 				(ops[i]->sym->cipher.data.offset >> 3) :
 			rte_pktmbuf_mtod(ops[i]->sym->m_src, uint8_t *) +
 				(ops[i]->sym->cipher.data.offset >> 3);
-		IV[i] = ops[i]->sym->cipher.iv.data;
+		IV[i] = rte_crypto_op_ctod_offset(ops[i], uint8_t *,
+				ops[i]->sym->cipher.iv.offset);
 		num_bytes[i] = ops[i]->sym->cipher.data.length >> 3;
 
 		processed_ops++;
@@ -233,7 +234,8 @@ process_snow3g_cipher_op_bit(struct rte_crypto_op *op,
 		return 0;
 	}
 	dst = rte_pktmbuf_mtod(op->sym->m_dst, uint8_t *);
-	IV = op->sym->cipher.iv.data;
+	IV = rte_crypto_op_ctod_offset(op, uint8_t *,
+				op->sym->cipher.iv.offset);
 	length_in_bits = op->sym->cipher.data.length;
 
 	sso_snow3g_f8_1_buffer_bit(&session->pKeySched_cipher, IV,

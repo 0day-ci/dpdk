@@ -106,12 +106,9 @@ cperf_set_ops_cipher(struct rte_crypto_op **ops,
 		sym_op->m_dst = bufs_out[i];
 
 		/* cipher parameters */
-		sym_op->cipher.iv.data = rte_crypto_op_ctod_offset(ops[i],
-							uint8_t *, iv_offset);
-		sym_op->cipher.iv.phys_addr = rte_crypto_op_ctophys_offset(ops[i],
-							iv_offset);
+		sym_op->cipher.iv.offset = iv_offset;
 		sym_op->cipher.iv.length = test_vector->iv.length;
-		memcpy(sym_op->cipher.iv.data,
+		memcpy(rte_crypto_op_ctod_offset(ops[i], uint8_t *, iv_offset),
 				test_vector->iv.data,
 				test_vector->iv.length);
 
@@ -211,12 +208,9 @@ cperf_set_ops_cipher_auth(struct rte_crypto_op **ops,
 		sym_op->m_dst = bufs_out[i];
 
 		/* cipher parameters */
-		sym_op->cipher.iv.data = rte_crypto_op_ctod_offset(ops[i],
-							uint8_t *, iv_offset);
-		sym_op->cipher.iv.phys_addr = rte_crypto_op_ctophys_offset(ops[i],
-							iv_offset);
+		sym_op->cipher.iv.offset = iv_offset;
 		sym_op->cipher.iv.length = test_vector->iv.length;
-		memcpy(sym_op->cipher.iv.data,
+		memcpy(rte_crypto_op_ctod_offset(ops[i], uint8_t *, iv_offset),
 				test_vector->iv.data,
 				test_vector->iv.length);
 
@@ -293,12 +287,9 @@ cperf_set_ops_aead(struct rte_crypto_op **ops,
 		sym_op->m_dst = bufs_out[i];
 
 		/* cipher parameters */
-		sym_op->cipher.iv.data = rte_crypto_op_ctod_offset(ops[i],
-							uint8_t *, iv_offset);
-		sym_op->cipher.iv.phys_addr = rte_crypto_op_ctophys_offset(ops[i],
-							iv_offset);
+		sym_op->cipher.iv.offset = iv_offset;
 		sym_op->cipher.iv.length = test_vector->iv.length;
-		memcpy(sym_op->cipher.iv.data,
+		memcpy(rte_crypto_op_ctod_offset(ops[i], uint8_t *, iv_offset),
 				test_vector->iv.data,
 				test_vector->iv.length);
 

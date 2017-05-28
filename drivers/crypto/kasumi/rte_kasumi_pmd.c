@@ -179,6 +179,7 @@ process_kasumi_cipher_op(struct rte_crypto_op **ops,
 	unsigned i;
 	uint8_t processed_ops = 0;
 	uint8_t *src[num_ops], *dst[num_ops];
+	uint8_t *IV_ptr;
 	uint64_t IV[num_ops];
 	uint32_t num_bytes[num_ops];
 
@@ -197,7 +198,9 @@ process_kasumi_cipher_op(struct rte_crypto_op **ops,
 				(ops[i]->sym->cipher.data.offset >> 3) :
 			rte_pktmbuf_mtod(ops[i]->sym->m_src, uint8_t *) +
 				(ops[i]->sym->cipher.data.offset >> 3);
-		IV[i] = *((uint64_t *)(ops[i]->sym->cipher.iv.data));
+		IV_ptr = rte_crypto_op_ctod_offset(ops[i], uint8_t *,
+				ops[i]->sym->cipher.iv.offset);
+		IV[i] = *((uint64_t *)(IV_ptr));
 		num_bytes[i] = ops[i]->sym->cipher.data.length >> 3;
 
 		processed_ops++;
@@ -216,6 +219,7 @@ process_kasumi_cipher_op_bit(struct rte_crypto_op *op,
 		struct kasumi_session *session)
 {
 	uint8_t *src, *dst;
+	uint8_t *IV_ptr;
 	uint64_t IV;
 	uint32_t length_in_bits, offset_in_bits;
 
@@ -234,7 +238,9 @@ process_kasumi_cipher_op_bit(struct rte_crypto_op *op,
 		return 0;
 	}
 	dst = rte_pktmbuf_mtod(op->sym->m_dst, uint8_t *);
-	IV = *((uint64_t *)(op->sym->cipher.iv.data));
+	IV_ptr = rte_crypto_op_ctod_offset(op, uint8_t *,
+			op->sym->cipher.iv.offset);
+	IV = *((uint64_t *)(IV_ptr));
 	length_in_bits = op->sym->cipher.data.length;
 
 	sso_kasumi_f8_1_buffer_bit(&session->pKeySched_cipher, IV,
