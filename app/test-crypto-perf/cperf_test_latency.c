@@ -66,6 +66,10 @@ struct cperf_latency_ctx {
 	struct cperf_op_result *res;
 };
 
+struct priv_op_data {
+	struct cperf_op_result *result;
+};
+
 #define max(a, b) (a > b ? (uint64_t)a : (uint64_t)b)
 #define min(a, b) (a < b ? (uint64_t)a : (uint64_t)b)
 
@@ -276,8 +280,9 @@ cperf_latency_test_constructor(uint8_t dev_id, uint16_t qp_id,
 	snprintf(pool_name, sizeof(pool_name), "cperf_op_pool_cdev_%d",
 			dev_id);
 
+	uint16_t priv_size = sizeof(struct priv_op_data);
 	ctx->crypto_op_pool = rte_crypto_op_pool_create(pool_name,
-			RTE_CRYPTO_OP_TYPE_SYMMETRIC, options->pool_sz, 0, 0,
+			RTE_CRYPTO_OP_TYPE_SYMMETRIC, options->pool_sz, 0, priv_size,
 			rte_socket_id());
 	if (ctx->crypto_op_pool == NULL)
 		goto err;
@@ -299,7 +304,6 @@ int
 cperf_latency_test_runner(void *arg)
 {
 	struct cperf_latency_ctx *ctx = arg;
-	struct cperf_op_result *pres;
 	uint16_t test_burst_size;
 	uint8_t burst_size_idx = 0;
 
@@ -311,6 +315,7 @@ cperf_latency_test_runner(void *arg)
 	struct rte_crypto_op *ops[ctx->options->max_burst_size];
 	struct rte_crypto_op *ops_processed[ctx->options->max_burst_size];
 	uint64_t i;
+	struct priv_op_data *priv_data;
 
 	uint32_t lcore = rte_lcore_id();
 
@@ -398,7 +403,12 @@ cperf_latency_test_runner(void *arg)
 
 			for (i = 0; i < ops_enqd; i++) {
 				ctx->res[tsc_idx].tsc_start = tsc_start;
-				ops[i]->opaque_data = (void *)&ctx->res[tsc_idx];
+				/*
+				 * Private data structure starts after the end of the
+				 * rte_crypto_sym_op structure.
+				 */
+				priv_data = (struct priv_op_data *) (ops[i]->sym + 1);
+				priv_data->result = (void *)&ctx->res[tsc_idx];
 				tsc_idx++;
 			}
 
@@ -410,10 +420,9 @@ cperf_latency_test_runner(void *arg)
 				 * failures.
 				 */
 				for (i = 0; i < ops_deqd; i++) {
-					pres = (struct cperf_op_result *)
-							(ops_processed[i]->opaque_data);
-					pres->status = ops_processed[i]->status;
-					pres->tsc_end = tsc_end;
+					priv_data = (struct priv_op_data *) (ops[i]->sym + 1);
+					priv_data->result->status = ops_processed[i]->status;
+					priv_data->result->tsc_end = tsc_end;
 
 					rte_crypto_op_free(ops_processed[i]);
 				}
@@ -446,10 +455,9 @@ cperf_latency_test_runner(void *arg)
 
 			if (ops_deqd != 0) {
 				for (i = 0; i < ops_deqd; i++) {
-					pres = (struct cperf_op_result *)
-							(ops_processed[i]->opaque_data);
-					pres->status = ops_processed[i]->status;
-					pres->tsc_end = tsc_end;
+					priv_data = (struct priv_op_data *) (ops[i]->sym + 1);
+					priv_data->result->status = ops_processed[i]->status;
+					priv_data->result->tsc_end = tsc_end;
 
 					rte_crypto_op_free(ops_processed[i]);
 				}
