@@ -89,6 +89,7 @@ usage(char* progname)
 	       "[--cmdline-file=FILENAME] "
 #endif
 	       "[--help|-h] | [--auto-start|-a] | ["
+	       "-T PERIOD: statistics will be shown every PERIOD seconds (only if interactive is disabled)"
 	       "--coremask=COREMASK --portmask=PORTMASK --numa "
 	       "--mbuf-size= | --total-num-mbufs= | "
 	       "--nb-cores= | --nb-ports= | "
@@ -639,7 +640,7 @@ launch_args_parse(int argc, char** argv)
 #else
 #define SHORTOPTS ""
 #endif
-	while ((opt = getopt_long(argc, argvopt, SHORTOPTS "ah",
+	while ((opt = getopt_long(argc, argvopt, SHORTOPTS "ahT:",
 				 lgopts, &opt_idx)) != EOF) {
 		switch (opt) {
 #ifdef RTE_LIBRTE_CMDLINE
@@ -653,6 +654,18 @@ launch_args_parse(int argc, char** argv)
 			auto_start = 1;
 			break;
 
+		case 'T':
+		{
+			char *end = NULL;
+			unsigned int n;
+
+			n = strtoul(optarg, &end, 10);
+			if ((optarg[0] == '\0') || (end == NULL) || (*end != '\0'))
+				break;
+
+			stats_period = n;
+			break;
+		}
 		case 0: /*long options */
 			if (!strcmp(lgopts[opt_idx].name, "help")) {
 				usage(argv[0]);

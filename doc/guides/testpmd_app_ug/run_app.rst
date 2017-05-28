@@ -188,6 +188,11 @@ The commandline options are:
 
     Start forwarding on initialization.
 
+*   ``-T PERIOD``
+
+    Display statistics every PERIOD seconds, if interactive mode is disabled.
+    The default value is 0, which means that the statistics will not be displayed.
+
 *   ``--nb-cores=N``
 
     Set the number of forwarding cores,
