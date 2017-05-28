@@ -43,7 +43,11 @@ static const struct rte_cryptodev_capabilities kasumi_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
-			.iv_size = { 0 },
+			.iv_size = {
+				.min = 8,
+				.max = 8,
+				.increment = 0
+			},
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_KASUMI_F9,
 				.block_size = 8,
@@ -57,11 +61,7 @@ static const struct rte_cryptodev_capabilities kasumi_pmd_capabilities[] = {
 					.max = 4,
 					.increment = 0
 				},
-				.aad_size = {
-					.min = 8,
-					.max = 8,
-					.increment = 0
-				}
+				.aad_size = { 0 }
 			}, }
 		}, }
 	},

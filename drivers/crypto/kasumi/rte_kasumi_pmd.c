@@ -251,6 +251,7 @@ process_kasumi_hash_op(struct rte_crypto_op **ops,
 	unsigned i;
 	uint8_t processed_ops = 0;
 	uint8_t *src, *dst;
+	uint8_t *IV_ptr;
 	uint32_t length_in_bits;
 	uint32_t num_bytes;
 	uint32_t shift_bits;
@@ -258,12 +259,6 @@ process_kasumi_hash_op(struct rte_crypto_op **ops,
 	uint8_t direction;
 
 	for (i = 0; i < num_ops; i++) {
-		if (unlikely(ops[i]->sym->auth.aad.length != KASUMI_IV_LENGTH)) {
-			ops[i]->status = RTE_CRYPTO_OP_STATUS_INVALID_ARGS;
-			KASUMI_LOG_ERR("aad");
-			break;
-		}
-
 		/* Data must be byte aligned */
 		if ((ops[i]->sym->auth.data.offset % BYTE_LEN) != 0) {
 			ops[i]->status = RTE_CRYPTO_OP_STATUS_INVALID_ARGS;
@@ -275,8 +270,9 @@ process_kasumi_hash_op(struct rte_crypto_op **ops,
 
 		src = rte_pktmbuf_mtod(ops[i]->sym->m_src, uint8_t *) +
 				(ops[i]->sym->auth.data.offset >> 3);
-		/* IV from AAD */
-		IV = *((uint64_t *)(ops[i]->sym->auth.aad.data));
+		IV_ptr = rte_crypto_op_ctod_offset(ops[i], uint8_t *,
+				session->iv_offset);
+		IV = *((uint64_t *)(IV_ptr));
 		/* Direction from next bit after end of message */
 		num_bytes = (length_in_bits >> 3) + 1;
 		shift_bits = (BYTE_LEN - 1 - length_in_bits) % BYTE_LEN;

@@ -247,14 +247,9 @@ process_snow3g_hash_op(struct rte_crypto_op **ops,
 	uint8_t processed_ops = 0;
 	uint8_t *src, *dst;
 	uint32_t length_in_bits;
+	uint8_t *IV;
 
 	for (i = 0; i < num_ops; i++) {
-		if (unlikely(ops[i]->sym->auth.aad.length != SNOW3G_IV_LENGTH)) {
-			ops[i]->status = RTE_CRYPTO_OP_STATUS_INVALID_ARGS;
-			SNOW3G_LOG_ERR("aad");
-			break;
-		}
-
 		/* Data must be byte aligned */
 		if ((ops[i]->sym->auth.data.offset % BYTE_LEN) != 0) {
 			ops[i]->status = RTE_CRYPTO_OP_STATUS_INVALID_ARGS;
@@ -266,13 +261,15 @@ process_snow3g_hash_op(struct rte_crypto_op **ops,
 
 		src = rte_pktmbuf_mtod(ops[i]->sym->m_src, uint8_t *) +
 				(ops[i]->sym->auth.data.offset >> 3);
+		IV = rte_crypto_op_ctod_offset(ops[i], uint8_t *,
+				session->iv_offset);
 
 		if (session->auth_op == RTE_CRYPTO_AUTH_OP_VERIFY) {
 			dst = (uint8_t *)rte_pktmbuf_append(ops[i]->sym->m_src,
 					SNOW3G_DIGEST_LENGTH);
 
 			sso_snow3g_f9_1_buffer(&session->pKeySched_hash,
-					ops[i]->sym->auth.aad.data, src,
+					IV, src,
 					length_in_bits,	dst);
 			/* Verify digest. */
 			if (memcmp(dst, ops[i]->sym->auth.digest.data,
@@ -286,7 +283,7 @@ process_snow3g_hash_op(struct rte_crypto_op **ops,
 			dst = ops[i]->sym->auth.digest.data;
 
 			sso_snow3g_f9_1_buffer(&session->pKeySched_hash,
-					ops[i]->sym->auth.aad.data, src,
+					IV, src,
 					length_in_bits, dst);
 		}
 		processed_ops++;
