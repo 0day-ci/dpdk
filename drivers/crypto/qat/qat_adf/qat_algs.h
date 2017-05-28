@@ -128,6 +128,10 @@ struct qat_session {
 	uint32_t *aad_len;
 	struct qat_crypto_instance *inst;
 	uint16_t digest_length;
+	struct {
+		uint16_t offset;
+		uint16_t length;
+	} iv;
 	rte_spinlock_t lock;	/* protects this struct */
 };
 

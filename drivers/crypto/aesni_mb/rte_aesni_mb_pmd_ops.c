@@ -44,6 +44,7 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_MD5_HMAC,
 				.block_size = 64,
@@ -65,6 +66,7 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
 				.block_size = 64,
@@ -86,6 +88,7 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_SHA224_HMAC,
 				.block_size = 64,
@@ -107,6 +110,7 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_SHA256_HMAC,
 				.block_size = 64,
@@ -128,6 +132,7 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_SHA384_HMAC,
 				.block_size = 128,
@@ -149,6 +154,7 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_SHA512_HMAC,
 				.block_size = 128,
@@ -170,6 +176,7 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_AES_XCBC_MAC,
 				.block_size = 16,
@@ -191,6 +198,11 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_CIPHER,
+			.iv_size = {
+				.min = 16,
+				.max = 16,
+				.increment = 0
+			},
 			{.cipher = {
 				.algo = RTE_CRYPTO_CIPHER_AES_CBC,
 				.block_size = 16,
@@ -199,11 +211,6 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 					.max = 32,
 					.increment = 8
 				},
-				.iv_size = {
-					.min = 16,
-					.max = 16,
-					.increment = 0
-				}
 			}, }
 		}, }
 	},
@@ -211,6 +218,11 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_CIPHER,
+			.iv_size = {
+				.min = 16,
+				.max = 16,
+				.increment = 0
+			},
 			{.cipher = {
 				.algo = RTE_CRYPTO_CIPHER_AES_CTR,
 				.block_size = 16,
@@ -219,11 +231,6 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 					.max = 32,
 					.increment = 8
 				},
-				.iv_size = {
-					.min = 16,
-					.max = 16,
-					.increment = 0
-				}
 			}, }
 		}, }
 	},
@@ -231,6 +238,11 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_CIPHER,
+			.iv_size = {
+				.min = 16,
+				.max = 16,
+				.increment = 0
+			},
 			{.cipher = {
 				.algo = RTE_CRYPTO_CIPHER_AES_DOCSISBPI,
 				.block_size = 16,
@@ -239,11 +251,6 @@ static const struct rte_cryptodev_capabilities aesni_mb_pmd_capabilities[] = {
 					.max = 16,
 					.increment = 0
 				},
-				.iv_size = {
-					.min = 16,
-					.max = 16,
-					.increment = 0
-				}
 			}, }
 		}, }
 	},

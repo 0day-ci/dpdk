@@ -168,6 +168,8 @@ struct rte_cryptodev_symmetric_capability {
 	enum rte_crypto_sym_xform_type xform_type;
 	/**< Transform type : Authentication / Cipher */
 	RTE_STD_C11
+	struct rte_crypto_param_range iv_size;
+	/**< Initialisation vector data size range */
 	union {
 		struct {
 			enum rte_crypto_auth_algorithm algo;
@@ -189,8 +191,6 @@ struct rte_cryptodev_symmetric_capability {
 			/**< algorithm block size */
 			struct rte_crypto_param_range key_size;
 			/**< cipher key size range */
-			struct rte_crypto_param_range iv_size;
-			/**< Initialisation vector data size range */
 		} cipher;
 		/**< Symmetric Cipher transform capabilities */
 	};
@@ -237,7 +237,7 @@ rte_cryptodev_sym_capability_get(uint8_t dev_id,
  *
  * @param	capability	Description of the symmetric crypto capability.
  * @param	key_size	Cipher key size.
- * @param	iv_size		Cipher initial vector size.
+ * @param	iv_size		Initial vector size.
  *
  * @return
  *   - Return 0 if the parameters are in range of the capability.
@@ -256,6 +256,7 @@ rte_cryptodev_sym_capability_check_cipher(
  * @param	key_size	Auth key size.
  * @param	digest_size	Auth digest size.
  * @param	aad_size	Auth aad size.
+ * @param	iv_size		Initial vector size.
  *
  * @return
  *   - Return 0 if the parameters are in range of the capability.
@@ -264,7 +265,8 @@ rte_cryptodev_sym_capability_check_cipher(
 int
 rte_cryptodev_sym_capability_check_auth(
 		const struct rte_cryptodev_symmetric_capability *capability,
-		uint16_t key_size, uint16_t digest_size, uint16_t aad_size);
+		uint16_t key_size, uint16_t digest_size, uint16_t aad_size,
+		uint16_t iv_size);
 
 /**
  * Provide the cipher algorithm enum, given an algorithm string

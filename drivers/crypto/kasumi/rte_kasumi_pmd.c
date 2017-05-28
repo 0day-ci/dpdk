@@ -111,6 +111,13 @@ kasumi_set_session_parameters(struct kasumi_session *sess,
 		return -EINVAL;
 	}
 
+	/* Sanity checks. */
+	if (xform->iv.length != KASUMI_IV_LENGTH) {
+		KASUMI_LOG_ERR("Wrong IV length");
+		return -EINVAL;
+	}
+	sess->iv_offset = xform->iv.offset;
+
 	if (cipher_xform) {
 		/* Only KASUMI F8 supported */
 		if (cipher_xform->cipher.algo != RTE_CRYPTO_CIPHER_KASUMI_F8)
@@ -184,13 +191,6 @@ process_kasumi_cipher_op(struct rte_crypto_op **ops,
 	uint32_t num_bytes[num_ops];
 
 	for (i = 0; i < num_ops; i++) {
-		/* Sanity checks. */
-		if (ops[i]->sym->cipher.iv.length != KASUMI_IV_LENGTH) {
-			ops[i]->status = RTE_CRYPTO_OP_STATUS_INVALID_ARGS;
-			KASUMI_LOG_ERR("iv");
-			break;
-		}
-
 		src[i] = rte_pktmbuf_mtod(ops[i]->sym->m_src, uint8_t *) +
 				(ops[i]->sym->cipher.data.offset >> 3);
 		dst[i] = ops[i]->sym->m_dst ?
@@ -199,7 +199,7 @@ process_kasumi_cipher_op(struct rte_crypto_op **ops,
 			rte_pktmbuf_mtod(ops[i]->sym->m_src, uint8_t *) +
 				(ops[i]->sym->cipher.data.offset >> 3);
 		IV_ptr = rte_crypto_op_ctod_offset(ops[i], uint8_t *,
-				ops[i]->sym->cipher.iv.offset);
+				session->iv_offset);
 		IV[i] = *((uint64_t *)(IV_ptr));
 		num_bytes[i] = ops[i]->sym->cipher.data.length >> 3;
 
@@ -223,13 +223,6 @@ process_kasumi_cipher_op_bit(struct rte_crypto_op *op,
 	uint64_t IV;
 	uint32_t length_in_bits, offset_in_bits;
 
-	/* Sanity checks. */
-	if (unlikely(op->sym->cipher.iv.length != KASUMI_IV_LENGTH)) {
-		op->status = RTE_CRYPTO_OP_STATUS_INVALID_ARGS;
-		KASUMI_LOG_ERR("iv");
-		return 0;
-	}
-
 	offset_in_bits = op->sym->cipher.data.offset;
 	src = rte_pktmbuf_mtod(op->sym->m_src, uint8_t *);
 	if (op->sym->m_dst == NULL) {
@@ -239,7 +232,7 @@ process_kasumi_cipher_op_bit(struct rte_crypto_op *op,
 	}
 	dst = rte_pktmbuf_mtod(op->sym->m_dst, uint8_t *);
 	IV_ptr = rte_crypto_op_ctod_offset(op, uint8_t *,
-			op->sym->cipher.iv.offset);
+			session->iv_offset);
 	IV = *((uint64_t *)(IV_ptr));
 	length_in_bits = op->sym->cipher.data.length;
 

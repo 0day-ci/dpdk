@@ -488,9 +488,9 @@ parse_cipher_key_sz(struct cperf_options *opts, const char *arg)
 }
 
 static int
-parse_cipher_iv_sz(struct cperf_options *opts, const char *arg)
+parse_iv_sz(struct cperf_options *opts, const char *arg)
 {
-	return parse_uint16_t(&opts->cipher_iv_sz, arg);
+	return parse_uint16_t(&opts->iv_sz, arg);
 }
 
 static int
@@ -594,7 +594,7 @@ static struct option lgopts[] = {
 	{ CPERF_CIPHER_OP, required_argument, 0, 0 },
 
 	{ CPERF_CIPHER_KEY_SZ, required_argument, 0, 0 },
-	{ CPERF_CIPHER_IV_SZ, required_argument, 0, 0 },
+	{ CPERF_IV_SZ, required_argument, 0, 0 },
 
 	{ CPERF_AUTH_ALGO, required_argument, 0, 0 },
 	{ CPERF_AUTH_OP, required_argument, 0, 0 },
@@ -644,7 +644,7 @@ cperf_options_default(struct cperf_options *opts)
 	opts->cipher_algo = RTE_CRYPTO_CIPHER_AES_CBC;
 	opts->cipher_op = RTE_CRYPTO_CIPHER_OP_ENCRYPT;
 	opts->cipher_key_sz = 16;
-	opts->cipher_iv_sz = 16;
+	opts->iv_sz = 16;
 
 	opts->auth_algo = RTE_CRYPTO_AUTH_SHA1_HMAC;
 	opts->auth_op = RTE_CRYPTO_AUTH_OP_GENERATE;
@@ -674,7 +674,7 @@ cperf_opts_parse_long(int opt_idx, struct cperf_options *opts)
 		{ CPERF_CIPHER_ALGO,	parse_cipher_algo },
 		{ CPERF_CIPHER_OP,	parse_cipher_op },
 		{ CPERF_CIPHER_KEY_SZ,	parse_cipher_key_sz },
-		{ CPERF_CIPHER_IV_SZ,	parse_cipher_iv_sz },
+		{ CPERF_IV_SZ,	parse_iv_sz },
 		{ CPERF_AUTH_ALGO,	parse_auth_algo },
 		{ CPERF_AUTH_OP,	parse_auth_op },
 		{ CPERF_AUTH_KEY_SZ,	parse_auth_key_sz },
@@ -904,6 +904,8 @@ cperf_options_dump(struct cperf_options *opts)
 	printf("# out of place: %s\n", opts->out_of_place ? "yes" : "no");
 
 	printf("#\n");
+	printf("# iv size: %u\n", opts->iv_sz);
+	printf("#\n");
 
 	if (opts->op_type == CPERF_AUTH_ONLY ||
 			opts->op_type == CPERF_CIPHER_THEN_AUTH ||
@@ -928,7 +930,6 @@ cperf_options_dump(struct cperf_options *opts)
 		printf("# cipher operation: %s\n",
 			rte_crypto_cipher_operation_strings[opts->cipher_op]);
 		printf("# cipher key size: %u\n", opts->cipher_key_sz);
-		printf("# cipher iv size: %u\n", opts->cipher_iv_sz);
 		printf("#\n");
 	}
 }

@@ -111,6 +111,13 @@ snow3g_set_session_parameters(struct snow3g_session *sess,
 		return -EINVAL;
 	}
 
+	/* Sanity checks. */
+	if (xform->iv.length != SNOW3G_IV_LENGTH) {
+		SNOW3G_LOG_ERR("Wrong IV length");
+		return -EINVAL;
+	}
+	sess->iv_offset = xform->iv.offset;
+
 	if (cipher_xform) {
 		/* Only SNOW 3G UEA2 supported */
 		if (cipher_xform->cipher.algo != RTE_CRYPTO_CIPHER_SNOW3G_UEA2)
@@ -183,13 +190,6 @@ process_snow3g_cipher_op(struct rte_crypto_op **ops,
 	uint32_t num_bytes[SNOW3G_MAX_BURST];
 
 	for (i = 0; i < num_ops; i++) {
-		/* Sanity checks. */
-		if (unlikely(ops[i]->sym->cipher.iv.length != SNOW3G_IV_LENGTH)) {
-			ops[i]->status = RTE_CRYPTO_OP_STATUS_INVALID_ARGS;
-			SNOW3G_LOG_ERR("iv");
-			break;
-		}
-
 		src[i] = rte_pktmbuf_mtod(ops[i]->sym->m_src, uint8_t *) +
 				(ops[i]->sym->cipher.data.offset >> 3);
 		dst[i] = ops[i]->sym->m_dst ?
@@ -198,7 +198,7 @@ process_snow3g_cipher_op(struct rte_crypto_op **ops,
 			rte_pktmbuf_mtod(ops[i]->sym->m_src, uint8_t *) +
 				(ops[i]->sym->cipher.data.offset >> 3);
 		IV[i] = rte_crypto_op_ctod_offset(ops[i], uint8_t *,
-				ops[i]->sym->cipher.iv.offset);
+				session->iv_offset);
 		num_bytes[i] = ops[i]->sym->cipher.data.length >> 3;
 
 		processed_ops++;
@@ -219,13 +219,6 @@ process_snow3g_cipher_op_bit(struct rte_crypto_op *op,
 	uint8_t *IV;
 	uint32_t length_in_bits, offset_in_bits;
 
-	/* Sanity checks. */
-	if (unlikely(op->sym->cipher.iv.length != SNOW3G_IV_LENGTH)) {
-		op->status = RTE_CRYPTO_OP_STATUS_INVALID_ARGS;
-		SNOW3G_LOG_ERR("iv");
-		return 0;
-	}
-
 	offset_in_bits = op->sym->cipher.data.offset;
 	src = rte_pktmbuf_mtod(op->sym->m_src, uint8_t *);
 	if (op->sym->m_dst == NULL) {
@@ -235,7 +228,7 @@ process_snow3g_cipher_op_bit(struct rte_crypto_op *op,
 	}
 	dst = rte_pktmbuf_mtod(op->sym->m_dst, uint8_t *);
 	IV = rte_crypto_op_ctod_offset(op, uint8_t *,
-				op->sym->cipher.iv.offset);
+				session->iv_offset);
 	length_in_bits = op->sym->cipher.data.length;
 
 	sso_snow3g_f8_1_buffer_bit(&session->pKeySched_cipher, IV,

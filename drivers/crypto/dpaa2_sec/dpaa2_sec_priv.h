@@ -187,6 +187,10 @@ typedef struct dpaa2_sec_session_entry {
 		uint8_t *data;	/**< pointer to key data */
 		size_t length;	/**< key length in bytes */
 	} auth_key;
+	struct {
+		uint16_t length; /**< IV length in bytes */
+		uint16_t offset; /**< IV offset in bytes */
+	} iv;
 	uint16_t digest_length;
 	uint8_t status;
 	union {
@@ -201,6 +205,7 @@ static const struct rte_cryptodev_capabilities dpaa2_sec_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_MD5_HMAC,
 				.block_size = 64,
@@ -222,6 +227,7 @@ static const struct rte_cryptodev_capabilities dpaa2_sec_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_SHA1_HMAC,
 				.block_size = 64,
@@ -243,6 +249,7 @@ static const struct rte_cryptodev_capabilities dpaa2_sec_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_SHA224_HMAC,
 				.block_size = 64,
@@ -264,6 +271,7 @@ static const struct rte_cryptodev_capabilities dpaa2_sec_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_SHA256_HMAC,
 				.block_size = 64,
@@ -285,6 +293,7 @@ static const struct rte_cryptodev_capabilities dpaa2_sec_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_SHA384_HMAC,
 				.block_size = 128,
@@ -306,6 +315,7 @@ static const struct rte_cryptodev_capabilities dpaa2_sec_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
+			.iv_size = { 0 },
 			{.auth = {
 				.algo = RTE_CRYPTO_AUTH_SHA512_HMAC,
 				.block_size = 128,
@@ -327,6 +337,11 @@ static const struct rte_cryptodev_capabilities dpaa2_sec_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_CIPHER,
+			.iv_size = {
+				.min = 16,
+				.max = 16,
+				.increment = 0
+			},
 			{.cipher = {
 				.algo = RTE_CRYPTO_CIPHER_AES_CBC,
 				.block_size = 16,
@@ -334,11 +349,6 @@ static const struct rte_cryptodev_capabilities dpaa2_sec_capabilities[] = {
 					.min = 16,
 					.max = 32,
 					.increment = 8
-				},
-				.iv_size = {
-					.min = 16,
-					.max = 16,
-					.increment = 0
 				}
 			}, }
 		}, }
@@ -347,6 +357,11 @@ static const struct rte_cryptodev_capabilities dpaa2_sec_capabilities[] = {
 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
 		{.sym = {
 			.xform_type = RTE_CRYPTO_SYM_XFORM_CIPHER,
+			.iv_size = {
+				.min = 8,
+				.max = 8,
+				.increment = 0
+			},
 			{.cipher = {
 				.algo = RTE_CRYPTO_CIPHER_3DES_CBC,
 				.block_size = 8,
@@ -354,11 +369,6 @@ static const struct rte_cryptodev_capabilities dpaa2_sec_capabilities[] = {
 					.min = 16,
 					.max = 24,
 					.increment = 8
-				},
-				.iv_size = {
-					.min = 8,
-					.max = 8,
-					.increment = 0
 				}
 			}, }
 		}, }

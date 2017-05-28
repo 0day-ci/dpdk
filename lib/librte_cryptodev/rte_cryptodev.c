@@ -381,7 +381,7 @@ rte_cryptodev_sym_capability_check_cipher(
 	if (param_range_check(key_size, capability->cipher.key_size))
 		return -1;
 
-	if (param_range_check(iv_size, capability->cipher.iv_size))
+	if (param_range_check(iv_size, capability->iv_size))
 		return -1;
 
 	return 0;
@@ -390,7 +390,8 @@ rte_cryptodev_sym_capability_check_cipher(
 int
 rte_cryptodev_sym_capability_check_auth(
 		const struct rte_cryptodev_symmetric_capability *capability,
-		uint16_t key_size, uint16_t digest_size, uint16_t aad_size)
+		uint16_t key_size, uint16_t digest_size, uint16_t aad_size,
+		uint16_t iv_size)
 {
 	if (param_range_check(key_size, capability->auth.key_size))
 		return -1;
@@ -399,6 +400,9 @@ rte_cryptodev_sym_capability_check_auth(
 		return -1;
 
 	if (param_range_check(aad_size, capability->auth.aad_size))
+		return -1;
+
+	if (param_range_check(iv_size, capability->iv_size))
 		return -1;
 
 	return 0;

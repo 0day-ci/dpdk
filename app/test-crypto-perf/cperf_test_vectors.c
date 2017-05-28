@@ -414,16 +414,16 @@ cperf_test_vector_get_dummy(struct cperf_options *options)
 			t_vec->cipher_key.length = options->cipher_key_sz;
 			t_vec->ciphertext.data = ciphertext;
 			t_vec->cipher_key.data = cipher_key;
-			t_vec->iv.data = rte_malloc(NULL, options->cipher_iv_sz,
+			t_vec->iv.data = rte_malloc(NULL, options->iv_sz,
 					16);
 			if (t_vec->iv.data == NULL) {
 				rte_free(t_vec);
 				return NULL;
 			}
-			memcpy(t_vec->iv.data, iv, options->cipher_iv_sz);
+			memcpy(t_vec->iv.data, iv, options->iv_sz);
 		}
 		t_vec->ciphertext.length = options->max_buffer_size;
-		t_vec->iv.length = options->cipher_iv_sz;
+		t_vec->iv.length = options->iv_sz;
 		t_vec->data.cipher_offset = 0;
 		t_vec->data.cipher_length = options->max_buffer_size;
 	}

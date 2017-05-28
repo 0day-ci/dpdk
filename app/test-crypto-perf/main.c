@@ -138,7 +138,8 @@ cperf_verify_devices_capabilities(struct cperf_options *opts,
 					capability,
 					opts->auth_key_sz,
 					opts->auth_digest_sz,
-					opts->auth_aad_sz);
+					opts->auth_aad_sz,
+					opts->iv_sz);
 			if (ret != 0)
 				return ret;
 		}
@@ -159,7 +160,7 @@ cperf_verify_devices_capabilities(struct cperf_options *opts,
 			ret = rte_cryptodev_sym_capability_check_cipher(
 					capability,
 					opts->cipher_key_sz,
-					opts->cipher_iv_sz);
+					opts->iv_sz);
 			if (ret != 0)
 				return ret;
 		}
@@ -187,7 +188,7 @@ cperf_check_test_vector(struct cperf_options *opts,
 				return -1;
 			if (test_vec->iv.data == NULL)
 				return -1;
-			if (test_vec->iv.length != opts->cipher_iv_sz)
+			if (test_vec->iv.length != opts->iv_sz)
 				return -1;
 			if (test_vec->cipher_key.data == NULL)
 				return -1;
@@ -228,7 +229,7 @@ cperf_check_test_vector(struct cperf_options *opts,
 				return -1;
 			if (test_vec->iv.data == NULL)
 				return -1;
-			if (test_vec->iv.length != opts->cipher_iv_sz)
+			if (test_vec->iv.length != opts->iv_sz)
 				return -1;
 			if (test_vec->cipher_key.data == NULL)
 				return -1;

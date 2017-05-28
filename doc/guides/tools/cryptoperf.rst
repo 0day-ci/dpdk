@@ -246,9 +246,9 @@ The following are the appication command-line options:
 
         Set the size of cipher key.
 
-* ``--cipher-iv-sz <n>``
+* ``--iv-sz <n>``
 
-        Set the size of cipher iv.
+        Set the size of iv.
 
 * ``--auth-algo <name>``
 
@@ -375,7 +375,7 @@ on two cores for cipher encryption aes-cbc, ten operations in silent mode::
 
    dpdk-test-crypto-perf -l 4-7 --vdev crypto_aesni_mb_pmd1
    --vdev crypto_aesni_mb_pmd2 -w 0000:00:00.0 -- --devtype crypto_aesni_mb
-   --cipher-algo aes-cbc --cipher-key-sz 16 --cipher-iv-sz 16
+   --cipher-algo aes-cbc --cipher-key-sz 16 --iv-sz 16
    --cipher-op encrypt --optype cipher-only --silent
    --ptest latency --total-ops 10
 
@@ -386,7 +386,7 @@ with packet verification::
 
    dpdk-test-crypto-perf -l 4-7 --vdev crypto_openssl -w 0000:00:00.0 --
    --devtype crypto_openssl --cipher-algo aes-gcm --cipher-key-sz 16
-   --cipher-iv-sz 16 --cipher-op encrypt --auth-algo aes-gcm --auth-key-sz 16
+   --iv-sz 16 --cipher-op encrypt --auth-algo aes-gcm --auth-key-sz 16
    --auth-digest-sz 16 --auth-aad-sz 16 --auth-op generate --optype aead
    --silent --ptest verify --total-ops 10
    --test-file test_aes_gcm.data

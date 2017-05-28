@@ -20,10 +20,11 @@
 #define CPERF_TEST_FILE		("test-file")
 #define CPERF_TEST_NAME		("test-name")
 
+#define CPERF_IV_SZ		("iv-sz")
+
 #define CPERF_CIPHER_ALGO	("cipher-algo")
 #define CPERF_CIPHER_OP		("cipher-op")
 #define CPERF_CIPHER_KEY_SZ	("cipher-key-sz")
-#define CPERF_CIPHER_IV_SZ	("cipher-iv-sz")
 
 #define CPERF_AUTH_ALGO		("auth-algo")
 #define CPERF_AUTH_OP		("auth-op")
@@ -66,11 +67,12 @@ struct cperf_options {
 	uint32_t silent:1;
 	uint32_t csv:1;
 
+	uint16_t iv_sz;
+
 	enum rte_crypto_cipher_algorithm cipher_algo;
 	enum rte_crypto_cipher_operation cipher_op;
 
 	uint16_t cipher_key_sz;
-	uint16_t cipher_iv_sz;
 
 	enum rte_crypto_auth_algorithm auth_algo;
 	enum rte_crypto_auth_operation auth_op;

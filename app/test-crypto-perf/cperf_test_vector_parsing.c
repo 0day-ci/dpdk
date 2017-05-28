@@ -306,12 +306,12 @@ parse_entry(char *entry, struct cperf_test_vector *vector,
 		if (tc_found)
 			vector->iv.length = data_length;
 		else {
-			if (opts->cipher_iv_sz > data_length) {
+			if (opts->iv_sz > data_length) {
 				printf("Global iv shorter than "
-					"cipher_iv_sz\n");
+					"iv_sz\n");
 				return -1;
 			}
-			vector->iv.length = opts->cipher_iv_sz;
+			vector->iv.length = opts->iv_sz;
 		}
 
 	} else if (strstr(key_token, "ciphertext")) {
