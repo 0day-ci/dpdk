@@ -46,6 +46,8 @@
 #include <rte_per_lcore.h>
 #include <rte_config.h>
 
+struct rte_cfgfile; /* forward declaration of struct */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -187,6 +189,10 @@ int rte_eal_iopl_init(void);
  *            readable by the eal.
  */
 int rte_eal_init(int argc, char **argv);
+
+#ifdef RTE_LIBRTE_CFGFILE
+int rte_eal_configure(struct rte_cfgfile *cfg);
+#endif
 
 /**
  * Check if a primary process is currently alive

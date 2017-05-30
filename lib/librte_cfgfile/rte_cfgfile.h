@@ -49,6 +49,8 @@ extern "C" {
 *
 ***/
 
+struct rte_cfgfile; /* forward declaration of struct */
+
 #ifndef CFG_NAME_LEN
 #define CFG_NAME_LEN 64
 #endif

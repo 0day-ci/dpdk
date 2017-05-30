@@ -50,6 +50,10 @@ EXPORT_MAP := rte_eal_version.map
 
 LIBABIVER := 4
 
+ifeq ($(CONFIG_RTE_LIBRTE_CFGFILE),y)
+LDLIBS += -lrte_cfgfile
+endif
+
 # specific to bsdapp exec-env
 SRCS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) := eal.c
 SRCS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) += eal_memory.c

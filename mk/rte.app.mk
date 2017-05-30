@@ -80,7 +80,6 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_POWER)          += -lrte_power
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_TIMER)          += -lrte_timer
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EFD)            += -lrte_efd
-_LDLIBS-$(CONFIG_RTE_LIBRTE_CFGFILE)        += -lrte_cfgfile
 
 _LDLIBS-y += --whole-archive
 
@@ -96,6 +95,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_MEMPOOL)        += -lrte_mempool
 _LDLIBS-$(CONFIG_RTE_DRIVER_MEMPOOL_RING)   += -lrte_mempool_ring
 _LDLIBS-$(CONFIG_RTE_LIBRTE_RING)           += -lrte_ring
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EAL)            += -lrte_eal
+_LDLIBS-$(CONFIG_RTE_LIBRTE_CFGFILE)        += -lrte_cfgfile
 _LDLIBS-$(CONFIG_RTE_LIBRTE_CMDLINE)        += -lrte_cmdline
 _LDLIBS-$(CONFIG_RTE_LIBRTE_REORDER)        += -lrte_reorder
 

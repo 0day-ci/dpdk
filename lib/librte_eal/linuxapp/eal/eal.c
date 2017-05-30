@@ -78,6 +78,7 @@
 #include <rte_version.h>
 #include <rte_atomic.h>
 #include <malloc_heap.h>
+#include <rte_cfgfile.h>
 
 #include "eal_private.h"
 #include "eal_thread.h"
@@ -121,6 +122,12 @@ struct internal_config internal_config;
 
 /* used by rte_rdtsc() */
 int rte_cycles_vmware_tsc_map;
+
+
+static int cfg_argc;
+#ifdef RTE_LIBRTE_CFGFILE
+static char **cfg_argv;
+#endif
 
 /* Return a pointer to the configuration structure */
 struct rte_config *
@@ -745,10 +752,12 @@ static void rte_eal_init_alert(const char *msg)
 	RTE_LOG(ERR, EAL, "%s\n", msg);
 }
 
+
 /* Launch threads, called at application init(). */
 int
 rte_eal_init(int argc, char **argv)
 {
+	int combined_argc; /* combine cfg and param versions */
 	int i, fctret, ret;
 	pthread_t thread_id;
 	static rte_atomic32_t run_once = RTE_ATOMIC32_INIT(0);
@@ -776,8 +785,25 @@ rte_eal_init(int argc, char **argv)
 
 	eal_reset_internal_config(&internal_config);
 
+#ifdef RTE_LIBRTE_CFGFILE
+	combined_argc = argc + cfg_argc;
+	char *combined_argv[combined_argc + 1];
+
+	combined_argv[0] = argv[0];
+	for (i = 0; i < cfg_argc; i++)
+		combined_argv[i + 1] = cfg_argv[i];
+	for (i = 1; i < argc; i++)
+		combined_argv[i + cfg_argc] = argv[i];
+	combined_argv[combined_argc] = NULL;
+#else
+	combined_argc = argc;
+	char **combined_argv;
+
+	combined_argv = argv;
+#endif
+
 	/* set log level as early as possible */
-	eal_log_level_parse(argc, argv);
+	eal_log_level_parse(combined_argc, combined_argv);
 
 	if (rte_eal_cpu_init() < 0) {
 		rte_eal_init_alert("Cannot detect lcores.");
@@ -785,13 +811,17 @@ rte_eal_init(int argc, char **argv)
 		return -1;
 	}
 
-	fctret = eal_parse_args(argc, argv);
+	fctret = eal_parse_args(combined_argc, combined_argv);
 	if (fctret < 0) {
 		rte_eal_init_alert("Invalid 'command line' arguments.");
 		rte_errno = EINVAL;
 		rte_atomic32_clear(&run_once);
 		return -1;
 	}
+	fctret -= cfg_argc;
+
+	if (fctret)
+		argv[fctret] = argv[0];
 
 	if (internal_config.no_hugetlbfs == 0 &&
 			internal_config.process_type != RTE_PROC_SECONDARY &&
@@ -995,3 +1025,77 @@ rte_eal_check_module(const char *module_name)
 	/* Module has been found */
 	return 1;
 }
+
+#ifdef RTE_LIBRTE_CFGFILE
+
+static char *strdup_with_prefix(const char *p)
+{
+	char *np;
+
+	if (strlen(p) > 1) {
+		np = (char *)malloc(strlen(p)+3);
+		if (np)
+			strcpy(np, "--");
+	} else {
+		np = (char *)malloc(strlen(p)+2);
+		if (np)
+			strcpy(np, "-");
+	}
+	return np ? strcat(np, p) : np;
+}
+
+int
+rte_eal_configure(struct rte_cfgfile *cfg)
+{
+	int i, num_entries;
+
+	if (cfg == NULL) {
+		rte_errno = -EINVAL;
+		return -1;
+	}
+
+	if (!rte_cfgfile_has_section(cfg, "DPDK"))
+		return 0;
+
+	num_entries = rte_cfgfile_section_num_entries(cfg, "DPDK");
+	if (num_entries <= 0)
+		return 0;
+
+	cfg_argv = malloc((num_entries * 2 + 1) * sizeof(cfg_argv[0]));
+	if (cfg_argv == NULL) {
+		rte_errno = -ENOMEM;
+		return -1;
+	}
+
+	struct rte_cfgfile_entry cfg_entries[num_entries];
+
+	rte_cfgfile_section_entries(cfg, "DPDK", cfg_entries, num_entries);
+
+	cfg_argc = 0;
+	for (i = 0; i < num_entries; i++) {
+		cfg_argv[cfg_argc] = strdup_with_prefix(cfg_entries[i].name);
+		if (!(cfg_argv[cfg_argc]))
+			goto allocation_error;
+		cfg_argc++;
+		if (strlen(cfg_entries[i].value)) {
+			cfg_argv[cfg_argc] = strdup(cfg_entries[i].value);
+			if (!(cfg_argv[cfg_argc]))
+				goto allocation_error;
+			cfg_argc++;
+		}
+	}
+	/* set last pointer to 0 */
+	cfg_argv[cfg_argc] = 0;
+
+	return cfg_argc;
+
+allocation_error:
+	rte_eal_init_alert("Cannot allocate memory in rte_eal_configure()\n");
+	rte_errno = ENOMEM;
+	for (i = 1; i < cfg_argc; i++) {
+		free(cfg_argv[i]);
+		cfg_argv[i] = 0;
+	}
+	return -1;
+}
+#endif

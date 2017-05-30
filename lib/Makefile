@@ -32,7 +32,11 @@
 include $(RTE_SDK)/mk/rte.vars.mk
 
 DIRS-y += librte_compat
+DIRS-$(CONFIG_RTE_LIBRTE_CFGFILE) += librte_cfgfile
 DIRS-$(CONFIG_RTE_LIBRTE_EAL) += librte_eal
+ifeq ($(CONFIG_RTE_LIBRTE_CFGFILE),y)
+DEPDIRS-librte_eal := librte_cfgfile
+endif
 DIRS-$(CONFIG_RTE_LIBRTE_RING) += librte_ring
 DEPDIRS-librte_ring := librte_eal
 DIRS-$(CONFIG_RTE_LIBRTE_MEMPOOL) += librte_mempool
@@ -41,8 +45,6 @@ DIRS-$(CONFIG_RTE_LIBRTE_MBUF) += librte_mbuf
 DEPDIRS-librte_mbuf := librte_eal librte_mempool
 DIRS-$(CONFIG_RTE_LIBRTE_TIMER) += librte_timer
 DEPDIRS-librte_timer := librte_eal
-DIRS-$(CONFIG_RTE_LIBRTE_CFGFILE) += librte_cfgfile
-DEPDIRS-librte_cfgfile := librte_eal
 DIRS-$(CONFIG_RTE_LIBRTE_CMDLINE) += librte_cmdline
 DEPDIRS-librte_cmdline := librte_eal
 DIRS-$(CONFIG_RTE_LIBRTE_ETHER) += librte_ether
