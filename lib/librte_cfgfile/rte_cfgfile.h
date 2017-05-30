@@ -121,6 +121,56 @@ struct rte_cfgfile *rte_cfgfile_load_with_params(const char *filename,
 	int flags, const struct rte_cfgfile_parameters *params);
 
 /**
+ * Create new empty cfgfile instance.
+ *
+ * @param flags
+ *   CFG_FLAG_GLOBAL_SECTION
+ *   Indicates that the file supports key value entries before the first
+ *   defined section.  These entries can be accessed in the "GLOBAL"
+ *   section.
+ *   CFG_FLAG_EMPTY_VALUES
+ *   Indicates that file supports key value entries where the value can
+ *   be zero length (e.g., "key=").
+ * @return
+ *   Handle to empty cfgfile instance on success, NULL on error
+ */
+struct rte_cfgfile *rte_cfgfile_create(int flags);
+
+/**
+ * Add section in cfgfile instance.
+ *
+ * @param cfgfile
+ *   A pointer to a pointer to the cfgfile structure, this approach enables
+ *   cfgfile object passing to and after required change
+ *   returning from function.
+ * @param sectionname
+ *   Section name which will be add to cfgfile.
+ * @return
+ *   value 0 on success, value different than 0 otherwise
+ */
+int
+rte_cfgfile_add_section(struct rte_cfgfile **cfgfile, const char *sectionname);
+
+/**
+ * Add entry in cfgfile instance.
+ *
+ * @param cfgfile
+ *   A pointer to a pointer to the cfgfile structure, this approach enables
+ *   cfgfile object passing to and after required change
+ *   returning from function.
+ * @param sectionname
+ *   Given section name to add an entry.
+ * @param entryname
+ *   Entry name.
+ * @param entryvalue
+ *   Entry value.
+ * @return
+ *   value 0 on success, value different than 0 otherwise
+ */
+int rte_cfgfile_add_entry(struct rte_cfgfile *cfgfile, const char *sectionname,
+				const char *entryname, const char *entryvalue);
+
+/**
 * Get number of sections in config file
 *
 * @param cfg

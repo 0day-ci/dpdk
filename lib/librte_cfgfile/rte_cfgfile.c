@@ -35,8 +35,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include <rte_common.h>
-#include <rte_string_fns.h>
 
 #include "rte_cfgfile.h"
 
@@ -144,10 +144,6 @@ struct rte_cfgfile *
 rte_cfgfile_load_with_params(const char *filename, int flags,
 			     const struct rte_cfgfile_parameters *params)
 {
-	int allocated_sections = CFG_ALLOC_SECTION_BATCH;
-	int allocated_entries = 0;
-	int curr_section = -1;
-	int curr_entry = -1;
 	char buffer[CFG_NAME_LEN + CFG_VALUE_LEN + 4] = {0};
 	int lineno = 0;
 	struct rte_cfgfile *cfg = NULL;
@@ -159,28 +155,7 @@ rte_cfgfile_load_with_params(const char *filename, int flags,
 	if (f == NULL)
 		return NULL;
 
-	cfg = malloc(sizeof(*cfg) + sizeof(cfg->sections[0]) *
-		allocated_sections);
-	if (cfg == NULL)
-		goto error2;
-
-	memset(cfg->sections, 0, sizeof(cfg->sections[0]) * allocated_sections);
-
-	if (flags & CFG_FLAG_GLOBAL_SECTION) {
-		curr_section = 0;
-		allocated_entries = CFG_ALLOC_ENTRY_BATCH;
-		cfg->sections[curr_section] = malloc(
-			sizeof(*cfg->sections[0]) +
-			sizeof(cfg->sections[0]->entries[0]) *
-			allocated_entries);
-		if (cfg->sections[curr_section] == NULL) {
-			printf("Error - no memory for global section\n");
-			goto error1;
-		}
-
-		snprintf(cfg->sections[curr_section]->name,
-				 sizeof(cfg->sections[0]->name), "GLOBAL");
-	}
+	cfg = rte_cfgfile_create(flags);
 
 	while (fgets(buffer, sizeof(buffer), f) != NULL) {
 		char *pos = NULL;
@@ -191,6 +166,7 @@ rte_cfgfile_load_with_params(const char *filename, int flags,
 					"Check if line too long\n", lineno);
 			goto error1;
 		}
+		/* skip parsing if comment character found */
 		pos = memchr(buffer, params->comment_character, len);
 		if (pos != NULL) {
 			*pos = '\0';
@@ -198,6 +174,7 @@ rte_cfgfile_load_with_params(const char *filename, int flags,
 		}
 
 		len = _strip(buffer, len);
+		/* if not section line go to parse entry line */
 		if (buffer[0] != '[' && memchr(buffer, '=', len) == NULL)
 			continue;
 
@@ -212,121 +189,185 @@ rte_cfgfile_load_with_params(const char *filename, int flags,
 			*end = '\0';
 			_strip(&buffer[1], end - &buffer[1]);
 
-			/* close off old section and add start new one */
-			if (curr_section >= 0)
-				cfg->sections[curr_section]->num_entries =
-					curr_entry + 1;
-			curr_section++;
-
-			/* resize overall struct if we don't have room for more
-			sections */
-			if (curr_section == allocated_sections) {
-				allocated_sections += CFG_ALLOC_SECTION_BATCH;
-				struct rte_cfgfile *n_cfg = realloc(cfg,
-					sizeof(*cfg) + sizeof(cfg->sections[0])
-					* allocated_sections);
-				if (n_cfg == NULL) {
-					curr_section--;
-					printf("Error - no more memory\n");
-					goto error1;
-				}
-				cfg = n_cfg;
-			}
-
-			/* allocate space for new section */
-			allocated_entries = CFG_ALLOC_ENTRY_BATCH;
-			curr_entry = -1;
-			cfg->sections[curr_section] = malloc(
-				sizeof(*cfg->sections[0]) +
-				sizeof(cfg->sections[0]->entries[0]) *
-				allocated_entries);
-			if (cfg->sections[curr_section] == NULL) {
-				printf("Error - no more memory\n");
-				goto error1;
-			}
-
-			snprintf(cfg->sections[curr_section]->name,
-					sizeof(cfg->sections[0]->name),
-					"%s", &buffer[1]);
+			rte_cfgfile_add_section(&cfg, &buffer[1]);
 		} else {
 			/* value line */
-			if (curr_section < 0) {
-				printf("Error line %d - value outside of"
-					"section\n", lineno);
-				goto error1;
-			}
-
-			struct rte_cfgfile_section *sect =
-				cfg->sections[curr_section];
-			int n;
 			char *split[2] = {NULL};
-			n = rte_strsplit(buffer, sizeof(buffer), split, 2, '=');
-			if (flags & CFG_FLAG_EMPTY_VALUES) {
-				if ((n < 1) || (n > 2)) {
-					printf("Error at line %d - cannot split string, n=%d\n",
-					       lineno, n);
-					goto error1;
-				}
-			} else {
-				if (n != 2) {
-					printf("Error at line %d - cannot split string, n=%d\n",
-					       lineno, n);
-					goto error1;
-				}
-			}
 
-			curr_entry++;
-			if (curr_entry == allocated_entries) {
-				allocated_entries += CFG_ALLOC_ENTRY_BATCH;
-				struct rte_cfgfile_section *n_sect = realloc(
-					sect, sizeof(*sect) +
-					sizeof(sect->entries[0]) *
-					allocated_entries);
-				if (n_sect == NULL) {
-					curr_entry--;
-					printf("Error - no more memory\n");
-					goto error1;
-				}
-				sect = cfg->sections[curr_section] = n_sect;
-			}
-
-			sect->entries[curr_entry] = malloc(
-				sizeof(*sect->entries[0]));
-			if (sect->entries[curr_entry] == NULL) {
-				printf("Error - no more memory\n");
+			split[0] = buffer;
+			split[1] = memchr(buffer, '=', len);
+			if ((split[1] == NULL) &&
+					!(flags & CFG_FLAG_EMPTY_VALUES)) {
+				printf("Error at line %d - cannot split "
+					"string\n", lineno);
 				goto error1;
 			}
-
-			struct rte_cfgfile_entry *entry = sect->entries[
-				curr_entry];
-			snprintf(entry->name, sizeof(entry->name), "%s",
-				split[0]);
-			snprintf(entry->value, sizeof(entry->value), "%s",
-				 split[1] ? split[1] : "");
-			_strip(entry->name, strnlen(entry->name,
-				sizeof(entry->name)));
-			_strip(entry->value, strnlen(entry->value,
-				sizeof(entry->value)));
+			if (split[1] != NULL) {
+				*split[1] = '\0';
+				split[1]++;
+			}
+			if (cfg->num_sections == 0)
+				goto error1;
+			rte_cfgfile_add_entry(cfg,
+				cfg->sections[cfg->num_sections - 1]->name,
+					split[0], split[1] ? split[1] : "");
 		}
 	}
 	fclose(f);
-	cfg->flags = flags;
-	cfg->num_sections = curr_section + 1;
-	/* curr_section will still be -1 if we have an empty file */
-	if (curr_section >= 0)
-		cfg->sections[curr_section]->num_entries = curr_entry + 1;
 	return cfg;
-
 error1:
-	cfg->num_sections = curr_section + 1;
-	if (curr_section >= 0)
-		cfg->sections[curr_section]->num_entries = curr_entry + 1;
 	rte_cfgfile_close(cfg);
-error2:
 	fclose(f);
 	return NULL;
 }
 
+struct rte_cfgfile *
+rte_cfgfile_create(int flags)
+{
+	int allocated_sections = CFG_ALLOC_SECTION_BATCH;
+	struct rte_cfgfile *cfg = NULL;
+
+	cfg = malloc(sizeof(*cfg) + sizeof(cfg->sections[0]) *
+			allocated_sections);
+	if (cfg == NULL) {
+		printf("Error - no memory to create cfgfile\n");
+		return NULL;
+	}
+
+	memset(cfg->sections, 0, sizeof(cfg->sections[0]) * allocated_sections);
+
+	cfg->flags = flags;
+	cfg->num_sections = 0;
+
+	if (flags & CFG_FLAG_GLOBAL_SECTION)
+		rte_cfgfile_add_section(&cfg, "GLOBAL");
+	return cfg;
+}
+
+int
+rte_cfgfile_add_section(struct rte_cfgfile **cfgfile, const char *sectionname)
+{
+	struct rte_cfgfile *cfg = *cfgfile;
+	int curr_section = cfg->num_sections - 1;
+	int allocated_sections = 0;
+
+	/* check if given section already exist */
+	if (rte_cfgfile_has_section(cfg, sectionname) != 0) {
+		printf("Given section '%s' already exist\n", sectionname);
+		return 0;
+	}
+	/* calculate allocated sections from number of sections */
+	if ((cfg->num_sections) != 0)
+		allocated_sections = (cfg->num_sections/
+			CFG_ALLOC_SECTION_BATCH + 1) * CFG_ALLOC_SECTION_BATCH;
+
+	curr_section++;
+	/* resize overall struct if we don't have room for more	sections */
+	if (curr_section == allocated_sections) {
+		allocated_sections += CFG_ALLOC_SECTION_BATCH;
+		struct rte_cfgfile *n_cfg = realloc(cfg,
+			sizeof(*cfg) + sizeof(cfg->sections[0])
+			* allocated_sections);
+		if (n_cfg == NULL)
+			return -ENOMEM;
+		*cfgfile = n_cfg;
+		cfg = *cfgfile;
+	}
+	/* allocate space for new section */
+	cfg->sections[curr_section] = malloc(
+		sizeof(*cfg->sections[0]) +
+		sizeof(cfg->sections[0]->entries[0]) *
+		CFG_ALLOC_ENTRY_BATCH);
+
+	if (cfg->sections[curr_section] == NULL)
+		return -ENOMEM;
+
+	snprintf(cfg->sections[curr_section]->name,
+			sizeof(cfg->sections[0]->name), "%s", sectionname);
+
+	cfg->sections[curr_section]->num_entries = 0;
+	cfg->num_sections = curr_section + 1;
+	return 0;
+}
+
+static int
+_get_section_index(struct rte_cfgfile *cfgfile, const char *sectionname) {
+	int i;
+
+	for (i = 0; i < cfgfile->num_sections; i++) {
+		if (strncmp(cfgfile->sections[i]->name, sectionname,
+				sizeof(cfgfile->sections[0]->name)) == 0)
+			return i;
+	}
+	return -1;
+}
+
+static signed int
+_add_entry(struct rte_cfgfile *cfgfile, const signed int curr_section,
+		const char *entryname, const char *entryvalue)
+{
+	int allocated_entries = 0;
+	int curr_entry = cfgfile->sections[curr_section]->num_entries - 1;
+
+	/* calculate allocated entries from number of entries */
+	if ((curr_entry + 1) != 0)
+		allocated_entries = ((curr_entry + 1)/
+			CFG_ALLOC_ENTRY_BATCH + 1) * CFG_ALLOC_ENTRY_BATCH;
+
+	curr_entry++;
+	struct rte_cfgfile_section *sect = cfgfile->sections[curr_section];
+
+	sect->entries[curr_entry] = malloc(sizeof(*sect->entries[0]));
+
+	if (curr_entry == allocated_entries) {
+		allocated_entries += CFG_ALLOC_ENTRY_BATCH;
+		struct rte_cfgfile_section *n_sect = realloc(
+			sect, sizeof(*sect) +
+			sizeof(sect->entries[0]) *
+			allocated_entries);
+		if (n_sect == NULL)
+			return -ENOMEM;
+		sect = cfgfile->sections[curr_section] = n_sect;
+	}
+
+	if (sect->entries[curr_entry] == NULL) {
+		cfgfile->num_sections = curr_section + 1;
+		if (curr_section >= 0) {
+			cfgfile->sections[curr_section]->num_entries =
+								curr_entry + 1;
+			return -ENOMEM;
+		}
+	}
+
+	struct rte_cfgfile_entry *entry = sect->entries[curr_entry];
+
+	snprintf(entry->name, sizeof(entry->name), "%s", entryname);
+	snprintf(entry->value, sizeof(entry->value), "%s", entryvalue);
+	_strip(entry->name, strnlen(entry->name, sizeof(entry->name)));
+	_strip(entry->value, strnlen(entry->value, sizeof(entry->value)));
+
+	cfgfile->sections[curr_section]->num_entries = curr_entry + 1;
+
+	return 0;
+};
+
+int rte_cfgfile_add_entry(struct rte_cfgfile *cfgfile, const char *sectionname,
+		const char *entryname, const char *entryvalue)
+{
+	int curr_section;
+
+	/* check if given entry in specified section already exist */
+	if (rte_cfgfile_has_entry(cfgfile, sectionname, entryname) != 0)
+		return 0;
+
+	/* search for section index by sectionname */
+	curr_section = _get_section_index(cfgfile, sectionname);
+
+	if (curr_section < 0)
+		return -EINVAL;
+
+	return _add_entry(cfgfile, curr_section, entryname, entryvalue);
+}
 
 int rte_cfgfile_close(struct rte_cfgfile *cfg)
 {
