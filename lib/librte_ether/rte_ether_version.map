@@ -161,4 +161,12 @@ DPDK_17.08 {
     global:
 
 	rte_eth_dev_mtr_ops_get;
+	rte_mtr_meter_profile_add;
+	rte_mtr_meter_profile_delete;
+	rte_mtr_create;
+	rte_mtr_destroy;
+	rte_mtr_meter_profile_update;
+	rte_mtr_policer_action_update;
+	rte_mtr_stats_update;
+	rte_mtr_stats_read;
 } DPDK_17.05;
