@@ -77,8 +77,14 @@
 #include <rte_eth_bond.h>
 #endif
 #include <rte_flow.h>
+#include <rte_cfgfile.h>
 
 #include "testpmd.h"
+
+#ifdef RTE_LIBRTE_CFGFILE
+static int cfg_argc;
+static char **cfg_argv;
+#endif
 
 static void
 usage(char* progname)
@@ -549,15 +555,107 @@ parse_event_printing_config(const char *optarg, int enable)
 	return 0;
 }
 
-void
-launch_args_parse(int argc, char** argv)
+#ifdef RTE_LIBRTE_CFGFILE
+
+static void
+free_pointer_array(char **pkt)
 {
+	int i = 0;
+
+	if (pkt) {
+		while (pkt[i]) {
+			free(pkt[i]);
+			pkt[i++] = 0;
+		}
+		free(pkt);
+		pkt = 0;
+	}
+}
+
+static char *strdup_with_prefix(const char *p)
+{
+	char *np;
+
+	if (strlen(p) > 1) {
+		np = (char *)malloc(strlen(p)+3);
+		if (np)
+			strcpy(np, "--");
+	} else {
+		np = (char *)malloc(strlen(p)+2);
+		if (np)
+			strcpy(np, "-");
+	}
+	return np ? strcat(np, p) : np;
+}
+
+#define APP_SECTION "TEST-PMD"
+static int non_eal_configure(struct rte_cfgfile *cfg)
+{
+	int i, num_entries;
+
+	if (cfg == NULL) {
+		rte_errno = -EINVAL;
+		return -1;
+	}
+
+	if (!rte_cfgfile_has_section(cfg, APP_SECTION))
+		return 0;
+
+	num_entries = rte_cfgfile_section_num_entries(cfg, APP_SECTION);
+	if (num_entries <= 0)
+		return 0;
+
+	cfg_argv = malloc((num_entries * 2 + 1) * sizeof(cfg_argv[0]));
+	if (cfg_argv == NULL) {
+		rte_errno = -ENOMEM;
+		return -1;
+	}
+
+	struct rte_cfgfile_entry cfg_entries[num_entries];
+
+	rte_cfgfile_section_entries(cfg, APP_SECTION, cfg_entries, num_entries);
+
+	cfg_argc = 0;
+	for (i = 0; i < num_entries; i++) {
+		cfg_argv[cfg_argc] = strdup_with_prefix(cfg_entries[i].name);
+		if (!(cfg_argv[cfg_argc]))
+			goto allocation_error;
+		cfg_argc++;
+		if (strlen(cfg_entries[i].value)) {
+			cfg_argv[cfg_argc] = strdup(cfg_entries[i].value);
+			if (!(cfg_argv[cfg_argc]))
+				goto allocation_error;
+			cfg_argc++;
+		}
+	}
+	/* set last pointer to 0 */
+	cfg_argv[cfg_argc] = 0;
+
+	return cfg_argc;
+
+allocation_error:
+	printf("Warning: Cannot allocate memory in rte_eal_configure()\n");
+	rte_errno = ENOMEM;
+	for (i = 1; i < cfg_argc; i++) {
+		free(cfg_argv[i]);
+		cfg_argv[i] = 0;
+	}
+	return -1;
+}
+#endif
+
+void
+launch_args_parse(int argc, char **argv, struct rte_cfgfile *cfg)
+{
+	int combined_argc; /* combine cfg and param versions */
+	char **combined_argv;
 	int n, opt;
 	char **argvopt;
 	int opt_idx;
 	enum { TX, RX };
 
 	static struct option lgopts[] = {
+		{ "cfgfile-path",		1, 0, 1 },
 		{ "help",			0, 0, 0 },
 #ifdef RTE_LIBRTE_CMDLINE
 		{ "interactive",		0, 0, 0 },
@@ -632,14 +730,32 @@ launch_args_parse(int argc, char** argv)
 		{ 0, 0, 0, 0 },
 	};
 
-	argvopt = argv;
+#ifdef RTE_LIBRTE_CFGFILE
+	int i;
+
+	non_eal_configure(cfg);
+
+	combined_argc = argc + cfg_argc;
+	combined_argv = malloc((combined_argc + 1) * sizeof(char *));
+	combined_argv[0] = argv[0];
+	for (i = 0; i < cfg_argc; i++)
+		combined_argv[i + 1] = cfg_argv[i];
+	for (i = 1; i < argc; i++)
+		combined_argv[i + cfg_argc] = argv[i];
+	combined_argv[combined_argc] = NULL;
+#else
+	combined_argc = argc;
+	combined_argv = argv;
+#endif
+
+	argvopt = combined_argv;
 
 #ifdef RTE_LIBRTE_CMDLINE
 #define SHORTOPTS "i"
 #else
 #define SHORTOPTS ""
 #endif
-	while ((opt = getopt_long(argc, argvopt, SHORTOPTS "ah",
+	while ((opt = getopt_long(combined_argc, argvopt, SHORTOPTS "ah",
 				 lgopts, &opt_idx)) != EOF) {
 		switch (opt) {
 #ifdef RTE_LIBRTE_CMDLINE
@@ -655,7 +771,7 @@ launch_args_parse(int argc, char** argv)
 
 		case 0: /*long options */
 			if (!strcmp(lgopts[opt_idx].name, "help")) {
-				usage(argv[0]);
+				usage(combined_argv[0]);
 				rte_exit(EXIT_SUCCESS, "Displayed help\n");
 			}
 #ifdef RTE_LIBRTE_CMDLINE
@@ -1094,14 +1210,21 @@ launch_args_parse(int argc, char** argv)
 
 			break;
 		case 'h':
-			usage(argv[0]);
+			usage(combined_argv[0]);
 			rte_exit(EXIT_SUCCESS, "Displayed help\n");
 			break;
+		case 1:
+			/* does nothing*/
+			break;
 		default:
-			usage(argv[0]);
+			usage(combined_argv[0]);
 			rte_exit(EXIT_FAILURE,
 				 "Command line is incomplete or incorrect\n");
 			break;
 		}
 	}
+
+#ifdef RTE_LIBRTE_CFGFILE
+	free_pointer_array(cfg_argv);
+#endif
 }

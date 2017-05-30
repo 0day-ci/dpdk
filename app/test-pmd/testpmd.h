@@ -499,7 +499,7 @@ port_pci_reg_write(struct rte_port *port, uint32_t reg_off, uint32_t reg_v)
 unsigned int parse_item_list(char* str, const char* item_name,
 			unsigned int max_items,
 			unsigned int *parsed_items, int check_unique_values);
-void launch_args_parse(int argc, char** argv);
+void launch_args_parse(int argc, char **argv, struct rte_cfgfile *cfg);
 void cmdline_read_from_file(const char *filename);
 void prompt(void);
 void prompt_exit(void);

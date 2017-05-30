@@ -87,6 +87,7 @@
 #ifdef RTE_LIBRTE_LATENCY_STATS
 #include <rte_latencystats.h>
 #endif
+#include <rte_cfgfile.h>
 
 #include "testpmd.h"
 
@@ -2248,14 +2249,53 @@ signal_handler(int signum)
 	}
 }
 
+
+
+#ifdef RTE_LIBRTE_CFGFILE
+/* Load config file path from command line */
+static char *
+cfgfile_load_path(int argc, char **argv)
+{
+	int i;
+
+	for (i = 0; i < argc; i++) {
+		if (!strcmp("--cfgfile-path", argv[i])) {
+			if (i < argc)
+				return strdup(argv[i+1]);
+		}
+	}
+	return 0;
+}
+#endif
+
 int
 main(int argc, char** argv)
 {
 	int  diag;
 	uint8_t port_id;
+	struct rte_cfgfile *cfg = NULL;
+	char *config_file = NULL;
 
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
+
+#ifdef RTE_LIBRTE_CFGFILE
+	/* load --cfgfile-path argument from argv */
+	config_file = cfgfile_load_path(argc, argv);
+
+	if (config_file) {
+		printf("Info: found cfgfile-path \"%s\"\n", config_file);
+	} else {
+		printf("Info: not found cfgfile-path parameter "
+				"(searching for cfgfile "
+				"in default directory)\n");
+		config_file = strdup("config.ini");
+	}
+	cfg = rte_cfgfile_load(config_file, CFG_FLAG_EMPTY_VALUES);
+	if (cfg == NULL)
+		printf("Info: Valid cfgfile not found\n");
+	rte_eal_configure(cfg);
+#endif
 
 	diag = rte_eal_init(argc, argv);
 	if (diag < 0)
@@ -2289,7 +2329,16 @@ main(int argc, char** argv)
 	argc -= diag;
 	argv += diag;
 	if (argc > 1)
-		launch_args_parse(argc, argv);
+		launch_args_parse(argc, argv, cfg);
+
+
+	rte_cfgfile_close(cfg);
+	cfg = 0;
+
+	if (config_file) {
+		free(config_file);
+		config_file = 0;
+	}
 
 	if (!nb_rxq && !nb_txq)
 		printf("Warning: Either rx or tx queues should be non-zero\n");
