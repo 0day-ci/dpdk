@@ -156,3 +156,9 @@ DPDK_17.05 {
 	rte_eth_xstats_get_names_by_id;
 
 } DPDK_17.02;
+
+DPDK_17.08 {
+    global:
+
+	rte_eth_dev_mtr_ops_get;
+} DPDK_17.05;
