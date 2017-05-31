@@ -365,7 +365,7 @@ timer_del(struct rte_timer *tim, union rte_timer_status prev_status,
 static int
 __rte_timer_reset(struct rte_timer *tim, uint64_t expire,
 		  uint64_t period, unsigned tim_lcore,
-		  rte_timer_cb_t fct, void *arg,
+		  void *fct, void *arg,
 		  int local_is_locked)
 {
 	union rte_timer_status prev_status, status;
@@ -424,9 +424,9 @@ __rte_timer_reset(struct rte_timer *tim, uint64_t expire,
 
 /* Reset and start the timer associated with the timer handle tim */
 int
-rte_timer_reset(struct rte_timer *tim, uint64_t ticks,
+rte_timer_reset_v20(struct rte_timer *tim, uint64_t ticks,
 		enum rte_timer_type type, unsigned tim_lcore,
-		rte_timer_cb_t fct, void *arg)
+		rte_timer_cb_t_v20 fct, void *arg)
 {
 	uint64_t cur_time = rte_get_timer_cycles();
 	uint64_t period;
@@ -443,17 +443,58 @@ rte_timer_reset(struct rte_timer *tim, uint64_t ticks,
 	return __rte_timer_reset(tim,  cur_time + ticks, period, tim_lcore,
 			  fct, arg, 0);
 }
+VERSION_SYMBOL(rte_timer_reset, _v20, 2.0);
 
 /* loop until rte_timer_reset() succeed */
 void
-rte_timer_reset_sync(struct rte_timer *tim, uint64_t ticks,
+rte_timer_reset_sync_v20(struct rte_timer *tim, uint64_t ticks,
 		     enum rte_timer_type type, unsigned tim_lcore,
-		     rte_timer_cb_t fct, void *arg)
+		     rte_timer_cb_t_v20 fct, void *arg)
+{
+	while (rte_timer_reset_v20(tim, ticks, type, tim_lcore,
+			       fct, arg) != 0)
+		rte_pause();
+}
+VERSION_SYMBOL(rte_timer_reset_sync, _v20, 2.0);
+
+/* Reset and start the timer associated with the timer handle tim */
+int
+rte_timer_reset_v1708(struct rte_timer *tim, uint64_t ticks,
+		enum rte_timer_type type, unsigned int tim_lcore,
+		rte_timer_cb_t fct, void *arg)
+{
+	uint64_t cur_time = rte_get_timer_cycles();
+	uint64_t period;
+
+	if (unlikely((tim_lcore != (unsigned int)LCORE_ID_ANY) &&
+			!rte_lcore_is_enabled(tim_lcore)))
+		return -1;
+
+	if (type == PERIODICAL)
+		period = ticks;
+	else
+		period = 0;
+
+	return __rte_timer_reset(tim,  cur_time + ticks, period, tim_lcore,
+			  fct, arg, 0);
+}
+MAP_STATIC_SYMBOL(int rte_timer_reset(struct rte_timer *tim, uint64_t ticks,
+		    enum rte_timer_type type, unsigned int tim_lcore,
+		    rte_timer_cb_t fct, void *arg), rte_timer_reset_v1708);
+
+/* loop until rte_timer_reset() succeed */
+void
+rte_timer_reset_sync_v1708(struct rte_timer *tim, uint64_t ticks,
+		enum rte_timer_type type, unsigned int tim_lcore,
+		rte_timer_cb_t fct, void *arg)
 {
 	while (rte_timer_reset(tim, ticks, type, tim_lcore,
 			       fct, arg) != 0)
 		rte_pause();
 }
+MAP_STATIC_SYMBOL(void rte_timer_reset_sync(struct rte_timer *tim,
+		uint64_t ticks, enum rte_timer_type type, unsigned int tim_lcore,
+		rte_timer_cb_t fct, void *arg), rte_timer_reset_sync_v1708);
 
 /* Stop the timer associated with the timer handle tim */
 int
@@ -505,8 +546,13 @@ rte_timer_pending(struct rte_timer *tim)
 	return tim->status.state == RTE_TIMER_PENDING;
 }
 
+enum timer_version {
+	TIMER_VERSION_20,
+	TIMER_VERSION_1708,
+};
 /* must be called periodically, run all timer that expired */
-void rte_timer_manage(void)
+static void
+__timer_manage(enum timer_version ver)
 {
 	union rte_timer_status status;
 	struct rte_timer *tim, *next_tim;
@@ -590,9 +636,12 @@ void rte_timer_manage(void)
 		priv_timer[lcore_id].running_tim = tim;
 
 		/* execute callback function with list unlocked */
-		if (tim->period == 0)
+		if (ver == TIMER_VERSION_20) {
+			rte_timer_cb_t_v20 f = (void *)tim->f;
+			f(tim, tim->arg);
+		} else if (tim->period == 0) {
 			tim->f(tim, 1, tim->arg);
-		else {
+		} else {
 			/* for periodic check how many expiries we have */
 			uint64_t over_time = cur_time - tim->expire;
 			unsigned int extra_expiries = over_time / tim->period;
@@ -629,6 +678,20 @@ void rte_timer_manage(void)
 	}
 	priv_timer[lcore_id].running_tim = NULL;
 }
+
+void
+rte_timer_manage_v20(void)
+{
+	__timer_manage(TIMER_VERSION_20);
+}
+VERSION_SYMBOL(rte_timer_manage, _v20, 2.0);
+
+void
+rte_timer_manage_v1708(void)
+{
+	__timer_manage(TIMER_VERSION_1708);
+}
+MAP_STATIC_SYMBOL(void rte_timer_manage(void), rte_timer_manage_v1708);
 
 /* dump statistics about timers */
 void rte_timer_dump_stats(FILE *f)

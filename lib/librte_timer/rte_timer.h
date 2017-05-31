@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2017 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -67,6 +67,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <rte_common.h>
+#include <rte_compat.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -224,7 +225,7 @@ void rte_timer_init(struct rte_timer *tim);
 int rte_timer_reset(struct rte_timer *tim, uint64_t ticks,
 		    enum rte_timer_type type, unsigned tim_lcore,
 		    rte_timer_cb_t fct, void *arg);
-
+BIND_DEFAULT_SYMBOL(rte_timer_reset, _v1708, 17.08);
 
 /**
  * Loop until rte_timer_reset() succeeds.
@@ -256,6 +257,7 @@ void
 rte_timer_reset_sync(struct rte_timer *tim, uint64_t ticks,
 		     enum rte_timer_type type, unsigned tim_lcore,
 		     rte_timer_cb_t fct, void *arg);
+BIND_DEFAULT_SYMBOL(rte_timer_reset_sync, _v1708, 17.08);
 
 /**
  * Stop a timer.
@@ -321,7 +323,7 @@ int rte_timer_pending(struct rte_timer *tim);
  * CPU resources it will use.
  */
 void rte_timer_manage(void);
-
+BIND_DEFAULT_SYMBOL(rte_timer_manage, _v1708, 17.08);
 /**
  * Dump statistics about timers.
  *
@@ -329,6 +331,25 @@ void rte_timer_manage(void);
  *   A pointer to a file for output
  */
 void rte_timer_dump_stats(FILE *f);
+
+/* legacy definition for ABI compatibility */
+typedef void (*rte_timer_cb_t_v20)(struct rte_timer *, void *);
+
+/* prototypes for versioned functions for ABI compatibility */
+int rte_timer_reset_v20(struct rte_timer *tim, uint64_t ticks,
+		enum rte_timer_type type, unsigned int tim_lcore,
+		rte_timer_cb_t_v20 fct, void *arg);
+void rte_timer_reset_sync_v20(struct rte_timer *tim, uint64_t ticks,
+		enum rte_timer_type type, unsigned int tim_lcore,
+		rte_timer_cb_t_v20 fct, void *arg);
+int rte_timer_reset_v1708(struct rte_timer *tim, uint64_t ticks,
+		enum rte_timer_type type, unsigned int tim_lcore,
+		rte_timer_cb_t fct, void *arg);
+void rte_timer_reset_sync_v1708(struct rte_timer *tim, uint64_t ticks,
+		enum rte_timer_type type, unsigned int tim_lcore,
+		rte_timer_cb_t fct, void *arg);
+void rte_timer_manage_v20(void);
+void rte_timer_manage_v1708(void);
 
 #ifdef __cplusplus
 }
