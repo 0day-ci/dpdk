@@ -1,7 +1,7 @@
 /*-
  *   BSD LICENSE
  *
- *   Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2010-2017 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -565,6 +565,54 @@ timer_sanity_check(void)
 }
 
 static int
+test_multiple_timeouts(void)
+{
+	struct rte_timer pt; /* a periodic timer */
+	uint64_t hz = rte_get_timer_hz();
+
+	RTE_LOG(INFO, TESTTIMER, "Running multiple-expiry tests\n");
+
+	rte_timer_init(&pt);
+	/* set timer for 1/100th of a second */
+	rte_timer_reset(&pt, hz/100, PERIODICAL, rte_lcore_id(),
+			timer_stress2_cb, NULL);
+	cb_count = 0;
+
+	/* delay for 1/10th second */
+	rte_delay_us(100000);
+	rte_timer_manage();
+	if (cb_count != 10) {
+		RTE_LOG(ERR, TESTTIMER,
+				"Unexpected callback count. Expected 10, got %d\n",
+				cb_count);
+		return -1;
+	}
+
+	/* should be no further expiries just yet */
+	rte_timer_manage();
+	if (cb_count > 10) {
+		RTE_LOG(ERR, TESTTIMER,
+				"Premature callbacks got. Expected only 10, got %d\n",
+				cb_count);
+		return -1;
+	}
+
+	/* delay 2/100ths of a second and check for two more expiries */
+	rte_delay_us(20000);
+	rte_timer_manage();
+	if (cb_count != 12) {
+		RTE_LOG(ERR, TESTTIMER,
+				"Unexpected callback count. Expected 12, got %d\n",
+				cb_count);
+		return -1;
+	}
+
+	RTE_LOG(INFO, TESTTIMER, "Multiple-expiry tests passed\n");
+
+	return 0;
+}
+
+static int
 test_timer(void)
 {
 	unsigned i;
@@ -624,6 +672,10 @@ test_timer(void)
 	for (i=0; i<NB_TIMER; i++) {
 		rte_timer_stop_sync(&mytiminfo[i].tim);
 	}
+
+	/* sanity test for multiple timeouts between timer_manage calls */
+	if (test_multiple_timeouts() < 0)
+		return -1;
 
 	rte_timer_dump_stats(stdout);
 
