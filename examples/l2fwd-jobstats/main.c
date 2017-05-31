@@ -410,7 +410,8 @@ l2fwd_job_update_cb(struct rte_jobstats *job, int64_t result)
 }
 
 static void
-l2fwd_fwd_job(__rte_unused struct rte_timer *timer, void *arg)
+l2fwd_fwd_job(__rte_unused struct rte_timer *timer,
+		__rte_unused unsigned int count, void *arg)
 {
 	struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
 	struct rte_mbuf *m;
@@ -460,7 +461,9 @@ l2fwd_fwd_job(__rte_unused struct rte_timer *timer, void *arg)
 }
 
 static void
-l2fwd_flush_job(__rte_unused struct rte_timer *timer, __rte_unused void *arg)
+l2fwd_flush_job(__rte_unused struct rte_timer *timer,
+		__rte_unused unsigned int count,
+		__rte_unused void *arg)
 {
 	uint64_t now;
 	unsigned lcore_id;

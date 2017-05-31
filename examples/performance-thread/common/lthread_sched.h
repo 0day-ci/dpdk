@@ -149,7 +149,7 @@ _reschedule(void)
 }
 
 extern struct lthread_sched *schedcore[];
-void _sched_timer_cb(struct rte_timer *tim, void *arg);
+void _sched_timer_cb(struct rte_timer *tim, unsigned int count, void *arg);
 void _sched_shutdown(__rte_unused void *arg);
 
 #ifdef __cplusplus

@@ -410,8 +410,9 @@ signal_exit_now(int sigtype)
 
 /*  Freqency scale down timer callback */
 static void
-power_timer_cb(__attribute__((unused)) struct rte_timer *tim,
-			  __attribute__((unused)) void *arg)
+power_timer_cb(__rte_unused struct rte_timer *tim,
+		__rte_unused unsigned int count,
+		__rte_unused void *arg)
 {
 	uint64_t hz;
 	float sleep_time_ratio;
