@@ -51,6 +51,9 @@ rte_bus_register(struct rte_bus *bus)
 	RTE_VERIFY(bus->scan);
 	RTE_VERIFY(bus->probe);
 
+	/* Buses supporting hotplug also require unplug */
+	RTE_VERIFY(!bus->plug || bus->unplug);
+
 	TAILQ_INSERT_TAIL(&rte_bus_list, bus, next);
 	RTE_LOG(DEBUG, EAL, "Registered [%s] bus.\n", bus->name);
 }
