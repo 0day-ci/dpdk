@@ -356,11 +356,18 @@ vdev_plug(struct rte_devargs *da)
 	return rte_vdev_init(da->virt.drv_name, da->args);
 }
 
+static int
+vdev_unplug(struct rte_devargs *da)
+{
+	return rte_vdev_uninit(da->virt.drv_name);
+}
+
 static struct rte_bus rte_vdev_bus = {
 	.scan = vdev_scan,
 	.probe = vdev_probe,
 	.find_device = vdev_find_device,
 	.plug = vdev_plug,
+	.unplug = vdev_unplug,
 };
 
 RTE_INIT(rte_vdev_bus_register);
