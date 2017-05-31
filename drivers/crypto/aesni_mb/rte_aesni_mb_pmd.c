@@ -494,7 +494,7 @@ static inline void
 verify_digest(JOB_AES_HMAC *job, struct rte_crypto_op *op) {
 	struct rte_mbuf *m_dst = (struct rte_mbuf *)job->user_data2;
 
-	RTE_ASSERT(m_dst == NULL);
+	RTE_ASSERT(m_dst != NULL);
 
 	/* Verify digest if required */
 	if (memcmp(job->auth_tag_output, op->sym->auth.digest.data,
@@ -522,7 +522,7 @@ post_process_mb_job(struct aesni_mb_qp *qp, JOB_AES_HMAC *job)
 
 	struct aesni_mb_session *sess;
 
-	RTE_ASSERT(op == NULL);
+	RTE_ASSERT(op != NULL);
 
 	if (unlikely(op->status == RTE_CRYPTO_OP_STATUS_ENQUEUED)) {
 		switch (job->status) {
