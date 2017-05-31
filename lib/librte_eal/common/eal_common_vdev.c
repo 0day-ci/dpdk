@@ -350,10 +350,17 @@ vdev_find_device(rte_dev_match_t match, const void *data)
 	return NULL;
 }
 
+static int
+vdev_plug(struct rte_devargs *da)
+{
+	return rte_vdev_init(da->virt.drv_name, da->args);
+}
+
 static struct rte_bus rte_vdev_bus = {
 	.scan = vdev_scan,
 	.probe = vdev_probe,
 	.find_device = vdev_find_device,
+	.plug = vdev_plug,
 };
 
 RTE_INIT(rte_vdev_bus_register);
