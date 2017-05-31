@@ -145,3 +145,16 @@ rte_bus_dump(FILE *f)
 		}
 	}
 }
+
+struct rte_bus *
+rte_bus_find(rte_bus_match_t match, const void *data)
+{
+	struct rte_bus *bus = NULL;
+
+	TAILQ_FOREACH(bus, &rte_bus_list, next) {
+		if (match(bus, data))
+			break;
+	}
+
+	return bus;
+}
