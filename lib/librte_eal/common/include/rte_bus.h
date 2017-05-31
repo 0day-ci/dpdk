@@ -180,6 +180,11 @@ typedef int (*rte_bus_match_t)(const struct rte_bus *bus, const void *data);
 struct rte_bus *rte_bus_find(rte_bus_match_t match, const void *data);
 
 /**
+ * Find the registered bus for a particular device.
+ */
+struct rte_bus *rte_bus_find_by_device(const struct rte_device *dev);
+
+/**
  * Helper for Bus registration.
  * The constructor has higher priority than PMD constructors.
  */
