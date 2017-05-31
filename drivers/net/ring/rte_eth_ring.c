@@ -515,6 +515,8 @@ rte_pmd_ring_probe(struct rte_vdev_device *dev)
 	RTE_LOG(INFO, PMD, "Initializing pmd_ring for %s\n", name);
 
 	if (params == NULL || params[0] == '\0') {
+		struct rte_eth_dev *eth_dev;
+
 		ret = eth_dev_ring_create(name, rte_socket_id(), DEV_CREATE);
 		if (ret == -1) {
 			RTE_LOG(INFO, PMD,
@@ -522,6 +524,11 @@ rte_pmd_ring_probe(struct rte_vdev_device *dev)
 			ret = eth_dev_ring_create(name, rte_socket_id(),
 						  DEV_ATTACH);
 		}
+		/* find an ethdev entry */
+		eth_dev = rte_eth_dev_allocated(name);
+		if (eth_dev == NULL)
+			return -ENODEV;
+		eth_dev->device = &dev->device;
 	}
 	else {
 		kvlist = rte_kvargs_parse(params, valid_arguments);
