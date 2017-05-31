@@ -87,6 +87,92 @@
 #define IXGBE_PACKET_TYPE_MASK_TUNNEL       0XFF
 #define IXGBE_PACKET_TYPE_TUNNEL_BIT        0X1000
 
+#define IXGBE_PACKET_TYPE_ETHER                        0X00
+#define IXGBE_PACKET_TYPE_IPV4                         0X01
+#define IXGBE_PACKET_TYPE_IPV4_TCP                     0X11
+#define IXGBE_PACKET_TYPE_IPV4_UDP                     0X21
+#define IXGBE_PACKET_TYPE_IPV4_SCTP                    0X41
+#define IXGBE_PACKET_TYPE_IPV4_EXT                     0X03
+#define IXGBE_PACKET_TYPE_IPV4_EXT_TCP                 0X13
+#define IXGBE_PACKET_TYPE_IPV4_EXT_UDP                 0X23
+#define IXGBE_PACKET_TYPE_IPV4_EXT_SCTP                0X43
+#define IXGBE_PACKET_TYPE_IPV6                         0X04
+#define IXGBE_PACKET_TYPE_IPV6_TCP                     0X14
+#define IXGBE_PACKET_TYPE_IPV6_UDP                     0X24
+#define IXGBE_PACKET_TYPE_IPV6_SCTP                    0X44
+#define IXGBE_PACKET_TYPE_IPV6_EXT                     0X0C
+#define IXGBE_PACKET_TYPE_IPV6_EXT_TCP                 0X1C
+#define IXGBE_PACKET_TYPE_IPV6_EXT_UDP                 0X2C
+#define IXGBE_PACKET_TYPE_IPV6_EXT_SCTP                0X4C
+#define IXGBE_PACKET_TYPE_IPV4_IPV6                    0X05
+#define IXGBE_PACKET_TYPE_IPV4_IPV6_TCP                0X15
+#define IXGBE_PACKET_TYPE_IPV4_IPV6_UDP                0X25
+#define IXGBE_PACKET_TYPE_IPV4_IPV6_SCTP               0X45
+#define IXGBE_PACKET_TYPE_IPV4_EXT_IPV6                0X07
+#define IXGBE_PACKET_TYPE_IPV4_EXT_IPV6_TCP            0X17
+#define IXGBE_PACKET_TYPE_IPV4_EXT_IPV6_UDP            0X27
+#define IXGBE_PACKET_TYPE_IPV4_EXT_IPV6_SCTP           0X47
+#define IXGBE_PACKET_TYPE_IPV4_IPV6_EXT                0X0D
+#define IXGBE_PACKET_TYPE_IPV4_IPV6_EXT_TCP            0X1D
+#define IXGBE_PACKET_TYPE_IPV4_IPV6_EXT_UDP            0X2D
+#define IXGBE_PACKET_TYPE_IPV4_IPV6_EXT_SCTP           0X4D
+#define IXGBE_PACKET_TYPE_IPV4_EXT_IPV6_EXT            0X0F
+#define IXGBE_PACKET_TYPE_IPV4_EXT_IPV6_EXT_TCP        0X1F
+#define IXGBE_PACKET_TYPE_IPV4_EXT_IPV6_EXT_UDP        0X2F
+#define IXGBE_PACKET_TYPE_IPV4_EXT_IPV6_EXT_SCTP       0X4F
+
+#define IXGBE_PACKET_TYPE_NVGRE                   0X00
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4              0X01
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_TCP          0X11
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_UDP          0X21
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_SCTP         0X41
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_EXT          0X03
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_EXT_TCP      0X13
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_EXT_UDP      0X23
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_EXT_SCTP     0X43
+#define IXGBE_PACKET_TYPE_NVGRE_IPV6              0X04
+#define IXGBE_PACKET_TYPE_NVGRE_IPV6_TCP          0X14
+#define IXGBE_PACKET_TYPE_NVGRE_IPV6_UDP          0X24
+#define IXGBE_PACKET_TYPE_NVGRE_IPV6_SCTP         0X44
+#define IXGBE_PACKET_TYPE_NVGRE_IPV6_EXT          0X0C
+#define IXGBE_PACKET_TYPE_NVGRE_IPV6_EXT_TCP      0X1C
+#define IXGBE_PACKET_TYPE_NVGRE_IPV6_EXT_UDP      0X2C
+#define IXGBE_PACKET_TYPE_NVGRE_IPV6_EXT_SCTP     0X4C
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_IPV6         0X05
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_IPV6_TCP     0X15
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_IPV6_UDP     0X25
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_IPV6_EXT     0X0D
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_IPV6_EXT_TCP 0X1D
+#define IXGBE_PACKET_TYPE_NVGRE_IPV4_IPV6_EXT_UDP 0X2D
+
+#define IXGBE_PACKET_TYPE_VXLAN                   0X80
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4              0X81
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_TCP          0x91
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_UDP          0xA1
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_SCTP         0xC1
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_EXT          0x83
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_EXT_TCP      0X93
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_EXT_UDP      0XA3
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_EXT_SCTP     0XC3
+#define IXGBE_PACKET_TYPE_VXLAN_IPV6              0X84
+#define IXGBE_PACKET_TYPE_VXLAN_IPV6_TCP          0X94
+#define IXGBE_PACKET_TYPE_VXLAN_IPV6_UDP          0XA4
+#define IXGBE_PACKET_TYPE_VXLAN_IPV6_SCTP         0XC4
+#define IXGBE_PACKET_TYPE_VXLAN_IPV6_EXT          0X8C
+#define IXGBE_PACKET_TYPE_VXLAN_IPV6_EXT_TCP      0X9C
+#define IXGBE_PACKET_TYPE_VXLAN_IPV6_EXT_UDP      0XAC
+#define IXGBE_PACKET_TYPE_VXLAN_IPV6_EXT_SCTP     0XCC
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_IPV6         0X85
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_IPV6_TCP     0X95
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_IPV6_UDP     0XA5
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_IPV6_EXT     0X8D
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_IPV6_EXT_TCP 0X9D
+#define IXGBE_PACKET_TYPE_VXLAN_IPV4_IPV6_EXT_UDP 0XAD
+
+#define IXGBE_PACKET_TYPE_MAX               0X80
+#define IXGBE_PACKET_TYPE_TN_MAX            0X100
+#define IXGBE_PACKET_TYPE_SHIFT             0X04
+
 /**
  * Structure associated with each descriptor of the RX ring of a RX queue.
  */
@@ -301,6 +387,9 @@ void ixgbe_set_tx_function(struct rte_eth_dev *dev, struct ixgbe_tx_queue *txq);
  */
 void ixgbe_set_rx_function(struct rte_eth_dev *dev);
 
+uint32_t ixgbe_rxd_pkt_info_to_pkt_type(uint32_t pkt_info,
+		uint16_t ptype_mask);
+
 uint16_t ixgbe_recv_pkts_vec(void *rx_queue, struct rte_mbuf **rx_pkts,
 		uint16_t nb_pkts);
 uint16_t ixgbe_recv_scattered_pkts_vec(void *rx_queue,
@@ -308,6 +397,9 @@ uint16_t ixgbe_recv_scattered_pkts_vec(void *rx_queue,
 int ixgbe_rx_vec_dev_conf_condition_check(struct rte_eth_dev *dev);
 int ixgbe_rxq_vec_setup(struct ixgbe_rx_queue *rxq);
 void ixgbe_rx_queue_release_mbufs_vec(struct ixgbe_rx_queue *rxq);
+
+extern const uint32_t ptype_table[IXGBE_PACKET_TYPE_MAX];
+extern const uint32_t ptype_table_tn[IXGBE_PACKET_TYPE_TN_MAX];
 
 #ifdef RTE_IXGBE_INC_VECTOR
 
