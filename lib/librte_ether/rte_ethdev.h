@@ -1381,6 +1381,10 @@ typedef int (*eth_l2_tunnel_offload_set_t)
 	 uint8_t en);
 /**< @internal enable/disable the l2 tunnel offload functions */
 
+typedef int (*eth_get_preferred_pool_t)(struct rte_eth_dev *dev,
+						const char *pool);
+/**< @internal Get preferred pool handler for a device */
+
 #ifdef RTE_NIC_BYPASS
 
 enum {
@@ -1573,6 +1577,8 @@ struct eth_dev_ops {
 	/**< Get extended device statistic values by ID. */
 	eth_xstats_get_names_by_id_t xstats_get_names_by_id;
 	/**< Get name of extended device statistics by ID. */
+	eth_get_preferred_pool_t get_preferred_pool;
+	/**< Get preferred pool handler for a device */
 };
 
 /**
@@ -4606,6 +4612,21 @@ rte_eth_dev_get_port_by_name(const char *name, uint8_t *port_id);
 */
 int
 rte_eth_dev_get_name_by_port(uint8_t port_id, char *name);
+
+/**
+ * Get preferred pool handle for a device
+ *
+ * @param port_id
+ *   port identifier of the device
+ * @param [out] pool
+ *   Preferred pool handle for this device.
+ *   Pool len shouldn't more than 256B. Allocated by pmd driver.
+ * @return
+ *   - (0) if successful.
+ *   - (-EINVAL) on failure.
+ */
+int
+rte_eth_dev_get_preferred_pool(uint8_t port_id, const char *pool);
 
 #ifdef __cplusplus
 }

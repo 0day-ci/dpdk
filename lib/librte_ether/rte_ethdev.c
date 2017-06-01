@@ -3472,3 +3472,19 @@ rte_eth_dev_l2_tunnel_offload_set(uint8_t port_id,
 				-ENOTSUP);
 	return (*dev->dev_ops->l2_tunnel_offload_set)(dev, l2_tunnel, mask, en);
 }
+
+int
+rte_eth_dev_get_preferred_pool(uint8_t port_id, const char *pool)
+{
+	struct rte_eth_dev *dev;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+
+	if (*dev->dev_ops->get_preferred_pool == NULL) {
+		pool = RTE_MBUF_DEFAULT_MEMPOOL_OPS;
+		return 0;
+	}
+	return (*dev->dev_ops->get_preferred_pool)(dev, pool);
+}
