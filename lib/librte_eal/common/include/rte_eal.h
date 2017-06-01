@@ -283,6 +283,15 @@ static inline int rte_gettid(void)
 	return RTE_PER_LCORE(_thread_id);
 }
 
+/**
+ * Get mempool name from cmdline.
+ *
+ * @return
+ *   On success, returns the pool name.
+ *   On Failure, returs NULL.
+ */
+char *rte_eal_get_mp_name(void);
+
 #define RTE_INIT(func) \
 static void __attribute__((constructor, used)) func(void)
 

@@ -122,6 +122,15 @@ struct internal_config internal_config;
 /* used by rte_rdtsc() */
 int rte_cycles_vmware_tsc_map;
 
+char *
+rte_eal_get_mp_name(void)
+{
+	if (internal_config.mp_name[0] == 0x0)
+		return NULL;
+	else
+		return internal_config.mp_name;
+}
+
 /* Return a pointer to the configuration structure */
 struct rte_config *
 rte_eal_get_configuration(void)
@@ -478,6 +487,23 @@ eal_parse_vfio_intr(const char *mode)
 	return -1;
 }
 
+static int
+eal_parse_mp_name(const char *name)
+{
+	int len;
+
+	if (name == NULL)
+		return -1;
+
+	len = strlen(name);
+	if (len >= MAX_POOL_NAME_LEN)
+		return -1;
+
+	strcpy(internal_config.mp_name, name);
+
+	return 0;
+}
+
 /* Parse the arguments for --log-level only */
 static void
 eal_log_level_parse(int argc, char **argv)
@@ -609,6 +635,16 @@ eal_parse_args(int argc, char **argv)
 
 		case OPT_CREATE_UIO_DEV_NUM:
 			internal_config.create_uio_dev = 1;
+			break;
+
+		case OPT_PKT_MEMPOOL_NUM:
+			if (eal_parse_mp_name(optarg) < 0) {
+				RTE_LOG(ERR, EAL, "invalid parameters for --"
+						OPT_PKT_MEMPOOL "\n");
+				eal_usage(prgname);
+				ret = -1;
+				goto out;
+			}
 			break;
 
 		default:

@@ -43,6 +43,7 @@
 #include <rte_pci_dev_feature_defs.h>
 
 #define MAX_HUGEPAGE_SIZES 3  /**< support up to 3 page sizes */
+#define MAX_POOL_NAME_LEN 256 /**< Max len of a pool name */
 
 /*
  * internal configuration structure for the number, size and
@@ -84,6 +85,7 @@ struct internal_config {
 	const char *hugepage_dir;         /**< specific hugetlbfs directory to use */
 
 	unsigned num_hugepage_sizes;      /**< how many sizes on this system */
+	char mp_name[MAX_POOL_NAME_LEN];  /**< mempool handle name */
 	struct hugepage_info hugepage_info[MAX_HUGEPAGE_SIZES];
 };
 extern struct internal_config internal_config; /**< Global EAL configuration. */

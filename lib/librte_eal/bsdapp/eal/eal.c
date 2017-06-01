@@ -113,6 +113,15 @@ struct internal_config internal_config;
 /* used by rte_rdtsc() */
 int rte_cycles_vmware_tsc_map;
 
+char *__rte_unused
+rte_eal_get_mp_name(void)
+{
+	if (internal_config.mp_name[0] == 0x0)
+		return NULL;
+	else
+		return internal_config.mp_name;
+}
+
 /* Return a pointer to the configuration structure */
 struct rte_config *
 rte_eal_get_configuration(void)
