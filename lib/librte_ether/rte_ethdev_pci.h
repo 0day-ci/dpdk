@@ -134,6 +134,11 @@ rte_eth_dev_pci_release(struct rte_eth_dev *eth_dev)
 
 	eth_dev->data->dev_private = NULL;
 
+	/* Secondary process will use this field, name, for secondary attach,
+	 * clear this field to avoid attaching any released ports in primary.
+	 */
+	memset(eth_dev->data->name, 0, RTE_ETH_NAME_MAX_LEN);
+
 	eth_dev->device = NULL;
 	eth_dev->intr_handle = NULL;
 }
