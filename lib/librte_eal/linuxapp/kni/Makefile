@@ -43,6 +43,9 @@ MODULE_CFLAGS += -I$(SRCDIR) --param max-inline-insns-single=50
 MODULE_CFLAGS += -I$(RTE_OUTPUT)/include -I$(SRCDIR)/ethtool/ixgbe -I$(SRCDIR)/ethtool/igb
 MODULE_CFLAGS += -include $(RTE_OUTPUT)/include/rte_config.h
 MODULE_CFLAGS += -Wall -Werror
+ifeq ($(shell test $(GCC_VERSION) -ge 70 && echo 1), 1)
+MODULE_CFLAGS += -Wno-format-truncation
+endif
 
 -include /etc/lsb-release
 
