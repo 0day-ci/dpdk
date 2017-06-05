@@ -592,16 +592,18 @@ virtio_read_caps(struct rte_pci_device *dev, struct virtio_hw *hw)
 	}
 
 	ret = rte_pci_read_config(dev, &pos, 1, PCI_CAPABILITY_LIST);
-	if (ret < 0) {
-		PMD_INIT_LOG(DEBUG, "failed to read pci capability list");
+	if (ret != 1) {
+		PMD_INIT_LOG(DEBUG,
+			     "failed to read pci capability list, ret %d", ret);
 		return -1;
 	}
 
 	while (pos) {
 		ret = rte_pci_read_config(dev, &cap, sizeof(cap), pos);
-		if (ret < 0) {
-			PMD_INIT_LOG(ERR,
-				"failed to read pci cap at pos: %x", pos);
+		if (ret != sizeof(cap)) {
+			PMD_INIT_LOG(DEBUG,
+				     "failed to read pci cap at pos: %x ret %d",
+				     pos, ret);
 			break;
 		}
 
