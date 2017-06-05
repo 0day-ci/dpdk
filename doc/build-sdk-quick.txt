@@ -11,6 +11,9 @@ Build commands
 	examples_clean   clean examples for given targets (T=)
 	test             compile tests and run basic unit tests
 	test-*           run specific subset of unit tests
+	tags T=          generate ctags for given targets (T=)
+	gtags T=         generate gtags for given targets (T=)
+	cscope T=        generate cscope database for given targets (T=)
 Build variables
 	EXTRA_CPPFLAGS   preprocessor options
 	EXTRA_CFLAGS     compiler options
