@@ -96,6 +96,22 @@ Known Issues
    Also, make sure to start the actual text at the margin.
    =========================================================
 
+* **On mlx5 PMD, Flow pattern without any specific vlan will match for vlan packets as well.**
+
+  When VLAN spec is not specified in the pattern, the matching rule will be created with VLAN as a wild card.
+  Meaning, the flow rule::
+
+        flow create 0 ingress pattern eth / vlan vid is 3 / ipv4 / end ...
+
+  Will only match vlan packets with vid=3. and the flow rules::
+
+        flow create 0 ingress pattern eth / ipv4 / end ...
+
+  Or::
+
+        flow create 0 ingress pattern eth / vlan / ipv4 / end ...
+
+  Will match any ipv4 packet (VLAN included).
 
 API Changes
 -----------
