@@ -909,7 +909,7 @@ rte_eth_dev_start(uint8_t port_id)
 		RTE_PMD_DEBUG_TRACE("Device with port_id=%" PRIu8
 			" already started\n",
 			port_id);
-		return 0;
+		return -EBUSY;
 	}
 
 	diag = (*dev->dev_ops->dev_start)(dev);
