@@ -31,11 +31,17 @@
 
 #include <rte_malloc.h>
 #include <rte_mbuf.h>
+#include <rte_ethdev.h>
+#include <rte_ip.h>
+#include <rte_tcp.h>
 
 #include "rte_gro.h"
+#include "rte_gro_tcp.h"
 
-static gro_tbl_create_fn tbl_create_functions[GRO_TYPE_MAX_NB];
-static gro_tbl_destroy_fn tbl_destroy_functions[GRO_TYPE_MAX_NB];
+static gro_tbl_create_fn tbl_create_functions[GRO_TYPE_MAX_NB] = {
+	gro_tcp_tbl_create, NULL};
+static gro_tbl_destroy_fn tbl_destroy_functions[GRO_TYPE_MAX_NB] = {
+	gro_tcp_tbl_destroy, NULL};
 
 struct rte_gro_tbl *rte_gro_tbl_create(uint16_t socket_id,
 		uint16_t max_flow_num,
@@ -93,33 +99,145 @@ void rte_gro_tbl_destroy(struct rte_gro_tbl *gro_tbl)
 }
 
 uint16_t
-rte_gro_reassemble_burst(struct rte_mbuf **pkts __rte_unused,
+rte_gro_reassemble_burst(struct rte_mbuf **pkts,
 		const uint16_t nb_pkts,
-		const struct rte_gro_param param __rte_unused)
+		const struct rte_gro_param param)
 {
-	return nb_pkts;
+	struct ether_hdr *eth_hdr;
+	struct ipv4_hdr *ipv4_hdr;
+	uint16_t l3proc_type, i;
+	uint16_t nb_after_gro = nb_pkts;
+	const uint64_t item_num = nb_pkts >
+		param.max_flow_num * param.max_item_per_flow ?
+		param.max_flow_num * param.max_item_per_flow :
+		nb_pkts;
+	const uint32_t flow_num = nb_pkts > param.max_flow_num ?
+		param.max_flow_num : nb_pkts;
+
+	/* allocate respective GRO tables for all supported GRO types */
+	struct gro_tcp_tbl tcp_tbl;
+	struct gro_tcp_flow tcp_flows[flow_num];
+	struct gro_tcp_item tcp_items[item_num];
+	struct gro_tcp_rule tcp_rule;
+
+	struct rte_mbuf *unprocess_pkts[nb_pkts];
+	uint16_t unprocess_num = 0;
+	int32_t ret;
+
+	if (unlikely(nb_pkts <= 1))
+		return nb_pkts;
+
+	memset(tcp_flows, 0, sizeof(struct gro_tcp_flow) *
+			flow_num);
+	memset(tcp_items, 0, sizeof(struct gro_tcp_item) *
+			item_num);
+	tcp_tbl.flows = tcp_flows;
+	tcp_tbl.items = tcp_items;
+	tcp_tbl.flow_num = 0;
+	tcp_tbl.item_num = 0;
+	tcp_tbl.max_flow_num = flow_num;
+	tcp_tbl.max_item_num = item_num;
+	tcp_rule.max_packet_size = param.max_packet_size;
+
+	for (i = 0; i < nb_pkts; i++) {
+		eth_hdr = rte_pktmbuf_mtod(pkts[i], struct ether_hdr *);
+		l3proc_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+		if (l3proc_type == ETHER_TYPE_IPv4) {
+			ipv4_hdr = (struct ipv4_hdr *)(eth_hdr + 1);
+			if (ipv4_hdr->next_proto_id == IPPROTO_TCP &&
+					(param.desired_gro_types &
+					 GRO_TCP_IPV4)) {
+				ret = gro_tcp4_reassemble(pkts[i],
+						&tcp_tbl,
+						&tcp_rule);
+				if (ret > 0)
+					nb_after_gro--;
+				else if (ret < 0)
+					unprocess_pkts[unprocess_num++] =
+						pkts[i];
+			} else
+				unprocess_pkts[unprocess_num++] =
+					pkts[i];
+		} else
+			unprocess_pkts[unprocess_num++] =
+				pkts[i];
+	}
+
+	if (nb_after_gro < nb_pkts) {
+		/* update packets headers and re-arrange GROed packets */
+		if (param.desired_gro_types & GRO_TCP_IPV4) {
+			gro_tcp4_tbl_cksum_update(&tcp_tbl);
+			for (i = 0; i < tcp_tbl.item_num; i++)
+				pkts[i] = tcp_tbl.items[i].pkt;
+		}
+		if (unprocess_num > 0) {
+			memcpy(&pkts[i], unprocess_pkts,
+					sizeof(struct rte_mbuf *) *
+					unprocess_num);
+			i += unprocess_num;
+		}
+		if (nb_pkts > i)
+			memset(&pkts[i], 0,
+					sizeof(struct rte_mbuf *) *
+					(nb_pkts - i));
+	}
+	return nb_after_gro;
 }
 
-int rte_gro_reassemble(struct rte_mbuf *pkt __rte_unused,
-		struct rte_gro_tbl *gro_tbl __rte_unused)
+int rte_gro_reassemble(struct rte_mbuf *pkt,
+		struct rte_gro_tbl *gro_tbl)
 {
+	struct ether_hdr *eth_hdr;
+	struct ipv4_hdr *ipv4_hdr;
+	uint16_t l3proc_type;
+	struct gro_tcp_rule tcp_rule;
+
+	if (pkt == NULL)
+		return -1;
+	tcp_rule.max_packet_size = gro_tbl->max_packet_size;
+	eth_hdr = rte_pktmbuf_mtod(pkt, struct ether_hdr *);
+	l3proc_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+	if (l3proc_type == ETHER_TYPE_IPv4) {
+		ipv4_hdr = (struct ipv4_hdr *)(eth_hdr + 1);
+		if (ipv4_hdr->next_proto_id == IPPROTO_TCP &&
+				(gro_tbl->desired_gro_types & GRO_TCP_IPV4)) {
+			return gro_tcp4_reassemble(pkt,
+					gro_tbl->tbls[GRO_TCP_IPV4_INDEX],
+					&tcp_rule);
+		}
+	}
 	return -1;
 }
 
-uint16_t rte_gro_flush(struct rte_gro_tbl *gro_tbl __rte_unused,
-		uint64_t desired_gro_types __rte_unused,
-		uint16_t flush_num __rte_unused,
-		struct rte_mbuf **out __rte_unused,
-		const uint16_t max_nb_out __rte_unused)
+uint16_t rte_gro_flush(struct rte_gro_tbl *gro_tbl,
+		uint64_t desired_gro_types,
+		uint16_t flush_num,
+		struct rte_mbuf **out,
+		const uint16_t max_nb_out)
 {
+	desired_gro_types = desired_gro_types &
+		gro_tbl->desired_gro_types;
+	if (desired_gro_types & GRO_TCP_IPV4)
+		return gro_tcp_tbl_flush(
+				gro_tbl->tbls[GRO_TCP_IPV4_INDEX],
+				flush_num,
+				out,
+				max_nb_out);
 	return 0;
 }
 
 uint16_t
-rte_gro_timeout_flush(struct rte_gro_tbl *gro_tbl __rte_unused,
-		uint64_t desired_gro_types __rte_unused,
-		struct rte_mbuf **out __rte_unused,
-		const uint16_t max_nb_out __rte_unused)
+rte_gro_timeout_flush(struct rte_gro_tbl *gro_tbl,
+		uint64_t desired_gro_types,
+		struct rte_mbuf **out,
+		const uint16_t max_nb_out)
 {
+	desired_gro_types = desired_gro_types &
+		gro_tbl->desired_gro_types;
+	if (desired_gro_types & GRO_TCP_IPV4)
+		return gro_tcp_tbl_timeout_flush(
+				gro_tbl->tbls[GRO_TCP_IPV4_INDEX],
+				gro_tbl->max_timeout_cycles,
+				out, max_nb_out);
 	return 0;
 }

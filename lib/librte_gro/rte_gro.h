@@ -34,7 +34,11 @@
 
 /* maximum number of supported GRO types */
 #define GRO_TYPE_MAX_NB 64
-#define GRO_TYPE_SUPPORT_NB 0	/**< current supported GRO num */
+#define GRO_TYPE_SUPPORT_NB 1	/**< supported GRO types number */
+
+/* TCP/IPv4 GRO flag */
+#define GRO_TCP_IPV4_INDEX 0
+#define GRO_TCP_IPV4 (1ULL << GRO_TCP_IPV4_INDEX)
 
 /**
  * GRO table structure. DPDK GRO uses GRO table to reassemble
@@ -138,9 +142,9 @@ void rte_gro_tbl_destroy(struct rte_gro_tbl *gro_tbl);
  * @return
  *  the number of packets after GROed.
  */
-uint16_t rte_gro_reassemble_burst(struct rte_mbuf **pkts __rte_unused,
-		const uint16_t nb_pkts __rte_unused,
-		const struct rte_gro_param param __rte_unused);
+uint16_t rte_gro_reassemble_burst(struct rte_mbuf **pkts,
+		const uint16_t nb_pkts,
+		const struct rte_gro_param param);
 
 /**
  * This is the main reassembly API used in heavyweight mode, which
@@ -163,8 +167,8 @@ uint16_t rte_gro_reassemble_burst(struct rte_mbuf **pkts __rte_unused,
  *  if merge the packet successfully, return a positive value. If fail
  *  to merge, return zero. If errors happen, return a negative value.
  */
-int rte_gro_reassemble(struct rte_mbuf *pkt __rte_unused,
-		struct rte_gro_tbl *gro_tbl __rte_unused);
+int rte_gro_reassemble(struct rte_mbuf *pkt,
+		struct rte_gro_tbl *gro_tbl);
 
 /**
  * This function flushed packets of desired GRO types from their
@@ -183,11 +187,11 @@ int rte_gro_reassemble(struct rte_mbuf *pkt __rte_unused,
  * @return
  *  the number of flushed packets. If no packets are flushed, return 0.
  */
-uint16_t rte_gro_flush(struct rte_gro_tbl *gro_tbl __rte_unused,
-		uint64_t desired_gro_types __rte_unused,
-		uint16_t flush_num __rte_unused,
-		struct rte_mbuf **out __rte_unused,
-		const uint16_t max_nb_out __rte_unused);
+uint16_t rte_gro_flush(struct rte_gro_tbl *gro_tbl,
+		uint64_t desired_gro_types,
+		uint16_t flush_num,
+		struct rte_mbuf **out,
+		const uint16_t max_nb_out);
 
 /**
  * This function flushes the timeout packets from reassembly tables of
@@ -205,8 +209,8 @@ uint16_t rte_gro_flush(struct rte_gro_tbl *gro_tbl __rte_unused,
  * @return
  *  the number of flushed packets. If no packets are flushed, return 0.
  */
-uint16_t rte_gro_timeout_flush(struct rte_gro_tbl *gro_tbl __rte_unused,
-		uint64_t desired_gro_types __rte_unused,
-		struct rte_mbuf **out __rte_unused,
-		const uint16_t max_nb_out __rte_unused);
+uint16_t rte_gro_timeout_flush(struct rte_gro_tbl *gro_tbl,
+		uint64_t desired_gro_types,
+		struct rte_mbuf **out,
+		const uint16_t max_nb_out);
 #endif
