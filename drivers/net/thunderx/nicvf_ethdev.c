@@ -2079,7 +2079,7 @@ nicvf_eth_dev_init(struct rte_eth_dev *eth_dev)
 			goto fail;
 		}
 
-		/* Detach port by returning postive error number */
+		/* Detach port by returning positive error number */
 		return ENOTSUP;
 	}
 

@@ -1411,7 +1411,7 @@ qede_xmit_prep_pkts(__rte_unused void *p_txq, struct rte_mbuf **tx_pkts,
 			break;
 		}
 #endif
-		/* TBD: pseudo csum calcuation required iff
+		/* TBD: pseudo csum calcuation required if
 		 * ETH_TX_DATA_2ND_BD_L4_PSEUDO_CSUM_MODE not set?
 		 */
 		ret = rte_net_intel_cksum_prepare(m);
@@ -1600,7 +1600,7 @@ qede_xmit_pkts(void *p_txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 					    (hdr_size +
 					    rte_mbuf_data_dma_addr(mbuf)),
 					    mbuf->data_len - hdr_size);
-			/* TBD: check pseudo csum iff tx_prepare not called? */
+			/* TBD: check pseudo csum if tx_prepare not called? */
 			if (ipv6_ext_flg) {
 				bd2->data.bitfields1 |=
 				ETH_L4_PSEUDO_CSUM_ZERO_LENGTH <<
@@ -1711,7 +1711,7 @@ int qede_dev_start(struct rte_eth_dev *eth_dev)
 	}
 
 	/* Newer SR-IOV PF driver expects RX/TX queues to be started before
-	 * enabling RSS. Hence RSS configuration is deferred upto this point.
+	 * enabling RSS. Hence RSS configuration is deferred up to this point.
 	 * Also, we would like to retain similar behavior in PF case, so we
 	 * don't do PF/VF specific check here.
 	 */
