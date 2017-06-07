@@ -47,6 +47,10 @@ ifneq ($(MAKECMDGOALS),pre_install)
 include $(RTE_SDK)/mk/rte.vars.mk
 endif
 
+ifndef T
+T := $(RTE_TEMPLATE)
+endif
+
 ifdef T # defaults with T= will install an almost flat staging tree
 export prefix ?=
 kerneldir   ?= $(prefix)/kmod
