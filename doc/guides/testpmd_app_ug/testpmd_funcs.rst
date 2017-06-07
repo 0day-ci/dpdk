@@ -2513,6 +2513,8 @@ This section lists supported pattern items and their attributes, if any.
 
 - ``invert``: perform actions when pattern does not match.
 
+- ``fuzzy``: this is a fuzzy match..
+
 - ``any``: match any protocol for the current layer.
 
   - ``num {unsigned}``: number of layers covered.

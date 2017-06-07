@@ -925,6 +925,7 @@ static const struct {
 	MK_FLOW_ITEM(END, 0),
 	MK_FLOW_ITEM(VOID, 0),
 	MK_FLOW_ITEM(INVERT, 0),
+	MK_FLOW_ITEM(FUZZY, sizeof(struct rte_flow_item_fuzzy)),
 	MK_FLOW_ITEM(ANY, sizeof(struct rte_flow_item_any)),
 	MK_FLOW_ITEM(PF, 0),
 	MK_FLOW_ITEM(VF, sizeof(struct rte_flow_item_vf)),
