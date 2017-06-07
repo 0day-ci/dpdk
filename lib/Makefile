@@ -106,6 +106,7 @@ DIRS-$(CONFIG_RTE_LIBRTE_REORDER) += librte_reorder
 DEPDIRS-librte_reorder := librte_eal librte_mempool librte_mbuf
 DIRS-$(CONFIG_RTE_LIBRTE_PDUMP) += librte_pdump
 DEPDIRS-librte_pdump := librte_eal librte_mempool librte_mbuf librte_ether
+DIRS-$(CONFIG_RTE_LIBRTE_GRO) += librte_gro
 
 ifeq ($(CONFIG_RTE_EXEC_ENV_LINUXAPP),y)
 DIRS-$(CONFIG_RTE_LIBRTE_KNI) += librte_kni
