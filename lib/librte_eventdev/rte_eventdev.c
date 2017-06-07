@@ -1023,7 +1023,7 @@ rte_event_dev_start(uint8_t dev_id)
 	if (dev->data->dev_started != 0) {
 		RTE_EDEV_LOG_ERR("Device with dev_id=%" PRIu8 "already started",
 			dev_id);
-		return 0;
+		return -EBUSY;
 	}
 
 	diag = (*dev->dev_ops->dev_start)(dev);

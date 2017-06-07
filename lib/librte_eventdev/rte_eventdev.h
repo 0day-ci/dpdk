@@ -759,6 +759,7 @@ rte_event_port_count(uint8_t dev_id);
  *   - 0: Success, device started.
  *   - -ESTALE : Not all ports of the device are configured
  *   - -ENOLINK: Not all queues are linked, which could lead to deadlock.
+ *   - -EBUSY  : Device has already been started.
  */
 int
 rte_event_dev_start(uint8_t dev_id);
