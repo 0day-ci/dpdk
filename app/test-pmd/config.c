@@ -68,6 +68,7 @@
 #ifdef RTE_LIBRTE_IXGBE_PMD
 #include <rte_pmd_ixgbe.h>
 #endif
+#include <rte_gro.h>
 
 #include "testpmd.h"
 
@@ -2391,6 +2392,34 @@ set_tx_pkt_segments(unsigned *seg_lengths, unsigned nb_segs)
 
 	tx_pkt_length  = tx_pkt_len;
 	tx_pkt_nb_segs = (uint8_t) nb_segs;
+}
+
+void
+setup_gro(const char *mode, uint8_t port_id)
+{
+	if (!rte_eth_dev_is_valid_port(port_id)) {
+		printf("invalid port id %u\n", port_id);
+		return;
+	}
+	if (strcmp(mode, "on") == 0) {
+		if (test_done == 0) {
+			printf("before enable GRO,"
+					" please stop forwarding first\n");
+			return;
+		}
+		gro_ports[port_id].enable = 1;
+		gro_ports[port_id].param.max_flow_num = 4;
+		gro_ports[port_id].param.max_item_per_flow = 32;
+		gro_ports[port_id].param.desired_gro_types = GRO_TCP_IPV4;
+		gro_ports[port_id].param.max_packet_size = UINT16_MAX;
+	} else if (strcmp(mode, "off") == 0) {
+		if (test_done == 0) {
+			printf("before disable GRO,"
+					" please stop forwarding first\n");
+			return;
+		}
+		gro_ports[port_id].enable = 0;
+	}
 }
 
 char*

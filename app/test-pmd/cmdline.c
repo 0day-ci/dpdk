@@ -76,6 +76,7 @@
 #include <rte_devargs.h>
 #include <rte_eth_ctrl.h>
 #include <rte_flow.h>
+#include <rte_gro.h>
 
 #include <cmdline_rdline.h>
 #include <cmdline_parse.h>
@@ -419,6 +420,9 @@ static void cmd_help_long_parsed(void *parsed_result,
 
 			"tso show (portid)"
 			"    Display the status of TCP Segmentation Offload.\n\n"
+
+			"gro (on|off) (port_id)"
+			"    Enable or disable Generic Receive Offload.\n\n"
 
 			"set fwd (%s)\n"
 			"    Set packet forwarding mode.\n\n"
@@ -3821,6 +3825,46 @@ cmdline_parse_inst_t cmd_tunnel_tso_show = {
 		(void *)&cmd_tunnel_tso_set_tso,
 		(void *)&cmd_tunnel_tso_show_mode,
 		(void *)&cmd_tunnel_tso_set_portid,
+		NULL,
+	},
+};
+
+/* *** SET GRO FOR A PORT *** */
+struct cmd_gro_result {
+	cmdline_fixed_string_t cmd_keyword;
+	cmdline_fixed_string_t mode;
+	uint8_t port_id;
+};
+
+static void
+cmd_set_gro_parsed(void *parsed_result,
+		__attribute__((unused)) struct cmdline *cl,
+		__attribute__((unused)) void *data)
+{
+	struct cmd_gro_result *res;
+
+	res = parsed_result;
+	setup_gro(res->mode, res->port_id);
+}
+
+cmdline_parse_token_string_t cmd_gro_keyword =
+	TOKEN_STRING_INITIALIZER(struct cmd_gro_result,
+			cmd_keyword, "gro");
+cmdline_parse_token_string_t cmd_gro_mode =
+	TOKEN_STRING_INITIALIZER(struct cmd_gro_result,
+			mode, "on#off");
+cmdline_parse_token_num_t cmd_gro_pid =
+	TOKEN_NUM_INITIALIZER(struct cmd_gro_result,
+			port_id, UINT8);
+
+cmdline_parse_inst_t cmd_set_gro = {
+	.f = cmd_set_gro_parsed,
+	.data = NULL,
+	.help_str = "gro (on|off) (port_id)",
+	.tokens = {
+		(void *)&cmd_gro_keyword,
+		(void *)&cmd_gro_mode,
+		(void *)&cmd_gro_pid,
 		NULL,
 	},
 };
@@ -13629,6 +13673,7 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_tso_show,
 	(cmdline_parse_inst_t *)&cmd_tunnel_tso_set,
 	(cmdline_parse_inst_t *)&cmd_tunnel_tso_show,
+	(cmdline_parse_inst_t *)&cmd_set_gro,
 	(cmdline_parse_inst_t *)&cmd_link_flow_control_set,
 	(cmdline_parse_inst_t *)&cmd_link_flow_control_set_rx,
 	(cmdline_parse_inst_t *)&cmd_link_flow_control_set_tx,

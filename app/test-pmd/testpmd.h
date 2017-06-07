@@ -34,6 +34,8 @@
 #ifndef _TESTPMD_H_
 #define _TESTPMD_H_
 
+#include <rte_gro.h>
+
 #define RTE_PORT_ALL            (~(portid_t)0x0)
 
 #define RTE_TEST_RX_DESC_MAX    2048
@@ -108,6 +110,8 @@ struct fwd_stream {
 	portid_t   tx_port;   /**< forwarding port of received packets */
 	queueid_t  tx_queue;  /**< TX queue to send forwarded packets */
 	streamid_t peer_addr; /**< index of peer ethernet address of packets */
+
+	uint16_t tbl_idx;	/**< TCP IPv4 GRO lookup tale index */
 
 	unsigned int retry_enabled;
 
@@ -428,6 +432,12 @@ extern struct ether_addr peer_eth_addrs[RTE_MAX_ETHPORTS];
 extern uint32_t burst_tx_delay_time; /**< Burst tx delay time(us) for mac-retry. */
 extern uint32_t burst_tx_retry_num;  /**< Burst tx retry number for mac-retry. */
 
+struct gro_status {
+	struct rte_gro_param param;
+	uint8_t enable;
+};
+extern struct gro_status gro_ports[RTE_MAX_ETHPORTS];
+
 static inline unsigned int
 lcore_num(void)
 {
@@ -625,6 +635,7 @@ void get_2tuple_filter(uint8_t port_id, uint16_t index);
 void get_5tuple_filter(uint8_t port_id, uint16_t index);
 int rx_queue_id_is_invalid(queueid_t rxq_id);
 int tx_queue_id_is_invalid(queueid_t txq_id);
+void setup_gro(const char *mode, uint8_t port_id);
 
 /* Functions to manage the set of filtered Multicast MAC addresses */
 void mcast_addr_add(uint8_t port_id, struct ether_addr *mc_addr);
