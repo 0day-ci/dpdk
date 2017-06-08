@@ -122,6 +122,13 @@ struct internal_config internal_config;
 /* used by rte_rdtsc() */
 int rte_cycles_vmware_tsc_map;
 
+/* Get the iova mode */
+enum rte_iova_mode
+rte_eal_iova_mode(void)
+{
+	return internal_config.iova_mode;
+}
+
 /* Return a pointer to the configuration structure */
 struct rte_config *
 rte_eal_get_configuration(void)
@@ -793,6 +800,17 @@ rte_eal_init(int argc, char **argv)
 		return -1;
 	}
 
+	if (rte_bus_scan()) {
+		rte_eal_init_alert("Cannot scan the buses for devices\n");
+		rte_errno = ENODEV;
+		return -1;
+	}
+
+	if (rte_eal_iova_mode() == RTE_IOVA_VA &&
+	    rte_bus_get_iommu_class() == RTE_IOVA_VA) {
+		internal_config.iova_mode = RTE_IOVA_VA;
+	}
+
 	if (internal_config.no_hugetlbfs == 0 &&
 			internal_config.process_type != RTE_PROC_SECONDARY &&
 			internal_config.xen_dom0_support == 0 &&
@@ -887,12 +905,6 @@ rte_eal_init(int argc, char **argv)
 
 	if (rte_eal_intr_init() < 0) {
 		rte_eal_init_alert("Cannot init interrupt-handling thread\n");
-		return -1;
-	}
-
-	if (rte_bus_scan()) {
-		rte_eal_init_alert("Cannot scan the buses for devices\n");
-		rte_errno = ENODEV;
 		return -1;
 	}
 
