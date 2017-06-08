@@ -816,4 +816,27 @@ vfio_noiommu_dma_map(int __rte_unused vfio_container_fd)
 	return 0;
 }
 
+int
+vfio_noiommu_is_enabled(void)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0)
+	return -1;
+#else
+	int fd, ret, cnt __rte_unused;
+	char c;
+
+	ret = -1;
+	fd = open(VFIO_NOIOMMU_MODE, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	cnt = read(fd, &c, 1);
+	if (c == 'Y')
+		ret = 1;
+
+	close(fd);
+	return ret;
+#endif
+}
+
 #endif

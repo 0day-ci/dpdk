@@ -45,6 +45,7 @@
 #include "eal_filesystem.h"
 #include "eal_private.h"
 #include "eal_pci_init.h"
+#include "eal_vfio.h"
 
 /**
  * @file
@@ -486,6 +487,43 @@ rte_pci_scan(void)
 error:
 	closedir(dir);
 	return -1;
+}
+
+/*
+ * Get iommu class of PCI devices on the bus.
+ * Check that those devices are attached to iommu driver.
+ * If attached then return iova_va or iova_pa mode, else
+ * return with dont_care(_DC).
+ */
+enum rte_iova_mode
+rte_pci_get_iommu_class(void)
+{
+	struct rte_pci_device *dev = NULL;
+	int ret = RTE_IOVA_DC;
+
+	TAILQ_FOREACH(dev, &rte_pci_bus.device_list, next) {
+
+		if (dev->kdrv == RTE_KDRV_UNKNOWN ||
+		    dev->kdrv == RTE_KDRV_NONE)
+			continue;
+
+		if (dev->kdrv != RTE_KDRV_VFIO) {
+			ret = RTE_IOVA_PA;
+			return ret;
+		}
+
+		ret = RTE_IOVA_VA;
+	}
+
+	/* In case of iova_va, check for vfio_noiommu mode */
+	if (ret == RTE_IOVA_VA) {
+#ifdef VFIO_PRESENT
+		if (vfio_noiommu_is_enabled() == 1)
+#endif
+			ret = RTE_IOVA_PA;
+	}
+
+	return ret;
 }
 
 /* Read PCI config space. */
