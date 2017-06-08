@@ -91,6 +91,16 @@ typedef int (*rte_bus_scan_t)(void);
  */
 typedef int (*rte_bus_probe_t)(void);
 
+
+/**
+ * Get iommu class of devices on the bus.
+ * Check that those devices are attached to iommu driver.
+ *
+ * @return
+ *      enum rte_iova_mode value.
+ */
+typedef enum rte_iova_mode (*rte_bus_get_iommu_class_t)(void);
+
 /**
  * A structure describing a generic bus.
  */
@@ -99,6 +109,7 @@ struct rte_bus {
 	const char *name;            /**< Name of the bus */
 	rte_bus_scan_t scan;         /**< Scan for devices attached to bus */
 	rte_bus_probe_t probe;       /**< Probe devices on bus */
+	rte_bus_get_iommu_class_t get_iommu_class; /**< Get iommu class */
 };
 
 /**
@@ -149,6 +160,16 @@ int rte_bus_probe(void);
  *	!0 in case there is error in opening the output stream
  */
 void rte_bus_dump(FILE *f);
+
+
+/**
+ * Get iommu class of devices on the bus.
+ * Check that those devices are attached to iommu driver.
+ *
+ * @return
+ *	enum rte_iova_mode value.
+ */
+enum rte_iova_mode rte_bus_get_iommu_class(void);
 
 /**
  * Helper for Bus registration.

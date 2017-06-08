@@ -145,3 +145,26 @@ rte_bus_dump(FILE *f)
 		}
 	}
 }
+
+/*
+ * Get iommu class of devices on the bus.
+ */
+enum rte_iova_mode
+rte_bus_get_iommu_class(void)
+{
+	int mode = RTE_IOVA_DC;
+	struct rte_bus *bus;
+
+	TAILQ_FOREACH(bus, &rte_bus_list, next) {
+
+		if (bus->get_iommu_class) {
+			mode |= bus->get_iommu_class();
+		}
+	}
+
+	if (mode != RTE_IOVA_VA) {
+		/* Mapping could be _DC or _PA. Use default IOVA mode */
+		mode = RTE_IOVA_PA;
+	}
+	return mode;
+}
