@@ -84,6 +84,7 @@ struct internal_config {
 	const char *hugepage_dir;         /**< specific hugetlbfs directory to use */
 
 	unsigned num_hugepage_sizes;      /**< how many sizes on this system */
+	enum rte_iova_mode iova_mode ;    /**< Set iova mode on this system  */
 	struct hugepage_info hugepage_info[MAX_HUGEPAGE_SIZES];
 };
 extern struct internal_config internal_config; /**< Global EAL configuration. */

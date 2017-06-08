@@ -95,6 +95,7 @@ eal_long_options[] = {
 	{OPT_VFIO_INTR,         1, NULL, OPT_VFIO_INTR_NUM        },
 	{OPT_VMWARE_TSC_MAP,    0, NULL, OPT_VMWARE_TSC_MAP_NUM   },
 	{OPT_XEN_DOM0,          0, NULL, OPT_XEN_DOM0_NUM         },
+	{OPT_IOVA_MODE,	        1, NULL, OPT_IOVA_MODE_NUM        },
 	{0,                     0, NULL, 0                        }
 };
 
@@ -161,6 +162,7 @@ eal_reset_internal_config(struct internal_config *internal_cfg)
 #endif
 	internal_cfg->vmware_tsc_map = 0;
 	internal_cfg->create_uio_dev = 0;
+	internal_cfg->iova_mode = RTE_IOVA_PA;
 }
 
 static int
@@ -791,6 +793,25 @@ eal_parse_proc_type(const char *arg)
 	return RTE_PROC_INVALID;
 }
 
+static int
+eal_parse_iova_mode(const char *name)
+{
+	int mode;
+
+	if (name == NULL)
+		return -1;
+
+	if (!strcmp("pa", name))
+		mode = RTE_IOVA_PA;
+	else if (!strcmp("va", name))
+		mode = RTE_IOVA_VA;
+	else
+		return -1;
+
+	internal_config.iova_mode = mode;
+	return 0;
+}
+
 int
 eal_parse_common_option(int opt, const char *optarg,
 			struct internal_config *conf)
@@ -931,6 +952,14 @@ eal_parse_common_option(int opt, const char *optarg,
 			return -1;
 		}
 		core_parsed = 1;
+		break;
+
+	case OPT_IOVA_MODE_NUM:
+		if (eal_parse_iova_mode(optarg) < 0) {
+			RTE_LOG(ERR, EAL, "invalid parameters for --"
+				OPT_IOVA_MODE "\n");
+			return -1;
+		}
 		break;
 
 	/* don't know what to do, leave this to caller */
@@ -1083,5 +1112,7 @@ eal_common_usage(void)
 	       "  --"OPT_NO_PCI"            Disable PCI\n"
 	       "  --"OPT_NO_HPET"           Disable HPET\n"
 	       "  --"OPT_NO_SHCONF"         No shared config (mmap'd files)\n"
+	       "  --"OPT_IOVA_MODE"         Set iova mode. 'pa' for IOVA_PA\n"
+	       "                            'va' for IOVA_VA\n"
 	       "\n", RTE_MAX_LCORE);
 }
