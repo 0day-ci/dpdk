@@ -193,3 +193,10 @@ DPDK_17.05 {
 	vfio_get_group_no;
 
 } DPDK_17.02;
+
+DPDK_17.08 {
+	global:
+
+	rte_pci_get_iommu_class;
+
+} DPDK_17.05;

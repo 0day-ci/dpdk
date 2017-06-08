@@ -56,6 +56,16 @@ extern "C" {
 /** Double linked list of buses */
 TAILQ_HEAD(rte_bus_list, rte_bus);
 
+
+/**
+ * IOVA mapping mode.
+ */
+enum rte_iova_mode {
+	RTE_IOVA_DC,	/* _DC --> Don't Care mode */
+	RTE_IOVA_PA,
+	RTE_IOVA_VA
+};
+
 /**
  * Bus specific scan for devices attached on the bus.
  * For each bus object, the scan would be reponsible for finding devices and

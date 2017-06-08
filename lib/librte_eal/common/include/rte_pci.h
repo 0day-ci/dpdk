@@ -377,6 +377,16 @@ int
 rte_pci_probe(void);
 
 /**
+ * Get iommu class of PCI devices on the bus.
+ * And return their preferred iova mapping mode.
+ *
+ * @return
+ *   - enum rte_iova_mode.
+ */
+enum rte_iova_mode
+rte_pci_get_iommu_class(void);
+
+/**
  * Map the PCI device resources in user space virtual memory address
  *
  * Note that driver should not call this function when flag
@@ -471,6 +481,7 @@ int rte_pci_detach(const struct rte_pci_addr *addr);
  *   A pointer to a file for output
  */
 void rte_pci_dump(FILE *f);
+
 
 /**
  * Register a PCI driver.
