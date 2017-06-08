@@ -78,6 +78,7 @@
 #include <rte_ring.h>
 #include <rte_memcpy.h>
 #include <rte_common.h>
+#include <rte_bus.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -1397,9 +1398,14 @@ rte_mempool_empty(const struct rte_mempool *mp)
 static inline phys_addr_t
 rte_mempool_virt2phy(__rte_unused const struct rte_mempool *mp, const void *elt)
 {
-	const struct rte_mempool_objhdr *hdr;
-	hdr = (const struct rte_mempool_objhdr *)RTE_PTR_SUB(elt,
+	struct rte_mempool_objhdr *hdr;
+
+	hdr = (struct rte_mempool_objhdr *)RTE_PTR_SUB(elt,
 		sizeof(*hdr));
+
+	if (rte_eal_iova_mode() == RTE_IOVA_VA)
+		hdr->physaddr = (uintptr_t)elt;
+
 	return hdr->physaddr;
 }
 
