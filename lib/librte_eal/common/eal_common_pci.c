@@ -221,7 +221,12 @@ rte_pci_probe_one_driver(struct rte_pci_driver *dr,
 	ret = dr->probe(dr, dev);
 	if (ret) {
 		dev->driver = NULL;
-		if (dr->drv_flags & RTE_PCI_DRV_NEED_MAPPING)
+		if ((dr->drv_flags & RTE_PCI_DRV_NEED_MAPPING) &&
+			/* Don't unmap if device is unsupported and
+			 * driver needs mapped resources.
+			 */
+			!(ret > 0 &&
+				(dr->drv_flags & RTE_PCI_DRV_KEEP_MAPPED_RES)))
 			rte_pci_unmap_device(dev);
 	}
 
@@ -235,6 +240,7 @@ rte_pci_probe_one_driver(struct rte_pci_driver *dr,
 static int
 rte_pci_detach_dev(struct rte_pci_device *dev)
 {
+	int ret = 0;
 	struct rte_pci_addr *loc;
 	struct rte_pci_driver *dr;
 
@@ -251,13 +257,18 @@ rte_pci_detach_dev(struct rte_pci_device *dev)
 	RTE_LOG(DEBUG, EAL, "  remove driver: %x:%x %s\n", dev->id.vendor_id,
 			dev->id.device_id, dr->driver.name);
 
-	if (dr->remove && (dr->remove(dev) < 0))
-		return -1;	/* negative value is an error */
+	if (dr->remove) {
+		ret = dr->remove(dev);
+		if (ret < 0)
+			return -1; /* negative value is an error */
+	}
 
 	/* clear driver structure */
 	dev->driver = NULL;
 
-	if (dr->drv_flags & RTE_PCI_DRV_NEED_MAPPING)
+	if ((dr->drv_flags & RTE_PCI_DRV_NEED_MAPPING) &&
+	/* Don't unmap if dev is unsupported and it needs mapped resources */
+		!(ret > 0 && (dr->drv_flags & RTE_PCI_DRV_KEEP_MAPPED_RES)))
 		/* unmap resources for devices that use igb_uio */
 		rte_pci_unmap_device(dev);
 
