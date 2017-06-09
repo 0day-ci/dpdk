@@ -1687,7 +1687,7 @@ struct rte_eth_dev_sriov {
 };
 #define RTE_ETH_DEV_SRIOV(dev)         ((dev)->data->sriov)
 
-#define RTE_ETH_NAME_MAX_LEN (32)
+#define RTE_ETH_NAME_MAX_LEN RTE_DEV_NAME_MAX_LEN
 
 /**
  * @internal
