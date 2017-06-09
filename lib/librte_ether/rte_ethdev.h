@@ -1441,6 +1441,9 @@ typedef int (*eth_filter_ctrl_t)(struct rte_eth_dev *dev,
 				 void *arg);
 /**< @internal Take operations to assigned filter type on an Ethernet device */
 
+typedef int (*eth_tm_ops_get_t)(struct rte_eth_dev *dev, void *ops);
+/**< @internal Get Traffic Management (TM) operations on an Ethernet device */
+
 typedef int (*eth_get_dcb_info)(struct rte_eth_dev *dev,
 				 struct rte_eth_dcb_info *dcb_info);
 /**< @internal Get dcb information on an Ethernet device */
@@ -1573,6 +1576,9 @@ struct eth_dev_ops {
 	/**< Get extended device statistic values by ID. */
 	eth_xstats_get_names_by_id_t xstats_get_names_by_id;
 	/**< Get name of extended device statistics by ID. */
+
+	eth_tm_ops_get_t tm_ops_get;
+	/**< Get Traffic Management (TM) operations. */
 };
 
 /**
@@ -4103,6 +4109,20 @@ int rte_eth_dev_filter_supported(uint8_t port_id, enum rte_filter_type filter_ty
  */
 int rte_eth_dev_filter_ctrl(uint8_t port_id, enum rte_filter_type filter_type,
 			enum rte_filter_op filter_op, void *arg);
+
+/**
+ * Take Traffic Management (TM) operations on an Ethernet device.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ * @param ops
+ *   Pointer to TM operations.
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP) if hardware doesn't support.
+ *   - (-ENODEV) if *port_id* invalid.
+ */
+int rte_eth_dev_tm_ops_get(uint8_t port_id, void *ops);
 
 /**
  * Get DCB information on an Ethernet device.
