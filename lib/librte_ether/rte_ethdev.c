@@ -178,9 +178,11 @@ rte_eth_dev_allocated(const char *name)
 	unsigned i;
 
 	for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
-		if ((rte_eth_devices[i].state == RTE_ETH_DEV_ATTACHED) &&
-		    strcmp(rte_eth_devices[i].data->name, name) == 0)
-			return &rte_eth_devices[i];
+		if (rte_eth_devices[i].state == RTE_ETH_DEV_ATTACHED &&
+				rte_eth_devices[i].device) {
+			if (!strcmp(rte_eth_devices[i].device->name, name))
+				return &rte_eth_devices[i];
+		}
 	}
 	return NULL;
 }
@@ -310,7 +312,7 @@ rte_eth_dev_count(void)
 int
 rte_eth_dev_get_name_by_port(uint8_t port_id, char *name)
 {
-	char *tmp;
+	const char *tmp;
 
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 
@@ -321,7 +323,7 @@ rte_eth_dev_get_name_by_port(uint8_t port_id, char *name)
 
 	/* shouldn't check 'rte_eth_devices[i].data',
 	 * because it might be overwritten by VDEV PMD */
-	tmp = rte_eth_dev_data[port_id].name;
+	tmp = rte_eth_devices[port_id].device->name;
 	strcpy(name, tmp);
 	return 0;
 }
@@ -329,6 +331,7 @@ rte_eth_dev_get_name_by_port(uint8_t port_id, char *name)
 int
 rte_eth_dev_get_port_by_name(const char *name, uint8_t *port_id)
 {
+	int ret;
 	int i;
 
 	if (name == NULL) {
@@ -341,11 +344,14 @@ rte_eth_dev_get_port_by_name(const char *name, uint8_t *port_id)
 
 	*port_id = RTE_MAX_ETHPORTS;
 	RTE_ETH_FOREACH_DEV(i) {
-		if (!strncmp(name,
-			rte_eth_dev_data[i].name, strlen(name))) {
+		if (!rte_eth_devices[i].device)
+			continue;
 
+		ret = strncmp(name, rte_eth_devices[i].device->name,
+			strlen(name));
+
+		if (!ret) {
 			*port_id = i;
-
 			return 0;
 		}
 	}
@@ -438,8 +444,8 @@ rte_eth_dev_detach(uint8_t port_id, char *name)
 	if (rte_eth_dev_is_detachable(port_id))
 		goto err;
 
-	snprintf(name, sizeof(rte_eth_devices[port_id].data->name),
-		 "%s", rte_eth_devices[port_id].data->name);
+	snprintf(name, sizeof(rte_eth_devices[port_id].device->name),
+		 "%s", rte_eth_devices[port_id].device->name);
 	ret = rte_eal_dev_detach(name);
 	if (ret < 0)
 		goto err;
