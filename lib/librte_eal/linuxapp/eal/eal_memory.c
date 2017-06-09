@@ -108,6 +108,13 @@ test_phys_addrs_available(void)
 	if (rte_xen_dom0_supported())
 		return;
 
+	if (!rte_eal_has_hugepages()) {
+		RTE_LOG(ERR, EAL,
+			"Started without hugepages support, physical addresses not available\n");
+		phys_addrs_available = false;
+		return;
+	}
+
 	physaddr = rte_mem_virt2phy(&tmp);
 	if (physaddr == RTE_BAD_PHYS_ADDR) {
 		RTE_LOG(ERR, EAL,

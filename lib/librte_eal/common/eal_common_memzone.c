@@ -250,7 +250,10 @@ memzone_reserve_aligned_thread_unsafe(const char *name, size_t len,
 
 	mcfg->memzone_cnt++;
 	snprintf(mz->name, sizeof(mz->name), "%s", name);
-	mz->phys_addr = rte_malloc_virt2phy(mz_addr);
+	if (rte_eal_has_hugepages())
+		mz->phys_addr = rte_malloc_virt2phy(mz_addr);
+	else
+		mz->phys_addr = RTE_BAD_PHYS_ADDR;
 	mz->addr = mz_addr;
 	mz->len = (requested_len == 0 ? elem->size : requested_len);
 	mz->hugepage_sz = elem->ms->hugepage_sz;
