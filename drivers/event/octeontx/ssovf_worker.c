@@ -196,8 +196,16 @@ ssows_enq(void *port, const struct rte_event *ev)
 uint16_t __hot
 ssows_enq_burst(void *port, const struct rte_event ev[], uint16_t nb_events)
 {
-	RTE_SET_USED(nb_events);
-	return ssows_enq(port, ev);
+	uint16_t i;
+	struct ssows *ws = port;
+
+	if (ev[0].all_op_new) {
+		rte_smp_wmb();
+		for (i = 0; i < nb_events; i++)
+			ssows_new_event(ws, &ev[i]);
+		return i;
+	} else
+		return ssows_enq(port, ev);
 }
 
 void

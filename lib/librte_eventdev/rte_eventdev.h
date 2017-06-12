@@ -933,7 +933,15 @@ struct rte_event {
 			 * and is undefined on dequeue.
 			 * @see RTE_EVENT_OP_NEW, (RTE_EVENT_OP_*)
 			 */
-			uint8_t rsvd:4;
+			uint8_t all_op_new:1;
+			/**< Valid only with event enqueue operation - This hint
+			 * indicates that the enqueue request has only the
+			 * events with op == RTE_EVENT_OP_NEW.
+			 * The event producer, typically use this pattern to
+			 * inject the events to eventdev.
+			 * @see RTE_EVENT_OP_NEW rte_event_enqueue_burst()
+			 */
+			uint8_t rsvd:3;
 			/**< Reserved for future use */
 			uint8_t sched_type:2;
 			/**< Scheduler synchronization type (RTE_SCHED_TYPE_*)
