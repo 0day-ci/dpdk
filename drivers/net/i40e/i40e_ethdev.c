@@ -4257,6 +4257,11 @@ i40e_vsi_config_tc_queue_mapping(struct i40e_vsi *vsi,
 	int i, total_tc = 0;
 	uint16_t qpnum_per_tc, bsf, qp_idx;
 
+	if (enabled_tcmap == 0) {
+		PMD_DRV_LOG(ERR, "Error! enabled tcmap shouldn't be 0");
+		return I40E_ERR_PARAM;
+	}
+
 	ret = validate_tcmap_parameter(vsi, enabled_tcmap);
 	if (ret != I40E_SUCCESS)
 		return ret;
