@@ -276,7 +276,6 @@ cmdline_parse(struct cmdline *cl, const char * buf)
 		return CMDLINE_PARSE_BAD_ARGS;
 
 	ctx = cl->ctx;
-	memset(&dyn_tokens, 0, sizeof(dyn_tokens));
 
 	/*
 	 * - look if the buffer contains at least one line
@@ -319,6 +318,7 @@ cmdline_parse(struct cmdline *cl, const char * buf)
 	inst = ctx[inst_num];
 	while (inst) {
 		debug_printf("INST %d\n", inst_num);
+		memset(&dyn_tokens, 0, sizeof(dyn_tokens));
 
 		/* fully parsed */
 		tok = match_inst(inst, buf, 0, tmp_result.buf,
