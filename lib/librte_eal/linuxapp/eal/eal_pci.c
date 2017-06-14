@@ -351,6 +351,8 @@ pci_scan_one(const char *dirname, const struct rte_pci_addr *addr)
 			dev->kdrv = RTE_KDRV_IGB_UIO;
 		else if (!strcmp(driver, "uio_pci_generic"))
 			dev->kdrv = RTE_KDRV_UIO_GENERIC;
+		else if (!strcmp(driver, "mlx5_core"))
+			dev->kdrv = RTE_KDRV_BIFURCATED;
 		else
 			dev->kdrv = RTE_KDRV_UNKNOWN;
 	} else
