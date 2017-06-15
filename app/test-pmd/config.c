@@ -3000,10 +3000,10 @@ fdir_set_flex_payload(portid_t port_id, struct rte_eth_flex_payload_cfg *cfg)
 
 }
 
-#ifdef RTE_LIBRTE_IXGBE_PMD
 void
 set_vf_traffic(portid_t port_id, uint8_t is_rx, uint16_t vf, uint8_t on)
 {
+#ifdef RTE_LIBRTE_IXGBE_PMD
 	int diag;
 
 	if (is_rx)
@@ -3013,15 +3013,21 @@ set_vf_traffic(portid_t port_id, uint8_t is_rx, uint16_t vf, uint8_t on)
 
 	if (diag == 0)
 		return;
-	if(is_rx)
+	if(is_rx) {
 		printf("rte_pmd_ixgbe_set_vf_rx for port_id=%d failed "
-	       		"diag=%d\n", port_id, diag);
-	else
+				"diag=%d\n", port_id, diag);
+		return;
+	} else {
 		printf("rte_pmd_ixgbe_set_vf_tx for port_id=%d failed "
-	       		"diag=%d\n", port_id, diag);
-
-}
+				"diag=%d\n", port_id, diag);
+		return;
+	}
 #endif
+	printf("VF %s setting not supported for port %d\n",
+			is_rx ? "Rx" : "Tx", port_id);
+	RTE_SET_USED(vf);
+	RTE_SET_USED(on);
+}
 
 int
 set_queue_rate_limit(portid_t port_id, uint16_t queue_idx, uint16_t rate)
