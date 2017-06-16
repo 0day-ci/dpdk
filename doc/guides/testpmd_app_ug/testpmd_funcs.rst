@@ -380,6 +380,13 @@ For example::
    testpmd> read txd 0 0 4
         0x00000001 - 0x24C3C440 / 0x000F0000 - 0x2330003C
 
+ddp get info
+~~~~~~~~~~~~
+
+Display information about dynamic device personalization profile::
+
+   testpmd> ddp get info (profile_patch)
+
 show vf stats
 ~~~~~~~~~~~~~
 
