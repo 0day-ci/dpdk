@@ -59,5 +59,6 @@ LINK_USING_CC := 1
 EXECENV_LDFLAGS += -export-dynamic
 # Add library to the group to resolve symbols
 EXECENV_LDLIBS  += -ldl
+EXECENV_LDLIBS  += -lnuma
 
 export EXECENV_CFLAGS EXECENV_LDFLAGS EXECENV_ASFLAGS EXECENV_LDLIBS
