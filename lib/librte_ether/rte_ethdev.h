@@ -186,6 +186,10 @@ extern "C" {
 #include "rte_eth_ctrl.h"
 #include "rte_dev_info.h"
 
+#ifdef RTE_ETHDEV_TRACE_WASTED_RX_ITERATIONS
+#include "rte_eth_itt.h"
+#endif
+
 struct rte_mbuf;
 
 /**
@@ -2709,6 +2713,28 @@ rte_eth_rx_burst(uint8_t port_id, uint16_t queue_id,
 #endif
 	int16_t nb_rx = (*dev->rx_pkt_burst)(dev->data->rx_queues[queue_id],
 			rx_pkts, nb_pkts);
+
+#ifdef RTE_ETHDEV_TRACE_WASTED_RX_ITERATIONS
+	/**
+	* See rte_eth_itt.h to find comments on code below.
+	*/
+	if (unlikely(nb_rx == 0)) {
+		if (!itt_aux_data[port_id].queue_is_wasting_iterations[queue_id]) {
+			__itt_task_begin(
+				itt_aux_data[port_id].wasted_iteration_itt_domains[queue_id],
+				__itt_null, __itt_null,
+				itt_aux_data[port_id].wasted_iteration_itt_handles[queue_id]);
+			itt_aux_data[port_id].queue_is_wasting_iterations[queue_id] = 1;
+		}
+	}
+	else {
+		if (unlikely(itt_aux_data[port_id].queue_is_wasting_iterations[queue_id])) {
+			__itt_task_end(
+				itt_aux_data[port_id].wasted_iteration_itt_domains[queue_id]);
+			itt_aux_data[port_id].queue_is_wasting_iterations[queue_id] = 0;
+		}
+	}
+#endif
 
 #ifdef RTE_ETHDEV_RXTX_CALLBACKS
 	struct rte_eth_rxtx_callback *cb = dev->post_rx_burst_cbs[queue_id];

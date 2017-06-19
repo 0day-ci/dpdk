@@ -818,6 +818,13 @@ rte_eth_dev_configure(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 		return diag;
 	}
 
+#ifdef RTE_ETHDEV_TRACE_WASTED_RX_ITERATIONS
+	/**
+	* See rte_eth_itt.h to find comments on code below.
+	*/
+	rte_eth_init_itt(port_id, dev->data->name, nb_rx_q);
+#endif
+
 	return 0;
 }
 
