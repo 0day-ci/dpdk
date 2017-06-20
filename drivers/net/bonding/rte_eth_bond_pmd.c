@@ -2272,9 +2272,10 @@ bond_alloc(struct rte_vdev_device *dev, uint8_t mode)
 	 * and internal (private) data
 	 */
 
-	if (socket_id >= number_of_sockets()) {
-		RTE_BOND_LOG(ERR,
-				"Invalid socket id specified to create bonded device on.");
+	if (!rte_eal_has_memory_socket(socket_id)) {
+		RTE_BOND_LOG(ERR, "Socket ID specified to create the "
+				"the bonded device on does not have "
+				"available memory");
 		goto err;
 	}
 

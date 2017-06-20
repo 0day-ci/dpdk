@@ -205,7 +205,7 @@ bond_ethdev_parse_socket_id_kvarg(const char *key __rte_unused,
 		return -1;
 
 	/* validate mode value */
-	if (socket_id >= 0 && socket_id < number_of_sockets()) {
+	if (socket_id >= 0 && rte_eal_has_memory_socket(socket_id)) {
 		*(uint8_t *)extra_args = (uint8_t)socket_id;
 		return 0;
 	}
