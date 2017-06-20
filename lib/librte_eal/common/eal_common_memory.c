@@ -122,6 +122,23 @@ unsigned rte_memory_get_nrank(void)
 	return rte_eal_get_configuration()->mem_config->nrank;
 }
 
+/**
+ * Return if socket has memory reserved.
+ */
+unsigned int
+rte_eal_has_memory_socket(uint8_t socket_id)
+{
+	unsigned int i;
+	const struct rte_memseg *ms = rte_eal_get_physmem_layout();
+
+	for (i = 0; ((i < RTE_MAX_MEMSEG) && (ms[i].addr != NULL)); i++) {
+		if (ms[i].socket_id == (int) socket_id)
+			return 1;
+	}
+
+	return 0;
+}
+
 static int
 rte_eal_memdevice_init(void)
 {

@@ -195,6 +195,15 @@ unsigned rte_memory_get_nchannel(void);
  */
 unsigned rte_memory_get_nrank(void);
 
+/**
+ * Return if socket has memory reserved.
+ *
+ * @return
+ *   - 0 if socket has no memory reserved.
+ *   - 1 if socket has memory reserved..
+ */
+unsigned int rte_eal_has_memory_socket(uint8_t socket_id);
+
 #ifdef RTE_LIBRTE_XEN_DOM0
 
 /**< Internal use only - should DOM0 memory mapping be used */
