@@ -511,20 +511,6 @@ virtual_ethdev_get_mbufs_from_tx_queue(uint8_t port_id,
 		burst_length, NULL);
 }
 
-static uint8_t
-get_number_of_sockets(void)
-{
-	int sockets = 0;
-	int i;
-	const struct rte_memseg *ms = rte_eal_get_physmem_layout();
-
-	for (i = 0; i < RTE_MAX_MEMSEG && ms[i].addr != NULL; i++) {
-		if (sockets < ms[i].socket_id)
-			sockets = ms[i].socket_id;
-	}
-	/* Number of sockets = maximum socket_id + 1 */
-	return ++sockets;
-}
 
 int
 virtual_ethdev_create(const char *name, struct ether_addr *mac_addr,
@@ -542,7 +528,7 @@ virtual_ethdev_create(const char *name, struct ether_addr *mac_addr,
 	 * and internal (dev_private) data
 	 */
 
-	if (socket_id >= get_number_of_sockets())
+	if (!rte_eal_has_memory_socket(socket_id))
 		goto err;
 
 	pci_dev = rte_zmalloc_socket(name, sizeof(*pci_dev), 0, socket_id);
