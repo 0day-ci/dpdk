@@ -57,7 +57,7 @@
 
 #include "l3fwd.h"
 
-#if defined(RTE_MACHINE_CPUFLAG_SSE4_2) || defined(RTE_MACHINE_CPUFLAG_CRC32)
+#if defined(RTE_ARCH_X86) || defined(RTE_MACHINE_CPUFLAG_CRC32)
 #define EM_HASH_CRC 1
 #endif
 
@@ -328,7 +328,7 @@ em_get_ipv6_dst_port(void *ipv6_hdr,  uint8_t portid, void *lookup_struct)
 	return (uint8_t)((ret < 0) ? portid : ipv6_l3fwd_out_if[ret]);
 }
 
-#if defined(__SSE4_1__)
+#if defined(RTE_ARCH_X86)
 #if defined(NO_HASH_MULTI_LOOKUP)
 #include "l3fwd_em_sse.h"
 #else
@@ -709,7 +709,7 @@ em_main_loop(__attribute__((unused)) void *dummy)
 			if (nb_rx == 0)
 				continue;
 
-#if defined(__SSE4_1__)
+#if defined(RTE_ARCH_X86)
 			l3fwd_em_send_packets(nb_rx, pkts_burst,
 							portid, qconf);
 #else
