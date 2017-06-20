@@ -56,7 +56,7 @@
 #ifdef RTE_SCHED_VECTOR
 #include <rte_vect.h>
 
-#if defined(__SSE4__)
+#ifdef RTE_ARCH_X86
 #define SCHED_VECTOR_SSE4
 #endif
 
