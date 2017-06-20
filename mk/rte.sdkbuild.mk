@@ -67,9 +67,16 @@ clean: $(CLEANDIRS)
 .PHONY: test-build
 test-build: test
 
+.PHONY: headers
+headers: $(addprefix headers-, $(ROOTDIRS-y))
+headers-%:
+	@[ -d $(BUILDDIR)/$* ] || mkdir -p $(BUILDDIR)/$*
+	$(Q)$(MAKE) S=$* -f $(RTE_SRCDIR)/$*/Makefile -C $(BUILDDIR)/$* \
+		-srR headers
+
 .SECONDEXPANSION:
 .PHONY: $(ROOTDIRS-y) $(ROOTDIRS-)
-$(ROOTDIRS-y) $(ROOTDIRS-):
+$(ROOTDIRS-y) $(ROOTDIRS-): headers
 	@[ -d $(BUILDDIR)/$@ ] || mkdir -p $(BUILDDIR)/$@
 	@echo "== Build $@"
 	$(Q)$(MAKE) S=$@ -f $(RTE_SRCDIR)/$@/Makefile -C $(BUILDDIR)/$@ all

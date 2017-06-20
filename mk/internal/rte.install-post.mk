@@ -55,7 +55,9 @@ $(foreach dir,$(INSTALL-DIRS-y),\
 # arg1: relative install dir in RTE_OUTPUT
 # arg2: relative file name in a source dir (VPATH)
 #
+.PHONY: headers
 define symlink_rule
+headers: $(addprefix $(RTE_OUTPUT)/$(1)/,$(notdir $(2)))
 $(addprefix $(RTE_OUTPUT)/$(1)/,$(notdir $(2))): $(2)
 	@echo "  SYMLINK-FILE $(addprefix $(1)/,$(notdir $(2)))"
 	@[ -d $(RTE_OUTPUT)/$(1) ] || mkdir -p $(RTE_OUTPUT)/$(1)

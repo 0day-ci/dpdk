@@ -57,6 +57,13 @@ _postinstall: build
 .PHONY: build
 build: _postbuild
 
+.PHONY: headers
+headers: $(addprefix headers-, $(DIRS-y))
+headers-%:
+	@[ -d $(CURDIR)/$* ] || mkdir -p $(CURDIR)/$*
+	@$(MAKE) S=$S/$* -f $(SRCDIR)/$*/Makefile -C $(CURDIR)/$* \
+		-srR headers
+
 .SECONDEXPANSION:
 .PHONY: $(DIRS-y)
 $(DIRS-y):
