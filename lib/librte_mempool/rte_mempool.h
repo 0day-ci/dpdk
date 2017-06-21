@@ -266,6 +266,7 @@ struct rte_mempool {
 #define MEMPOOL_F_POOL_CREATED   0x0010 /**< Internal: pool is created. */
 #define MEMPOOL_F_NO_PHYS_CONTIG 0x0020 /**< Don't need physically contiguous objs. */
 #define MEMPOOL_F_POOL_CONTIG    0x0040 /**< Detect physcially contiguous objs */
+#define MEMPOOL_F_POOL_BLK_SZ_ALIGNED 0x0080 /**< Align buffer address to block size*/
 
 /**
  * @internal When debug is enabled, store some statistics.
