@@ -48,6 +48,8 @@ There are more differences between drivers regarding some internal properties,
 portability or even documentation availability.
 Most of these differences are summarized below.
 
+More detail about features can be found :ref:`here <NIC_Overview_Features>`.
+
 .. _table_net_pmd_features:
 
 .. include:: overview_table.txt
