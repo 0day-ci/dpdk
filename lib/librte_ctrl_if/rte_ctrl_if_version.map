@@ -1,0 +1,10 @@
+DPDK_17.02 {
+	global:
+
+	rte_eth_control_interface_create;
+	rte_eth_control_interface_destroy;
+	rte_eth_control_interface_msg_exist;
+	rte_eth_control_interface_msg_process;
+
+	local: *;
+};

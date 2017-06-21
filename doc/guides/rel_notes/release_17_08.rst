@@ -75,6 +75,14 @@ New Features
 
   Added support for firmwares with multiple Ethernet ports per physical port.
 
+* **Control interface support added.**
+
+  To enable controlling DPDK ports by common Linux tools.
+  Following modules added to DPDK:
+
+  * librte_ctrl_if library
+  * librte_eal/linuxapp/unci kernel module
+
 
 Resolved Issues
 ---------------
@@ -183,6 +191,7 @@ The libraries prepended with a plus sign were incremented in this version.
      librte_cfgfile.so.2
      librte_cmdline.so.2
      librte_cryptodev.so.2
+   + librte_ctrl_if.so.1
      librte_distributor.so.1
      librte_eal.so.4
      librte_ethdev.so.6

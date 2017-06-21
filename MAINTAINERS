@@ -280,6 +280,7 @@ F: doc/guides/sample_app_ug/kernel_nic_interface.rst
 Linux Userspace Network Control Interface (UNCI)
 M: Ferruh Yigit <ferruh.yigit@intel.com>
 F: lib/librte_eal/linuxapp/unci/
+F: lib/librte_ctrl_if/
 
 Linux AF_PACKET
 M: John W. Linville <linville@tuxdriver.com>
