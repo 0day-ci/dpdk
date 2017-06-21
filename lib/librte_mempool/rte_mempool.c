@@ -527,6 +527,11 @@ rte_mempool_populate_default(struct rte_mempool *mp)
 	if (mp->nb_mem_chunks != 0)
 		return -EEXIST;
 
+	/* Get external mempool capability */
+	ret = rte_mempool_ops_get_hw_cap(mp);
+	if (ret != -ENOENT)
+		mp->flags |= ret;
+
 	if (rte_xen_dom0_supported()) {
 		pg_sz = RTE_PGSIZE_2M;
 		pg_shift = rte_bsf32(pg_sz);

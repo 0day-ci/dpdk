@@ -85,6 +85,7 @@ rte_mempool_register_ops(const struct rte_mempool_ops *h)
 	ops->enqueue = h->enqueue;
 	ops->dequeue = h->dequeue;
 	ops->get_count = h->get_count;
+	ops->get_hw_cap = h->get_hw_cap;
 
 	rte_spinlock_unlock(&rte_mempool_ops_table.sl);
 
@@ -121,6 +122,19 @@ rte_mempool_ops_get_count(const struct rte_mempool *mp)
 
 	ops = rte_mempool_get_ops(mp->ops_index);
 	return ops->get_count(mp);
+}
+
+/* wrapper to get external mempool capability. */
+int
+rte_mempool_ops_get_hw_cap(struct rte_mempool *mp)
+{
+	struct rte_mempool_ops *ops;
+
+	ops = rte_mempool_get_ops(mp->ops_index);
+	if (ops->get_hw_cap)
+		return ops->get_hw_cap(mp);
+
+	return -ENOENT;
 }
 
 /* sets mempool ops previously registered by rte_mempool_register_ops. */

@@ -389,6 +389,12 @@ typedef int (*rte_mempool_dequeue_t)(struct rte_mempool *mp,
  */
 typedef unsigned (*rte_mempool_get_count)(const struct rte_mempool *mp);
 
+/**
+ * Get the mempool hw capability.
+ */
+typedef int (*rte_mempool_get_hw_cap_t)(struct rte_mempool *mp);
+
+
 /** Structure defining mempool operations structure */
 struct rte_mempool_ops {
 	char name[RTE_MEMPOOL_OPS_NAMESIZE]; /**< Name of mempool ops struct. */
@@ -397,6 +403,7 @@ struct rte_mempool_ops {
 	rte_mempool_enqueue_t enqueue;   /**< Enqueue an object. */
 	rte_mempool_dequeue_t dequeue;   /**< Dequeue an object. */
 	rte_mempool_get_count get_count; /**< Get qty of available objs. */
+	rte_mempool_get_hw_cap_t get_hw_cap; /**< Get hw capability */
 } __rte_cache_aligned;
 
 #define RTE_MEMPOOL_MAX_OPS_IDX 16  /**< Max registered ops structs */
@@ -507,6 +514,19 @@ rte_mempool_ops_enqueue_bulk(struct rte_mempool *mp, void * const *obj_table,
  */
 unsigned
 rte_mempool_ops_get_count(const struct rte_mempool *mp);
+
+
+/**
+ * @internal wrapper for mempool_ops get_hw_cap callback.
+ *
+ * @param mp
+ *   Pointer to the memory pool.
+ * @return
+ *   - On success; Valid capability flag.
+ *   - On failure; -ENOENT error code i.e. implementation not supported.
+ */
+int
+rte_mempool_ops_get_hw_cap(struct rte_mempool *mp);
 
 /**
  * @internal wrapper for mempool_ops free callback.
