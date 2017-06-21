@@ -368,6 +368,14 @@ rte_mempool_populate_phys(struct rte_mempool *mp, char *vaddr,
 
 	total_elt_sz = mp->header_size + mp->elt_size + mp->trailer_size;
 
+	/* Detect nb_mbuf fit in hugepage */
+	if (mp->flags & MEMPOOL_F_POOL_CONTIG) {
+		if (len < total_elt_sz * mp->size) {
+			RTE_LOG(ERR, MEMPOOL, "nb_mbufs not fitting in one hugepage,..exit\n");
+			return -ENOSPC;
+		}
+	}
+
 	memhdr = rte_zmalloc("MEMPOOL_MEMHDR", sizeof(*memhdr), 0);
 	if (memhdr == NULL)
 		return -ENOMEM;
