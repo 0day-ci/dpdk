@@ -214,57 +214,6 @@ static const char *pmd_name(enum rte_cryptodev_type pmd)
 	}
 }
 
-static const char *cipher_algo_name(enum rte_crypto_cipher_algorithm cipher_algo)
-{
-	switch (cipher_algo) {
-	case RTE_CRYPTO_CIPHER_NULL: return "NULL";
-	case RTE_CRYPTO_CIPHER_3DES_CBC: return "3DES_CBC";
-	case RTE_CRYPTO_CIPHER_3DES_CTR: return "3DES_CTR";
-	case RTE_CRYPTO_CIPHER_3DES_ECB: return "3DES_ECB";
-	case RTE_CRYPTO_CIPHER_AES_CBC: return "AES_CBC";
-	case RTE_CRYPTO_CIPHER_AES_CCM: return "AES_CCM";
-	case RTE_CRYPTO_CIPHER_AES_CTR: return "AES_CTR";
-	case RTE_CRYPTO_CIPHER_AES_ECB: return "AES_ECB";
-	case RTE_CRYPTO_CIPHER_AES_F8: return "AES_F8";
-	case RTE_CRYPTO_CIPHER_AES_GCM: return "AES_GCM";
-	case RTE_CRYPTO_CIPHER_AES_XTS: return "AES_XTS";
-	case RTE_CRYPTO_CIPHER_ARC4: return "ARC4";
-	case RTE_CRYPTO_CIPHER_KASUMI_F8: return "KASUMI_F8";
-	case RTE_CRYPTO_CIPHER_SNOW3G_UEA2: return "SNOW3G_UEA2";
-	case RTE_CRYPTO_CIPHER_ZUC_EEA3: return "ZUC_EEA3";
-	default: return "Another cipher algo";
-	}
-}
-
-static const char *auth_algo_name(enum rte_crypto_auth_algorithm auth_algo)
-{
-	switch (auth_algo) {
-	case RTE_CRYPTO_AUTH_NULL: return "NULL"; break;
-	case RTE_CRYPTO_AUTH_AES_CBC_MAC: return "AES_CBC_MAC"; break;
-	case RTE_CRYPTO_AUTH_AES_CCM: return "AES_CCM"; break;
-	case RTE_CRYPTO_AUTH_AES_CMAC: return "AES_CMAC,"; break;
-	case RTE_CRYPTO_AUTH_AES_GCM: return "AES_GCM"; break;
-	case RTE_CRYPTO_AUTH_AES_GMAC: return "AES_GMAC"; break;
-	case RTE_CRYPTO_AUTH_AES_XCBC_MAC: return "AES_XCBC_MAC"; break;
-	case RTE_CRYPTO_AUTH_KASUMI_F9: return "KASUMI_F9"; break;
-	case RTE_CRYPTO_AUTH_MD5: return "MD5"; break;
-	case RTE_CRYPTO_AUTH_MD5_HMAC: return "MD5_HMAC,"; break;
-	case RTE_CRYPTO_AUTH_SHA1: return "SHA1"; break;
-	case RTE_CRYPTO_AUTH_SHA1_HMAC: return "SHA1_HMAC"; break;
-	case RTE_CRYPTO_AUTH_SHA224: return "SHA224"; break;
-	case RTE_CRYPTO_AUTH_SHA224_HMAC: return "SHA224_HMAC"; break;
-	case RTE_CRYPTO_AUTH_SHA256: return "SHA256"; break;
-	case RTE_CRYPTO_AUTH_SHA256_HMAC: return "SHA256_HMAC"; break;
-	case RTE_CRYPTO_AUTH_SHA384: return "SHA384,"; break;
-	case RTE_CRYPTO_AUTH_SHA384_HMAC: return "SHA384_HMAC,"; break;
-	case RTE_CRYPTO_AUTH_SHA512: return "SHA512,"; break;
-	case RTE_CRYPTO_AUTH_SHA512_HMAC: return "SHA512_HMAC,"; break;
-	case RTE_CRYPTO_AUTH_SNOW3G_UIA2: return "SNOW3G_UIA2"; break;
-	case RTE_CRYPTO_AUTH_ZUC_EIA3: return "RTE_CRYPTO_AUTH_ZUC_EIA3"; break;
-	default: return "Another auth algo"; break;
-	};
-}
-
 static struct rte_mbuf *
 setup_test_string(struct rte_mempool *mpool,
 		const uint8_t *data, size_t len, uint8_t blocksize)
@@ -2168,8 +2117,8 @@ test_perf_snow3G_optimise_cyclecount(struct perf_test_params *pparams)
 			pmd_name(gbl_cryptodev_perftest_devtype),
 			ts_params->dev_id, 0,
 			chain_mode_name(pparams->chain),
-			cipher_algo_name(pparams->cipher_algo),
-			auth_algo_name(pparams->auth_algo),
+			rte_crypto_cipher_algorithm_strings[pparams->cipher_algo],
+			rte_crypto_auth_algorithm_strings[pparams->auth_algo],
 			pparams->buf_size);
 	printf("\nOps Tx\tOps Rx\tOps/burst  ");
 	printf("Retries  EmptyPolls\tIACycles/CyOp\tIACycles/Burst\tIACycles/Byte");
@@ -2363,9 +2312,9 @@ test_perf_openssl_optimise_cyclecount(struct perf_test_params *pparams)
 			pmd_name(gbl_cryptodev_perftest_devtype),
 			ts_params->dev_id, 0,
 			chain_mode_name(pparams->chain),
-			cipher_algo_name(pparams->cipher_algo),
+			rte_crypto_cipher_algorithm_strings[pparams->cipher_algo],
 			pparams->cipher_key_length,
-			auth_algo_name(pparams->auth_algo),
+			rte_crypto_auth_algorithm_strings[pparams->auth_algo],
 			pparams->buf_size);
 	printf("\nOps Tx\tOps Rx\tOps/burst  ");
 	printf("Retries  EmptyPolls\tIACycles/CyOp\tIACycles/Burst\t"
@@ -2498,9 +2447,9 @@ test_perf_armv8_optimise_cyclecount(struct perf_test_params *pparams)
 			pmd_name(gbl_cryptodev_perftest_devtype),
 			ts_params->dev_id, 0,
 			chain_mode_name(pparams->chain),
-			cipher_algo_name(pparams->cipher_algo),
+			rte_crypto_cipher_algorithm_strings[pparams->cipher_algo],
 			pparams->cipher_key_length,
-			auth_algo_name(pparams->auth_algo),
+			rte_crypto_auth_algorithm_strings[pparams->auth_algo],
 			pparams->buf_size);
 	printf("\nOps Tx\tOps Rx\tOps/burst  ");
 	printf("Retries  "
@@ -3796,8 +3745,8 @@ test_perf_aes_cbc_encrypt_digest_vary_pkt_size(void)
 		printf("\n%s. cipher algo: %s auth algo: %s cipher key size=%u."
 				" burst_size: %d ops\n",
 				chain_mode_name(params_set[i].chain),
-				cipher_algo_name(params_set[i].cipher_algo),
-				auth_algo_name(params_set[i].auth_algo),
+				rte_crypto_cipher_algorithm_strings[params_set[i].cipher_algo],
+				rte_crypto_auth_algorithm_strings[params_set[i].auth_algo],
 				params_set[i].cipher_key_length,
 				burst_size);
 		printf("\nBuffer Size(B)\tOPS(M)\tThroughput(Gbps)\t"
@@ -3849,8 +3798,8 @@ test_perf_snow3G_vary_pkt_size(void)
 				pmd_name(gbl_cryptodev_perftest_devtype),
 				testsuite_params.dev_id, 0,
 				chain_mode_name(params_set[i].chain),
-				cipher_algo_name(params_set[i].cipher_algo),
-				auth_algo_name(params_set[i].auth_algo),
+				rte_crypto_cipher_algorithm_strings[params_set[i].cipher_algo],
+				rte_crypto_auth_algorithm_strings[params_set[i].auth_algo],
 				burst_sizes[k]);
 
 			params_set[i].burst_size = burst_sizes[k];
@@ -3935,8 +3884,8 @@ test_perf_openssl_vary_pkt_size(void)
 		printf("\n%s. cipher algo: %s auth algo: %s cipher key size=%u."
 				" burst_size: %d ops\n",
 				chain_mode_name(params_set[i].chain),
-				cipher_algo_name(params_set[i].cipher_algo),
-				auth_algo_name(params_set[i].auth_algo),
+				rte_crypto_cipher_algorithm_strings[params_set[i].cipher_algo],
+				rte_crypto_auth_algorithm_strings[params_set[i].auth_algo],
 				params_set[i].cipher_key_length,
 				burst_size);
 		printf("\nBuffer Size(B)\tOPS(M)\tThroughput(Gbps)\tRetries\t"
@@ -4075,8 +4024,8 @@ test_perf_armv8_vary_pkt_size(void)
 		printf("\n%s. cipher algo: %s auth algo: %s cipher key size=%u."
 				" burst_size: %d ops\n",
 				chain_mode_name(params_set[i].chain),
-				cipher_algo_name(params_set[i].cipher_algo),
-				auth_algo_name(params_set[i].auth_algo),
+				rte_crypto_cipher_algorithm_strings[params_set[i].cipher_algo],
+				rte_crypto_auth_algorithm_strings[params_set[i].auth_algo],
 				params_set[i].cipher_key_length,
 				burst_size);
 		printf("\nBuffer Size(B)\tOPS(M)\tThroughput(Gbps)\tRetries\t"
@@ -4611,8 +4560,8 @@ test_perf_continual_performance_test(void)
 		printf("\n%s. cipher algo: %s auth algo: %s cipher key size=%u."
 				" burst_size: %d ops\n",
 				chain_mode_name(params_set.chain),
-				cipher_algo_name(params_set.cipher_algo),
-				auth_algo_name(params_set.auth_algo),
+				rte_crypto_cipher_algorithm_strings[params_set.cipher_algo],
+				rte_crypto_auth_algorithm_strings[params_set.auth_algo],
 				params_set.cipher_key_length,
 				burst_size);
 		printf("\nBuffer Size(B)\tOPS(M)\tThroughput(Gbps)\t"
