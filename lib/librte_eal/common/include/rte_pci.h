@@ -112,7 +112,7 @@ struct rte_pci_id {
  * A structure describing the location of a PCI device.
  */
 struct rte_pci_addr {
-	uint16_t domain;                /**< Device domain */
+	uint32_t domain;                /**< Device domain */
 	uint8_t bus;                    /**< Device bus */
 	uint8_t devid;                  /**< Device ID */
 	uint8_t function;               /**< Device function. */
