@@ -86,6 +86,7 @@ rte_mempool_register_ops(const struct rte_mempool_ops *h)
 	ops->dequeue = h->dequeue;
 	ops->get_count = h->get_count;
 	ops->get_hw_cap = h->get_hw_cap;
+	ops->update_range = h->update_range;
 
 	rte_spinlock_unlock(&rte_mempool_ops_table.sl);
 
@@ -135,6 +136,18 @@ rte_mempool_ops_get_hw_cap(struct rte_mempool *mp)
 		return ops->get_hw_cap(mp);
 
 	return -ENOENT;
+}
+
+/* wrapper to update range info to external mempool */
+void
+rte_mempool_ops_update_range(struct rte_mempool *mp, char *vaddr,
+				phys_addr_t paddr, size_t len)
+{
+	struct rte_mempool_ops *ops;
+
+	ops = rte_mempool_get_ops(mp->ops_index);
+	if (ops->update_range)
+		ops->update_range(mp, vaddr, paddr, len);
 }
 
 /* sets mempool ops previously registered by rte_mempool_register_ops. */

@@ -46,5 +46,6 @@ DPDK_17.08 {
 	global:
 
 	rte_mempool_ops_get_hw_cap;
+	rte_mempool_ops_update_range;
 
 } DPDK_17.05;
