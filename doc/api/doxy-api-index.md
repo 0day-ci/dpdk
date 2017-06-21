@@ -161,4 +161,5 @@ There are many libraries, so their headers may be grouped by topics:
   [device metrics]     (@ref rte_metrics.h),
   [bitrate statistics] (@ref rte_bitrate.h),
   [latency statistics] (@ref rte_latencystats.h),
-  [version]            (@ref rte_version.h)
+  [version]            (@ref rte_version.h),
+  [ethtool]            (@ref rte_ethtool.h)
