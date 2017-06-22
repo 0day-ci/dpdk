@@ -151,6 +151,7 @@ DPDK_17.05 {
 DPDK_17.08 {
 	global:
 
+	rte_eth_tx_done_cleanup;
 	rte_flow_isolate;
 
 } DPDK_17.05;
