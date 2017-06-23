@@ -38,6 +38,9 @@
 #include <rte_ring.h>
 #include <rte_errno.h>
 
+#include <rte_service_private.h>
+#include <rte_cycles.h>
+
 #include "sw_evdev.h"
 #include "iq_ring.h"
 #include "event_ring.h"
@@ -695,6 +698,14 @@ set_credit_quanta(const char *key __rte_unused, const char *value, void *opaque)
 	return 0;
 }
 
+
+static int32_t sw_sched_service_func(void *args)
+{
+	struct rte_eventdev *dev = args;
+	sw_event_schedule(dev);
+	return 0;
+}
+
 static int
 sw_probe(struct rte_vdev_device *vdev)
 {
@@ -805,6 +816,17 @@ sw_probe(struct rte_vdev_device *vdev)
 	/* copy values passed from vdev command line to instance */
 	sw->credit_update_quanta = credit_quanta;
 	sw->sched_quanta = sched_quanta;
+
+	/* register service with EAL */
+	struct rte_service_spec service;
+	memset(&service, 0, sizeof(struct rte_service_spec));
+	snprintf(service.name, sizeof(service.name), "%s_service", name);
+	service.socket_id = socket_id;
+	service.callback = sw_sched_service_func;
+	service.callback_userdata = (void *)dev;
+
+	int32_t ret = rte_service_register(&service);
+	printf("serivce register = %d, cb ud %p\n", ret, dev);
 
 	return 0;
 }
