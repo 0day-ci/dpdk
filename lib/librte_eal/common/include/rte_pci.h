@@ -68,6 +68,9 @@ const char *pci_get_sysfs_path(void);
 /** Short formatting string, without domain, for PCI device: Ex: 00:01.0 */
 #define PCI_SHORT_PRI_FMT "%.2" PRIx8 ":%.2" PRIx8 ".%" PRIx8
 
+/** Formatting string for PCI vendor and device ID: Ex: 1234:5678 */
+#define PCI_ID_PRI_FMT "%.4" PRIx16 ":%.4" PRIx16
+
 /** Nb. of values in PCI device identifier format string. */
 #define PCI_FMT_NVAL 4
 

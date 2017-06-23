@@ -203,8 +203,8 @@ rte_pci_probe_one_driver(struct rte_pci_driver *dr,
 		return 1;
 	}
 
-	RTE_LOG(INFO, EAL, "  probe driver: %x:%x %s\n", dev->id.vendor_id,
-		dev->id.device_id, dr->driver.name);
+	RTE_LOG(INFO, EAL, "  probe driver: " PCI_ID_PRI_FMT " %s\n",
+		dev->id.vendor_id, dev->id.device_id, dr->driver.name);
 
 	if (dr->drv_flags & RTE_PCI_DRV_NEED_MAPPING) {
 		/* map resources for devices that use igb_uio */
@@ -253,8 +253,8 @@ rte_pci_detach_dev(struct rte_pci_device *dev)
 			loc->domain, loc->bus, loc->devid,
 			loc->function, dev->device.numa_node);
 
-	RTE_LOG(DEBUG, EAL, "  remove driver: %x:%x %s\n", dev->id.vendor_id,
-			dev->id.device_id, dr->driver.name);
+	RTE_LOG(DEBUG, EAL, "  remove driver: " PCI_ID_PRI_FMT " %s\n",
+			dev->id.vendor_id, dev->id.device_id, dr->driver.name);
 
 	if (dr->remove && (dr->remove(dev) < 0))
 		return -1;	/* negative value is an error */
