@@ -78,6 +78,7 @@
 #include <rte_version.h>
 #include <rte_atomic.h>
 #include <malloc_heap.h>
+#include <rte_service_private.h>
 
 #include "eal_private.h"
 #include "eal_thread.h"
@@ -936,6 +937,20 @@ rte_eal_init(int argc, char **argv)
 	if (rte_bus_probe()) {
 		rte_eal_init_alert("Cannot probe devices\n");
 		rte_errno = ENOTSUP;
+		return -1;
+	}
+
+	/* initialize service core threads and default service-core mapping */
+	struct rte_config *config = rte_eal_get_configuration();
+	uint32_t service_cores[RTE_MAX_LCORE];
+	int count = rte_service_core_list(service_cores, RTE_MAX_LCORE);
+	for (i = 0; i < count; i++) {
+		config->lcore_role[service_cores[i]] = ROLE_SERVICE;
+		rte_service_core_start(service_cores[i]);
+	}
+	ret = rte_service_init_default_mapping();
+	if (ret) {
+		rte_errno = ENOEXEC;
 		return -1;
 	}
 
