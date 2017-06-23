@@ -50,6 +50,7 @@
 #include <rte_version.h>
 #include <rte_devargs.h>
 #include <rte_memcpy.h>
+#include <rte_service.h>
 
 #include "eal_internal_cfg.h"
 #include "eal_options.h"
@@ -61,6 +62,7 @@ const char
 eal_short_options[] =
 	"b:" /* pci-blacklist */
 	"c:" /* coremask */
+	"s:" /* service coremask */
 	"d:" /* driver */
 	"h"  /* help */
 	"l:" /* corelist */
@@ -264,6 +266,75 @@ static int xdigit2val(unsigned char c)
 	else
 		val = c - 'a' + 10;
 	return val;
+}
+
+static int
+eal_parse_service_coremask(const char *coremask)
+{
+	struct rte_config *cfg = rte_eal_get_configuration();
+	int i, j, idx = 0;
+	unsigned count = 0;
+	char c;
+	int val;
+
+	if (coremask == NULL)
+		return -1;
+	/* Remove all blank characters ahead and after .
+	 * Remove 0x/0X if exists.
+	 */
+	while (isblank(*coremask))
+		coremask++;
+	if (coremask[0] == '0' && ((coremask[1] == 'x')
+		|| (coremask[1] == 'X')))
+		coremask += 2;
+	i = strlen(coremask);
+	while ((i > 0) && isblank(coremask[i - 1]))
+		i--;
+
+	if (i == 0)
+		return -1;
+
+	printf("\n\nRemoving Service Cores from lcore roles now\n\n");
+
+	/* TODO: only scan active cores in coremask */
+	for (i = i - 1; i >= 0 && idx < RTE_MAX_LCORE; i--) {
+		c = coremask[i];
+		if (isxdigit(c) == 0) {
+			/* invalid characters */
+			return -1;
+		}
+		val = xdigit2val(c);
+		for (j = 0; j < BITS_PER_HEX && idx < RTE_MAX_LCORE;
+				j++, idx++) {
+			if ((1 << j) & val) {
+				/* TODO: enable flexible master core */
+				if (idx == 0)
+					continue;
+
+				if (!lcore_config[idx].detected) {
+					RTE_LOG(ERR, EAL,
+						"lcore %u unavailable\n", idx);
+					return -1;
+				}
+				//cfg->lcore_role[idx] = ROLE_SERVICE;
+				rte_service_core_add(idx);
+				count++;
+			}
+		}
+	}
+
+	for (; i >= 0; i--)
+		if (coremask[i] != '0')
+			return -1;
+
+	for (; idx < RTE_MAX_LCORE; idx++)
+		lcore_config[idx].core_index = -1;
+
+	if (count == 0)
+		return -1;
+
+	cfg->score_count = count;
+	return 0;
 }
 
 static int
@@ -825,6 +896,13 @@ eal_parse_common_option(int opt, const char *optarg,
 			return -1;
 		}
 		core_parsed = 1;
+		break;
+	/* service coremask */
+	case 's':
+		if (eal_parse_service_coremask(optarg) < 0) {
+			RTE_LOG(ERR, EAL, "invalid service coremask\n");
+			return -1;
+		}
 		break;
 	/* size of memory */
 	case 'm':
