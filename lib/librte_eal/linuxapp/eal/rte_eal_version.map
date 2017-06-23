@@ -198,3 +198,27 @@ DPDK_17.05 {
 	vfio_get_group_no;
 
 } DPDK_17.02;
+
+DPDK_17.08 {
+	global:
+
+	rte_service_core_add;
+	rte_service_core_count;
+	rte_service_core_del;
+	rte_service_core_list;
+	rte_service_core_reset_all;
+	rte_service_core_start;
+	rte_service_core_stop;
+	rte_service_disable_on_core;
+	rte_service_enable_on_core;
+	rte_service_get_by_id;
+	rte_service_get_count;
+	rte_service_get_enabled_on_core;
+	rte_service_is_running;
+	rte_service_register;
+	rte_service_reset;
+	rte_service_start;
+	rte_service_stop;
+	rte_service_unregister;
+
+} DPDK_17.05;
