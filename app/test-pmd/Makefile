@@ -83,6 +83,12 @@ endif
 
 endif
 
+ifeq ($(CONFIG_RTE_JSON_SUPPORT),y)
+ifeq ($(CONFIG_RTE_LIBRTE_CFGFILE),y)
+LDLIBS += -ljansson
+endif
+endif
+
 CFLAGS_cmdline.o := -D_GNU_SOURCE
 
 include $(RTE_SDK)/mk/rte.app.mk

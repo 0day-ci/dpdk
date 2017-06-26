@@ -46,6 +46,10 @@
 
 #include <stdint.h>
 #include <unistd.h>
+
+#ifdef RTE_JSON_SUPPORT
+#include <jansson.h>
+#endif
 #include <inttypes.h>
 
 #include <rte_common.h>
@@ -2275,6 +2279,87 @@ cfgfile_load_path(int argc, char **argv)
 	}
 	return NULL;
 }
+
+#ifdef RTE_JSON_SUPPORT
+/*
+ * Decoding JSON structure to rte_cfgfile structure.
+ * Returns handler to cfgfile object, NULL if error.
+ */
+static struct
+rte_cfgfile *l3fwd_json_to_cfg(json_t *json, int flags)
+{
+	if (!json) {
+		printf("Error: JSON structure is NULL, nothing to parse\n");
+		return NULL;
+	}
+	/* create an empty instance of cfgfile structure */
+	struct rte_cfgfile *cfgfile = rte_cfgfile_create(flags);
+
+	if (!cfgfile)
+		return NULL;
+
+	const char *section;
+	json_t *entry;
+
+	/* set pointer to first section */
+	void *iter_section = json_object_iter(json);
+
+	while (iter_section) {
+
+		section = json_object_iter_key(iter_section);
+		entry = json_object_iter_value(iter_section);
+
+		/* add parsed section name of current section to cfgfile */
+		rte_cfgfile_add_section(cfgfile, section);
+
+		/* set pointer to first entry */
+		void *iter_entry = json_object_iter(entry);
+
+		while (iter_entry) {
+
+			const char *key;
+			const char *value;
+
+			key = json_object_iter_key(iter_entry);
+			value = json_string_value(
+					json_object_iter_value(iter_entry));
+
+			/* add parsed key and value of current entry */
+			/* to cfgfile */
+			rte_cfgfile_add_entry(cfgfile, section, key, value);
+
+			/* pointer to next entry */
+			iter_entry = json_object_iter_next(entry, iter_entry);
+		}
+		/* pointer to next section */
+		iter_section = json_object_iter_next(json, iter_section);
+	}
+	return cfgfile;
+}
+
+/*
+ * Check presence and load JSON file to rte_cfgfile structure.
+ * Returns handler to cfgfile object, NULL if error.
+ */
+static struct
+rte_cfgfile *l3fwd_load_json_to_cfg(const char *path)
+{
+	struct rte_cfgfile *cfgfile = NULL;
+	/* check if config file exist */
+	if (access(path, F_OK) != -1) {
+		/* parse JSON file */
+		json_error_t error;
+		json_t *json = json_load_file(path, 0, &error);
+
+		if (json)
+			cfgfile = l3fwd_json_to_cfg(json, 0);
+		else
+			fprintf(stderr, "JSON error on line %d: %s\n",
+							error.line, error.text);
+	}
+	return cfgfile;
+}
+#endif
 #endif
 
 #define APP_NAME "TEST-PMD"
@@ -2303,9 +2388,16 @@ main(int argc, char** argv)
 				"in default directory)\n");
 		config_file = strdup("config.ini");
 	}
-
+#ifndef RTE_JSON_SUPPORT
 	cfg = rte_cfgfile_load(config_file, CFG_FLAG_EMPTY_VALUES);
+#endif
 
+#ifdef RTE_JSON_SUPPORT
+	if (strstr(config_file, ".ini"))
+		cfg = rte_cfgfile_load(config_file, CFG_FLAG_EMPTY_VALUES);
+	else if (strstr(config_file, ".json"))
+		cfg = l3fwd_load_json_to_cfg(config_file);
+#endif
 	if (cfg == NULL) {
 		printf("Info: Valid cfgfile not found\n");
 		cfg = rte_cfgfile_create(CFG_FLAG_EMPTY_VALUES);
