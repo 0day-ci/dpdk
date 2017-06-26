@@ -111,6 +111,7 @@ _test_cfgfile_sample(struct rte_cfgfile *cfgfile)
 	return 0;
 }
 
+
 static int
 test_cfgfile_sample1(void)
 {
@@ -146,6 +147,42 @@ test_cfgfile_sample2(void)
 
 	ret = _test_cfgfile_sample(cfgfile);
 	TEST_ASSERT_SUCCESS(ret, "Failed to validate sample file: %d", ret);
+
+	ret = rte_cfgfile_close(cfgfile);
+	TEST_ASSERT_SUCCESS(ret, "Failed to close cfgfile");
+
+	return 0;
+}
+
+static int
+test_cfgfile_realloc_sections(void)
+{
+	struct rte_cfgfile *cfgfile;
+	int ret;
+	const char *value;
+
+	cfgfile = rte_cfgfile_load(CFG_FILES_ETC "/realloc_sections.ini", 0);
+	TEST_ASSERT_NOT_NULL(cfgfile, "Failed to load config file");
+
+	ret = rte_cfgfile_num_sections(cfgfile, NULL, 0);
+	TEST_ASSERT(ret == 9, "Unexpected number of sections: %d", ret);
+
+	ret = rte_cfgfile_has_section(cfgfile, "section9");
+	TEST_ASSERT(ret, "section9 missing");
+
+	ret = rte_cfgfile_section_num_entries(cfgfile, "section3");
+	TEST_ASSERT(ret == 21,
+			"section3 unexpected number of entries: %d", ret);
+
+	ret = rte_cfgfile_section_num_entries(cfgfile, "section9");
+	TEST_ASSERT(ret == 8, "section9 unexpected number of entries: %d", ret);
+
+	value = rte_cfgfile_get_entry(cfgfile, "section9", "key8");
+	TEST_ASSERT(strcmp("value8_section9", value) == 0,
+		    "key unexpected value: %s", value);
+
+	ret = rte_cfgfile_save(cfgfile, "cfgfile_save.ini");
+	TEST_ASSERT_SUCCESS(ret, "Failed to save *.ini file");
 
 	ret = rte_cfgfile_close(cfgfile);
 	TEST_ASSERT_SUCCESS(ret, "Failed to close cfgfile");
@@ -290,6 +327,9 @@ test_cfgfile(void)
 		return -1;
 
 	if (test_cfgfile_sample2())
+		return -1;
+
+	if (test_cfgfile_realloc_sections())
 		return -1;
 
 	if (test_cfgfile_invalid_section_header())
