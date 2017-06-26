@@ -131,7 +131,12 @@ static int core_parsed;
 void
 eal_reset_internal_config(struct internal_config *internal_cfg)
 {
+	static int run_once;
 	int i;
+
+	if (run_once)
+		return;
+	run_once = 1;
 
 	internal_cfg->memory = 0;
 	internal_cfg->force_nrank = 0;

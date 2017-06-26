@@ -53,10 +53,17 @@
 int
 rte_eal_cpu_init(void)
 {
+	static int run_once;
+	static int ret;
 	/* pointer to global configuration */
 	struct rte_config *config = rte_eal_get_configuration();
 	unsigned lcore_id;
 	unsigned count = 0;
+
+	/* No need to calculate this function again if we know the result */
+	if (run_once)
+		return ret;
+	run_once = 1;
 
 	/*
 	 * Parse the maximum set of logical cores, detect the subset of running
@@ -91,7 +98,7 @@ rte_eal_cpu_init(void)
 				"RTE_MAX_NUMA_NODES (%d)\n",
 				lcore_config[lcore_id].socket_id,
 				RTE_MAX_NUMA_NODES);
-			return -1;
+			return ret = -1;
 #endif
 		}
 		RTE_LOG(DEBUG, EAL, "Detected lcore %u as "
@@ -107,5 +114,5 @@ rte_eal_cpu_init(void)
 		RTE_MAX_LCORE);
 	RTE_LOG(INFO, EAL, "Detected %u lcore(s)\n", config->lcore_count);
 
-	return 0;
+	return ret = 0;
 }

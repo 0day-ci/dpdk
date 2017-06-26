@@ -78,6 +78,9 @@
 #include <rte_version.h>
 #include <rte_atomic.h>
 #include <malloc_heap.h>
+#ifdef RTE_LIBRTE_CFGFILE
+#include <rte_cfgfile.h>
+#endif
 
 #include "eal_private.h"
 #include "eal_thread.h"
@@ -478,6 +481,20 @@ eal_parse_vfio_intr(const char *mode)
 	return -1;
 }
 
+#ifdef RTE_LIBRTE_CFGFILE
+/* Parse the arguments for --log-level only */
+static void
+eal_log_level_cfg(struct rte_cfgfile *cfg)
+{
+	const char *entry;
+
+	entry = rte_cfgfile_get_entry(cfg, "DPDK", OPT_LOG_LEVEL);
+	if (entry)
+		eal_parse_common_option(OPT_LOG_LEVEL_NUM, entry,
+				&internal_config);
+}
+#endif
+
 /* Parse the arguments for --log-level only */
 static void
 eal_log_level_parse(int argc, char **argv)
@@ -515,6 +532,114 @@ eal_log_level_parse(int argc, char **argv)
 	optarg = old_optarg;
 }
 
+/* Parse single argument */
+static int
+eal_parse_option(int opt, char *optarg, int option_index, char *prgname)
+{
+	int ret;
+
+	/* getopt is not happy, stop right now */
+	if (opt == '?') {
+		eal_usage(prgname);
+		ret = -1;
+		goto out;
+	}
+
+	ret = eal_parse_common_option(opt, optarg, &internal_config);
+	/* common parser is not happy */
+	if (ret < 0) {
+		eal_usage(prgname);
+		ret = -1;
+		goto out;
+	}
+	/* common parser handled this option */
+	if (ret == 0)
+		return 0;
+
+	switch (opt) {
+	case 'h':
+		eal_usage(prgname);
+		exit(EXIT_SUCCESS);
+		break;
+
+	/* long options */
+	case OPT_XEN_DOM0_NUM:
+#ifdef RTE_LIBRTE_XEN_DOM0
+		internal_config.xen_dom0_support = 1;
+		break;
+#else
+		RTE_LOG(ERR, EAL, "Can't support DPDK app "
+			"running on Dom0, please configure"
+			" RTE_LIBRTE_XEN_DOM0=y\n");
+		ret = -1;
+		goto out;
+#endif
+
+	case OPT_HUGE_DIR_NUM:
+		internal_config.hugepage_dir = optarg;
+		break;
+
+	case OPT_FILE_PREFIX_NUM:
+		internal_config.hugefile_prefix = optarg;
+		break;
+
+	case OPT_SOCKET_MEM_NUM:
+		if (eal_parse_socket_mem(optarg) < 0) {
+			RTE_LOG(ERR, EAL, "invalid parameters for --"
+					OPT_SOCKET_MEM "\n");
+			eal_usage(prgname);
+			ret = -1;
+			goto out;
+		}
+		break;
+
+	case OPT_BASE_VIRTADDR_NUM:
+		if (eal_parse_base_virtaddr(optarg) < 0) {
+			RTE_LOG(ERR, EAL, "invalid parameter for --"
+					OPT_BASE_VIRTADDR "\n");
+			eal_usage(prgname);
+			ret = -1;
+			goto out;
+		}
+		break;
+
+	case OPT_VFIO_INTR_NUM:
+		if (eal_parse_vfio_intr(optarg) < 0) {
+			RTE_LOG(ERR, EAL, "invalid parameters for --"
+					OPT_VFIO_INTR "\n");
+			eal_usage(prgname);
+			ret = -1;
+			goto out;
+		}
+		break;
+
+	case OPT_CREATE_UIO_DEV_NUM:
+		internal_config.create_uio_dev = 1;
+		break;
+
+	default:
+		if (opt < OPT_LONG_MIN_NUM && isprint(opt)) {
+			RTE_LOG(ERR, EAL, "Option %c is not supported "
+				"on Linux\n", opt);
+		} else if (opt >= OPT_LONG_MIN_NUM &&
+			   opt < OPT_LONG_MAX_NUM) {
+			RTE_LOG(ERR, EAL, "Option %s is not supported "
+				"on Linux\n",
+				eal_long_options[option_index].name);
+		} else {
+			RTE_LOG(ERR, EAL, "Option %d is not supported "
+				"on Linux\n", opt);
+		}
+		eal_usage(prgname);
+		ret = -1;
+		goto out;
+	}
+
+	return 0;
+out:
+	return ret;
+}
+
 /* Parse the argument given in the command line of the application */
 static int
 eal_parse_args(int argc, char **argv)
@@ -533,101 +658,9 @@ eal_parse_args(int argc, char **argv)
 	while ((opt = getopt_long(argc, argvopt, eal_short_options,
 				  eal_long_options, &option_index)) != EOF) {
 
-		/* getopt is not happy, stop right now */
-		if (opt == '?') {
-			eal_usage(prgname);
-			ret = -1;
+		ret = eal_parse_option(opt, optarg, option_index, prgname);
+		if (ret < 0)
 			goto out;
-		}
-
-		ret = eal_parse_common_option(opt, optarg, &internal_config);
-		/* common parser is not happy */
-		if (ret < 0) {
-			eal_usage(prgname);
-			ret = -1;
-			goto out;
-		}
-		/* common parser handled this option */
-		if (ret == 0)
-			continue;
-
-		switch (opt) {
-		case 'h':
-			eal_usage(prgname);
-			exit(EXIT_SUCCESS);
-
-		/* long options */
-		case OPT_XEN_DOM0_NUM:
-#ifdef RTE_LIBRTE_XEN_DOM0
-			internal_config.xen_dom0_support = 1;
-#else
-			RTE_LOG(ERR, EAL, "Can't support DPDK app "
-				"running on Dom0, please configure"
-				" RTE_LIBRTE_XEN_DOM0=y\n");
-			ret = -1;
-			goto out;
-#endif
-			break;
-
-		case OPT_HUGE_DIR_NUM:
-			internal_config.hugepage_dir = optarg;
-			break;
-
-		case OPT_FILE_PREFIX_NUM:
-			internal_config.hugefile_prefix = optarg;
-			break;
-
-		case OPT_SOCKET_MEM_NUM:
-			if (eal_parse_socket_mem(optarg) < 0) {
-				RTE_LOG(ERR, EAL, "invalid parameters for --"
-						OPT_SOCKET_MEM "\n");
-				eal_usage(prgname);
-				ret = -1;
-				goto out;
-			}
-			break;
-
-		case OPT_BASE_VIRTADDR_NUM:
-			if (eal_parse_base_virtaddr(optarg) < 0) {
-				RTE_LOG(ERR, EAL, "invalid parameter for --"
-						OPT_BASE_VIRTADDR "\n");
-				eal_usage(prgname);
-				ret = -1;
-				goto out;
-			}
-			break;
-
-		case OPT_VFIO_INTR_NUM:
-			if (eal_parse_vfio_intr(optarg) < 0) {
-				RTE_LOG(ERR, EAL, "invalid parameters for --"
-						OPT_VFIO_INTR "\n");
-				eal_usage(prgname);
-				ret = -1;
-				goto out;
-			}
-			break;
-
-		case OPT_CREATE_UIO_DEV_NUM:
-			internal_config.create_uio_dev = 1;
-			break;
-
-		default:
-			if (opt < OPT_LONG_MIN_NUM && isprint(opt)) {
-				RTE_LOG(ERR, EAL, "Option %c is not supported "
-					"on Linux\n", opt);
-			} else if (opt >= OPT_LONG_MIN_NUM &&
-				   opt < OPT_LONG_MAX_NUM) {
-				RTE_LOG(ERR, EAL, "Option %s is not supported "
-					"on Linux\n",
-					eal_long_options[option_index].name);
-			} else {
-				RTE_LOG(ERR, EAL, "Option %d is not supported "
-					"on Linux\n", opt);
-			}
-			eal_usage(prgname);
-			ret = -1;
-			goto out;
-		}
 	}
 
 	if (eal_adjust_config(&internal_config) != 0) {
@@ -995,3 +1028,149 @@ rte_eal_check_module(const char *module_name)
 	/* Module has been found */
 	return 1;
 }
+
+#ifdef RTE_LIBRTE_CFGFILE
+#define vdev_buff_size		200
+#define sectionname_size	20
+static int
+parse_vdev_devices(struct rte_cfgfile *cfg)
+{
+	char sectionname[sectionname_size];
+	char buffer1[vdev_buff_size];
+	int vdev_nb = 0;
+	int n_entries;
+
+	int i;
+
+	/* ----------- parsing VDEVS */
+	snprintf(sectionname, sectionname_size, "DPDK.vdev%d", vdev_nb);
+
+	for (vdev_nb = 1; rte_cfgfile_has_section(cfg, sectionname);
+			vdev_nb++) {
+		n_entries = rte_cfgfile_section_num_entries(cfg, sectionname);
+
+		struct rte_cfgfile_entry entries[n_entries];
+
+
+		if (n_entries != rte_cfgfile_section_entries(cfg, sectionname,
+				entries, n_entries)) {
+			rte_eal_init_alert("Unexpected fault.");
+			rte_errno = EFAULT;
+			return -1;
+		}
+
+		buffer1[0] = 0;
+		for (i = 0; i < n_entries; i++) {
+			if (strlen(entries[i].value)) {
+
+				if ((strlen(buffer1) +
+						strlen(entries[i].name) +
+						strlen(entries[i].value) + 3)
+						>= vdev_buff_size)
+					goto buff_size_err;
+				strcat(buffer1, entries[i].name);
+				strcat(buffer1, "=");
+				strcat(buffer1, entries[i].value);
+			} else {
+				if ((strlen(buffer1) +
+						strlen(entries[i].name) + 2)
+						>= vdev_buff_size)
+					goto buff_size_err;
+				strcat(buffer1, entries[i].name);
+			}
+
+			if (i < (n_entries - 1))
+				strcat(buffer1, ",");
+		}
+
+		/* parsing vdev */
+		if (rte_eal_devargs_add(RTE_DEVTYPE_VIRTUAL,
+				buffer1) < 0) {
+			return -1;
+		}
+		snprintf(sectionname, sectionname_size, "DPDK.vdev%d", vdev_nb);
+	}
+	/* ----------- parsing VDEVS */
+	return 0;
+
+buff_size_err:
+	printf("parse_vdev_devices(): buffer size is to small\n");
+	return -1;
+}
+
+static void
+eal_getopt(const char *str, int *opt, int *option_index)
+{
+	int i;
+
+	*opt = '?';
+	*option_index = 0;
+
+	if (strlen(str) == 1) {
+		*opt = *str;
+		return;
+	}
+
+	for (i = 0; eal_long_options[i].name != NULL; i++) {
+		if (strcmp(str, eal_long_options[i].name) == 0) {
+			*opt = eal_long_options[i].val;
+			*option_index = i;
+			break;
+		}
+	}
+}
+
+int
+rte_eal_configure(struct rte_cfgfile *cfg, char *prgname)
+{
+	int n_entries;
+	int i;
+	int opt;
+	int option_index;
+
+	if (cfg == NULL) {
+		rte_errno = -EINVAL;
+		return -1;
+	}
+
+	n_entries = rte_cfgfile_section_num_entries(cfg, "DPDK");
+
+	if (n_entries < 1) {
+		printf("No DPDK section entries in cfgfile object\n");
+		return 0;
+	}
+
+	struct rte_cfgfile_entry entries[n_entries];
+
+	if (n_entries !=
+			rte_cfgfile_section_entries(cfg, "DPDK", entries,
+					n_entries)) {
+		rte_eal_init_alert("Unexpected fault.");
+		rte_errno = EFAULT;
+		return -1;
+	}
+
+	eal_reset_internal_config(&internal_config);
+
+	/* set log level as early as possible */
+	eal_log_level_cfg(cfg);
+
+	for (i = 0; i < n_entries; i++) {
+		eal_getopt(entries[i].name, &opt, &option_index);
+
+		if (eal_parse_option(opt, entries[i].value,
+				option_index, prgname) != 0) {
+			rte_eal_init_alert("Invalid config file arguments.");
+			rte_errno = EINVAL;
+			return -1;
+		}
+	}
+
+	if (parse_vdev_devices(cfg) < 0) {
+		rte_eal_init_alert("Couldn't parse vdevs");
+		rte_errno = ENOMEM;
+		return -1;
+	}
+	return 0;
+}
+#endif

@@ -50,12 +50,18 @@ rte_cpu_check_supported(void)
 int
 rte_cpu_is_supported(void)
 {
+	static int run_once;
+	static int ret;
 	/* This is generated at compile-time by the build system */
 	static const enum rte_cpu_flag_t compile_time_flags[] = {
 			RTE_COMPILE_TIME_CPUFLAGS
 	};
 	unsigned count = RTE_DIM(compile_time_flags), i;
-	int ret;
+
+	/* No need to calculate this function again if we know the result */
+	if (run_once)
+		return ret;
+	run_once = 1;
 
 	for (i = 0; i < count; i++) {
 		ret = rte_cpu_get_flag_enabled(compile_time_flags[i]);
@@ -64,16 +70,16 @@ rte_cpu_is_supported(void)
 			fprintf(stderr,
 				"ERROR: CPU feature flag lookup failed with error %d\n",
 				ret);
-			return 0;
+			return ret = 0;
 		}
 		if (!ret) {
 			fprintf(stderr,
 			        "ERROR: This system does not support \"%s\".\n"
 			        "Please check that RTE_MACHINE is set correctly.\n",
 			        rte_cpu_get_flag_name(compile_time_flags[i]));
-			return 0;
+			return ret = 0;
 		}
 	}
 
-	return 1;
+	return ret = 1;
 }

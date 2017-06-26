@@ -569,6 +569,7 @@ CONFIG_RTE_LIBRTE_TIMER_DEBUG=n
 # Compile librte_cfgfile
 #
 CONFIG_RTE_LIBRTE_CFGFILE=y
+CONFIG_RTE_LIBRTE_CFGFILE_DEBUG=n
 
 #
 # Compile librte_cmdline

@@ -193,3 +193,7 @@ DPDK_17.05 {
 	vfio_get_group_no;
 
 } DPDK_17.02;
+
+DPDK_17.08 {
+	rte_eal_configure;
+} DPDK_17.05;
