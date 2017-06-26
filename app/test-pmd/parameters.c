@@ -77,8 +77,95 @@
 #include <rte_eth_bond.h>
 #endif
 #include <rte_flow.h>
+#ifdef RTE_LIBRTE_CFGFILE
+#include <rte_cfgfile.h>
+#endif
 
 #include "testpmd.h"
+
+enum { TX, RX };
+
+static struct option lgopts[] = {
+	{ "cfgfile-path",		1, 0, 1 },
+	{ "help",			0, 0, 0 },
+#ifdef RTE_LIBRTE_CMDLINE
+	{ "interactive",		0, 0, 0 },
+	{ "cmdline-file",		1, 0, 0 },
+	{ "auto-start",			0, 0, 0 },
+	{ "eth-peers-configfile",	1, 0, 0 },
+	{ "eth-peer",			1, 0, 0 },
+#endif
+	{ "ports",			1, 0, 0 },
+	{ "nb-cores",			1, 0, 0 },
+	{ "nb-ports",			1, 0, 0 },
+	{ "coremask",			1, 0, 0 },
+	{ "portmask",			1, 0, 0 },
+	{ "numa",			0, 0, 0 },
+	{ "no-numa",			0, 0, 0 },
+	{ "mp-anon",			0, 0, 0 },
+	{ "port-numa-config",           1, 0, 0 },
+	{ "ring-numa-config",           1, 0, 0 },
+	{ "socket-num",			1, 0, 0 },
+	{ "mbuf-size",			1, 0, 0 },
+	{ "total-num-mbufs",		1, 0, 0 },
+	{ "max-pkt-len",		1, 0, 0 },
+	{ "pkt-filter-mode",            1, 0, 0 },
+	{ "pkt-filter-report-hash",     1, 0, 0 },
+	{ "pkt-filter-size",            1, 0, 0 },
+	{ "pkt-filter-drop-queue",      1, 0, 0 },
+#ifdef RTE_LIBRTE_LATENCY_STATS
+	{ "latencystats",               1, 0, 0 },
+#endif
+#ifdef RTE_LIBRTE_BITRATE
+	{ "bitrate-stats",              1, 0, 0 },
+#endif
+	{ "disable-crc-strip",          0, 0, 0 },
+	{ "enable-lro",                 0, 0, 0 },
+	{ "enable-rx-cksum",            0, 0, 0 },
+	{ "enable-scatter",             0, 0, 0 },
+	{ "disable-hw-vlan",            0, 0, 0 },
+	{ "disable-hw-vlan-filter",     0, 0, 0 },
+	{ "disable-hw-vlan-strip",      0, 0, 0 },
+	{ "disable-hw-vlan-extend",     0, 0, 0 },
+	{ "enable-drop-en",            0, 0, 0 },
+	{ "disable-rss",                0, 0, 0 },
+	{ "port-topology",              1, 0, 0 },
+	{ "forward-mode",               1, 0, 0 },
+	{ "rss-ip",			0, 0, 0 },
+	{ "rss-udp",			0, 0, 0 },
+	{ "rxq",			1, 0, 0 },
+	{ "txq",			1, 0, 0 },
+	{ "rxd",			1, 0, 0 },
+	{ "txd",			1, 0, 0 },
+	{ "burst",			1, 0, 0 },
+	{ "mbcache",			1, 0, 0 },
+	{ "txpt",			1, 0, 0 },
+	{ "txht",			1, 0, 0 },
+	{ "txwt",			1, 0, 0 },
+	{ "txfreet",			1, 0, 0 },
+	{ "txrst",			1, 0, 0 },
+	{ "txqflags",			1, 0, 0 },
+	{ "rxpt",			1, 0, 0 },
+	{ "rxht",			1, 0, 0 },
+	{ "rxwt",			1, 0, 0 },
+	{ "rxfreet",                    1, 0, 0 },
+	{ "tx-queue-stats-mapping",	1, 0, 0 },
+	{ "rx-queue-stats-mapping",	1, 0, 0 },
+	{ "no-flush-rx",	0, 0, 0 },
+	{ "txpkts",			1, 0, 0 },
+	{ "disable-link-check",		0, 0, 0 },
+	{ "no-lsc-interrupt",		0, 0, 0 },
+	{ "no-rmv-interrupt",		0, 0, 0 },
+	{ "print-event",		1, 0, 0 },
+	{ "mask-event",			1, 0, 0 },
+	{ 0, 0, 0, 0 },
+};
+
+#ifdef RTE_LIBRTE_CMDLINE
+#define SHORTOPTS "i"
+#else
+#define SHORTOPTS ""
+#endif
 
 static void
 usage(char* progname)
@@ -549,559 +636,675 @@ parse_event_printing_config(const char *optarg, int enable)
 	return 0;
 }
 
-void
-launch_args_parse(int argc, char** argv)
+static int
+parse_option(int opt, char *optarg, int opt_idx, char *prgname)
 {
-	int n, opt;
-	char **argvopt;
-	int opt_idx;
-	enum { TX, RX };
+	int n;
 
-	static struct option lgopts[] = {
-		{ "help",			0, 0, 0 },
+	switch (opt) {
 #ifdef RTE_LIBRTE_CMDLINE
-		{ "interactive",		0, 0, 0 },
-		{ "cmdline-file",		1, 0, 0 },
-		{ "auto-start",			0, 0, 0 },
-		{ "eth-peers-configfile",	1, 0, 0 },
-		{ "eth-peer",			1, 0, 0 },
+	case 'i':
+		printf("Interactive-mode selected\n");
+		interactive = 1;
+		break;
 #endif
-		{ "ports",			1, 0, 0 },
-		{ "nb-cores",			1, 0, 0 },
-		{ "nb-ports",			1, 0, 0 },
-		{ "coremask",			1, 0, 0 },
-		{ "portmask",			1, 0, 0 },
-		{ "numa",			0, 0, 0 },
-		{ "no-numa",			0, 0, 0 },
-		{ "mp-anon",			0, 0, 0 },
-		{ "port-numa-config",           1, 0, 0 },
-		{ "ring-numa-config",           1, 0, 0 },
-		{ "socket-num",			1, 0, 0 },
-		{ "mbuf-size",			1, 0, 0 },
-		{ "total-num-mbufs",		1, 0, 0 },
-		{ "max-pkt-len",		1, 0, 0 },
-		{ "pkt-filter-mode",            1, 0, 0 },
-		{ "pkt-filter-report-hash",     1, 0, 0 },
-		{ "pkt-filter-size",            1, 0, 0 },
-		{ "pkt-filter-drop-queue",      1, 0, 0 },
+	case 'a':
+		printf("Auto-start selected\n");
+		auto_start = 1;
+		break;
+
+	case 0: /*long options */
+		if (!strcmp(lgopts[opt_idx].name, "help")) {
+			usage(prgname);
+			rte_exit(EXIT_SUCCESS, "Displayed help\n");
+			return 0;
+		}
+#ifdef RTE_LIBRTE_CMDLINE
+		if (!strcmp(lgopts[opt_idx].name, "interactive")) {
+			printf("Interactive-mode selected\n");
+			interactive = 1;
+		}
+		if (!strcmp(lgopts[opt_idx].name, "cmdline-file")) {
+			printf("CLI commands to be read from %s\n",
+			       optarg);
+			snprintf(cmdline_filename,
+				 sizeof(cmdline_filename), "%s",
+				 optarg);
+		}
+		if (!strcmp(lgopts[opt_idx].name, "auto-start")) {
+			printf("Auto-start selected\n");
+			auto_start = 1;
+		}
+		if (!strcmp(lgopts[opt_idx].name,
+			    "eth-peers-configfile")) {
+			if (init_peer_eth_addrs(optarg) != 0)
+				rte_exit(EXIT_FAILURE,
+					 "Cannot open logfile\n");
+		}
+		if (!strcmp(lgopts[opt_idx].name, "eth-peer")) {
+			char *port_end;
+			uint8_t c, peer_addr[6];
+
+			errno = 0;
+			n = strtoul(optarg, &port_end, 10);
+			if (errno != 0 || port_end == optarg ||
+					*port_end++ != ',')
+				rte_exit(EXIT_FAILURE,
+					 "Invalid eth-peer: %s", optarg);
+			if (n >= RTE_MAX_ETHPORTS) {
+				rte_exit(EXIT_FAILURE,
+					 "eth-peer: port %d >= "
+					 "RTE_MAX_ETHPORTS(%d)\n",
+					 n, RTE_MAX_ETHPORTS);
+				return -1;
+			}
+
+			if (cmdline_parse_etheraddr(NULL, port_end,
+					&peer_addr, sizeof(peer_addr)) < 0) {
+				rte_exit(EXIT_FAILURE,
+					 "Invalid ethernet address: %s\n",
+					 port_end);
+				return -1;
+			}
+			for (c = 0; c < 6; c++)
+				peer_eth_addrs[n].addr_bytes[c] =
+					peer_addr[c];
+			nb_peer_eth_addrs++;
+		}
+#endif
+		if (!strcmp(lgopts[opt_idx].name, "nb-ports")) {
+			n = atoi(optarg);
+			if (n > 0 && n <= nb_ports)
+				nb_fwd_ports = (uint8_t) n;
+			else {
+				rte_exit(EXIT_FAILURE,
+					 "Invalid port %d\n", n);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "nb-cores")) {
+			n = atoi(optarg);
+			if (n > 0 && n <= nb_lcores)
+				nb_fwd_lcores = (uint8_t) n;
+			else {
+				rte_exit(EXIT_FAILURE,
+					 "nb-cores should be > 0 and <= %d\n",
+					 nb_lcores);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "coremask"))
+			parse_fwd_coremask(optarg);
+		if (!strcmp(lgopts[opt_idx].name, "portmask"))
+			parse_fwd_portmask(optarg);
+		if (!strcmp(lgopts[opt_idx].name, "no-numa"))
+			numa_support = 0;
+		if (!strcmp(lgopts[opt_idx].name, "numa"))
+			numa_support = 1;
+		if (!strcmp(lgopts[opt_idx].name, "mp-anon"))
+			mp_anon = 1;
+		if (!strcmp(lgopts[opt_idx].name, "port-numa-config")) {
+			if (parse_portnuma_config(optarg)) {
+				rte_exit(EXIT_FAILURE,
+				   "invalid port-numa configuration\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "ring-numa-config"))
+			if (parse_ringnuma_config(optarg)) {
+				rte_exit(EXIT_FAILURE,
+				   "invalid ring-numa configuration\n");
+				return -1;
+			}
+		if (!strcmp(lgopts[opt_idx].name, "socket-num")) {
+			n = atoi(optarg);
+			if (!new_socket_id((uint8_t)n)) {
+				socket_num = (uint8_t)n;
+			} else {
+				print_invalid_socket_id_error();
+				rte_exit(EXIT_FAILURE,
+					"Invalid socket id");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "mbuf-size")) {
+			n = atoi(optarg);
+			if (n > 0 && n <= 0xFFFF)
+				mbuf_data_size = (uint16_t) n;
+			else {
+				rte_exit(EXIT_FAILURE,
+					 "mbuf-size should be > 0 and < 65536\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "total-num-mbufs")) {
+			n = atoi(optarg);
+			if (n > 1024)
+				param_total_num_mbufs = (unsigned int)n;
+			else {
+				rte_exit(EXIT_FAILURE,
+					 "total-num-mbufs should be > 1024\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "max-pkt-len")) {
+			n = atoi(optarg);
+			if (n >= ETHER_MIN_LEN) {
+				rx_mode.max_rx_pkt_len = (uint32_t) n;
+				if (n > ETHER_MAX_LEN)
+					rx_mode.jumbo_frame = 1;
+			} else {
+				rte_exit(EXIT_FAILURE,
+					 "Invalid max-pkt-len=%d - should be > %d\n",
+					 n, ETHER_MIN_LEN);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "pkt-filter-mode")) {
+			if (!strcmp(optarg, "signature"))
+				fdir_conf.mode =
+					RTE_FDIR_MODE_SIGNATURE;
+			else if (!strcmp(optarg, "perfect"))
+				fdir_conf.mode = RTE_FDIR_MODE_PERFECT;
+			else if (!strcmp(optarg, "perfect-mac-vlan"))
+				fdir_conf.mode = RTE_FDIR_MODE_PERFECT_MAC_VLAN;
+			else if (!strcmp(optarg, "perfect-tunnel"))
+				fdir_conf.mode = RTE_FDIR_MODE_PERFECT_TUNNEL;
+			else if (!strcmp(optarg, "none"))
+				fdir_conf.mode = RTE_FDIR_MODE_NONE;
+			else {
+				rte_exit(EXIT_FAILURE,
+					 "pkt-mode-invalid %s invalid - must be: "
+					 "none, signature, perfect, perfect-mac-vlan"
+					 " or perfect-tunnel\n",
+					 optarg);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name,
+			    "pkt-filter-report-hash")) {
+			if (!strcmp(optarg, "none"))
+				fdir_conf.status =
+					RTE_FDIR_NO_REPORT_STATUS;
+			else if (!strcmp(optarg, "match"))
+				fdir_conf.status =
+					RTE_FDIR_REPORT_STATUS;
+			else if (!strcmp(optarg, "always"))
+				fdir_conf.status =
+					RTE_FDIR_REPORT_STATUS_ALWAYS;
+			else {
+				rte_exit(EXIT_FAILURE,
+					 "pkt-filter-report-hash %s invalid "
+					 "- must be: none or match or always\n",
+					 optarg);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "pkt-filter-size")) {
+			if (!strcmp(optarg, "64K"))
+				fdir_conf.pballoc =
+					RTE_FDIR_PBALLOC_64K;
+			else if (!strcmp(optarg, "128K"))
+				fdir_conf.pballoc =
+					RTE_FDIR_PBALLOC_128K;
+			else if (!strcmp(optarg, "256K"))
+				fdir_conf.pballoc =
+					RTE_FDIR_PBALLOC_256K;
+			else {
+				rte_exit(EXIT_FAILURE, "pkt-filter-size %s invalid -"
+					 " must be: 64K or 128K or 256K\n",
+					 optarg);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name,
+			    "pkt-filter-drop-queue")) {
+			n = atoi(optarg);
+			if (n >= 0)
+				fdir_conf.drop_queue = (uint8_t) n;
+			else {
+				rte_exit(EXIT_FAILURE,
+					 "drop queue %d invalid - must "
+					 "be >= 0\n", n);
+				return -1;
+			}
+		}
 #ifdef RTE_LIBRTE_LATENCY_STATS
-		{ "latencystats",               1, 0, 0 },
+		if (!strcmp(lgopts[opt_idx].name,
+			    "latencystats")) {
+			n = atoi(optarg);
+			if (n >= 0) {
+				latencystats_lcore_id = (lcoreid_t) n;
+				latencystats_enabled = 1;
+			} else {
+				rte_exit(EXIT_FAILURE,
+					 "invalid lcore id %d for latencystats"
+					 " must be >= 0\n", n);
+				return -1;
+			}
+		}
 #endif
 #ifdef RTE_LIBRTE_BITRATE
-		{ "bitrate-stats",              1, 0, 0 },
+		if (!strcmp(lgopts[opt_idx].name, "bitrate-stats")) {
+			n = atoi(optarg);
+			if (n >= 0) {
+				bitrate_lcore_id = (lcoreid_t) n;
+				bitrate_enabled = 1;
+			} else {
+				rte_exit(EXIT_FAILURE,
+					 "invalid lcore id %d for bitrate stats"
+					 " must be >= 0\n", n);
+				return -1;
+			}
+		}
 #endif
-		{ "disable-crc-strip",          0, 0, 0 },
-		{ "enable-lro",                 0, 0, 0 },
-		{ "enable-rx-cksum",            0, 0, 0 },
-		{ "enable-scatter",             0, 0, 0 },
-		{ "disable-hw-vlan",            0, 0, 0 },
-		{ "disable-hw-vlan-filter",     0, 0, 0 },
-		{ "disable-hw-vlan-strip",      0, 0, 0 },
-		{ "disable-hw-vlan-extend",     0, 0, 0 },
-		{ "enable-drop-en",            0, 0, 0 },
-		{ "disable-rss",                0, 0, 0 },
-		{ "port-topology",              1, 0, 0 },
-		{ "forward-mode",               1, 0, 0 },
-		{ "rss-ip",			0, 0, 0 },
-		{ "rss-udp",			0, 0, 0 },
-		{ "rxq",			1, 0, 0 },
-		{ "txq",			1, 0, 0 },
-		{ "rxd",			1, 0, 0 },
-		{ "txd",			1, 0, 0 },
-		{ "burst",			1, 0, 0 },
-		{ "mbcache",			1, 0, 0 },
-		{ "txpt",			1, 0, 0 },
-		{ "txht",			1, 0, 0 },
-		{ "txwt",			1, 0, 0 },
-		{ "txfreet",			1, 0, 0 },
-		{ "txrst",			1, 0, 0 },
-		{ "txqflags",			1, 0, 0 },
-		{ "rxpt",			1, 0, 0 },
-		{ "rxht",			1, 0, 0 },
-		{ "rxwt",			1, 0, 0 },
-		{ "rxfreet",                    1, 0, 0 },
-		{ "tx-queue-stats-mapping",	1, 0, 0 },
-		{ "rx-queue-stats-mapping",	1, 0, 0 },
-		{ "no-flush-rx",	0, 0, 0 },
-		{ "txpkts",			1, 0, 0 },
-		{ "disable-link-check",		0, 0, 0 },
-		{ "no-lsc-interrupt",		0, 0, 0 },
-		{ "no-rmv-interrupt",		0, 0, 0 },
-		{ "print-event",		1, 0, 0 },
-		{ "mask-event",			1, 0, 0 },
-		{ 0, 0, 0, 0 },
-	};
+		if (!strcmp(lgopts[opt_idx].name, "disable-crc-strip"))
+			rx_mode.hw_strip_crc = 0;
+		if (!strcmp(lgopts[opt_idx].name, "enable-lro"))
+			rx_mode.enable_lro = 1;
+		if (!strcmp(lgopts[opt_idx].name, "enable-scatter"))
+			rx_mode.enable_scatter = 1;
+		if (!strcmp(lgopts[opt_idx].name, "enable-rx-cksum"))
+			rx_mode.hw_ip_checksum = 1;
+
+		if (!strcmp(lgopts[opt_idx].name, "disable-hw-vlan")) {
+			rx_mode.hw_vlan_filter = 0;
+			rx_mode.hw_vlan_strip  = 0;
+			rx_mode.hw_vlan_extend = 0;
+		}
+
+		if (!strcmp(lgopts[opt_idx].name,
+				"disable-hw-vlan-filter"))
+			rx_mode.hw_vlan_filter = 0;
+
+		if (!strcmp(lgopts[opt_idx].name,
+				"disable-hw-vlan-strip"))
+			rx_mode.hw_vlan_strip  = 0;
+
+		if (!strcmp(lgopts[opt_idx].name,
+				"disable-hw-vlan-extend"))
+			rx_mode.hw_vlan_extend = 0;
+
+		if (!strcmp(lgopts[opt_idx].name, "enable-drop-en"))
+			rx_drop_en = 1;
+
+		if (!strcmp(lgopts[opt_idx].name, "disable-rss"))
+			rss_hf = 0;
+		if (!strcmp(lgopts[opt_idx].name, "port-topology")) {
+			if (!strcmp(optarg, "paired"))
+				port_topology = PORT_TOPOLOGY_PAIRED;
+			else if (!strcmp(optarg, "chained"))
+				port_topology = PORT_TOPOLOGY_CHAINED;
+			else if (!strcmp(optarg, "loop"))
+				port_topology = PORT_TOPOLOGY_LOOP;
+			else {
+				rte_exit(EXIT_FAILURE, "port-topology %s invalid -"
+					 " must be: paired or chained\n",
+					 optarg);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "forward-mode"))
+			set_pkt_forwarding_mode(optarg);
+		if (!strcmp(lgopts[opt_idx].name, "rss-ip"))
+			rss_hf = ETH_RSS_IP;
+		if (!strcmp(lgopts[opt_idx].name, "rss-udp"))
+			rss_hf = ETH_RSS_UDP;
+		if (!strcmp(lgopts[opt_idx].name, "rxq")) {
+			n = atoi(optarg);
+			if (n >= 0 && n <= (int) MAX_QUEUE_ID)
+				nb_rxq = (queueid_t) n;
+			else {
+				rte_exit(EXIT_FAILURE, "rxq %d invalid - must be"
+					  " >= 0 && <= %d\n", n,
+					  (int) MAX_QUEUE_ID);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "txq")) {
+			n = atoi(optarg);
+			if (n >= 0 && n <= (int) MAX_QUEUE_ID)
+				nb_txq = (queueid_t) n;
+			else {
+				rte_exit(EXIT_FAILURE, "txq %d invalid - must be"
+					  " >= 0 && <= %d\n", n,
+					  (int) MAX_QUEUE_ID);
+				return -1;
+			}
+		}
+		if (!nb_rxq && !nb_txq) {
+			rte_exit(EXIT_FAILURE, "Either rx or tx queues should "
+					"be non-zero\n");
+			return -1;
+		}
+		if (!strcmp(lgopts[opt_idx].name, "burst")) {
+			n = atoi(optarg);
+			if ((n >= 1) && (n <= MAX_PKT_BURST))
+				nb_pkt_per_burst = (uint16_t) n;
+			else {
+				rte_exit(EXIT_FAILURE,
+					 "burst must >= 1 and <= %d]",
+					 MAX_PKT_BURST);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "mbcache")) {
+			n = atoi(optarg);
+			if ((n >= 0) &&
+			    (n <= RTE_MEMPOOL_CACHE_MAX_SIZE))
+				mb_mempool_cache = (uint16_t) n;
+			else {
+				rte_exit(EXIT_FAILURE,
+					 "mbcache must be >= 0 and <= %d\n",
+					 RTE_MEMPOOL_CACHE_MAX_SIZE);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "txfreet")) {
+			n = atoi(optarg);
+			if (n >= 0)
+				tx_free_thresh = (int16_t)n;
+			else {
+				rte_exit(EXIT_FAILURE, "txfreet must be >= 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "txrst")) {
+			n = atoi(optarg);
+			if (n >= 0)
+				tx_rs_thresh = (int16_t)n;
+			else {
+				rte_exit(EXIT_FAILURE, "txrst must be >= 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "txqflags")) {
+			char *end = NULL;
+
+			n = strtoul(optarg, &end, 16);
+			if (n >= 0)
+				txq_flags = (int32_t)n;
+			else {
+				rte_exit(EXIT_FAILURE,
+					 "txqflags must be >= 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "rxd")) {
+			n = atoi(optarg);
+			if (n > 0) {
+				if (rx_free_thresh >= n)
+					rte_exit(EXIT_FAILURE,
+						 "rxd must be > "
+						 "rx_free_thresh(%d)\n",
+						 (int)rx_free_thresh);
+				else
+					nb_rxd = (uint16_t) n;
+			} else {
+				rte_exit(EXIT_FAILURE,
+					 "rxd(%d) invalid - must be > 0\n",
+					 n);
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "txd")) {
+			n = atoi(optarg);
+			if (n > 0)
+				nb_txd = (uint16_t) n;
+			else {
+				rte_exit(EXIT_FAILURE, "txd must be in > 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "txpt")) {
+			n = atoi(optarg);
+			if (n >= 0)
+				tx_pthresh = (int8_t)n;
+			else {
+				rte_exit(EXIT_FAILURE, "txpt must be >= 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "txht")) {
+			n = atoi(optarg);
+			if (n >= 0)
+				tx_hthresh = (int8_t)n;
+			else {
+				rte_exit(EXIT_FAILURE, "txht must be >= 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "txwt")) {
+			n = atoi(optarg);
+			if (n >= 0)
+				tx_wthresh = (int8_t)n;
+			else {
+				rte_exit(EXIT_FAILURE, "txwt must be >= 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "rxpt")) {
+			n = atoi(optarg);
+			if (n >= 0)
+				rx_pthresh = (int8_t)n;
+			else {
+				rte_exit(EXIT_FAILURE, "rxpt must be >= 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "rxht")) {
+			n = atoi(optarg);
+			if (n >= 0)
+				rx_hthresh = (int8_t)n;
+			else {
+				rte_exit(EXIT_FAILURE, "rxht must be >= 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "rxwt")) {
+			n = atoi(optarg);
+			if (n >= 0)
+				rx_wthresh = (int8_t)n;
+			else {
+				rte_exit(EXIT_FAILURE, "rxwt must be >= 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "rxfreet")) {
+			n = atoi(optarg);
+			if (n >= 0)
+				rx_free_thresh = (int16_t)n;
+			else {
+				rte_exit(EXIT_FAILURE, "rxfreet must be >= 0\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "tx-queue-stats-mapping")) {
+			if (parse_queue_stats_mapping_config(optarg, TX)) {
+				rte_exit(EXIT_FAILURE,
+					 "invalid TX queue statistics mapping config entered\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "rx-queue-stats-mapping")) {
+			if (parse_queue_stats_mapping_config(optarg, RX)) {
+				rte_exit(EXIT_FAILURE,
+					 "invalid RX queue statistics mapping config entered\n");
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "txpkts")) {
+			unsigned int seg_lengths[RTE_MAX_SEGS_PER_PKT];
+			unsigned int nb_segs;
+
+			nb_segs = parse_item_list(optarg, "txpkt segments",
+					RTE_MAX_SEGS_PER_PKT, seg_lengths, 0);
+			if (nb_segs > 0)
+				set_tx_pkt_segments(seg_lengths, nb_segs);
+			else {
+				rte_exit(EXIT_FAILURE, "bad txpkts\n");
+				return -1;
+			}
+		}
+		if (!strcmp(lgopts[opt_idx].name, "no-flush-rx"))
+			no_flush_rx = 1;
+		if (!strcmp(lgopts[opt_idx].name, "disable-link-check"))
+			no_link_check = 1;
+		if (!strcmp(lgopts[opt_idx].name, "no-lsc-interrupt"))
+			lsc_interrupt = 0;
+		if (!strcmp(lgopts[opt_idx].name, "no-rmv-interrupt"))
+			rmv_interrupt = 0;
+		if (!strcmp(lgopts[opt_idx].name, "print-event"))
+			if (parse_event_printing_config(optarg, 1)) {
+				rte_exit(EXIT_FAILURE,
+					 "invalid print-event argument\n");
+				return -1;
+			}
+		if (!strcmp(lgopts[opt_idx].name, "mask-event"))
+			if (parse_event_printing_config(optarg, 0)) {
+				rte_exit(EXIT_FAILURE,
+					 "invalid mask-event argument\n");
+				return -1;
+			}
+
+		break;
+	case 'h':
+		usage(prgname);
+		rte_exit(EXIT_SUCCESS, "Displayed help\n");
+		return -1;
+	case 1:
+		/* does nothing*/
+		break;
+	default:
+		usage(prgname);
+		rte_exit(EXIT_FAILURE,
+			 "Command line is incomplete or incorrect\n");
+		return -1;
+	}
+	return 0;
+}
+
+void
+launch_args_parse(int argc, char **argv)
+{
+	int opt;
+	char **argvopt;
+	int opt_idx;
 
 	argvopt = argv;
 
-#ifdef RTE_LIBRTE_CMDLINE
-#define SHORTOPTS "i"
-#else
-#define SHORTOPTS ""
-#endif
 	while ((opt = getopt_long(argc, argvopt, SHORTOPTS "ah",
 				 lgopts, &opt_idx)) != EOF) {
-		switch (opt) {
-#ifdef RTE_LIBRTE_CMDLINE
-		case 'i':
-			printf("Interactive-mode selected\n");
-			interactive = 1;
-			break;
+		parse_option(opt, optarg, opt_idx, argv[0]);
+	}
+}
+
+#ifdef RTE_LIBRTE_CFGFILE_DEBUG
+#define max_nb_sections 100
+static void print_cfg(struct rte_cfgfile *cfg)
+{
+	int i, num_sections, num_entries, j;
+
+	printf("-------------------------\n");
+	printf("SECTIONS:\n\n");
+
+	char *sections[max_nb_sections+1];
+
+	for (i = 0; i < max_nb_sections; i++)
+		sections[i] = malloc(sizeof(sections[0]) * 64);
+	sections[i] = 0;
+
+	num_sections = rte_cfgfile_sections(cfg, sections, max_nb_sections);
+
+	for (i = 0; i < num_sections; i++) {
+		printf("************************\n");
+		printf("%s:\n", sections[i]);
+		num_entries = rte_cfgfile_section_num_entries(cfg, sections[i]);
+
+		struct rte_cfgfile_entry entries[num_entries];
+
+		rte_cfgfile_section_entries(cfg, sections[i],
+				entries, num_entries);
+		for (j = 0; j < num_entries; j++)
+			printf("%s -> %s\n", entries[j].name,
+					entries[j].value);
+	}
+	printf("************************\n\n");
+	printf("-------------------------\n\n");
+
+	i = 0;
+	while (sections[i]) {
+		free(sections[i]);
+		sections[i] = 0;
+		i++;
+	}
+}
 #endif
-		case 'a':
-			printf("Auto-start selected\n");
-			auto_start = 1;
-			break;
 
-		case 0: /*long options */
-			if (!strcmp(lgopts[opt_idx].name, "help")) {
-				usage(argv[0]);
-				rte_exit(EXIT_SUCCESS, "Displayed help\n");
-			}
-#ifdef RTE_LIBRTE_CMDLINE
-			if (!strcmp(lgopts[opt_idx].name, "interactive")) {
-				printf("Interactive-mode selected\n");
-				interactive = 1;
-			}
-			if (!strcmp(lgopts[opt_idx].name, "cmdline-file")) {
-				printf("CLI commands to be read from %s\n",
-				       optarg);
-				snprintf(cmdline_filename,
-					 sizeof(cmdline_filename), "%s",
-					 optarg);
-			}
-			if (!strcmp(lgopts[opt_idx].name, "auto-start")) {
-				printf("Auto-start selected\n");
-				auto_start = 1;
-			}
-			if (!strcmp(lgopts[opt_idx].name,
-				    "eth-peers-configfile")) {
-				if (init_peer_eth_addrs(optarg) != 0)
-					rte_exit(EXIT_FAILURE,
-						 "Cannot open logfile\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "eth-peer")) {
-				char *port_end;
-				uint8_t c, peer_addr[6];
+#ifdef RTE_LIBRTE_CFGFILE
+static void
+non_eal_getopt(const char *str, int *opt, int *option_index)
+{
+	int i;
 
-				errno = 0;
-				n = strtoul(optarg, &port_end, 10);
-				if (errno != 0 || port_end == optarg || *port_end++ != ',')
-					rte_exit(EXIT_FAILURE,
-						 "Invalid eth-peer: %s", optarg);
-				if (n >= RTE_MAX_ETHPORTS)
-					rte_exit(EXIT_FAILURE,
-						 "eth-peer: port %d >= RTE_MAX_ETHPORTS(%d)\n",
-						 n, RTE_MAX_ETHPORTS);
+	*opt = '?';
+	*option_index = 0;
 
-				if (cmdline_parse_etheraddr(NULL, port_end,
-						&peer_addr, sizeof(peer_addr)) < 0)
-					rte_exit(EXIT_FAILURE,
-						 "Invalid ethernet address: %s\n",
-						 port_end);
-				for (c = 0; c < 6; c++)
-					peer_eth_addrs[n].addr_bytes[c] =
-						peer_addr[c];
-				nb_peer_eth_addrs++;
-			}
-#endif
-			if (!strcmp(lgopts[opt_idx].name, "nb-ports")) {
-				n = atoi(optarg);
-				if (n > 0 && n <= nb_ports)
-					nb_fwd_ports = (uint8_t) n;
-				else
-					rte_exit(EXIT_FAILURE,
-						 "Invalid port %d\n", n);
-			}
-			if (!strcmp(lgopts[opt_idx].name, "nb-cores")) {
-				n = atoi(optarg);
-				if (n > 0 && n <= nb_lcores)
-					nb_fwd_lcores = (uint8_t) n;
-				else
-					rte_exit(EXIT_FAILURE,
-						 "nb-cores should be > 0 and <= %d\n",
-						 nb_lcores);
-			}
-			if (!strcmp(lgopts[opt_idx].name, "coremask"))
-				parse_fwd_coremask(optarg);
-			if (!strcmp(lgopts[opt_idx].name, "portmask"))
-				parse_fwd_portmask(optarg);
-			if (!strcmp(lgopts[opt_idx].name, "no-numa"))
-				numa_support = 0;
-			if (!strcmp(lgopts[opt_idx].name, "numa"))
-				numa_support = 1;
-			if (!strcmp(lgopts[opt_idx].name, "mp-anon")) {
-				mp_anon = 1;
-			}
-			if (!strcmp(lgopts[opt_idx].name, "port-numa-config")) {
-				if (parse_portnuma_config(optarg))
-					rte_exit(EXIT_FAILURE,
-					   "invalid port-numa configuration\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "ring-numa-config"))
-				if (parse_ringnuma_config(optarg))
-					rte_exit(EXIT_FAILURE,
-					   "invalid ring-numa configuration\n");
-			if (!strcmp(lgopts[opt_idx].name, "socket-num")) {
-				n = atoi(optarg);
-				if (!new_socket_id((uint8_t)n)) {
-					socket_num = (uint8_t)n;
-				} else {
-					print_invalid_socket_id_error();
-					rte_exit(EXIT_FAILURE,
-						"Invalid socket id");
-				}
-			}
-			if (!strcmp(lgopts[opt_idx].name, "mbuf-size")) {
-				n = atoi(optarg);
-				if (n > 0 && n <= 0xFFFF)
-					mbuf_data_size = (uint16_t) n;
-				else
-					rte_exit(EXIT_FAILURE,
-						 "mbuf-size should be > 0 and < 65536\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "total-num-mbufs")) {
-				n = atoi(optarg);
-				if (n > 1024)
-					param_total_num_mbufs = (unsigned)n;
-				else
-					rte_exit(EXIT_FAILURE,
-						 "total-num-mbufs should be > 1024\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "max-pkt-len")) {
-				n = atoi(optarg);
-				if (n >= ETHER_MIN_LEN) {
-					rx_mode.max_rx_pkt_len = (uint32_t) n;
-					if (n > ETHER_MAX_LEN)
-					    rx_mode.jumbo_frame = 1;
-				} else
-					rte_exit(EXIT_FAILURE,
-						 "Invalid max-pkt-len=%d - should be > %d\n",
-						 n, ETHER_MIN_LEN);
-			}
-			if (!strcmp(lgopts[opt_idx].name, "pkt-filter-mode")) {
-				if (!strcmp(optarg, "signature"))
-					fdir_conf.mode =
-						RTE_FDIR_MODE_SIGNATURE;
-				else if (!strcmp(optarg, "perfect"))
-					fdir_conf.mode = RTE_FDIR_MODE_PERFECT;
-				else if (!strcmp(optarg, "perfect-mac-vlan"))
-					fdir_conf.mode = RTE_FDIR_MODE_PERFECT_MAC_VLAN;
-				else if (!strcmp(optarg, "perfect-tunnel"))
-					fdir_conf.mode = RTE_FDIR_MODE_PERFECT_TUNNEL;
-				else if (!strcmp(optarg, "none"))
-					fdir_conf.mode = RTE_FDIR_MODE_NONE;
-				else
-					rte_exit(EXIT_FAILURE,
-						 "pkt-mode-invalid %s invalid - must be: "
-						 "none, signature, perfect, perfect-mac-vlan"
-						 " or perfect-tunnel\n",
-						 optarg);
-			}
-			if (!strcmp(lgopts[opt_idx].name,
-				    "pkt-filter-report-hash")) {
-				if (!strcmp(optarg, "none"))
-					fdir_conf.status =
-						RTE_FDIR_NO_REPORT_STATUS;
-				else if (!strcmp(optarg, "match"))
-					fdir_conf.status =
-						RTE_FDIR_REPORT_STATUS;
-				else if (!strcmp(optarg, "always"))
-					fdir_conf.status =
-						RTE_FDIR_REPORT_STATUS_ALWAYS;
-				else
-					rte_exit(EXIT_FAILURE,
-						 "pkt-filter-report-hash %s invalid "
-						 "- must be: none or match or always\n",
-						 optarg);
-			}
-			if (!strcmp(lgopts[opt_idx].name, "pkt-filter-size")) {
-				if (!strcmp(optarg, "64K"))
-					fdir_conf.pballoc =
-						RTE_FDIR_PBALLOC_64K;
-				else if (!strcmp(optarg, "128K"))
-					fdir_conf.pballoc =
-						RTE_FDIR_PBALLOC_128K;
-				else if (!strcmp(optarg, "256K"))
-					fdir_conf.pballoc =
-						RTE_FDIR_PBALLOC_256K;
-				else
-					rte_exit(EXIT_FAILURE, "pkt-filter-size %s invalid -"
-						 " must be: 64K or 128K or 256K\n",
-						 optarg);
-			}
-			if (!strcmp(lgopts[opt_idx].name,
-				    "pkt-filter-drop-queue")) {
-				n = atoi(optarg);
-				if (n >= 0)
-					fdir_conf.drop_queue = (uint8_t) n;
-				else
-					rte_exit(EXIT_FAILURE,
-						 "drop queue %d invalid - must"
-						 "be >= 0 \n", n);
-			}
-#ifdef RTE_LIBRTE_LATENCY_STATS
-			if (!strcmp(lgopts[opt_idx].name,
-				    "latencystats")) {
-				n = atoi(optarg);
-				if (n >= 0) {
-					latencystats_lcore_id = (lcoreid_t) n;
-					latencystats_enabled = 1;
-				} else
-					rte_exit(EXIT_FAILURE,
-						 "invalid lcore id %d for latencystats"
-						 " must be >= 0\n", n);
-			}
-#endif
-#ifdef RTE_LIBRTE_BITRATE
-			if (!strcmp(lgopts[opt_idx].name, "bitrate-stats")) {
-				n = atoi(optarg);
-				if (n >= 0) {
-					bitrate_lcore_id = (lcoreid_t) n;
-					bitrate_enabled = 1;
-				} else
-					rte_exit(EXIT_FAILURE,
-						 "invalid lcore id %d for bitrate stats"
-						 " must be >= 0\n", n);
-			}
-#endif
-			if (!strcmp(lgopts[opt_idx].name, "disable-crc-strip"))
-				rx_mode.hw_strip_crc = 0;
-			if (!strcmp(lgopts[opt_idx].name, "enable-lro"))
-				rx_mode.enable_lro = 1;
-			if (!strcmp(lgopts[opt_idx].name, "enable-scatter"))
-				rx_mode.enable_scatter = 1;
-			if (!strcmp(lgopts[opt_idx].name, "enable-rx-cksum"))
-				rx_mode.hw_ip_checksum = 1;
+	if (strlen(str) == 1) {
+		*opt = *str;
+		return;
+	}
 
-			if (!strcmp(lgopts[opt_idx].name, "disable-hw-vlan")) {
-				rx_mode.hw_vlan_filter = 0;
-				rx_mode.hw_vlan_strip  = 0;
-				rx_mode.hw_vlan_extend = 0;
-			}
-
-			if (!strcmp(lgopts[opt_idx].name,
-					"disable-hw-vlan-filter"))
-				rx_mode.hw_vlan_filter = 0;
-
-			if (!strcmp(lgopts[opt_idx].name,
-					"disable-hw-vlan-strip"))
-				rx_mode.hw_vlan_strip  = 0;
-
-			if (!strcmp(lgopts[opt_idx].name,
-					"disable-hw-vlan-extend"))
-				rx_mode.hw_vlan_extend = 0;
-
-			if (!strcmp(lgopts[opt_idx].name, "enable-drop-en"))
-				rx_drop_en = 1;
-
-			if (!strcmp(lgopts[opt_idx].name, "disable-rss"))
-				rss_hf = 0;
-			if (!strcmp(lgopts[opt_idx].name, "port-topology")) {
-				if (!strcmp(optarg, "paired"))
-					port_topology = PORT_TOPOLOGY_PAIRED;
-				else if (!strcmp(optarg, "chained"))
-					port_topology = PORT_TOPOLOGY_CHAINED;
-				else if (!strcmp(optarg, "loop"))
-					port_topology = PORT_TOPOLOGY_LOOP;
-				else
-					rte_exit(EXIT_FAILURE, "port-topology %s invalid -"
-						 " must be: paired or chained \n",
-						 optarg);
-			}
-			if (!strcmp(lgopts[opt_idx].name, "forward-mode"))
-				set_pkt_forwarding_mode(optarg);
-			if (!strcmp(lgopts[opt_idx].name, "rss-ip"))
-				rss_hf = ETH_RSS_IP;
-			if (!strcmp(lgopts[opt_idx].name, "rss-udp"))
-				rss_hf = ETH_RSS_UDP;
-			if (!strcmp(lgopts[opt_idx].name, "rxq")) {
-				n = atoi(optarg);
-				if (n >= 0 && n <= (int) MAX_QUEUE_ID)
-					nb_rxq = (queueid_t) n;
-				else
-					rte_exit(EXIT_FAILURE, "rxq %d invalid - must be"
-						  " >= 0 && <= %d\n", n,
-						  (int) MAX_QUEUE_ID);
-			}
-			if (!strcmp(lgopts[opt_idx].name, "txq")) {
-				n = atoi(optarg);
-				if (n >= 0 && n <= (int) MAX_QUEUE_ID)
-					nb_txq = (queueid_t) n;
-				else
-					rte_exit(EXIT_FAILURE, "txq %d invalid - must be"
-						  " >= 0 && <= %d\n", n,
-						  (int) MAX_QUEUE_ID);
-			}
-			if (!nb_rxq && !nb_txq) {
-				rte_exit(EXIT_FAILURE, "Either rx or tx queues should "
-						"be non-zero\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "burst")) {
-				n = atoi(optarg);
-				if ((n >= 1) && (n <= MAX_PKT_BURST))
-					nb_pkt_per_burst = (uint16_t) n;
-				else
-					rte_exit(EXIT_FAILURE,
-						 "burst must >= 1 and <= %d]",
-						 MAX_PKT_BURST);
-			}
-			if (!strcmp(lgopts[opt_idx].name, "mbcache")) {
-				n = atoi(optarg);
-				if ((n >= 0) &&
-				    (n <= RTE_MEMPOOL_CACHE_MAX_SIZE))
-					mb_mempool_cache = (uint16_t) n;
-				else
-					rte_exit(EXIT_FAILURE,
-						 "mbcache must be >= 0 and <= %d\n",
-						 RTE_MEMPOOL_CACHE_MAX_SIZE);
-			}
-			if (!strcmp(lgopts[opt_idx].name, "txfreet")) {
-				n = atoi(optarg);
-				if (n >= 0)
-					tx_free_thresh = (int16_t)n;
-				else
-					rte_exit(EXIT_FAILURE, "txfreet must be >= 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "txrst")) {
-				n = atoi(optarg);
-				if (n >= 0)
-					tx_rs_thresh = (int16_t)n;
-				else
-					rte_exit(EXIT_FAILURE, "txrst must be >= 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "txqflags")) {
-				char *end = NULL;
-				n = strtoul(optarg, &end, 16);
-				if (n >= 0)
-					txq_flags = (int32_t)n;
-				else
-					rte_exit(EXIT_FAILURE,
-						 "txqflags must be >= 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "rxd")) {
-				n = atoi(optarg);
-				if (n > 0) {
-					if (rx_free_thresh >= n)
-						rte_exit(EXIT_FAILURE,
-							 "rxd must be > "
-							 "rx_free_thresh(%d)\n",
-							 (int)rx_free_thresh);
-					else
-						nb_rxd = (uint16_t) n;
-				} else
-					rte_exit(EXIT_FAILURE,
-						 "rxd(%d) invalid - must be > 0\n",
-						 n);
-			}
-			if (!strcmp(lgopts[opt_idx].name, "txd")) {
-				n = atoi(optarg);
-				if (n > 0)
-					nb_txd = (uint16_t) n;
-				else
-					rte_exit(EXIT_FAILURE, "txd must be in > 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "txpt")) {
-				n = atoi(optarg);
-				if (n >= 0)
-					tx_pthresh = (int8_t)n;
-				else
-					rte_exit(EXIT_FAILURE, "txpt must be >= 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "txht")) {
-				n = atoi(optarg);
-				if (n >= 0)
-					tx_hthresh = (int8_t)n;
-				else
-					rte_exit(EXIT_FAILURE, "txht must be >= 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "txwt")) {
-				n = atoi(optarg);
-				if (n >= 0)
-					tx_wthresh = (int8_t)n;
-				else
-					rte_exit(EXIT_FAILURE, "txwt must be >= 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "rxpt")) {
-				n = atoi(optarg);
-				if (n >= 0)
-					rx_pthresh = (int8_t)n;
-				else
-					rte_exit(EXIT_FAILURE, "rxpt must be >= 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "rxht")) {
-				n = atoi(optarg);
-				if (n >= 0)
-					rx_hthresh = (int8_t)n;
-				else
-					rte_exit(EXIT_FAILURE, "rxht must be >= 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "rxwt")) {
-				n = atoi(optarg);
-				if (n >= 0)
-					rx_wthresh = (int8_t)n;
-				else
-					rte_exit(EXIT_FAILURE, "rxwt must be >= 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "rxfreet")) {
-				n = atoi(optarg);
-				if (n >= 0)
-					rx_free_thresh = (int16_t)n;
-				else
-					rte_exit(EXIT_FAILURE, "rxfreet must be >= 0\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "tx-queue-stats-mapping")) {
-				if (parse_queue_stats_mapping_config(optarg, TX)) {
-					rte_exit(EXIT_FAILURE,
-						 "invalid TX queue statistics mapping config entered\n");
-				}
-			}
-			if (!strcmp(lgopts[opt_idx].name, "rx-queue-stats-mapping")) {
-				if (parse_queue_stats_mapping_config(optarg, RX)) {
-					rte_exit(EXIT_FAILURE,
-						 "invalid RX queue statistics mapping config entered\n");
-				}
-			}
-			if (!strcmp(lgopts[opt_idx].name, "txpkts")) {
-				unsigned seg_lengths[RTE_MAX_SEGS_PER_PKT];
-				unsigned int nb_segs;
-
-				nb_segs = parse_item_list(optarg, "txpkt segments",
-						RTE_MAX_SEGS_PER_PKT, seg_lengths, 0);
-				if (nb_segs > 0)
-					set_tx_pkt_segments(seg_lengths, nb_segs);
-				else
-					rte_exit(EXIT_FAILURE, "bad txpkts\n");
-			}
-			if (!strcmp(lgopts[opt_idx].name, "no-flush-rx"))
-				no_flush_rx = 1;
-			if (!strcmp(lgopts[opt_idx].name, "disable-link-check"))
-				no_link_check = 1;
-			if (!strcmp(lgopts[opt_idx].name, "no-lsc-interrupt"))
-				lsc_interrupt = 0;
-			if (!strcmp(lgopts[opt_idx].name, "no-rmv-interrupt"))
-				rmv_interrupt = 0;
-			if (!strcmp(lgopts[opt_idx].name, "print-event"))
-				if (parse_event_printing_config(optarg, 1)) {
-					rte_exit(EXIT_FAILURE,
-						 "invalid print-event argument\n");
-				}
-			if (!strcmp(lgopts[opt_idx].name, "mask-event"))
-				if (parse_event_printing_config(optarg, 0)) {
-					rte_exit(EXIT_FAILURE,
-						 "invalid mask-event argument\n");
-				}
-
-			break;
-		case 'h':
-			usage(argv[0]);
-			rte_exit(EXIT_SUCCESS, "Displayed help\n");
-			break;
-		default:
-			usage(argv[0]);
-			rte_exit(EXIT_FAILURE,
-				 "Command line is incomplete or incorrect\n");
+	for (i = 0; lgopts[i].name != NULL; i++) {
+		if (strcmp(str, lgopts[i].name) == 0) {
+			*opt = lgopts[i].val;
+			*option_index = i;
 			break;
 		}
 	}
 }
+#endif
+
+#ifdef RTE_LIBRTE_CFGFILE
+#define APP_SECTION "TEST-PMD"
+int non_eal_configure(struct rte_cfgfile *cfg, char *prgname)
+{
+	int n_entries;
+	int i;
+	int opt;
+	int option_index;
+
+	if (cfg == NULL) {
+		rte_errno = -EINVAL;
+		return -1;
+	}
+
+#ifdef RTE_LIBRTE_CFGFILE_DEBUG
+	print_cfg(cfg);
+#endif
+
+	n_entries = rte_cfgfile_section_num_entries(cfg, APP_SECTION);
+
+	if (n_entries < 1) {
+		printf("No %s section entries "
+				"in cfgfile object\n", APP_SECTION);
+		return -1;
+	}
+
+	struct rte_cfgfile_entry entries[n_entries];
+
+	if (n_entries !=
+		rte_cfgfile_section_entries(cfg, APP_SECTION, entries,
+				n_entries)) {
+		rte_exit(EXIT_FAILURE, "Unexpected fault");
+		return -1;
+	}
+
+	for (i = 0; i < n_entries; i++) {
+		non_eal_getopt(entries[i].name, &opt, &option_index);
+
+		parse_option(opt, entries[i].value,
+				option_index, prgname);
+	}
+	return 0;
+}
+#endif

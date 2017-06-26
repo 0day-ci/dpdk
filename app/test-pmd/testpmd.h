@@ -499,7 +499,7 @@ port_pci_reg_write(struct rte_port *port, uint32_t reg_off, uint32_t reg_v)
 unsigned int parse_item_list(char* str, const char* item_name,
 			unsigned int max_items,
 			unsigned int *parsed_items, int check_unique_values);
-void launch_args_parse(int argc, char** argv);
+void launch_args_parse(int argc, char **argv);
 void cmdline_read_from_file(const char *filename);
 void prompt(void);
 void prompt_exit(void);
@@ -641,6 +641,7 @@ enum print_warning {
 };
 int port_id_is_invalid(portid_t port_id, enum print_warning warning);
 int new_socket_id(unsigned int socket_id);
+int non_eal_configure(struct rte_cfgfile *cfg, char *prgname);
 
 /*
  * Work-around of a compilation error with ICC on invocations of the

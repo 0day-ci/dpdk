@@ -90,6 +90,9 @@
 #ifdef RTE_LIBRTE_LATENCY_STATS
 #include <rte_latencystats.h>
 #endif
+#ifdef RTE_LIBRTE_CFGFILE
+#include <rte_cfgfile.h>
+#endif
 
 #include "testpmd.h"
 
@@ -2251,15 +2254,66 @@ signal_handler(int signum)
 	}
 }
 
+#ifdef RTE_LIBRTE_CFGFILE
+/* Load config file path from command line */
+static char *
+cfgfile_load_path(int argc, char **argv)
+{
+	int i;
+
+	for (i = 0; i < argc; i++) {
+		if (!strcmp("--cfgfile-path", argv[i])) {
+			if (argv[i+1] && argv[i+1][0] != '-')
+				return strdup(argv[i+1]);
+		} else if (!strncmp("--cfgfile-path=", argv[i], 15)) {
+			char *ptr = argv[i];
+
+			ptr += 15;
+			if (strlen(ptr))
+				return strdup(ptr);
+		}
+	}
+	return NULL;
+}
+#endif
+
+#define APP_NAME "TEST-PMD"
 int
 main(int argc, char** argv)
 {
 	int  diag;
 	uint8_t port_id;
+#ifdef RTE_LIBRTE_CFGFILE
+	struct rte_cfgfile *cfg = NULL;
+	char *config_file = NULL;
+#endif
 
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
+#ifdef RTE_LIBRTE_CFGFILE
+	/* load --cfgfile-path argument from argv */
+	config_file = cfgfile_load_path(argc, argv);
+
+	if (config_file) {
+		printf("Info: found cfgfile-path \"%s\"\n", config_file);
+	} else {
+		printf("Info: not found cfgfile-path parameter "
+				"(searching for cfgfile "
+				"in default directory)\n");
+		config_file = strdup("config.ini");
+	}
+
+	cfg = rte_cfgfile_load(config_file, CFG_FLAG_EMPTY_VALUES);
+
+	if (cfg == NULL) {
+		printf("Info: Valid cfgfile not found\n");
+		cfg = rte_cfgfile_create(CFG_FLAG_EMPTY_VALUES);
+	}
+	diag = rte_eal_configure(cfg, argv[0]);
+	if (diag < 0)
+		rte_panic("Cannot init EAL\n");
+#endif
 	diag = rte_eal_init(argc, argv);
 	if (diag < 0)
 		rte_panic("Cannot init EAL\n");
@@ -2289,6 +2343,18 @@ main(int argc, char** argv)
 	latencystats_enabled = 0;
 #endif
 
+#ifdef RTE_LIBRTE_CFGFILE
+	if (argc > 1) {
+		non_eal_configure(cfg, argv[0]);
+		rte_cfgfile_close(cfg);
+		cfg = 0;
+
+		if (config_file) {
+			free(config_file);
+			config_file = 0;
+		}
+	}
+#endif
 	argc -= diag;
 	argv += diag;
 	if (argc > 1)
@@ -2360,6 +2426,5 @@ main(int argc, char** argv)
 		if (rc < 0)
 			return 1;
 	}
-
 	return 0;
 }
