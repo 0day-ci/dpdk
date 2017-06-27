@@ -212,6 +212,32 @@ struct rte_bus *rte_bus_find(rte_bus_cmp_t cmp,
 			     const struct rte_bus *start);
 
 /**
+ * Bus iterator to find a particular device.
+ *
+ * This function searches each registered bus to find a device that matches
+ * the data passed as parameter.
+ *
+ * If the comparison function returns zero this function will stop iterating
+ * over any more buses and devices. To continue a search the device of
+ * a previous search can be passed via the start parameter.
+ *
+ * @param cmp
+ *	Comparison function.
+ *
+ * @param data
+ *	Data to pass to comparison function.
+ *
+ * @param start
+ *	Starting point for the iteration.
+ *
+ * @return
+ *	A pointer to an rte_bus structure or NULL in case no device matches.
+ */
+struct rte_device *rte_bus_find_device(rte_dev_cmp_t cmp,
+				       const void *data,
+				       const struct rte_device *start);
+
+/**
  * Find the registered bus for a particular device.
  */
 struct rte_bus *rte_bus_find_by_device(const struct rte_device *dev);
