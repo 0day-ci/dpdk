@@ -250,6 +250,7 @@ static int i40e_dev_configure(struct rte_eth_dev *dev);
 static int i40e_dev_start(struct rte_eth_dev *dev);
 static void i40e_dev_stop(struct rte_eth_dev *dev);
 static void i40e_dev_close(struct rte_eth_dev *dev);
+static int  i40e_dev_reset(struct rte_eth_dev *dev);
 static void i40e_dev_promiscuous_enable(struct rte_eth_dev *dev);
 static void i40e_dev_promiscuous_disable(struct rte_eth_dev *dev);
 static void i40e_dev_allmulticast_enable(struct rte_eth_dev *dev);
@@ -449,6 +450,7 @@ static const struct eth_dev_ops i40e_eth_dev_ops = {
 	.dev_start                    = i40e_dev_start,
 	.dev_stop                     = i40e_dev_stop,
 	.dev_close                    = i40e_dev_close,
+	.dev_reset                    = i40e_dev_reset,
 	.promiscuous_enable           = i40e_dev_promiscuous_enable,
 	.promiscuous_disable          = i40e_dev_promiscuous_disable,
 	.allmulticast_enable          = i40e_dev_allmulticast_enable,
@@ -2133,6 +2135,20 @@ i40e_dev_close(struct rte_eth_dev *dev)
 	I40E_WRITE_REG(hw, I40E_PFGEN_CTRL,
 			(reg | I40E_PFGEN_CTRL_PFSWR_MASK));
 	I40E_WRITE_FLUSH(hw);
+}
+
+static int
+i40e_dev_reset(struct rte_eth_dev *dev)
+{
+	int ret;
+
+	ret = eth_i40e_dev_uninit(dev);
+	if (ret)
+		return ret;
+
+	ret = eth_i40e_dev_init(dev);
+
+	return ret;
 }
 
 static void

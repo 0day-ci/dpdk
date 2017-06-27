@@ -123,6 +123,7 @@ static void i40evf_vlan_offload_set(struct rte_eth_dev *dev, int mask);
 static int i40evf_vlan_pvid_set(struct rte_eth_dev *dev, uint16_t pvid,
 				int on);
 static void i40evf_dev_close(struct rte_eth_dev *dev);
+static int  i40evf_dev_reset(struct rte_eth_dev *dev);
 static void i40evf_dev_promiscuous_enable(struct rte_eth_dev *dev);
 static void i40evf_dev_promiscuous_disable(struct rte_eth_dev *dev);
 static void i40evf_dev_allmulticast_enable(struct rte_eth_dev *dev);
@@ -204,6 +205,7 @@ static const struct eth_dev_ops i40evf_eth_dev_ops = {
 	.xstats_get_names     = i40evf_dev_xstats_get_names,
 	.xstats_reset         = i40evf_dev_xstats_reset,
 	.dev_close            = i40evf_dev_close,
+	.dev_reset            = i40evf_dev_reset,
 	.dev_infos_get        = i40evf_dev_info_get,
 	.dev_supported_ptypes_get = i40e_dev_supported_ptypes_get,
 	.vlan_filter_set      = i40evf_vlan_filter_set,
@@ -2344,6 +2346,20 @@ i40evf_dev_close(struct rte_eth_dev *dev)
 	rte_intr_callback_unregister(intr_handle,
 				     i40evf_dev_interrupt_handler, dev);
 	i40evf_disable_irq0(hw);
+}
+
+static int
+i40evf_dev_reset(struct rte_eth_dev *dev)
+{
+	int ret;
+
+	ret = i40evf_dev_uninit(dev);
+	if (ret)
+		return ret;
+
+	ret = i40evf_dev_init(dev);
+
+	return ret;
 }
 
 static int
