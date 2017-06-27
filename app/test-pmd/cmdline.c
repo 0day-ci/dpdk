@@ -2618,6 +2618,36 @@ cmdline_parse_inst_t cmd_reset_port = {
 	},
 };
 
+/* *** reconfig a port with simplest settings only for test *** */
+struct cmd_reconfig_port_result {
+	cmdline_fixed_string_t command;
+	uint8_t port_id;
+};
+
+static void cmd_reconfig_port_parsed(__attribute__((unused)) void *parsed_result,
+			    __attribute__((unused)) struct cmdline *cl,
+			    __attribute__((unused)) void *data)
+{
+	struct cmd_reconfig_port_result *res = parsed_result;
+	reconfig_port(res->port_id);
+}
+
+cmdline_parse_token_string_t cmd_reconfig_port_cmd =
+	TOKEN_STRING_INITIALIZER(struct cmd_reconfig_port_result, command, "reconfig_port");
+cmdline_parse_token_num_t cmd_reconfig_port_id =
+	TOKEN_NUM_INITIALIZER(struct cmd_reconfig_port_result, port_id, UINT8);
+
+cmdline_parse_inst_t cmd_reconfig_port = {
+	.f = cmd_reconfig_port_parsed,
+	.data = NULL,
+	.help_str = "reconfig_port <port_id>",
+	.tokens = {
+		(void *)&cmd_reconfig_port_cmd,
+		(void *)&cmd_reconfig_port_id,
+		NULL,
+	},
+};
+
 /* *** SET CORELIST and PORTLIST CONFIGURATION *** */
 
 unsigned int
@@ -13782,6 +13812,7 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_read_rxd_txd,
 	(cmdline_parse_inst_t *)&cmd_stop,
 	(cmdline_parse_inst_t *)&cmd_reset_port,
+	(cmdline_parse_inst_t *)&cmd_reconfig_port,
 	(cmdline_parse_inst_t *)&cmd_mac_addr,
 	(cmdline_parse_inst_t *)&cmd_set_qmap,
 	(cmdline_parse_inst_t *)&cmd_operate_port,

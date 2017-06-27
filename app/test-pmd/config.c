@@ -3331,3 +3331,101 @@ reset_port(portid_t port_id)
 		return;
 	printf("Reset port %d failed. diag=%d\n", port_id, diag);	
 }
+
+static void
+test_simplest_rxtx(portid_t port)
+{
+#define BURST_SIZE 32
+#define NUM_PACKETS 100
+
+	struct rte_mbuf *bufs[BURST_SIZE];
+	uint16_t nb_rx, nb_tx, total;
+
+	printf("Begin to forward at least %d packets to test reconfiguration\n", NUM_PACKETS);
+	total = 0;
+	while (1) {
+		nb_rx = rte_eth_rx_burst(port, 0, bufs, BURST_SIZE);
+		if (nb_rx == 0)
+			continue;
+		nb_tx = rte_eth_tx_burst(port, 0, bufs, nb_rx);
+		total += nb_tx;
+		/* Free any unsent packets. */
+		if (unlikely(nb_tx < nb_rx)) {
+			uint16_t buf;
+			for (buf = nb_tx; buf < nb_rx; buf++)
+				rte_pktmbuf_free(bufs[buf]);
+		}
+		if (total >= NUM_PACKETS)
+			break;
+	}
+	printf("Finish forwarding %u packets to test reconfiguration\n", total);
+	return;
+}
+
+int
+reconfig_port(portid_t port)
+{
+#define RX_RING_SIZE 128
+#define TX_RING_SIZE 512
+
+#define NUM_MBUFS 8191
+#define MBUF_CACHE_SIZE 250
+
+	struct rte_mempool *mbuf_pool;
+	struct rte_eth_conf dev_conf = {
+		.rxmode = { .max_rx_pkt_len = ETHER_MAX_LEN }
+	};
+	const uint16_t rx_rings = 1, tx_rings = 1;
+	int retval;
+	uint16_t q;
+
+	if (port_id_is_invalid(port, ENABLED_WARN))
+		return -1;
+
+	/* Creates a new mempool in memory to hold the mbufs. */
+	mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS,
+		MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_eth_dev_socket_id(port));
+
+	/* Configure the Ethernet device. */
+	retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &dev_conf);
+	if (retval != 0)
+		return retval;
+
+	/* Allocate and set up 1 RX queue per Ethernet port. */
+	for (q = 0; q < rx_rings; q++) {
+		retval = rte_eth_rx_queue_setup(port, q, RX_RING_SIZE,
+				rte_eth_dev_socket_id(port), NULL, mbuf_pool);
+		if (retval < 0)
+			return retval;
+	}
+
+	/* Allocate and set up 1 TX queue per Ethernet port. */
+	for (q = 0; q < tx_rings; q++) {
+		retval = rte_eth_tx_queue_setup(port, q, TX_RING_SIZE,
+				rte_eth_dev_socket_id(port), NULL);
+		if (retval < 0)
+			return retval;
+	}
+
+	/* Start the Ethernet port. */
+	retval = rte_eth_dev_start(port);
+	if (retval < 0)
+		return retval;
+
+	/* Display the port MAC address. */
+	struct ether_addr addr;
+	rte_eth_macaddr_get(port, &addr);
+	printf("Port %u MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
+			   " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 "\n",
+			(unsigned)port,
+			addr.addr_bytes[0], addr.addr_bytes[1],
+			addr.addr_bytes[2], addr.addr_bytes[3],
+			addr.addr_bytes[4], addr.addr_bytes[5]);
+
+	/* Enable RX in promiscuous mode for the Ethernet device. */
+	rte_eth_promiscuous_enable(port);
+
+	test_simplest_rxtx(port);
+
+	return 0;
+}
