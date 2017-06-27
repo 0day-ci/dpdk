@@ -1211,6 +1211,13 @@ Add an E-tag forwarding filter on a port::
 Delete an E-tag forwarding filter on a port::
    testpmd> E-tag set filter del e-tag-id (value) port (port_id)
 
+ddp del
+~~~~~~~
+
+Delete a dynamic device personalization package::
+
+   testpmd> ddp del (port_id) (package_path)
+
 ptype mapping
 ~~~~~~~~~~~~~
 

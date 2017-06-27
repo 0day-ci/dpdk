@@ -604,8 +604,11 @@ static void cmd_help_long_parsed(void *parsed_result,
 			"E-tag set filter del e-tag-id (value) port (port_id)\n"
 			"    Delete an E-tag forwarding filter on a port\n\n"
 
-			"ddp add (port_id) (profile_path)\n"
+			"ddp add (port_id) (profile_path[,output_path])\n"
 			"    Load a profile package on a port\n\n"
+
+			"ddp del (port_id) (profile_path)\n"
+			"    Delete a profile package from a port\n\n"
 
 			"ptype mapping get (port_id) (valid_only)\n"
 			"    Get ptype mapping on a port\n\n"
@@ -12930,6 +12933,91 @@ cmd_ddp_add_parsed(
 	struct cmd_ddp_add_result *res = parsed_result;
 	uint8_t *buff;
 	uint32_t size;
+	char *filepath;
+	char *file_fld[2];
+	int file_num;
+	int ret = -ENOTSUP;
+
+	if (res->port_id > nb_ports) {
+		printf("Invalid port, range is [0, %d]\n", nb_ports - 1);
+		return;
+	}
+
+	if (!all_ports_stopped()) {
+		printf("Please stop all ports first\n");
+		return;
+	}
+
+	filepath = strdup(res->filepath);
+	if (filepath == NULL) {
+		printf("Failed to allocate memory\n");
+		return;
+	}
+	file_num = rte_strsplit(filepath, strlen(filepath), file_fld, 2, ',');
+
+	buff = open_ddp_package_file(file_fld[0], &size);
+	if (!buff) {
+		free((void *)filepath);
+		return;
+	}
+
+#ifdef RTE_LIBRTE_I40E_PMD
+	if (ret == -ENOTSUP)
+		ret = rte_pmd_i40e_process_ddp_package(res->port_id,
+					       buff, size,
+					       RTE_PMD_I40E_PKG_OP_WR_ADD);
+#endif
+
+	if (ret == -EEXIST)
+		printf("Profile has already existed.\n");
+	else if (ret < 0)
+		printf("Failed to load profile.\n");
+	else if (file_num == 2)
+		save_ddp_package_file(file_fld[1], buff, size);
+
+	close_ddp_package_file(buff);
+	free((void *)filepath);
+}
+
+cmdline_parse_inst_t cmd_ddp_add = {
+	.f = cmd_ddp_add_parsed,
+	.data = NULL,
+	.help_str = "ddp add <port_id> <profile_path[,output_path]>",
+	.tokens = {
+		(void *)&cmd_ddp_add_ddp,
+		(void *)&cmd_ddp_add_add,
+		(void *)&cmd_ddp_add_port_id,
+		(void *)&cmd_ddp_add_filepath,
+		NULL,
+	},
+};
+
+/* Delete dynamic device personalization*/
+struct cmd_ddp_del_result {
+	cmdline_fixed_string_t ddp;
+	cmdline_fixed_string_t del;
+	uint8_t port_id;
+	char filepath[];
+};
+
+cmdline_parse_token_string_t cmd_ddp_del_ddp =
+	TOKEN_STRING_INITIALIZER(struct cmd_ddp_del_result, ddp, "ddp");
+cmdline_parse_token_string_t cmd_ddp_del_del =
+	TOKEN_STRING_INITIALIZER(struct cmd_ddp_del_result, del, "del");
+cmdline_parse_token_num_t cmd_ddp_del_port_id =
+	TOKEN_NUM_INITIALIZER(struct cmd_ddp_del_result, port_id, UINT8);
+cmdline_parse_token_string_t cmd_ddp_del_filepath =
+	TOKEN_STRING_INITIALIZER(struct cmd_ddp_del_result, filepath, NULL);
+
+static void
+cmd_ddp_del_parsed(
+	void *parsed_result,
+	__attribute__((unused)) struct cmdline *cl,
+	__attribute__((unused)) void *data)
+{
+	struct cmd_ddp_del_result *res = parsed_result;
+	uint8_t *buff;
+	uint32_t size;
 	int ret = -ENOTSUP;
 
 	if (res->port_id > nb_ports) {
@@ -12950,26 +13038,26 @@ cmd_ddp_add_parsed(
 	if (ret == -ENOTSUP)
 		ret = rte_pmd_i40e_process_ddp_package(res->port_id,
 					       buff, size,
-					       RTE_PMD_I40E_PKG_OP_WR_ADD);
+					       RTE_PMD_I40E_PKG_OP_WR_DEL);
 #endif
 
-	if (ret < 0)
-		printf("Failed to load profile.\n");
-	else if (ret > 0)
-		printf("Profile has already existed.\n");
+	if (ret == -EACCES)
+		printf("Profile does not exist.\n");
+	else if (ret < 0)
+		printf("Failed to delete profile.\n");
 
 	close_ddp_package_file(buff);
 }
 
-cmdline_parse_inst_t cmd_ddp_add = {
-	.f = cmd_ddp_add_parsed,
+cmdline_parse_inst_t cmd_ddp_del = {
+	.f = cmd_ddp_del_parsed,
 	.data = NULL,
-	.help_str = "ddp add <port_id> <profile_path>",
+	.help_str = "ddp del <port_id> <profile_path>",
 	.tokens = {
-		(void *)&cmd_ddp_add_ddp,
-		(void *)&cmd_ddp_add_add,
-		(void *)&cmd_ddp_add_port_id,
-		(void *)&cmd_ddp_add_filepath,
+		(void *)&cmd_ddp_del_ddp,
+		(void *)&cmd_ddp_del_del,
+		(void *)&cmd_ddp_del_port_id,
+		(void *)&cmd_ddp_del_filepath,
 		NULL,
 	},
 };
@@ -13828,6 +13916,7 @@ cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_strict_link_prio,
 	(cmdline_parse_inst_t *)&cmd_tc_min_bw,
 	(cmdline_parse_inst_t *)&cmd_ddp_add,
+	(cmdline_parse_inst_t *)&cmd_ddp_del,
 	(cmdline_parse_inst_t *)&cmd_ddp_get_list,
 	(cmdline_parse_inst_t *)&cmd_show_vf_stats,
 	(cmdline_parse_inst_t *)&cmd_clear_vf_stats,
