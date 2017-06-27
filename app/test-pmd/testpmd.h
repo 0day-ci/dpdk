@@ -598,6 +598,7 @@ void stop_port(portid_t pid);
 void close_port(portid_t pid);
 void attach_port(char *identifier);
 void detach_port(uint8_t port_id);
+void reset_port(portid_t port_id);
 int all_ports_stopped(void);
 int port_is_started(portid_t port_id);
 void pmd_test_exit(void);

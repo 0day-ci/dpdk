@@ -3318,3 +3318,16 @@ close_ddp_package_file(uint8_t *buf)
 
 	return -1;
 }
+
+void
+reset_port(portid_t port_id)
+{
+	int diag;
+
+	if (port_id_is_invalid(port_id, ENABLED_WARN))
+		return;
+	diag = rte_eth_dev_reset(port_id);
+	if (diag == 0)
+		return;
+	printf("Reset port %d failed. diag=%d\n", port_id, diag);	
+}
