@@ -153,5 +153,5 @@ DPDK_17.08 {
 	global:
 
 	rte_flow_isolate;
-
+	rte_eth_dev_reset;
 } DPDK_17.05;
