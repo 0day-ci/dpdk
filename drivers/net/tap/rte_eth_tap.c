@@ -565,11 +565,22 @@ error:
 static int
 tap_link_set_down(struct rte_eth_dev *dev)
 {
+	int err, remote_err;
 	struct pmd_internals *pmd = dev->data->dev_private;
 	struct ifreq ifr = { .ifr_flags = IFF_UP };
 
 	dev->data->dev_link.link_status = ETH_LINK_DOWN;
-	return tap_ioctl(pmd, SIOCSIFFLAGS, &ifr, 0, LOCAL_AND_REMOTE);
+	err = tap_ioctl(pmd, SIOCSIFFLAGS, &ifr, 0, LOCAL_ONLY);
+
+	if (pmd->remote_if_index) {
+		/* Restore initial remote state */
+		remote_err = ioctl(pmd->ioctl_sock, SIOCSIFFLAGS,
+				&pmd->remote_initial_ifr);
+		if (remote_err < 0)
+			err = -1;
+	}
+
+	return err;
 }
 
 static int
@@ -1320,6 +1331,11 @@ eth_dev_tap_create(struct rte_vdev_device *vdev, char *tap_name,
 		}
 		snprintf(pmd->remote_iface, RTE_ETH_NAME_MAX_LEN,
 			 "%s", remote_iface);
+
+		/* Save state of remote device */
+		tap_ioctl(pmd, SIOCGIFFLAGS, &pmd->remote_initial_ifr, 0, REMOTE_ONLY);
+
+		/* Replicate remote MAC address */
 		if (tap_ioctl(pmd, SIOCGIFHWADDR, &ifr, 0, REMOTE_ONLY) < 0) {
 			RTE_LOG(ERR, PMD, "%s: failed to get %s MAC address.",
 				pmd->name, pmd->remote_iface);
