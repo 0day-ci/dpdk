@@ -34,8 +34,14 @@ include $(RTE_SDK)/mk/rte.vars.mk
 # library name
 LIB = librte_pdump.a
 
-CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR) -O3
-CFLAGS += -D_GNU_SOURCE
+# Include the source dir first, so that headers paths are always picked
+# from there. By including it last race conditions might happen during paralle
+# builds, and headers might be already installed in RTE_OUT/include when the
+# variable is recursively expanded, thus causing GCC to sometimes use the
+# SRCDIR path and sometimes the RTE_OUT/include, making the builds not
+# reproducible.
+CFLAGS := -I$(SRCDIR) $(CFLAGS)
+CFLAGS += $(WERROR_FLAGS) -O3 -D_GNU_SOURCE
 LDLIBS += -lpthread
 
 EXPORT_MAP := rte_pdump_version.map
