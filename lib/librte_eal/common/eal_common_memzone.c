@@ -238,6 +238,12 @@ memzone_reserve_aligned_thread_unsafe(const char *name, size_t len,
 	}
 
 	const struct malloc_elem *elem = malloc_elem_from_data(mz_addr);
+	
+	if (elem == NULL) {
+	    RTE_LOG(ERR, EAL, "%s(): Cannot malloc elem from data \n", __func__);
+		rte_errno = ENOSPC;
+		return NULL;
+	}
 
 	/* fill the zone in config */
 	mz = get_next_free_memzone();
