@@ -75,6 +75,12 @@ New Features
 
   Added support for firmwares with multiple Ethernet ports per physical port.
 
+* **Updated the AESNI MB PMD.**
+
+  The AESNI MB PMD has been updated with additional support for:
+
+  * 12-byte IV on AES Counter Mode, apart from the previous 16-byte IV.
+
 
 Resolved Issues
 ---------------

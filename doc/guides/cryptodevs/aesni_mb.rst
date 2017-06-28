@@ -69,6 +69,9 @@ Limitations
 * Chained mbufs are not supported.
 * Only in-place is currently supported (destination address is the same as source address).
 * Only supports session-oriented API implementation (session-less APIs are not supported).
+* If IV is passed with 16 bytes, last 4 bytes will be ignored, as underlying library only
+  requires 12 bytes and will append 4 bytes (counter) at the end.
+  The library always set these 4 bytes to 1, as IPSec requires counter to be set to 1.
 
 Installation
 ------------
@@ -95,7 +98,7 @@ and the Multi-Buffer library version supported by them:
    =============  ============================
    2.2 - 16.11    0.43 - 0.44
    17.02          0.44
-   17.05          0.45
+   17.05 - 17.08  0.45 - 0.46
    =============  ============================
 
 
@@ -131,3 +134,16 @@ Example:
 .. code-block:: console
 
     ./l2fwd-crypto -l 6 -n 4 --vdev="crypto_aesni_mb,socket_id=1,max_nb_sessions=128"
+
+Extra notes
+-----------
+
+For AES Counter mode (AES-CTR), the library supports two different sizes for Initialization
+Vector (IV):
+
+* 12 bytes: used mainly for IPSec, as it requires 12 bytes from the user, which internally
+  are appended the counter block (4 bytes), which is set to 1 for the first block
+  (no padding required from the user)
+
+* 16 bytes: when passing 16 bytes, the library will take them and use the last 4 bytes
+  as the initial counter block for the first block.
