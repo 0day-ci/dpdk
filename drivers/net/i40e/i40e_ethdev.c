@@ -1283,6 +1283,7 @@ eth_i40e_dev_init(struct rte_eth_dev *dev)
 
 	/* enable uio intr after callback register */
 	rte_intr_enable(intr_handle);
+
 	/*
 	 * Add an ethertype filter to drop all flow control frames transmitted
 	 * from VSIs. By doing so, we stop VF from sending out PAUSE or PFC
@@ -5832,10 +5833,28 @@ i40e_dev_interrupt_handler(void *param)
 {
 	struct rte_eth_dev *dev = (struct rte_eth_dev *)param;
 	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+	struct rte_uevent event;
 	uint32_t icr0;
+	struct rte_pci_device *pci_dev;
+	struct rte_intr_handle *intr_handle;
+
+	pci_dev = RTE_ETH_DEV_TO_PCI(dev);
+	intr_handle = &pci_dev->intr_handle;
 
 	/* Disable interrupt */
 	i40e_pf_disable_irq0(hw);
+
+	/* check device uevent */
+	if (rte_uevent_get(intr_handle->uevent_fd, &event) == 0) {
+		if (event.subsystem == RTE_UEVENT_SUBSYSTEM_UIO) {
+			if (event.action == RTE_UEVENT_REMOVE) {
+				_rte_eth_dev_callback_process(dev,
+					RTE_ETH_EVENT_INTR_RMV, NULL);
+				return;
+			}
+		}
+		goto done;
+	}
 
 	/* read out interrupt causes */
 	icr0 = I40E_READ_REG(hw, I40E_PFINT_ICR0);
