@@ -91,6 +91,7 @@ pkt_burst_io_forward(struct fwd_stream *fs)
 #ifdef RTE_TEST_PMD_RECORD_CORE_CYCLES
 	start_tsc = rte_rdtsc();
 #endif
+	int i;
 
 	/*
 	 * Receive a burst of packets and forward them.
@@ -104,6 +105,20 @@ pkt_burst_io_forward(struct fwd_stream *fs)
 #ifdef RTE_TEST_PMD_RECORD_BURST_STATS
 	fs->rx_burst_stats.pkt_burst_spread[nb_rx]++;
 #endif
+
+	for (i = 0; i < nb_rx; i++) {
+		uint64_t tx_ol_flags = 0, rx_ol_flags = pkts_burst[i]->ol_flags;
+
+		if (rx_ol_flags & PKT_RX_VLAN_PKT)
+			tx_ol_flags |= PKT_TX_VLAN_PKT;
+		else if (rx_ol_flags & PKT_RX_QINQ_PKT)
+			tx_ol_flags |= PKT_TX_QINQ_PKT;
+
+		pkts_burst[i]->ol_flags = 0;
+		pkts_burst[i]->ol_flags = tx_ol_flags;
+
+	}
+
 	nb_tx = rte_eth_tx_burst(fs->tx_port, fs->tx_queue,
 			pkts_burst, nb_rx);
 	/*
