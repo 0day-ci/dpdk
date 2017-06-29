@@ -90,6 +90,7 @@ struct rte_intr_handle {
 					for uio_pci_generic */
 	};
 	int fd;	 /**< interrupt event file descriptor */
+	int uevent_fd;	 /**< uevent file descriptor */
 	enum rte_intr_handle_type type;  /**< handle type */
 	uint32_t max_intr;             /**< max interrupt requested */
 	uint32_t nb_efd;               /**< number of available efd(event fd) */
@@ -97,6 +98,19 @@ struct rte_intr_handle {
 	struct rte_epoll_event elist[RTE_MAX_RXTX_INTR_VEC_ID];
 				       /**< intr vector epoll event */
 	int *intr_vec;                 /**< intr vector number array */
+};
+
+#define RTE_UEVENT_MSG_LEN 4096
+#define RTE_UEVENT_SUBSYSTEM_UIO 1
+
+enum rte_uevent_action {
+	RTE_UEVENT_ADD = 0,		/**< uevent type of device add */
+	RTE_UEVENT_REMOVE = 1,	/**< uevent type of device remove*/
+};
+
+struct rte_uevent {
+	enum rte_uevent_action action;	/**< uevent action type */
+	int subsystem;				/**< subsystem id */
 };
 
 #define RTE_EPOLL_PER_THREAD        -1  /**< to hint using per thread epfd */
@@ -235,5 +249,28 @@ rte_intr_allow_others(struct rte_intr_handle *intr_handle);
  */
 int
 rte_intr_cap_multiple(struct rte_intr_handle *intr_handle);
+
+/**
+ * It read out the uevent from the specific file descriptor.
+ *
+ * @param fd
+ *   The fd which the uevent associated to
+ * @param uevent
+ *   Pointer to the uevent which read from the monitoring fd.
+ * @return
+ *   - On success, zero.
+ *   - On failure, a negative value.
+ */
+int
+rte_uevent_get(int fd, struct rte_uevent *uevent);
+
+/**
+ * Connect to the device uevent file descriptor.
+ * @return
+ *   - On success, the connected uevent fd.
+ *   - On failure, a negative value.
+ */
+int
+rte_uevent_connect(void);
 
 #endif /* _RTE_LINUXAPP_INTERRUPTS_H_ */

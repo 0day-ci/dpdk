@@ -65,6 +65,10 @@
 #include <rte_errno.h>
 #include <rte_spinlock.h>
 
+#include <sys/socket.h>
+#include <linux/netlink.h>
+#include <sys/epoll.h>
+
 #include "eal_private.h"
 #include "eal_vfio.h"
 #include "eal_thread.h"
@@ -669,10 +673,13 @@ eal_intr_process_interrupts(struct epoll_event *events, int nfds)
 			RTE_SET_USED(r);
 			return -1;
 		}
+
 		rte_spinlock_lock(&intr_lock);
 		TAILQ_FOREACH(src, &intr_sources, next)
-			if (src->intr_handle.fd ==
-					events[n].data.fd)
+			if ((src->intr_handle.fd ==
+					events[n].data.fd) ||
+				(src->intr_handle.uevent_fd ==
+					events[n].data.fd))
 				break;
 		if (src == NULL){
 			rte_spinlock_unlock(&intr_lock);
@@ -858,7 +865,24 @@ eal_intr_thread_main(__rte_unused void *arg)
 			}
 			else
 				numfds++;
+
+			/**
+			 * add device uevent file descriptor
+			 * into wait list for uevent monitoring.
+			 */
+			ev.events = EPOLLIN | EPOLLPRI | EPOLLRDHUP | EPOLLHUP;
+			ev.data.fd = src->intr_handle.uevent_fd;
+			if (epoll_ctl(pfd, EPOLL_CTL_ADD,
+					src->intr_handle.uevent_fd, &ev) < 0){
+				rte_panic("Error adding uevent_fd %d epoll_ctl"
+					", %s\n",
+					src->intr_handle.uevent_fd,
+					strerror(errno));
+			} else
+				numfds++;
 		}
+
+
 		rte_spinlock_unlock(&intr_lock);
 		/* serve the interrupt */
 		eal_intr_handle_interrupts(pfd, numfds);
@@ -1254,4 +1278,112 @@ rte_intr_cap_multiple(struct rte_intr_handle *intr_handle)
 		return 1;
 
 	return 0;
+}
+
+int
+rte_uevent_connect(void)
+{
+	struct sockaddr_nl addr;
+	int ret;
+	int netlink_fd = -1;
+	int size = 64 * 1024;
+	int nonblock = 1;
+	memset(&addr, 0, sizeof(addr));
+	addr.nl_family = AF_NETLINK;
+	addr.nl_pid = 0;
+	addr.nl_groups = 0xffffffff;
+
+	netlink_fd = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT);
+	if (netlink_fd < 0)
+		return -1;
+
+	setsockopt(netlink_fd, SOL_SOCKET, SO_RCVBUFFORCE, &size, sizeof(size));
+
+	ret = ioctl(netlink_fd, FIONBIO, &nonblock);
+	if (ret != 0) {
+		RTE_LOG(ERR, EAL,
+		"ioctl(FIONBIO) failed\n");
+		close(netlink_fd);
+		return -1;
+	}
+
+	if (bind(netlink_fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+		close(netlink_fd);
+		return -1;
+	}
+
+	return netlink_fd;
+}
+
+static int
+parse_event(const char *buf, struct rte_uevent *event)
+{
+	char action[RTE_UEVENT_MSG_LEN];
+	char subsystem[RTE_UEVENT_MSG_LEN];
+	char dev_path[RTE_UEVENT_MSG_LEN];
+	int i = 0;
+
+	memset(action, 0, RTE_UEVENT_MSG_LEN);
+	memset(subsystem, 0, RTE_UEVENT_MSG_LEN);
+	memset(dev_path, 0, RTE_UEVENT_MSG_LEN);
+
+	while (i < RTE_UEVENT_MSG_LEN) {
+		for (; i < RTE_UEVENT_MSG_LEN; i++) {
+			if (*buf)
+				break;
+			buf++;
+		}
+		if (!strncmp(buf, "ACTION=", 7)) {
+			buf += 7;
+			i += 7;
+			snprintf(action, sizeof(action), "%s", buf);
+		} else if (!strncmp(buf, "DEVPATH=", 8)) {
+			buf += 8;
+			i += 8;
+			snprintf(dev_path, sizeof(dev_path), "%s", buf);
+		} else if (!strncmp(buf, "SUBSYSTEM=", 10)) {
+			buf += 10;
+			i += 10;
+			snprintf(subsystem, sizeof(subsystem), "%s", buf);
+		}
+		for (; i < RTE_UEVENT_MSG_LEN; i++) {
+			if (*buf == '\0')
+				break;
+			buf++;
+		}
+	}
+
+	if (!strncmp(subsystem, "uio", 3)) {
+
+		event->subsystem = RTE_UEVENT_SUBSYSTEM_UIO;
+		if (!strncmp(action, "add", 3))
+			event->action = RTE_UEVENT_ADD;
+		if (!strncmp(action, "remove", 6))
+			event->action = RTE_UEVENT_REMOVE;
+		return 0;
+	}
+
+	return -1;
+}
+
+int
+rte_uevent_get(int fd, struct rte_uevent *uevent)
+{
+	int ret;
+	char buf[RTE_UEVENT_MSG_LEN];
+
+	memset(uevent, 0, sizeof(struct rte_uevent));
+	memset(buf, 0, RTE_UEVENT_MSG_LEN);
+
+	ret = recv(fd, buf, RTE_UEVENT_MSG_LEN - 1, MSG_DONTWAIT);
+	if (ret > 0)
+		return parse_event(buf, uevent);
+	else if (ret < 0) {
+		RTE_LOG(ERR, EAL,
+		"Socket read error(%d): %s\n",
+		errno, strerror(errno));
+		return -1;
+	} else
+		/* connection closed */
+		return -1;
 }

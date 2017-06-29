@@ -231,6 +231,10 @@ pci_uio_free_resource(struct rte_pci_device *dev,
 		close(dev->intr_handle.uio_cfg_fd);
 		dev->intr_handle.uio_cfg_fd = -1;
 	}
+	if (dev->intr_handle.uevent_fd >= 0) {
+		close(dev->intr_handle.uevent_fd);
+		dev->intr_handle.uevent_fd = -1;
+	}
 	if (dev->intr_handle.fd >= 0) {
 		close(dev->intr_handle.fd);
 		dev->intr_handle.fd = -1;
@@ -275,6 +279,8 @@ pci_uio_alloc_resource(struct rte_pci_device *dev,
 			cfgname, strerror(errno));
 		goto error;
 	}
+
+	dev->intr_handle.uevent_fd = rte_uevent_connect();
 
 	if (dev->kdrv == RTE_KDRV_IGB_UIO)
 		dev->intr_handle.type = RTE_INTR_HANDLE_UIO;
