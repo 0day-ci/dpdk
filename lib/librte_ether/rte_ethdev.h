@@ -1087,6 +1087,9 @@ typedef int  (*eth_dev_set_link_down_t)(struct rte_eth_dev *dev);
 typedef void (*eth_dev_close_t)(struct rte_eth_dev *dev);
 /**< @internal Function used to close a configured Ethernet device. */
 
+typedef int (*eth_dev_reset_t)(struct rte_eth_dev *dev);
+/** <@internal Function used to reset a configured Ethernet device. */
+
 typedef void (*eth_promiscuous_enable_t)(struct rte_eth_dev *dev);
 /**< @internal Function used to enable the RX promiscuous mode of an Ethernet device. */
 
@@ -1404,6 +1407,7 @@ struct eth_dev_ops {
 	eth_dev_set_link_up_t      dev_set_link_up;   /**< Device link up. */
 	eth_dev_set_link_down_t    dev_set_link_down; /**< Device link down. */
 	eth_dev_close_t            dev_close;     /**< Close device. */
+	eth_dev_reset_t		   dev_reset;	   /**<	Reset device. */
 	eth_link_update_t          link_update;   /**< Get device link state. */
 
 	eth_promiscuous_enable_t   promiscuous_enable; /**< Promiscuous ON. */
@@ -2102,6 +2106,14 @@ int rte_eth_dev_set_link_down(uint8_t port_id);
  *   The port identifier of the Ethernet device.
  */
 void rte_eth_dev_close(uint8_t port_id);
+
+/**
+ * Reset a Ethernet device.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ */
+int rte_eth_dev_reset(uint8_t port_id);
 
 /**
  * Enable receipt in promiscuous mode for an Ethernet device.
