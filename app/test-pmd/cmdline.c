@@ -4390,7 +4390,9 @@ static void cmd_show_bonding_config_parsed(void *parsed_result,
 		printf("\tFailed to get bonding mode for port = %d\n", port_id);
 		return;
 	} else
-		printf("\tBonding mode: %d\n", bonding_mode);
+		printf("\tBonding mode: %d ", bonding_mode);
+	printf("[0:Round Robin, 1:Active Backup, 2:Balance, 3:Broadcast, ");
+	printf("\n\t\t\t4:802.3AD, 5:Adaptive TLB, 6:Adaptive Load Balancing]\n");
 
 	if (bonding_mode == BONDING_MODE_BALANCE) {
 		int balance_xmit_policy;
@@ -4454,12 +4456,15 @@ static void cmd_show_bonding_config_parsed(void *parsed_result,
 
 	}
 
-	primary_id = rte_eth_bond_primary_get(port_id);
-	if (primary_id < 0) {
-		printf("\tFailed to get primary slave for port = %d\n", port_id);
-		return;
-	} else
+	if (bonding_mode == BONDING_MODE_ACTIVE_BACKUP ||
+		bonding_mode == BONDING_MODE_TLB) {
+		primary_id = rte_eth_bond_primary_get(port_id);
+		if (primary_id < 0) {
+			printf("\tFailed to get primary slave for port = %d\n", port_id);
+			return;
+		}
 		printf("\tPrimary: [%d]\n", primary_id);
+	}
 
 }
 
