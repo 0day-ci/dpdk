@@ -98,6 +98,7 @@ uint16_t verbose_level = 0; /**< Silent by default. */
 /* use master core for command line ? */
 uint8_t interactive = 0;
 uint8_t auto_start = 0;
+uint8_t ring_bind_lcpu = 0;
 char cmdline_filename[PATH_MAX] = {0};
 
 /*
@@ -1395,6 +1396,46 @@ port_is_closed(portid_t port_id)
 	return 1;
 }
 
+static int find_local_socket(queueid_t qi, int is_rxq)
+{
+	/*
+	 * try to find the local mp with following logic:
+	 * 1) Find the correct stream for the queue;
+	 * 2) Find the correct lcore for the stream;
+	 * 3) Find the correct socket for the lcore;
+	 * 4) Find the correct mp for the scoket;
+	 *
+	 * If failed, failover to the old implementation.
+	 */
+	int i, j, socket = NUMA_NO_CONFIG;
+
+	/* find the stream based on queue no*/
+	for (i = 0; i < nb_fwd_streams; i++) {
+		if (is_rxq) {
+			if (fwd_streams[i]->rx_queue == qi)
+				break;
+		} else {
+			if (fwd_streams[i]->tx_queue == qi)
+				break;
+		}
+	}
+	if (i == nb_fwd_streams)
+		return NUMA_NO_CONFIG;
+
+	/* find the lcore based on stream idx */
+	for (j = 0; j < nb_lcores; j++) {
+		if (fwd_lcores[j]->stream_idx == i)
+			break;
+	}
+	if (j == nb_lcores)
+		return NUMA_NO_CONFIG;
+
+	/* find the scoket for the lcore */
+	socket = rte_lcore_to_socket_id(fwd_lcores_cpuids[j]);
+
+	return socket;
+}
+
 int
 start_port(portid_t pid)
 {
@@ -1445,14 +1486,19 @@ start_port(portid_t pid)
 			port->need_reconfig_queues = 0;
 			/* setup tx queues */
 			for (qi = 0; qi < nb_txq; qi++) {
+                                int socket = port->socket_id;
 				if ((numa_support) &&
 					(txring_numa[pi] != NUMA_NO_CONFIG))
-					diag = rte_eth_tx_queue_setup(pi, qi,
-						nb_txd,txring_numa[pi],
-						&(port->tx_conf));
-				else
-					diag = rte_eth_tx_queue_setup(pi, qi,
-						nb_txd,port->socket_id,
+                                        socket = txring_numa[pi];
+
+				if (ring_bind_lcpu) {
+					int ret = find_local_socket(qi, 0);
+					if (ret != NUMA_NO_CONFIG)
+						socket = ret;
+				}
+
+				diag = rte_eth_tx_queue_setup(pi, qi,
+						nb_txd, socket,
 						&(port->tx_conf));
 
 				if (diag == 0)
@@ -1471,35 +1517,29 @@ start_port(portid_t pid)
 			}
 			/* setup rx queues */
 			for (qi = 0; qi < nb_rxq; qi++) {
+				int socket = port->socket_id;
 				if ((numa_support) &&
-					(rxring_numa[pi] != NUMA_NO_CONFIG)) {
-					struct rte_mempool * mp =
-						mbuf_pool_find(rxring_numa[pi]);
-					if (mp == NULL) {
-						printf("Failed to setup RX queue:"
-							"No mempool allocation"
-							" on the socket %d\n",
-							rxring_numa[pi]);
-						return -1;
-					}
+						(rxring_numa[pi] != NUMA_NO_CONFIG))
+					socket = rxring_numa[pi];
 
-					diag = rte_eth_rx_queue_setup(pi, qi,
-					     nb_rxd,rxring_numa[pi],
-					     &(port->rx_conf),mp);
-				} else {
-					struct rte_mempool *mp =
-						mbuf_pool_find(port->socket_id);
-					if (mp == NULL) {
-						printf("Failed to setup RX queue:"
+				if (ring_bind_lcpu) {
+					int ret = find_local_socket(qi, 1);
+					if (ret != NUMA_NO_CONFIG)
+						socket = ret;
+				}
+
+				struct rte_mempool *mp =
+					mbuf_pool_find(socket);
+				if (mp == NULL) {
+					printf("Failed to setup RX queue:"
 							"No mempool allocation"
 							" on the socket %d\n",
-							port->socket_id);
-						return -1;
-					}
-					diag = rte_eth_rx_queue_setup(pi, qi,
-					     nb_rxd,port->socket_id,
-					     &(port->rx_conf), mp);
+							socket);
+					return -1;
 				}
+				diag = rte_eth_rx_queue_setup(pi, qi,
+						nb_rxd,socket,
+						&(port->rx_conf), mp);
 				if (diag == 0)
 					continue;
 

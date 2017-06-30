@@ -130,6 +130,11 @@ usage(char* progname)
 	       "(flag: 1 for RX; 2 for TX; 3 for RX and TX).\n");
 	printf("  --socket-num=N: set socket from which all memory is allocated "
 	       "in NUMA mode.\n");
+	printf("  --ring-bind-lcpu: "
+		" specify TX/RX rings will be allocated on local socket of lcpu."
+		" It will overriden ring-numa-config or port-numa-config if success."
+		" If local ring buffer is unavailable, it will use --ring-numa-config or port-numa-config instead."
+		" It allows one port binds to multiple NUMA nodes. \n");
 	printf("  --mbuf-size=N: set the data size of mbuf to N bytes.\n");
 	printf("  --total-num-mbufs=N: set the number of mbufs to be allocated "
 	       "in mbuf pools.\n");
@@ -563,6 +568,7 @@ launch_args_parse(int argc, char** argv)
 		{ "interactive",		0, 0, 0 },
 		{ "cmdline-file",		1, 0, 0 },
 		{ "auto-start",			0, 0, 0 },
+		{ "ring-bind-lcpu",		0, 0, 0 },
 		{ "eth-peers-configfile",	1, 0, 0 },
 		{ "eth-peer",			1, 0, 0 },
 #endif
@@ -673,6 +679,10 @@ launch_args_parse(int argc, char** argv)
 			if (!strcmp(lgopts[opt_idx].name, "auto-start")) {
 				printf("Auto-start selected\n");
 				auto_start = 1;
+			}
+			if (!strcmp(lgopts[opt_idx].name, "ring-bind-lcpu")) {
+				printf("RingBuffer bind with local CPU selected\n");
+				ring_bind_lcpu = 1;
 			}
 			if (!strcmp(lgopts[opt_idx].name,
 				    "eth-peers-configfile")) {
