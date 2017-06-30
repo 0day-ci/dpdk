@@ -55,6 +55,7 @@
 #define DEFAULT_POLLING_INTERVAL_10_MS (10)
 
 #define HASH_L4_PORTS(h) ((h)->src_port ^ (h)->dst_port)
+#define BOND_LSC_DELAY_TIME (10 * 1000)
 
 /* Table for statistics in mode 5 TLB */
 static uint64_t tlb_last_obytets[RTE_MAX_ETHPORTS];
@@ -1434,13 +1435,6 @@ slave_configure(struct rte_eth_dev *bonded_eth_dev,
 		}
 	}
 
-	/* If lsc interrupt is set, check initial slave's link status */
-	if (slave_eth_dev->data->dev_flags & RTE_ETH_DEV_INTR_LSC) {
-		slave_eth_dev->dev_ops->link_update(slave_eth_dev, 0);
-		bond_ethdev_lsc_event_callback(slave_eth_dev->data->port_id,
-			RTE_ETH_EVENT_INTR_LSC, &bonded_eth_dev->data->port_id);
-	}
-
 	return 0;
 }
 
@@ -1510,6 +1504,51 @@ bond_ethdev_primary_set(struct bond_dev_private *internals,
 
 static void
 bond_ethdev_promiscuous_enable(struct rte_eth_dev *eth_dev);
+
+static void
+bond_ethdev_slave_lsc_delay(void *cb_arg)
+{
+	struct rte_eth_dev *bonded_ethdev, *slave_dev;
+	struct bond_dev_private *internals;
+
+	/* Default value for polling slave found is true as we don't
+	 *  want todisable the polling thread if we cannot get the lock.
+	 */
+	int i = 0;
+
+	if (!cb_arg)
+		return;
+
+	bonded_ethdev = (struct rte_eth_dev *)cb_arg;
+	if (!bonded_ethdev->data->dev_started)
+		return;
+
+	internals = (struct bond_dev_private *)bonded_ethdev->data->dev_private;
+	if (!rte_spinlock_trylock(&internals->lock)) {
+		rte_eal_alarm_set(BOND_LSC_DELAY_TIME * 10,
+				  bond_ethdev_slave_lsc_delay,
+				  (void *)&rte_eth_devices[internals->port_id]);
+		return;
+	}
+
+	for (i = 0; i < internals->slave_count; i++) {
+		slave_dev = &(rte_eth_devices[internals->slaves[i].port_id]);
+		if (slave_dev->data->dev_conf.intr_conf.lsc != 0) {
+			if (slave_dev->dev_ops &&
+			    slave_dev->dev_ops->link_update)
+				slave_dev->dev_ops->link_update(slave_dev, 0);
+			bond_ethdev_lsc_event_callback(
+				internals->slaves[i].port_id,
+				RTE_ETH_EVENT_INTR_LSC,
+				&bonded_ethdev->data->port_id);
+		}
+	}
+	rte_spinlock_unlock(&internals->lock);
+	RTE_LOG(INFO, EAL,
+		"bond %s(%u): slave num %d, current active slave num %d\n",
+		bonded_ethdev->data->name, bonded_ethdev->data->port_id,
+		internals->slave_count, internals->active_slave_count);
+}
 
 static int
 bond_ethdev_start(struct rte_eth_dev *eth_dev)
@@ -1581,6 +1620,9 @@ bond_ethdev_start(struct rte_eth_dev *eth_dev)
 			bond_ethdev_slave_link_status_change_monitor,
 			(void *)&rte_eth_devices[internals->port_id]);
 	}
+
+	rte_eal_alarm_set(BOND_LSC_DELAY_TIME, bond_ethdev_slave_lsc_delay,
+			  (void *)&rte_eth_devices[internals->port_id]);
 
 	if (internals->user_defined_primary_port)
 		bond_ethdev_primary_set(internals, internals->primary_port);
