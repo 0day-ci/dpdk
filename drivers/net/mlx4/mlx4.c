@@ -573,9 +573,9 @@ rxq_cleanup(struct rxq *rxq);
  *   The number of entries in queues[].
  *
  * @return
- *   0 on success, negative errno value on failure.
+ *   Pointer to a parent rxq structure, NULL on failure.
  */
-static int
+struct rxq *
 priv_parent_create(struct priv *priv,
 		   uint16_t queues[],
 		   uint16_t children_n)
@@ -587,13 +587,15 @@ priv_parent_create(struct priv *priv,
 	parent = rte_zmalloc("parent queue",
 			     sizeof(*parent),
 			     RTE_CACHE_LINE_SIZE);
-	if (!parent)
-		return -ENOMEM;
+	if (!parent) {
+		ERROR("cannot allocate memory for RSS parent queue");
+		return NULL;
+	}
 	ret = rxq_setup(priv->dev, parent, 0, 0, 0,
 			NULL, NULL, children_n, NULL);
 	if (ret) {
 		rte_free(parent);
-		return -ret;
+		return NULL;
 	}
 	parent->rss.queues_n = children_n;
 	if (queues) {
@@ -606,7 +608,7 @@ priv_parent_create(struct priv *priv,
 			parent->rss.queues[i] = i;
 	}
 	LIST_INSERT_HEAD(&priv->parents, parent, next);
-	return 0;
+	return parent;
 }
 
 /**
@@ -655,7 +657,6 @@ dev_configure(struct rte_eth_dev *dev)
 	unsigned int rxqs_n = dev->data->nb_rx_queues;
 	unsigned int txqs_n = dev->data->nb_tx_queues;
 	unsigned int tmp;
-	int ret;
 
 	priv->rxqs = (void *)dev->data->rx_queues;
 	priv->txqs = (void *)dev->data->tx_queues;
@@ -712,14 +713,12 @@ dev_configure(struct rte_eth_dev *dev)
 	priv->rxqs_n = rxqs_n;
 	if (priv->isolated)
 		return 0;
-	ret = priv_parent_create(priv, NULL, priv->rxqs_n);
-	if (!ret)
+	if (priv_parent_create(priv, NULL, priv->rxqs_n))
 		return 0;
 	/* Failure, rollback. */
 	priv->rss = 0;
 	priv->rxqs_n = tmp;
-	assert(ret > 0);
-	return ret;
+	return ENOMEM;
 }
 
 /**
