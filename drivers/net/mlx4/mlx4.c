@@ -666,7 +666,7 @@ dev_configure(struct rte_eth_dev *dev)
 	}
 	if (rxqs_n == priv->rxqs_n)
 		return 0;
-	if (!rte_is_power_of_2(rxqs_n)) {
+	if (!rte_is_power_of_2(rxqs_n) && !priv->isolated) {
 		unsigned n_active;
 
 		n_active = rte_align32pow2(rxqs_n + 1) >> 1;
@@ -710,6 +710,8 @@ dev_configure(struct rte_eth_dev *dev)
 	priv->rss = 1;
 	tmp = priv->rxqs_n;
 	priv->rxqs_n = rxqs_n;
+	if (priv->isolated)
+		return 0;
 	ret = priv_parent_create(priv, NULL, priv->rxqs_n);
 	if (!ret)
 		return 0;
@@ -2596,6 +2598,7 @@ priv_mac_addr_del(struct priv *priv, unsigned int mac_index)
 {
 	unsigned int i;
 
+	assert(!priv->isolated);
 	assert(mac_index < elemof(priv->mac));
 	if (!BITFIELD_ISSET(priv->mac_configured, mac_index))
 		return;
@@ -2845,7 +2848,7 @@ rxq_cleanup(struct rxq *rxq)
 						rxq->if_cq,
 						&params));
 	}
-	if (rxq->qp != NULL) {
+	if (rxq->qp != NULL && !rxq->priv->isolated) {
 		rxq_promiscuous_disable(rxq);
 		rxq_allmulticast_disable(rxq);
 		rxq_mac_addrs_del(rxq);
@@ -3548,7 +3551,7 @@ rxq_rehash(struct rte_eth_dev *dev, struct rxq *rxq)
 		return 0;
 	}
 	/* Remove attached flows if RSS is disabled (no parent queue). */
-	if (!priv->rss) {
+	if (!priv->rss && !priv->isolated) {
 		rxq_allmulticast_disable(&tmpl);
 		rxq_promiscuous_disable(&tmpl);
 		rxq_mac_addrs_del(&tmpl);
@@ -3593,7 +3596,7 @@ skip_init:
 		return err;
 	}
 	/* Reconfigure flows. Do not care for errors. */
-	if (!priv->rss) {
+	if (!priv->rss && !priv->isolated) {
 		rxq_mac_addrs_add(&tmpl);
 		if (priv->promisc)
 			rxq_promiscuous_enable(&tmpl);
@@ -3752,7 +3755,7 @@ rxq_create_qp(struct rxq *rxq,
 		      strerror(ret));
 		return ret;
 	}
-	if (parent || !priv->rss) {
+	if (!priv->isolated && (parent || !priv->rss)) {
 		/* Configure MAC and broadcast addresses. */
 		ret = rxq_mac_addrs_add(rxq);
 		if (ret) {
@@ -4042,7 +4045,7 @@ mlx4_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 			return -ENOMEM;
 		}
 	}
-	if (priv->rss) {
+	if (priv->rss && !priv->isolated) {
 		/* The list consists of the single default one. */
 		parent = LIST_FIRST(&priv->parents);
 		if (idx >= rte_align32pow2(priv->rxqs_n + 1) >> 1)
@@ -4138,7 +4141,10 @@ mlx4_dev_start(struct rte_eth_dev *dev)
 	}
 	DEBUG("%p: attaching configured flows to all RX queues", (void *)dev);
 	priv->started = 1;
-	if (priv->rss) {
+	if (priv->isolated) {
+		rxq = NULL;
+		r = 1;
+	} else if (priv->rss) {
 		rxq = LIST_FIRST(&priv->parents);
 		r = 1;
 	} else {
@@ -4226,7 +4232,10 @@ mlx4_dev_stop(struct rte_eth_dev *dev)
 	}
 	DEBUG("%p: detaching flows from all RX queues", (void *)dev);
 	priv->started = 0;
-	if (priv->rss) {
+	if (priv->isolated) {
+		rxq = NULL;
+		r = 1;
+	} else if (priv->rss) {
 		rxq = LIST_FIRST(&priv->parents);
 		r = 1;
 	} else {
@@ -4658,6 +4667,8 @@ mlx4_mac_addr_remove(struct rte_eth_dev *dev, uint32_t index)
 	if (mlx4_is_secondary())
 		return;
 	priv_lock(priv);
+	if (priv->isolated)
+		goto end;
 	DEBUG("%p: removing MAC address from index %" PRIu32,
 	      (void *)dev, index);
 	/* Last array entry is reserved for broadcast. */
@@ -4691,6 +4702,12 @@ mlx4_mac_addr_add(struct rte_eth_dev *dev, struct ether_addr *mac_addr,
 		return -ENOTSUP;
 	(void)vmdq;
 	priv_lock(priv);
+	if (priv->isolated) {
+		DEBUG("%p: cannot add MAC address, "
+		      "device is in isolated mode", (void *)dev);
+		re = EPERM;
+		goto end;
+	}
 	DEBUG("%p: adding MAC address at index %" PRIu32,
 	      (void *)dev, index);
 	/* Last array entry is reserved for broadcast. */
@@ -4738,6 +4755,12 @@ mlx4_promiscuous_enable(struct rte_eth_dev *dev)
 	if (mlx4_is_secondary())
 		return;
 	priv_lock(priv);
+	if (priv->isolated) {
+		DEBUG("%p: cannot enable promiscuous, "
+		      "device is in isolated mode", (void *)dev);
+		priv_unlock(priv);
+		return;
+	}
 	if (priv->promisc) {
 		priv_unlock(priv);
 		return;
@@ -4786,7 +4809,7 @@ mlx4_promiscuous_disable(struct rte_eth_dev *dev)
 	if (mlx4_is_secondary())
 		return;
 	priv_lock(priv);
-	if (!priv->promisc) {
+	if (!priv->promisc || priv->isolated) {
 		priv_unlock(priv);
 		return;
 	}
@@ -4818,6 +4841,12 @@ mlx4_allmulticast_enable(struct rte_eth_dev *dev)
 	if (mlx4_is_secondary())
 		return;
 	priv_lock(priv);
+	if (priv->isolated) {
+		DEBUG("%p: cannot enable allmulticast, "
+		      "device is in isolated mode", (void *)dev);
+		priv_unlock(priv);
+		return;
+	}
 	if (priv->allmulti) {
 		priv_unlock(priv);
 		return;
@@ -4870,7 +4899,7 @@ mlx4_allmulticast_disable(struct rte_eth_dev *dev)
 		priv_unlock(priv);
 		return;
 	}
-	if (priv->rss) {
+	if (priv->rss && !priv->isolated) {
 		rxq_allmulticast_disable(LIST_FIRST(&priv->parents));
 		goto end;
 	}
@@ -5009,7 +5038,7 @@ mlx4_dev_set_mtu(struct rte_eth_dev *dev, uint16_t mtu)
 		}
 		/* Reenable non-RSS queue attributes. No need to check
 		 * for errors at this stage. */
-		if (!priv->rss) {
+		if (!priv->rss && !priv->isolated) {
 			rxq_mac_addrs_add(rxq);
 			if (priv->promisc)
 				rxq_promiscuous_enable(rxq);
@@ -5244,6 +5273,12 @@ mlx4_vlan_filter_set(struct rte_eth_dev *dev, uint16_t vlan_id, int on)
 	if (mlx4_is_secondary())
 		return -E_RTE_SECONDARY;
 	priv_lock(priv);
+	if (priv->isolated) {
+		DEBUG("%p: cannot set vlan filter, "
+		      "device is in isolated mode", (void *)dev);
+		priv_unlock(priv);
+		return -EINVAL;
+	}
 	ret = vlan_filter_set(dev, vlan_id, on);
 	priv_unlock(priv);
 	assert(ret >= 0);
@@ -5256,6 +5291,7 @@ const struct rte_flow_ops mlx4_flow_ops = {
 	.destroy = mlx4_flow_destroy,
 	.flush = mlx4_flow_flush,
 	.query = NULL,
+	.isolate = mlx4_flow_isolate,
 };
 
 /**
