@@ -204,3 +204,18 @@ rte_bus_find_by_name(const char *busname)
 {
 	return rte_bus_find(NULL, cmp_bus_name, (const void *)busname);
 }
+
+static int
+bus_can_parse(const struct rte_bus *bus, const void *_name)
+{
+	const char *name = _name;
+
+	return !(bus->parse && bus->parse(name, NULL) == 0);
+}
+
+/* find a bus capable of parsing a device description */
+struct rte_bus *
+rte_bus_find_by_device_name(const char *str)
+{
+	return rte_bus_find(NULL, bus_can_parse, str);
+}
