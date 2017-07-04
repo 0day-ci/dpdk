@@ -263,6 +263,10 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 	if (unlikely(vq->enabled == 0))
 		return 0;
 
+	if (unlikely(vq->access_ok == 0))
+		if (unlikely(vring_translate(dev, vq) < 0))
+			return 0;
+
 	avail_idx = *((volatile uint16_t *)&vq->avail->idx);
 	start_idx = vq->last_used_idx;
 	free_entries = avail_idx - start_idx;
@@ -546,6 +550,10 @@ virtio_dev_merge_rx(struct virtio_net *dev, uint16_t queue_id,
 	vq = dev->virtqueue[queue_id];
 	if (unlikely(vq->enabled == 0))
 		return 0;
+
+	if (unlikely(vq->access_ok == 0))
+		if (unlikely(vring_translate(dev, vq) < 0))
+			return 0;
 
 	count = RTE_MIN((uint32_t)MAX_PKT_BURST, count);
 	if (count == 0)
@@ -1028,6 +1036,10 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 	vq = dev->virtqueue[queue_id];
 	if (unlikely(vq->enabled == 0))
 		goto out;
+
+	if (unlikely(vq->access_ok == 0))
+		if (unlikely(vring_translate(dev, vq) < 0))
+			return 0;
 
 	if (unlikely(dev->dequeue_zero_copy)) {
 		struct zcopy_mbuf *zmbuf, *next;
