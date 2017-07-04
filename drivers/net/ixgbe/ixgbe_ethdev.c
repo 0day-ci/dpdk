@@ -4681,6 +4681,7 @@ ixgbe_dev_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 	struct rte_eth_dev_info dev_info;
 	uint32_t frame_size = mtu + ETHER_HDR_LEN + ETHER_CRC_LEN;
 	struct rte_eth_rxmode *rx_conf = &dev->data->dev_conf.rxmode;
+	struct rte_eth_dev_data *dev_data = dev->data;
 
 	ixgbe_dev_info_get(dev, &dev_info);
 
@@ -4688,13 +4689,15 @@ ixgbe_dev_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 	if ((mtu < ETHER_MIN_MTU) || (frame_size > dev_info.max_rx_pktlen))
 		return -EINVAL;
 
-	/* refuse mtu that requires the support of scattered packets when this
-	 * feature has not been enabled before.
+	/* if device is started, refuse mtu that requires the support of
+	 * scattered packets when this feature has not been enabled before.
 	 */
-	if (!rx_conf->enable_scatter &&
+	if (dev_data->dev_started && !rx_conf->enable_scatter &&
 	    (frame_size + 2 * IXGBE_VLAN_TAG_SIZE >
-	     dev->data->min_rx_buf_size - RTE_PKTMBUF_HEADROOM))
+	     dev->data->min_rx_buf_size - RTE_PKTMBUF_HEADROOM)) {
+		PMD_INIT_LOG(ERR, "Port should be stopped first.");
 		return -EINVAL;
+	}
 
 	hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	hlreg0 = IXGBE_READ_REG(hw, IXGBE_HLREG0);
