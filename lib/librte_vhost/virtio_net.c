@@ -154,8 +154,9 @@ virtio_enqueue_offload(struct rte_mbuf *m_buf, struct virtio_net_hdr *net_hdr)
 }
 
 static __rte_always_inline int
-copy_mbuf_to_desc(struct virtio_net *dev, struct vring_desc *descs,
-		  struct rte_mbuf *m, uint16_t desc_idx, uint32_t size)
+copy_mbuf_to_desc(struct virtio_net *dev, struct vhost_virtqueue *vq,
+		  struct vring_desc *descs, struct rte_mbuf *m,
+		  uint16_t desc_idx, uint32_t size)
 {
 	uint32_t desc_avail, desc_offset;
 	uint32_t mbuf_avail, mbuf_offset;
@@ -166,7 +167,8 @@ copy_mbuf_to_desc(struct virtio_net *dev, struct vring_desc *descs,
 	uint16_t nr_desc = 1;
 
 	desc = &descs[desc_idx];
-	desc_addr = rte_vhost_gpa_to_vva(dev->mem, desc->addr);
+	desc_addr = vhost_iova_to_vva(dev, vq, desc->addr,
+					desc->len, VHOST_ACCESS_RW);
 	/*
 	 * Checking of 'desc_addr' placed outside of 'unlikely' macro to avoid
 	 * performance issue with some versions of gcc (4.8.4 and 5.3.0) which
@@ -205,7 +207,9 @@ copy_mbuf_to_desc(struct virtio_net *dev, struct vring_desc *descs,
 				return -1;
 
 			desc = &descs[desc->next];
-			desc_addr = rte_vhost_gpa_to_vva(dev->mem, desc->addr);
+			desc_addr = vhost_iova_to_vva(dev, vq, desc->addr,
+							desc->len,
+							VHOST_ACCESS_RW);
 			if (unlikely(!desc_addr))
 				return -1;
 
@@ -290,8 +294,10 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 
 		if (vq->desc[desc_idx].flags & VRING_DESC_F_INDIRECT) {
 			descs = (struct vring_desc *)(uintptr_t)
-				rte_vhost_gpa_to_vva(dev->mem,
-					vq->desc[desc_idx].addr);
+				vhost_iova_to_vva(dev,
+						vq, vq->desc[desc_idx].addr,
+						vq->desc[desc_idx].len,
+						VHOST_ACCESS_RO);
 			if (unlikely(!descs)) {
 				count = i;
 				break;
@@ -304,7 +310,7 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 			sz = vq->size;
 		}
 
-		err = copy_mbuf_to_desc(dev, descs, pkts[i], desc_idx, sz);
+		err = copy_mbuf_to_desc(dev, vq, descs, pkts[i], desc_idx, sz);
 		if (unlikely(err)) {
 			used_idx = (start_idx + i) & (vq->size - 1);
 			vq->used->ring[used_idx].len = dev->vhost_hlen;
@@ -350,7 +356,9 @@ fill_vec_buf(struct virtio_net *dev, struct vhost_virtqueue *vq,
 
 	if (vq->desc[idx].flags & VRING_DESC_F_INDIRECT) {
 		descs = (struct vring_desc *)(uintptr_t)
-			rte_vhost_gpa_to_vva(dev->mem, vq->desc[idx].addr);
+			vhost_iova_to_vva(dev, vq, vq->desc[idx].addr,
+						vq->desc[idx].len,
+						VHOST_ACCESS_RO);
 		if (unlikely(!descs))
 			return -1;
 
@@ -425,8 +433,9 @@ reserve_avail_buf_mergeable(struct virtio_net *dev, struct vhost_virtqueue *vq,
 }
 
 static __rte_always_inline int
-copy_mbuf_to_desc_mergeable(struct virtio_net *dev, struct rte_mbuf *m,
-			    struct buf_vector *buf_vec, uint16_t num_buffers)
+copy_mbuf_to_desc_mergeable(struct virtio_net *dev, struct vhost_virtqueue *vq,
+				struct rte_mbuf *m, struct buf_vector *buf_vec,
+				uint16_t num_buffers)
 {
 	uint32_t vec_idx = 0;
 	uint64_t desc_addr;
@@ -439,7 +448,9 @@ copy_mbuf_to_desc_mergeable(struct virtio_net *dev, struct rte_mbuf *m,
 	if (unlikely(m == NULL))
 		return -1;
 
-	desc_addr = rte_vhost_gpa_to_vva(dev->mem, buf_vec[vec_idx].buf_addr);
+	desc_addr = vhost_iova_to_vva(dev, vq, buf_vec[vec_idx].buf_addr,
+						buf_vec[vec_idx].buf_len,
+						VHOST_ACCESS_RW);
 	if (buf_vec[vec_idx].buf_len < dev->vhost_hlen || !desc_addr)
 		return -1;
 
@@ -460,8 +471,11 @@ copy_mbuf_to_desc_mergeable(struct virtio_net *dev, struct rte_mbuf *m,
 		/* done with current desc buf, get the next one */
 		if (desc_avail == 0) {
 			vec_idx++;
-			desc_addr = rte_vhost_gpa_to_vva(dev->mem,
-					buf_vec[vec_idx].buf_addr);
+			desc_addr =
+				vhost_iova_to_vva(dev, vq,
+					buf_vec[vec_idx].buf_addr,
+					buf_vec[vec_idx].buf_len,
+					VHOST_ACCESS_RW);
 			if (unlikely(!desc_addr))
 				return -1;
 
@@ -558,7 +572,7 @@ virtio_dev_merge_rx(struct virtio_net *dev, uint16_t queue_id,
 			dev->vid, vq->last_avail_idx,
 			vq->last_avail_idx + num_buffers);
 
-		if (copy_mbuf_to_desc_mergeable(dev, pkts[pkt_idx],
+		if (copy_mbuf_to_desc_mergeable(dev, vq, pkts[pkt_idx],
 						buf_vec, num_buffers) < 0) {
 			vq->shadow_used_idx -= num_buffers;
 			break;
@@ -755,8 +769,9 @@ put_zmbuf(struct zcopy_mbuf *zmbuf)
 }
 
 static __rte_always_inline int
-copy_desc_to_mbuf(struct virtio_net *dev, struct vring_desc *descs,
-		  uint16_t max_desc, struct rte_mbuf *m, uint16_t desc_idx,
+copy_desc_to_mbuf(struct virtio_net *dev, struct vhost_virtqueue *vq,
+		  struct vring_desc *descs, uint16_t max_desc,
+		  struct rte_mbuf *m, uint16_t desc_idx,
 		  struct rte_mempool *mbuf_pool)
 {
 	struct vring_desc *desc;
@@ -774,7 +789,10 @@ copy_desc_to_mbuf(struct virtio_net *dev, struct vring_desc *descs,
 			(desc->flags & VRING_DESC_F_INDIRECT))
 		return -1;
 
-	desc_addr = rte_vhost_gpa_to_vva(dev->mem, desc->addr);
+	desc_addr = vhost_iova_to_vva(dev,
+					vq, desc->addr,
+					desc->len,
+					VHOST_ACCESS_RO);
 	if (unlikely(!desc_addr))
 		return -1;
 
@@ -794,7 +812,10 @@ copy_desc_to_mbuf(struct virtio_net *dev, struct vring_desc *descs,
 		if (unlikely(desc->flags & VRING_DESC_F_INDIRECT))
 			return -1;
 
-		desc_addr = rte_vhost_gpa_to_vva(dev->mem, desc->addr);
+		desc_addr = vhost_iova_to_vva(dev,
+							vq, desc->addr,
+							desc->len,
+							VHOST_ACCESS_RO);
 		if (unlikely(!desc_addr))
 			return -1;
 
@@ -858,7 +879,10 @@ copy_desc_to_mbuf(struct virtio_net *dev, struct vring_desc *descs,
 			if (unlikely(desc->flags & VRING_DESC_F_INDIRECT))
 				return -1;
 
-			desc_addr = rte_vhost_gpa_to_vva(dev->mem, desc->addr);
+			desc_addr = vhost_iova_to_vva(dev,
+							vq, desc->addr,
+							desc->len,
+							VHOST_ACCESS_RO);
 			if (unlikely(!desc_addr))
 				return -1;
 
@@ -1104,8 +1128,10 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 
 		if (vq->desc[desc_indexes[i]].flags & VRING_DESC_F_INDIRECT) {
 			desc = (struct vring_desc *)(uintptr_t)
-				rte_vhost_gpa_to_vva(dev->mem,
-					vq->desc[desc_indexes[i]].addr);
+				vhost_iova_to_vva(dev, vq,
+						vq->desc[desc_indexes[i]].addr,
+						sizeof(*desc),
+						VHOST_ACCESS_RO);
 			if (unlikely(!desc))
 				break;
 
@@ -1125,7 +1151,8 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 			break;
 		}
 
-		err = copy_desc_to_mbuf(dev, desc, sz, pkts[i], idx, mbuf_pool);
+		err = copy_desc_to_mbuf(dev, vq, desc, sz,
+						pkts[i], idx, mbuf_pool);
 		if (unlikely(err)) {
 			rte_pktmbuf_free(pkts[i]);
 			break;
