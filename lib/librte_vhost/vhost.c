@@ -48,6 +48,7 @@
 #include <rte_rwlock.h>
 #include <rte_vhost.h>
 
+#include "iotlb.h"
 #include "vhost.h"
 
 struct vhost_device {
@@ -191,13 +192,16 @@ free_device(struct virtio_net *dev)
 }
 
 static void
-init_vring_queue(struct vhost_virtqueue *vq)
+init_vring_queue(struct virtio_net *dev, uint32_t vring_idx)
 {
+	struct vhost_virtqueue *vq = dev->virtqueue[vring_idx];
+
 	memset(vq, 0, sizeof(struct vhost_virtqueue));
 
 	vq->kickfd = VIRTIO_UNINITIALIZED_EVENTFD;
 	vq->callfd = VIRTIO_UNINITIALIZED_EVENTFD;
 
+	vhost_user_iotlb_init(dev, vring_idx);
 	/* Backends are set to -1 indicating an inactive device. */
 	vq->backend = -1;
 
@@ -211,12 +215,13 @@ init_vring_queue(struct vhost_virtqueue *vq)
 }
 
 static void
-reset_vring_queue(struct vhost_virtqueue *vq)
+reset_vring_queue(struct virtio_net *dev, uint32_t vring_idx)
 {
+	struct vhost_virtqueue *vq = dev->virtqueue[vring_idx];
 	int callfd;
 
 	callfd = vq->callfd;
-	init_vring_queue(vq);
+	init_vring_queue(dev, vring_idx);
 	vq->callfd = callfd;
 }
 
@@ -233,7 +238,7 @@ alloc_vring_queue(struct virtio_net *dev, uint32_t vring_idx)
 	}
 
 	dev->virtqueue[vring_idx] = vq;
-	init_vring_queue(vq);
+	init_vring_queue(dev, vring_idx);
 
 	dev->nr_vring += 1;
 
@@ -255,7 +260,7 @@ reset_device(struct virtio_net *dev)
 	dev->flags = 0;
 
 	for (i = 0; i < dev->nr_vring; i++)
-		reset_vring_queue(dev->virtqueue[i]);
+		reset_vring_queue(dev, i);
 }
 
 /*
