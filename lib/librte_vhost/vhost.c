@@ -47,9 +47,11 @@
 #include <rte_malloc.h>
 #include <rte_rwlock.h>
 #include <rte_vhost.h>
+#include <rte_rwlock.h>
 
 #include "iotlb.h"
 #include "vhost.h"
+#include "vhost_user.h"
 
 struct vhost_device {
 	struct virtio_net *dev;
@@ -58,6 +60,39 @@ struct vhost_device {
 
 /* Declared as static so that .lock is initialized */
 static struct vhost_device vhost_devices[MAX_VHOST_DEVICE];
+
+uint64_t vhost_iova_to_vva(struct virtio_net *dev, struct vhost_virtqueue *vq,
+			uint64_t iova, uint64_t size, uint8_t perm)
+{
+	uint64_t vva, tmp_size;
+	int ret;
+
+	if (unlikely(!size))
+		return 0;
+
+	if (!(dev->features & (1ULL << VIRTIO_F_IOMMU_PLATFORM)))
+		return rte_vhost_gpa_to_vva(dev->mem, iova);
+
+	do {
+		tmp_size = size;
+
+		vva = vhost_user_iotlb_find(vq, iova, &tmp_size, perm);
+		if (tmp_size == size)
+			return vva;
+
+		/* Not in IOTLB cache */
+		ret = vhost_user_iotlb_miss(dev, iova + tmp_size, perm);
+		if (ret)
+			return 0;
+
+		while (!rte_atomic16_cmpset((volatile uint16_t *)
+					&vq->iotlb_event.cnt, 1, 0))
+			rte_pause();
+
+	} while (likely(dev->flags & VIRTIO_DEV_RUNNING));
+
+	return 0;
+}
 
 static inline struct virtio_net *
 __get_device(int vid)
