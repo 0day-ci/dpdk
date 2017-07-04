@@ -319,10 +319,10 @@ qva_to_vva(struct virtio_net *dev, uint64_t qva)
  * This function then converts these to our address space.
  */
 static int
-vhost_user_set_vring_addr(struct virtio_net **pdev, VhostUserMsg *msg)
+vhost_user_set_vring_addr(struct virtio_net *dev, VhostUserMsg *msg)
 {
 	struct vhost_virtqueue *vq;
-	struct virtio_net *dev = *pdev;
+	struct vhost_vring_addr *addr = &msg->payload.addr;
 
 	if (dev->mem == NULL)
 		return -1;
@@ -330,35 +330,50 @@ vhost_user_set_vring_addr(struct virtio_net **pdev, VhostUserMsg *msg)
 	/* addr->index refers to the queue index. The txq 1, rxq is 0. */
 	vq = dev->virtqueue[msg->payload.addr.index];
 
+	/*
+	 * Rings addresses should not be interpreted as long as the ring is not
+	 * started and enabled
+	 */
+	memcpy(&vq->ring_addrs, addr, sizeof(*addr));
+
+	return 0;
+}
+
+static struct virtio_net *translate_ring_addresses(struct virtio_net *dev,
+		int vq_index)
+{
+	struct vhost_virtqueue *vq = dev->virtqueue[vq_index];
+	struct vhost_vring_addr *addr = &vq->ring_addrs;
+
 	/* The addresses are converted from QEMU virtual to Vhost virtual. */
 	vq->desc = (struct vring_desc *)(uintptr_t)qva_to_vva(dev,
-			msg->payload.addr.desc_user_addr);
+			addr->desc_user_addr);
 	if (vq->desc == 0) {
 		RTE_LOG(ERR, VHOST_CONFIG,
 			"(%d) failed to find desc ring address.\n",
 			dev->vid);
-		return -1;
+		return NULL;
 	}
 
-	*pdev = dev = numa_realloc(dev, msg->payload.addr.index);
-	vq = dev->virtqueue[msg->payload.addr.index];
+	dev = numa_realloc(dev, vq_index);
+	vq = dev->virtqueue[vq_index];
 
 	vq->avail = (struct vring_avail *)(uintptr_t)qva_to_vva(dev,
-			msg->payload.addr.avail_user_addr);
+			addr->avail_user_addr);
 	if (vq->avail == 0) {
 		RTE_LOG(ERR, VHOST_CONFIG,
 			"(%d) failed to find avail ring address.\n",
 			dev->vid);
-		return -1;
+		return NULL;
 	}
 
 	vq->used = (struct vring_used *)(uintptr_t)qva_to_vva(dev,
-			msg->payload.addr.used_user_addr);
+			addr->used_user_addr);
 	if (vq->used == 0) {
 		RTE_LOG(ERR, VHOST_CONFIG,
 			"(%d) failed to find used ring address.\n",
 			dev->vid);
-		return -1;
+		return NULL;
 	}
 
 	if (vq->last_used_idx != vq->used->idx) {
@@ -370,7 +385,7 @@ vhost_user_set_vring_addr(struct virtio_net **pdev, VhostUserMsg *msg)
 		vq->last_avail_idx = vq->used->idx;
 	}
 
-	vq->log_guest_addr = msg->payload.addr.log_guest_addr;
+	vq->log_guest_addr = addr->log_guest_addr;
 
 	LOG_DEBUG(VHOST_CONFIG, "(%d) mapped address desc: %p\n",
 			dev->vid, vq->desc);
@@ -381,7 +396,7 @@ vhost_user_set_vring_addr(struct virtio_net **pdev, VhostUserMsg *msg)
 	LOG_DEBUG(VHOST_CONFIG, "(%d) log_guest_addr: %" PRIx64 "\n",
 			dev->vid, vq->log_guest_addr);
 
-	return 0;
+	return dev;
 }
 
 /*
@@ -652,10 +667,11 @@ vhost_user_set_vring_call(struct virtio_net *dev, struct VhostUserMsg *pmsg)
 }
 
 static void
-vhost_user_set_vring_kick(struct virtio_net *dev, struct VhostUserMsg *pmsg)
+vhost_user_set_vring_kick(struct virtio_net **pdev, struct VhostUserMsg *pmsg)
 {
 	struct vhost_vring_file file;
 	struct vhost_virtqueue *vq;
+	struct virtio_net *dev = *pdev;
 
 	file.index = pmsg->payload.u64 & VHOST_USER_VRING_IDX_MASK;
 	if (pmsg->payload.u64 & VHOST_USER_VRING_NOFD_MASK)
@@ -664,6 +680,16 @@ vhost_user_set_vring_kick(struct virtio_net *dev, struct VhostUserMsg *pmsg)
 		file.fd = pmsg->fds[0];
 	RTE_LOG(INFO, VHOST_CONFIG,
 		"vring kick idx:%d file:%d\n", file.index, file.fd);
+
+	/*
+	 * Interpret ring addresses only when ring is started and enabled.
+	 * This is now if protocol features aren't supported.
+	 */
+	if (!(dev->features & (1ULL << VHOST_USER_F_PROTOCOL_FEATURES))) {
+		*pdev = dev = translate_ring_addresses(dev, file.index);
+		if (!dev)
+			return;
+	}
 
 	vq = dev->virtqueue[file.index];
 
@@ -747,14 +773,28 @@ vhost_user_get_vring_base(struct virtio_net *dev,
  * enable the virtio queue pair.
  */
 static int
-vhost_user_set_vring_enable(struct virtio_net *dev,
+vhost_user_set_vring_enable(struct virtio_net **pdev,
 			    VhostUserMsg *msg)
 {
+	struct virtio_net *dev = *pdev;
 	int enable = (int)msg->payload.state.num;
 
 	RTE_LOG(INFO, VHOST_CONFIG,
 		"set queue enable: %d to qp idx: %d\n",
 		enable, msg->payload.state.index);
+
+	/*
+	 * Interpret ring addresses only when ring is started and enabled.
+	 * This is now if protocol features are supported.
+	 */
+	if (enable && (dev->features &
+				(1ULL << VHOST_USER_F_PROTOCOL_FEATURES))) {
+		dev = translate_ring_addresses(dev, msg->payload.state.index);
+		if (!dev)
+			return -1;
+
+		*pdev = dev;
+	}
 
 	if (dev->notify_ops->vring_state_changed)
 		dev->notify_ops->vring_state_changed(dev->vid,
@@ -1114,7 +1154,7 @@ vhost_user_msg_handler(int vid, int fd)
 		vhost_user_set_vring_num(dev, &msg);
 		break;
 	case VHOST_USER_SET_VRING_ADDR:
-		vhost_user_set_vring_addr(&dev, &msg);
+		vhost_user_set_vring_addr(dev, &msg);
 		break;
 	case VHOST_USER_SET_VRING_BASE:
 		vhost_user_set_vring_base(dev, &msg);
@@ -1127,7 +1167,7 @@ vhost_user_msg_handler(int vid, int fd)
 		break;
 
 	case VHOST_USER_SET_VRING_KICK:
-		vhost_user_set_vring_kick(dev, &msg);
+		vhost_user_set_vring_kick(&dev, &msg);
 		break;
 	case VHOST_USER_SET_VRING_CALL:
 		vhost_user_set_vring_call(dev, &msg);
@@ -1146,7 +1186,7 @@ vhost_user_msg_handler(int vid, int fd)
 		break;
 
 	case VHOST_USER_SET_VRING_ENABLE:
-		vhost_user_set_vring_enable(dev, &msg);
+		vhost_user_set_vring_enable(&dev, &msg);
 		break;
 	case VHOST_USER_SEND_RARP:
 		vhost_user_send_rarp(dev, &msg);

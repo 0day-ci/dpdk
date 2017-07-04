@@ -115,6 +115,7 @@ struct vhost_virtqueue {
 
 	struct vring_used_elem  *shadow_used_ring;
 	uint16_t                shadow_used_idx;
+	struct vhost_vring_addr ring_addrs;
 
 	rte_rwlock_t	iotlb_lock;
 	struct rte_mempool *iotlb_pool;
