@@ -182,6 +182,7 @@ free_device(struct virtio_net *dev)
 		vq = dev->virtqueue[i];
 
 		rte_free(vq->shadow_used_ring);
+		rte_mempool_free(vq->iotlb_pool);
 
 		rte_free(vq);
 	}
