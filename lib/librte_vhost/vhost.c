@@ -45,16 +45,25 @@
 #include <rte_string_fns.h>
 #include <rte_memory.h>
 #include <rte_malloc.h>
+#include <rte_rwlock.h>
 #include <rte_vhost.h>
 
 #include "vhost.h"
 
-struct virtio_net *vhost_devices[MAX_VHOST_DEVICE];
+struct vhost_device {
+	struct virtio_net *dev;
+	rte_rwlock_t lock;
+};
 
-struct virtio_net *
-get_device(int vid)
+/* Declared as static so that .lock is initialized */
+static struct vhost_device vhost_devices[MAX_VHOST_DEVICE];
+
+static inline struct virtio_net *
+__get_device(int vid)
 {
-	struct virtio_net *dev = vhost_devices[vid];
+	struct virtio_net *dev;
+
+	dev = vhost_devices[vid].dev;
 
 	if (unlikely(!dev)) {
 		RTE_LOG(ERR, VHOST_CONFIG,
@@ -62,6 +71,78 @@ get_device(int vid)
 	}
 
 	return dev;
+}
+
+struct virtio_net *
+get_device(int vid)
+{
+	struct virtio_net *dev;
+
+	rte_rwlock_read_lock(&vhost_devices[vid].lock);
+
+	dev = __get_device(vid);
+	if (unlikely(!dev))
+		rte_rwlock_read_unlock(&vhost_devices[vid].lock);
+
+	return dev;
+}
+
+void
+put_device(int vid)
+{
+	rte_rwlock_read_unlock(&vhost_devices[vid].lock);
+}
+
+static struct virtio_net *
+get_device_wr(int vid)
+{
+	struct virtio_net *dev;
+
+	rte_rwlock_write_lock(&vhost_devices[vid].lock);
+
+	dev = __get_device(vid);
+	if (unlikely(!dev))
+		rte_rwlock_write_unlock(&vhost_devices[vid].lock);
+
+	return dev;
+}
+
+static void
+put_device_wr(int vid)
+{
+	rte_rwlock_write_unlock(&vhost_devices[vid].lock);
+}
+
+int
+realloc_device(int vid, int vq_index, int node)
+{
+	struct virtio_net *dev, *old_dev;
+	struct vhost_virtqueue *vq;
+
+	dev = rte_malloc_socket(NULL, sizeof(*dev), 0, node);
+	if (!dev)
+		return -1;
+
+	vq = rte_malloc_socket(NULL, sizeof(*vq), 0, node);
+	if (!vq)
+		return -1;
+
+	old_dev = get_device_wr(vid);
+	if (!old_dev)
+		return -1;
+
+	memcpy(dev, old_dev, sizeof(*dev));
+	memcpy(vq, old_dev->virtqueue[vq_index], sizeof(*vq));
+	dev->virtqueue[vq_index] = vq;
+
+	rte_free(old_dev->virtqueue[vq_index]);
+	rte_free(old_dev);
+
+	vhost_devices[vid].dev = dev;
+
+	put_device_wr(vid);
+
+	return 0;
 }
 
 static void
@@ -194,7 +275,7 @@ vhost_new_device(void)
 	}
 
 	for (i = 0; i < MAX_VHOST_DEVICE; i++) {
-		if (vhost_devices[i] == NULL)
+		if (vhost_devices[i].dev == NULL)
 			break;
 	}
 	if (i == MAX_VHOST_DEVICE) {
@@ -204,8 +285,10 @@ vhost_new_device(void)
 		return -1;
 	}
 
-	vhost_devices[i] = dev;
+	rte_rwlock_write_lock(&vhost_devices[i].lock);
+	vhost_devices[i].dev = dev;
 	dev->vid = i;
+	rte_rwlock_write_unlock(&vhost_devices[i].lock);
 
 	return i;
 }
@@ -227,10 +310,15 @@ vhost_destroy_device(int vid)
 		dev->notify_ops->destroy_device(vid);
 	}
 
+	put_device(vid);
+	dev = get_device_wr(vid);
+
 	cleanup_device(dev, 1);
 	free_device(dev);
 
-	vhost_devices[vid] = NULL;
+	vhost_devices[vid].dev = NULL;
+
+	put_device_wr(vid);
 }
 
 void
@@ -248,6 +336,8 @@ vhost_set_ifname(int vid, const char *if_name, unsigned int if_len)
 
 	strncpy(dev->ifname, if_name, len);
 	dev->ifname[sizeof(dev->ifname) - 1] = '\0';
+
+	put_device(vid);
 }
 
 void
@@ -259,25 +349,30 @@ vhost_enable_dequeue_zero_copy(int vid)
 		return;
 
 	dev->dequeue_zero_copy = 1;
+
+	put_device(vid);
 }
 
 int
 rte_vhost_get_mtu(int vid, uint16_t *mtu)
 {
 	struct virtio_net *dev = get_device(vid);
+	int ret = 0;
 
 	if (!dev)
 		return -ENODEV;
 
 	if (!(dev->flags & VIRTIO_DEV_READY))
-		return -EAGAIN;
+		ret = -EAGAIN;
 
 	if (!(dev->features & VIRTIO_NET_F_MTU))
-		return -ENOTSUP;
+		ret = -ENOTSUP;
 
 	*mtu = dev->mtu;
 
-	return 0;
+	put_device(vid);
+
+	return ret;
 }
 
 int
@@ -296,8 +391,10 @@ rte_vhost_get_numa_node(int vid)
 	if (ret < 0) {
 		RTE_LOG(ERR, VHOST_CONFIG,
 			"(%d) failed to query numa node: %d\n", vid, ret);
-		return -1;
+		numa_node = -1;
 	}
+
+	put_device(vid);
 
 	return numa_node;
 #else
@@ -310,22 +407,32 @@ uint32_t
 rte_vhost_get_queue_num(int vid)
 {
 	struct virtio_net *dev = get_device(vid);
+	uint32_t queue_num;
 
 	if (dev == NULL)
 		return 0;
 
-	return dev->nr_vring / 2;
+	queue_num = dev->nr_vring / 2;
+
+	put_device(vid);
+
+	return queue_num;
 }
 
 uint16_t
 rte_vhost_get_vring_num(int vid)
 {
 	struct virtio_net *dev = get_device(vid);
+	uint16_t vring_num;
 
 	if (dev == NULL)
 		return 0;
 
-	return dev->nr_vring;
+	vring_num = dev->nr_vring;
+
+	put_device(vid);
+
+	return vring_num;
 }
 
 int
@@ -341,6 +448,8 @@ rte_vhost_get_ifname(int vid, char *buf, size_t len)
 	strncpy(buf, dev->ifname, len);
 	buf[len - 1] = '\0';
 
+	put_device(vid);
+
 	return 0;
 }
 
@@ -354,6 +463,9 @@ rte_vhost_get_negotiated_features(int vid, uint64_t *features)
 		return -1;
 
 	*features = dev->features;
+
+	put_device(vid);
+
 	return 0;
 }
 
@@ -363,6 +475,7 @@ rte_vhost_get_mem_table(int vid, struct rte_vhost_memory **mem)
 	struct virtio_net *dev;
 	struct rte_vhost_memory *m;
 	size_t size;
+	int ret = 0;
 
 	dev = get_device(vid);
 	if (!dev)
@@ -370,14 +483,19 @@ rte_vhost_get_mem_table(int vid, struct rte_vhost_memory **mem)
 
 	size = dev->mem->nregions * sizeof(struct rte_vhost_mem_region);
 	m = malloc(sizeof(struct rte_vhost_memory) + size);
-	if (!m)
-		return -1;
+	if (!m) {
+		ret = -1;
+		goto out;
+	}
 
 	m->nregions = dev->mem->nregions;
 	memcpy(m->regions, dev->mem->regions, size);
 	*mem = m;
 
-	return 0;
+out:
+	put_device(vid);
+
+	return ret;
 }
 
 int
@@ -386,17 +504,22 @@ rte_vhost_get_vhost_vring(int vid, uint16_t vring_idx,
 {
 	struct virtio_net *dev;
 	struct vhost_virtqueue *vq;
+	int ret = 0;
 
 	dev = get_device(vid);
 	if (!dev)
 		return -1;
 
-	if (vring_idx >= VHOST_MAX_VRING)
-		return -1;
+	if (vring_idx >= VHOST_MAX_VRING) {
+		ret = -1;
+		goto out;
+	}
 
 	vq = dev->virtqueue[vring_idx];
-	if (!vq)
-		return -1;
+	if (!vq) {
+		ret = -1;
+		goto out;
+	}
 
 	vring->desc  = vq->desc;
 	vring->avail = vq->avail;
@@ -407,7 +530,10 @@ rte_vhost_get_vhost_vring(int vid, uint16_t vring_idx,
 	vring->kickfd  = vq->kickfd;
 	vring->size    = vq->size;
 
-	return 0;
+out:
+	put_device(vid);
+
+	return ret;
 }
 
 uint16_t
@@ -415,6 +541,7 @@ rte_vhost_avail_entries(int vid, uint16_t queue_id)
 {
 	struct virtio_net *dev;
 	struct vhost_virtqueue *vq;
+	uint16_t avail_entries = 0;
 
 	dev = get_device(vid);
 	if (!dev)
@@ -422,15 +549,23 @@ rte_vhost_avail_entries(int vid, uint16_t queue_id)
 
 	vq = dev->virtqueue[queue_id];
 	if (!vq->enabled)
-		return 0;
+		goto out;
 
-	return *(volatile uint16_t *)&vq->avail->idx - vq->last_used_idx;
+
+	avail_entries = *(volatile uint16_t *)&vq->avail->idx;
+	avail_entries -= vq->last_used_idx;
+
+out:
+	put_device(vid);
+
+	return avail_entries;
 }
 
 int
 rte_vhost_enable_guest_notification(int vid, uint16_t queue_id, int enable)
 {
 	struct virtio_net *dev = get_device(vid);
+	int ret = 0;
 
 	if (dev == NULL)
 		return -1;
@@ -438,11 +573,16 @@ rte_vhost_enable_guest_notification(int vid, uint16_t queue_id, int enable)
 	if (enable) {
 		RTE_LOG(ERR, VHOST_CONFIG,
 			"guest notification isn't supported.\n");
-		return -1;
+		ret = -1;
+		goto out;
 	}
 
 	dev->virtqueue[queue_id]->used->flags = VRING_USED_F_NO_NOTIFY;
-	return 0;
+
+out:
+	put_device(vid);
+
+	return ret;
 }
 
 void
@@ -454,6 +594,8 @@ rte_vhost_log_write(int vid, uint64_t addr, uint64_t len)
 		return;
 
 	vhost_log_write(dev, addr, len);
+
+	put_device(vid);
 }
 
 void
@@ -468,12 +610,15 @@ rte_vhost_log_used_vring(int vid, uint16_t vring_idx,
 		return;
 
 	if (vring_idx >= VHOST_MAX_VRING)
-		return;
+		goto out;
 	vq = dev->virtqueue[vring_idx];
 	if (!vq)
-		return;
+		goto out;
 
 	vhost_log_used_vring(dev, vq, offset, len);
+
+out:
+	put_device(vid);
 }
 
 uint32_t
@@ -481,6 +626,7 @@ rte_vhost_rx_queue_count(int vid, uint16_t qid)
 {
 	struct virtio_net *dev;
 	struct vhost_virtqueue *vq;
+	uint32_t queue_count;
 
 	dev = get_device(vid);
 	if (dev == NULL)
@@ -489,15 +635,26 @@ rte_vhost_rx_queue_count(int vid, uint16_t qid)
 	if (unlikely(qid >= dev->nr_vring || (qid & 1) == 0)) {
 		RTE_LOG(ERR, VHOST_DATA, "(%d) %s: invalid virtqueue idx %d.\n",
 			dev->vid, __func__, qid);
-		return 0;
+		queue_count = 0;
+		goto out;
 	}
 
 	vq = dev->virtqueue[qid];
-	if (vq == NULL)
-		return 0;
+	if (vq == NULL) {
+		queue_count = 0;
+		goto out;
+	}
 
-	if (unlikely(vq->enabled == 0 || vq->avail == NULL))
-		return 0;
+	if (unlikely(vq->enabled == 0 || vq->avail == NULL)) {
+		queue_count = 0;
+		goto out;
+	}
 
-	return *((volatile uint16_t *)&vq->avail->idx) - vq->last_avail_idx;
+	queue_count = *((volatile uint16_t *)&vq->avail->idx);
+	queue_count -= vq->last_avail_idx;
+
+out:
+	put_device(vid);
+
+	return queue_count;
 }

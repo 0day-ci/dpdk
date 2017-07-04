@@ -241,61 +241,30 @@ vhost_user_set_vring_num(struct virtio_net *dev,
 static struct virtio_net*
 numa_realloc(struct virtio_net *dev, int index)
 {
-	int oldnode, newnode;
-	struct virtio_net *old_dev;
-	struct vhost_virtqueue *old_vq, *vq;
-	int ret;
+	int oldnode, newnode, vid, ret;
 
-	old_dev = dev;
-	vq = old_vq = dev->virtqueue[index];
+	vid = dev->vid;
 
-	ret = get_mempolicy(&newnode, NULL, 0, old_vq->desc,
+	ret = get_mempolicy(&newnode, NULL, 0, dev->virtqueue[index]->desc,
 			    MPOL_F_NODE | MPOL_F_ADDR);
 
 	/* check if we need to reallocate vq */
-	ret |= get_mempolicy(&oldnode, NULL, 0, old_vq,
+	ret |= get_mempolicy(&oldnode, NULL, 0, dev->virtqueue[index],
 			     MPOL_F_NODE | MPOL_F_ADDR);
 	if (ret) {
 		RTE_LOG(ERR, VHOST_CONFIG,
 			"Unable to get vq numa information.\n");
 		return dev;
 	}
+
 	if (oldnode != newnode) {
 		RTE_LOG(INFO, VHOST_CONFIG,
 			"reallocate vq from %d to %d node\n", oldnode, newnode);
-		vq = rte_malloc_socket(NULL, sizeof(*vq), 0, newnode);
-		if (!vq)
-			return dev;
-
-		memcpy(vq, old_vq, sizeof(*vq));
-		rte_free(old_vq);
+		put_device(vid);
+		if (realloc_device(vid, index, newnode))
+			RTE_LOG(ERR, VHOST_CONFIG, "Failed to realloc device\n");
+		dev = get_device(vid);
 	}
-
-	/* check if we need to reallocate dev */
-	ret = get_mempolicy(&oldnode, NULL, 0, old_dev,
-			    MPOL_F_NODE | MPOL_F_ADDR);
-	if (ret) {
-		RTE_LOG(ERR, VHOST_CONFIG,
-			"Unable to get dev numa information.\n");
-		goto out;
-	}
-	if (oldnode != newnode) {
-		RTE_LOG(INFO, VHOST_CONFIG,
-			"reallocate dev from %d to %d node\n",
-			oldnode, newnode);
-		dev = rte_malloc_socket(NULL, sizeof(*dev), 0, newnode);
-		if (!dev) {
-			dev = old_dev;
-			goto out;
-		}
-
-		memcpy(dev, old_dev, sizeof(*dev));
-		rte_free(old_dev);
-	}
-
-out:
-	dev->virtqueue[index] = vq;
-	vhost_devices[dev->vid] = dev;
 
 	return dev;
 }
@@ -336,9 +305,10 @@ qva_to_vva(struct virtio_net *dev, uint64_t qva)
  * This function then converts these to our address space.
  */
 static int
-vhost_user_set_vring_addr(struct virtio_net *dev, VhostUserMsg *msg)
+vhost_user_set_vring_addr(struct virtio_net **pdev, VhostUserMsg *msg)
 {
 	struct vhost_virtqueue *vq;
+	struct virtio_net *dev = *pdev;
 
 	if (dev->mem == NULL)
 		return -1;
@@ -356,7 +326,7 @@ vhost_user_set_vring_addr(struct virtio_net *dev, VhostUserMsg *msg)
 		return -1;
 	}
 
-	dev = numa_realloc(dev, msg->payload.addr.index);
+	*pdev = dev = numa_realloc(dev, msg->payload.addr.index);
 	vq = dev->virtqueue[msg->payload.addr.index];
 
 	vq->avail = (struct vring_avail *)(uintptr_t)qva_to_vva(dev,
@@ -966,7 +936,7 @@ vhost_user_msg_handler(int vid, int fd)
 {
 	struct virtio_net *dev;
 	struct VhostUserMsg msg;
-	int ret;
+	int ret = 0;
 
 	dev = get_device(vid);
 	if (dev == NULL)
@@ -978,7 +948,8 @@ vhost_user_msg_handler(int vid, int fd)
 			RTE_LOG(ERR, VHOST_CONFIG,
 				"failed to get callback ops for driver %s\n",
 				dev->ifname);
-			return -1;
+			ret = -1;
+			goto out;
 		}
 	}
 
@@ -994,10 +965,10 @@ vhost_user_msg_handler(int vid, int fd)
 			RTE_LOG(ERR, VHOST_CONFIG,
 				"vhost read incorrect message\n");
 
-		return -1;
+		ret = -1;
+		goto out;
 	}
 
-	ret = 0;
 	RTE_LOG(INFO, VHOST_CONFIG, "read message %s\n",
 		vhost_message_str[msg.request]);
 
@@ -1005,7 +976,8 @@ vhost_user_msg_handler(int vid, int fd)
 	if (ret < 0) {
 		RTE_LOG(ERR, VHOST_CONFIG,
 			"failed to alloc queue\n");
-		return -1;
+		ret = -1;
+		goto out;
 	}
 
 	switch (msg.request) {
@@ -1054,7 +1026,7 @@ vhost_user_msg_handler(int vid, int fd)
 		vhost_user_set_vring_num(dev, &msg);
 		break;
 	case VHOST_USER_SET_VRING_ADDR:
-		vhost_user_set_vring_addr(dev, &msg);
+		vhost_user_set_vring_addr(&dev, &msg);
 		break;
 	case VHOST_USER_SET_VRING_BASE:
 		vhost_user_set_vring_base(dev, &msg);
@@ -1122,5 +1094,8 @@ vhost_user_msg_handler(int vid, int fd)
 		}
 	}
 
-	return 0;
+out:
+	put_device(vid);
+
+	return ret;
 }

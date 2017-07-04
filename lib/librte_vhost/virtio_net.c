@@ -587,14 +587,19 @@ rte_vhost_enqueue_burst(int vid, uint16_t queue_id,
 	struct rte_mbuf **pkts, uint16_t count)
 {
 	struct virtio_net *dev = get_device(vid);
+	int ret = 0;
 
 	if (!dev)
 		return 0;
 
 	if (dev->features & (1 << VIRTIO_NET_F_MRG_RXBUF))
-		return virtio_dev_merge_rx(dev, queue_id, pkts, count);
+		ret = virtio_dev_merge_rx(dev, queue_id, pkts, count);
 	else
-		return virtio_dev_rx(dev, queue_id, pkts, count);
+		ret = virtio_dev_rx(dev, queue_id, pkts, count);
+
+	put_device(vid);
+
+	return ret;
 }
 
 static inline bool
@@ -993,12 +998,12 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 	if (unlikely(!is_valid_virt_queue_idx(queue_id, 1, dev->nr_vring))) {
 		RTE_LOG(ERR, VHOST_DATA, "(%d) %s: invalid virtqueue idx %d.\n",
 			dev->vid, __func__, queue_id);
-		return 0;
+		goto out;
 	}
 
 	vq = dev->virtqueue[queue_id];
 	if (unlikely(vq->enabled == 0))
-		return 0;
+		goto out;
 
 	if (unlikely(dev->dequeue_zero_copy)) {
 		struct zcopy_mbuf *zmbuf, *next;
@@ -1048,7 +1053,7 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 		if (rarp_mbuf == NULL) {
 			RTE_LOG(ERR, VHOST_DATA,
 				"Failed to allocate memory for mbuf.\n");
-			return 0;
+			goto out;
 		}
 
 		if (make_rarp_packet(rarp_mbuf, &dev->mac)) {
@@ -1166,6 +1171,8 @@ out:
 		pkts[0] = rarp_mbuf;
 		i += 1;
 	}
+
+	put_device(vid);
 
 	return i;
 }

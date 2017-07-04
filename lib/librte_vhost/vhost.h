@@ -269,7 +269,6 @@ vhost_log_used_vring(struct virtio_net *dev, struct vhost_virtqueue *vq,
 
 extern uint64_t VHOST_FEATURES;
 #define MAX_VHOST_DEVICE	1024
-extern struct virtio_net *vhost_devices[MAX_VHOST_DEVICE];
 
 /* Convert guest physical address to host physical address */
 static __rte_always_inline phys_addr_t
@@ -292,6 +291,8 @@ gpa_to_hpa(struct virtio_net *dev, uint64_t gpa, uint64_t size)
 }
 
 struct virtio_net *get_device(int vid);
+void put_device(int vid);
+int realloc_device(int vid, int vq_index, int node);
 
 int vhost_new_device(void);
 void cleanup_device(struct virtio_net *dev, int destroy);
