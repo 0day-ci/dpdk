@@ -119,6 +119,7 @@ struct vhost_virtqueue {
 	rte_rwlock_t	iotlb_lock;
 	struct rte_mempool *iotlb_pool;
 	TAILQ_HEAD(, vhost_iotlb_entry) iotlb_list;
+	rte_atomic16_t		iotlb_event;
 } __rte_cache_aligned;
 
 /* Old kernels have no such macros defined */
@@ -350,5 +351,6 @@ struct vhost_device_ops const *vhost_driver_callback_get(const char *path);
  * TODO: fix it; we have one backend now
  */
 void vhost_backend_cleanup(struct virtio_net *dev);
+void notify_iotlb_event(struct virtio_net *dev);
 
 #endif /* _VHOST_NET_CDEV_H_ */

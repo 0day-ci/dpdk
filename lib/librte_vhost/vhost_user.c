@@ -145,6 +145,11 @@ vhost_user_reset_owner(struct virtio_net *dev)
 {
 	if (dev->flags & VIRTIO_DEV_RUNNING) {
 		dev->flags &= ~VIRTIO_DEV_RUNNING;
+		/*
+		 * Unblock processing threads waiting for
+		 * IOTLB updates, if any.
+		 */
+		notify_iotlb_event(dev);
 		dev->notify_ops->destroy_device(dev->vid);
 	}
 
@@ -691,6 +696,11 @@ vhost_user_get_vring_base(struct virtio_net *dev,
 	/* We have to stop the queue (virtio) if it is running. */
 	if (dev->flags & VIRTIO_DEV_RUNNING) {
 		dev->flags &= ~VIRTIO_DEV_RUNNING;
+		/*
+		 * Unblock processing threads waiting for
+		 * IOTLB updates, if any.
+		 */
+		notify_iotlb_event(dev);
 		dev->notify_ops->destroy_device(dev->vid);
 	}
 

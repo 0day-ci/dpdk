@@ -206,6 +206,7 @@ int vhost_user_iotlb_init(struct virtio_net *dev, int vq_index)
 		socket = 0;
 
 	rte_rwlock_init(&vq->iotlb_lock);
+	rte_atomic16_init(&vq->iotlb_event);
 
 	TAILQ_INIT(&vq->iotlb_list);
 

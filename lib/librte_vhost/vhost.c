@@ -191,6 +191,17 @@ free_device(struct virtio_net *dev)
 	rte_free(dev);
 }
 
+void notify_iotlb_event(struct virtio_net *dev)
+{
+	struct vhost_virtqueue *vq;
+	uint32_t i;
+
+	for (i = 0; i < dev->nr_vring; i++) {
+		vq = dev->virtqueue[i];
+		rte_atomic16_set(&vq->iotlb_event, 1);
+	}
+}
+
 static void
 init_vring_queue(struct virtio_net *dev, uint32_t vring_idx)
 {
@@ -313,6 +324,11 @@ vhost_destroy_device(int vid)
 
 	if (dev->flags & VIRTIO_DEV_RUNNING) {
 		dev->flags &= ~VIRTIO_DEV_RUNNING;
+		/*
+		 * Unblock processing threads waiting for
+		 * IOTLB updates, if any.
+		 */
+		notify_iotlb_event(dev);
 		dev->notify_ops->destroy_device(vid);
 	}
 
