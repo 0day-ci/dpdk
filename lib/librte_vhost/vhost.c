@@ -274,6 +274,23 @@ out:
 	return 0;
 }
 
+void vring_invalidate(struct virtio_net *dev, struct vhost_virtqueue *vq)
+{
+	int vid = dev->vid;
+
+	/* Ensure no thread is using the vrings */
+	put_device(vid);
+	dev = get_device_wr(vid);
+
+	vq->access_ok = 0;
+	vq->desc = NULL;
+	vq->avail = NULL;
+	vq->used = NULL;
+
+	put_device_wr(vid);
+	get_device(vid);
+}
+
 static void
 init_vring_queue(struct virtio_net *dev, uint32_t vring_idx)
 {
