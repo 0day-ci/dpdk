@@ -95,3 +95,7 @@ Deprecation Notices
   The non-"do-sig" versions of the hash tables will be removed
   (including the ``signature_offset`` parameter)
   and the "do-sig" versions renamed accordingly.
+
+* ethdev: An ABI change is planned for 17.11 for the structure eth_dev_data.
+  The size of the unique name will increase RTE_ETH_NAME_MAX_LEN from 32 to
+  64 characters to allow using a globally unique identifier (GUID) in this field.
