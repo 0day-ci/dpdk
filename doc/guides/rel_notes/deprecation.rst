@@ -54,42 +54,6 @@ Deprecation Notices
   Target release for removal of the legacy API will be defined once most
   PMDs have switched to rte_flow.
 
-* cryptodev: All PMD names definitions will be moved to the individual PMDs
-  in 17.08.
-
-* cryptodev: The following changes will be done in in 17.08:
-
-  - the device type enumeration ``rte_cryptodev_type`` will be removed
-  - the following structures will be changed: ``rte_cryptodev_session``,
-    ``rte_cryptodev_sym_session``, ``rte_cryptodev_info``, ``rte_cryptodev``
-  - the function ``rte_cryptodev_count_devtype`` will be replaced by
-    ``rte_cryptodev_device_count_by_driver``
-
-* cryptodev: API changes are planned for 17.08 for the sessions management
-  to make it agnostic to the underlying devices, removing coupling with
-  crypto PMDs, so a single session can be used on multiple devices.
-
-  - ``struct rte_cryptodev_sym_session``, dev_id, dev_type will be removed,
-    _private field changed to the indirect array of private data pointers of
-    all supported devices
-
-  An API of followed functions will be changed to allow operate on multiple
-  devices with one session:
-
-  - ``rte_cryptodev_sym_session_create``
-  - ``rte_cryptodev_sym_session_free``
-  - ``rte_cryptodev_sym_session_pool_create``
-
-  While dev_id will not be stored in the ``struct rte_cryptodev_sym_session``,
-  directly, the change of followed API is required:
-
-  - ``rte_cryptodev_queue_pair_attach_sym_session``
-  - ``rte_cryptodev_queue_pair_detach_sym_session``
-
-* cryptodev: the structures ``rte_crypto_op``, ``rte_crypto_sym_op``
-  and ``rte_crypto_sym_xform`` will be restructured in 17.08,
-  for correctness and improvement.
-
 * librte_table: The ``key_mask`` parameter will be added to all the hash tables
   that currently do not have it, as well as to the hash compute function prototype.
   The non-"do-sig" versions of the hash tables will be removed
