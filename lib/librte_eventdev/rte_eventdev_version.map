@@ -42,3 +42,16 @@ DPDK_17.05 {
 
 	local: *;
 };
+
+DPDK_17.08 {
+	global:
+
+	rte_event_eth_rx_adapter_init;
+	rte_event_eth_rx_adapter_create;
+	rte_event_eth_rx_adapter_free;
+	rte_event_eth_rx_adapter_queue_add;
+	rte_event_eth_rx_adapter_queue_del;
+	rte_event_eth_rx_adapter_stats_get;
+	rte_event_eth_rx_adapter_stats_reset;
+
+} DPDK_17.05;
