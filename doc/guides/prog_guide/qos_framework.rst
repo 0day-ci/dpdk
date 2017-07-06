@@ -799,6 +799,9 @@ as described in :numref:`table_qos_10` and :numref:`table_qos_11`.
    | 4 | tc_credits            | Bytes | Current upper limit for the number of credits that can be consumed by |
    |   |                       |       | the current traffic class for the remainder of the current            |
    |   |                       |       | enforcement period.                                                   |
+   |   |                       |       | when The credits is update (every tc_period) the                      |
+   |   |                       |       | tc_credits_per_period is added to the value (tc_credits) if the new   |
+   |   |                       |       | value is lower than tc_rate. else the value is set to tc_rate.        |
    |   |                       |       |                                                                       |
    +---+-----------------------+-------+-----------------------------------------------------------------------+
 
@@ -819,8 +822,11 @@ as described in :numref:`table_qos_10` and :numref:`table_qos_11`.
    |   |                          |                                                                            |
    |   |                          | if (time >= tc_time) {                                                     |
    |   |                          |                                                                            |
-   |   |                          | tc_credits = tc_credits_per_period;                                        |
-   |   |                          |                                                                            |
+   |   |                          | if (tc_credits + tc_credits_per_period < tc_rate) {                        |
+   |   |                          |       tc_credits +=  tc_credits_per_period                                 |
+   |   |                          | else {                                                                     |
+   |   |                          |       tc_credits = tc_rate                                                 |
+   |   |                          | }                                                                          |
    |   |                          | tc_time = time + tc_period;                                                |
    |   |                          |                                                                            |
    |   |                          | }                                                                          |

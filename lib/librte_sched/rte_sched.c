@@ -85,6 +85,7 @@ struct rte_sched_subport {
 
 	/* Traffic classes (TCs) */
 	uint64_t tc_time; /* time of next update */
+	uint32_t tc_rate[RTE_SCHED_TRAFFIC_CLASSES_PER_PIPE];  
 	uint32_t tc_credits_per_period[RTE_SCHED_TRAFFIC_CLASSES_PER_PIPE];
 	uint32_t tc_credits[RTE_SCHED_TRAFFIC_CLASSES_PER_PIPE];
 	uint32_t tc_period;
@@ -109,6 +110,7 @@ struct rte_sched_pipe_profile {
 	uint32_t tb_size;
 
 	/* Pipe traffic classes */
+	uint32_t tc_rate[RTE_SCHED_TRAFFIC_CLASSES_PER_PIPE];
 	uint32_t tc_period;
 	uint32_t tc_credits_per_period[RTE_SCHED_TRAFFIC_CLASSES_PER_PIPE];
 	uint8_t tc_ov_weight;
@@ -568,11 +570,14 @@ rte_sched_port_config_pipe_profile_table(struct rte_sched_port *port, struct rte
 		/* Traffic Classes */
 		dst->tc_period = rte_sched_time_ms_to_bytes(src->tc_period,
 							    params->rate);
-
-		for (j = 0; j < RTE_SCHED_TRAFFIC_CLASSES_PER_PIPE; j++)
+	
+		for (j = 0; j < RTE_SCHED_TRAFFIC_CLASSES_PER_PIPE; j++) {
+		        dst->tc_rate[j] = src->tc_rate[j];
 			dst->tc_credits_per_period[j]
 				= rte_sched_time_ms_to_bytes(src->tc_period,
 							     src->tc_rate[j]);
+		}
+	
 
 #ifdef RTE_SCHED_SUBPORT_TC_OV
 		dst->tc_ov_weight = src->tc_ov_weight;
@@ -838,6 +843,7 @@ rte_sched_subport_config(struct rte_sched_port *port,
 	/* Traffic Classes (TCs) */
 	s->tc_period = rte_sched_time_ms_to_bytes(params->tc_period, port->rate);
 	for (i = 0; i < RTE_SCHED_TRAFFIC_CLASSES_PER_PIPE; i++) {
+	        s->tc_rate[i] =  params->tc_rate[i];
 		s->tc_credits_per_period[i]
 			= rte_sched_time_ms_to_bytes(params->tc_period,
 						     params->tc_rate[i]);
@@ -1495,19 +1501,59 @@ grinder_credits_update(struct rte_sched_port *port, uint32_t pos)
 
 	/* Subport TCs */
 	if (unlikely(port->time >= subport->tc_time)) {
-		subport->tc_credits[0] = subport->tc_credits_per_period[0];
-		subport->tc_credits[1] = subport->tc_credits_per_period[1];
-		subport->tc_credits[2] = subport->tc_credits_per_period[2];
-		subport->tc_credits[3] = subport->tc_credits_per_period[3];
+	        if (likely((subport->tc_credits[0] + subport->tc_credits_per_period[0]) < subport->tc_rate[0])) {
+		        subport->tc_credits[0] += subport->tc_credits_per_period[0];
+		}
+		else {
+		        subport->tc_credits[0] = subport->tc_rate[0];
+		}
+		if (likely((subport->tc_credits[1] + subport->tc_credits_per_period[1]) < subport->tc_rate[1])) {
+		        subport->tc_credits[1] += subport->tc_credits_per_period[1];
+		}
+		else {
+		        subport->tc_credits[1] = subport->tc_rate[1];
+		}
+		if (likely((subport->tc_credits[2] + subport->tc_credits_per_period[2]) < subport->tc_rate[2])) {
+		        subport->tc_credits[2] += subport->tc_credits_per_period[2];
+		}
+		else {
+		        subport->tc_credits[2] = subport->tc_rate[2];
+		}
+		if (likely((subport->tc_credits[3] + subport->tc_credits_per_period[3]) < subport->tc_rate[3])) {
+		        subport->tc_credits[3] += subport->tc_credits_per_period[3];
+		}
+		else {
+		        subport->tc_credits[3] = subport->tc_rate[3];
+		}
 		subport->tc_time = port->time + subport->tc_period;
 	}
 
 	/* Pipe TCs */
 	if (unlikely(port->time >= pipe->tc_time)) {
-		pipe->tc_credits[0] = params->tc_credits_per_period[0];
-		pipe->tc_credits[1] = params->tc_credits_per_period[1];
-		pipe->tc_credits[2] = params->tc_credits_per_period[2];
-		pipe->tc_credits[3] = params->tc_credits_per_period[3];
+	        if (likely((pipe->tc_credits[0] + params->tc_credits_per_period[0]) < params->tc_rate[0])) {
+		        pipe->tc_credits[0] += params->tc_credits_per_period[0];
+		}
+		else {
+		        pipe->tc_credits[0] = params->tc_rate[0];
+		}
+	        if (likely((pipe->tc_credits[1] + params->tc_credits_per_period[1]) < params->tc_rate[1])) {
+		        pipe->tc_credits[1] += params->tc_credits_per_period[1];
+		}
+		else {
+		        pipe->tc_credits[1] = params->tc_rate[1];
+		}
+	        if (likely((pipe->tc_credits[2] + params->tc_credits_per_period[2]) < params->tc_rate[2])) {
+		        pipe->tc_credits[2] += params->tc_credits_per_period[2];
+		}
+		else {
+		        pipe->tc_credits[2] = params->tc_rate[2];
+		}
+	        if (likely((pipe->tc_credits[3] + params->tc_credits_per_period[3]) < params->tc_rate[3])) {
+		        pipe->tc_credits[3] += params->tc_credits_per_period[3];
+		}
+		else {
+		        pipe->tc_credits[3] = params->tc_rate[3];
+		}
 		pipe->tc_time = port->time + params->tc_period;
 	}
 }
@@ -1573,22 +1619,60 @@ grinder_credits_update(struct rte_sched_port *port, uint32_t pos)
 	/* Subport TCs */
 	if (unlikely(port->time >= subport->tc_time)) {
 		subport->tc_ov_wm = grinder_tc_ov_credits_update(port, pos);
-
-		subport->tc_credits[0] = subport->tc_credits_per_period[0];
-		subport->tc_credits[1] = subport->tc_credits_per_period[1];
-		subport->tc_credits[2] = subport->tc_credits_per_period[2];
-		subport->tc_credits[3] = subport->tc_credits_per_period[3];
-
+		if (likely((subport->tc_credits[0] + subport->tc_credits_per_period[0]) < subport->tc_rate[0])) {
+		        subport->tc_credits[0] += subport->tc_credits_per_period[0];
+		}
+		else {
+		        subport->tc_credits[0] = subport->tc_rate[0];
+		}
+		if (likely((subport->tc_credits[1] + subport->tc_credits_per_period[1]) < subport->tc_rate[1])) {
+		        subport->tc_credits[1] += subport->tc_credits_per_period[1];
+		}
+		else {
+		        subport->tc_credits[1] = subport->tc_rate[1];
+		}
+		if (likely((subport->tc_credits[2] + subport->tc_credits_per_period[2]) < subport->tc_rate[2])) {
+		        subport->tc_credits[2] += subport->tc_credits_per_period[2];
+		}
+		else {
+		       subport->tc_credits[2] = subport->tc_rate[2];
+		}
+		if (likely((subport->tc_credits[3] + subport->tc_credits_per_period[3]) < subport->tc_rate[3])) {
+		        subport->tc_credits[3] += subport->tc_credits_per_period[3];
+		}
+		else {
+		        subport->tc_credits[3] = subport->tc_rate[3];
+		}
 		subport->tc_time = port->time + subport->tc_period;
 		subport->tc_ov_period_id++;
 	}
 
 	/* Pipe TCs */
 	if (unlikely(port->time >= pipe->tc_time)) {
-		pipe->tc_credits[0] = params->tc_credits_per_period[0];
-		pipe->tc_credits[1] = params->tc_credits_per_period[1];
-		pipe->tc_credits[2] = params->tc_credits_per_period[2];
-		pipe->tc_credits[3] = params->tc_credits_per_period[3];
+	        if (likely((pipe->tc_credits[0] + params->tc_credits_per_period[0]) < params->tc_rate[0])) {
+		        pipe->tc_credits[0] += params->tc_credits_per_period[0];
+		}
+		else {
+		        pipe->tc_credits[0] = params->tc_rate[0];
+		}
+	        if (likely((pipe->tc_credits[1] + params->tc_credits_per_period[1]) < params->tc_rate[1])) {
+		        pipe->tc_credits[1] += params->tc_credits_per_period[1];
+		}
+		else {
+		        pipe->tc_credits[1] = params->tc_rate[1];
+		}
+	        if (likely((pipe->tc_credits[2] + params->tc_credits_per_period[2]) < params->tc_rate[2])) {
+		        pipe->tc_credits[2] += params->tc_credits_per_period[2];
+		}
+		else {
+		        pipe->tc_credits[2] = params->tc_rate[2];
+		}
+	        if (likely((pipe->tc_credits[3] + params->tc_credits_per_period[3]) < params->tc_rate[3])) {
+		        pipe->tc_credits[3] += params->tc_credits_per_period[3];
+		}
+		else {
+		        pipe->tc_credits[3] = params->tc_rate[3];
+	        }
 		pipe->tc_time = port->time + params->tc_period;
 	}
 
