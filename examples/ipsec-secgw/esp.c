@@ -60,8 +60,11 @@ esp_inbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 
 	RTE_ASSERT(m != NULL);
 	RTE_ASSERT(sa != NULL);
-	RTE_ASSERT(cop != NULL);
 
+	if (OFFLOADED_SA(sa))
+		return 0;
+
+	RTE_ASSERT(cop != NULL);
 	ip4 = rte_pktmbuf_mtod(m, struct ip *);
 	if (likely(ip4->ip_v == IPVERSION))
 		ip_hdr_len = ip4->ip_hl * 4;
@@ -159,12 +162,22 @@ esp_inbound_post(struct rte_mbuf *m, struct ipsec_sa *sa,
 	uint8_t *nexthdr, *pad_len;
 	uint8_t *padding;
 	uint16_t i;
+	uint8_t decrypt_fail;
 
 	RTE_ASSERT(m != NULL);
 	RTE_ASSERT(sa != NULL);
-	RTE_ASSERT(cop != NULL);
 
-	if (cop->status != RTE_CRYPTO_OP_STATUS_SUCCESS) {
+	if (OFFLOADED_SA(sa)) {
+		if (m->ol_flags & PKT_RX_IPSEC_CRYPTO)
+			decrypt_fail = !!(m->ol_flags & PKT_RX_IPSEC_CRYPTO_FAILED);
+		else
+			decrypt_fail = 1;
+	} else {
+		RTE_ASSERT(cop != NULL);
+		decrypt_fail = (cop->status != RTE_CRYPTO_OP_STATUS_SUCCESS);
+	}
+
+	if (decrypt_fail) {
 		RTE_LOG(ERR, IPSEC_ESP, "failed crypto op\n");
 		return -1;
 	}
@@ -222,7 +235,6 @@ esp_outbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 
 	RTE_ASSERT(m != NULL);
 	RTE_ASSERT(sa != NULL);
-	RTE_ASSERT(cop != NULL);
 
 	ip_hdr_len = 0;
 
@@ -250,7 +262,6 @@ esp_outbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 	/* Padded payload length */
 	pad_payload_len = RTE_ALIGN_CEIL(rte_pktmbuf_pkt_len(m) -
 			ip_hdr_len + 2, sa->block_size);
-	pad_len = pad_payload_len + ip_hdr_len - rte_pktmbuf_pkt_len(m);
 
 	RTE_ASSERT(sa->flags == IP4_TUNNEL || sa->flags == IP6_TUNNEL ||
 			sa->flags == TRANSPORT);
@@ -272,12 +283,18 @@ esp_outbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 		return -EINVAL;
 	}
 
-	padding = (uint8_t *)rte_pktmbuf_append(m, pad_len + sa->digest_len);
-	if (unlikely(padding == NULL)) {
-		RTE_LOG(ERR, IPSEC_ESP, "not enough mbuf trailing space\n");
-		return -ENOSPC;
+	if (!OFFLOADED_SA(sa)) {
+		pad_len = pad_payload_len + ip_hdr_len - rte_pktmbuf_pkt_len(m);
+
+		padding = (uint8_t *)rte_pktmbuf_append(m, pad_len +
+							sa->digest_len);
+		if (unlikely(padding == NULL)) {
+			RTE_LOG(ERR, IPSEC_ESP,
+					"not enough mbuf trailing space\n");
+			return -ENOSPC;
+		}
+		rte_prefetch0(padding);
 	}
-	rte_prefetch0(padding);
 
 	switch (sa->flags) {
 	case IP4_TUNNEL:
@@ -311,20 +328,39 @@ esp_outbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 	esp->seq = rte_cpu_to_be_32((uint32_t)sa->seq);
 
 	uint64_t *iv = (uint64_t *)(esp + 1);
+	switch (sa->cipher_algo) {
+	case RTE_CRYPTO_CIPHER_NULL:
+	case RTE_CRYPTO_CIPHER_AES_CBC:
+		memset(iv, 0, sa->iv_len);
+		break;
+	case RTE_CRYPTO_CIPHER_AES_CTR:
+	case RTE_CRYPTO_CIPHER_AES_GCM:
+		*iv = sa->seq;
+		break;
+	default:
+		RTE_LOG(ERR, IPSEC_ESP, "unsupported cipher algorithm %u\n",
+				sa->cipher_algo);
+		return -EINVAL;
+	}
 
+	if (OFFLOADED_SA(sa)) {
+		m->inner_esp_next_proto = nlp;
+		m->ol_flags |= PKT_TX_IPSEC_CRYPTO_HW_TRAILER;
+		goto done;
+	}
+
+	RTE_ASSERT(cop != NULL);
 	sym_cop = get_sym_cop(cop);
 	sym_cop->m_src = m;
 	switch (sa->cipher_algo) {
 	case RTE_CRYPTO_CIPHER_NULL:
 	case RTE_CRYPTO_CIPHER_AES_CBC:
-		memset(iv, 0, sa->iv_len);
 		sym_cop->cipher.data.offset = ip_hdr_len +
 			sizeof(struct esp_hdr);
 		sym_cop->cipher.data.length = pad_payload_len + sa->iv_len;
 		break;
 	case RTE_CRYPTO_CIPHER_AES_CTR:
 	case RTE_CRYPTO_CIPHER_AES_GCM:
-		*iv = sa->seq;
 		sym_cop->cipher.data.offset = ip_hdr_len +
 			sizeof(struct esp_hdr) + sa->iv_len;
 		sym_cop->cipher.data.length = pad_payload_len;
@@ -380,18 +416,22 @@ esp_outbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 			rte_pktmbuf_pkt_len(m) - sa->digest_len);
 	sym_cop->auth.digest.length = sa->digest_len;
 
+done:
 	return 0;
 }
 
 int
 esp_outbound_post(struct rte_mbuf *m __rte_unused,
-		struct ipsec_sa *sa __rte_unused,
+		struct ipsec_sa *sa,
 		struct rte_crypto_op *cop)
 {
 	RTE_ASSERT(m != NULL);
 	RTE_ASSERT(sa != NULL);
-	RTE_ASSERT(cop != NULL);
 
+	if (OFFLOADED_SA(sa))
+		return 0;
+
+	RTE_ASSERT(cop != NULL);
 	if (cop->status != RTE_CRYPTO_OP_STATUS_SUCCESS) {
 		RTE_LOG(ERR, IPSEC_ESP, "Failed crypto op\n");
 		return -1;

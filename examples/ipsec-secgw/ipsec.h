@@ -38,6 +38,7 @@
 
 #include <rte_byteorder.h>
 #include <rte_crypto.h>
+#include <rte_flow.h>
 
 #define RTE_LOGTYPE_IPSEC       RTE_LOGTYPE_USER1
 #define RTE_LOGTYPE_IPSEC_ESP   RTE_LOGTYPE_USER2
@@ -97,6 +98,22 @@ struct ipsec_sa {
 	uint32_t cdev_id_qp;
 	uint64_t seq;
 	uint32_t salt;
+	int32_t portid;
+	struct rte_flow_attr attr;
+#define MAX_RTE_FLOW_PATTERN (4)
+	// ETH + IP + ESP + END
+	union {
+		struct rte_flow_item_ipv4 ipv4;
+		struct rte_flow_item_ipv6 ipv6;
+	} ip_spec;
+	struct rte_flow_item_esp esp_spec;
+	struct rte_flow_item pattern[MAX_RTE_FLOW_PATTERN];
+#define MAX_RTE_FLOW_ACTIONS (2)
+	// IPsec + END
+	struct rte_flow_action_crypto crypto_action;
+	struct rte_flow_action action[MAX_RTE_FLOW_ACTIONS];
+	struct rte_flow *flow;
+#define OFFLOADED_SA(sa)     ((sa)->flow)
 	struct rte_cryptodev_sym_session *crypto_session;
 	enum rte_crypto_cipher_algorithm cipher_algo;
 	enum rte_crypto_auth_algorithm auth_algo;
@@ -117,6 +134,9 @@ struct ipsec_sa {
 	struct rte_crypto_sym_xform *xforms;
 } __rte_cache_aligned;
 
+#define IPSEC_INFLIGHT_PKT_OFFLOADED (1 << 0)
+#define IPSEC_INFLIGHT_PKT_CRYPTODEV (1 << 1)
+
 struct ipsec_mbuf_metadata {
 	uint8_t buf[32];
 	struct ipsec_sa *sa;
@@ -130,6 +150,14 @@ struct cdev_qp {
 	uint16_t in_flight;
 	uint16_t len;
 	struct rte_crypto_op *buf[MAX_PKT_BURST] __rte_aligned(sizeof(void *));
+};
+
+struct sa_ctx {
+	struct ipsec_sa sa[IPSEC_SA_MAX_ENTRIES];
+	struct {
+		struct rte_crypto_sym_xform a;
+		struct rte_crypto_sym_xform b;
+	} xf[IPSEC_SA_MAX_ENTRIES];
 };
 
 struct ipsec_ctx {
@@ -231,4 +259,6 @@ sa_init(struct socket_ctx *ctx, int32_t socket_id);
 void
 rt_init(struct socket_ctx *ctx, int32_t socket_id);
 
+int
+create_session(struct ipsec_ctx *ipsec_ctx, struct ipsec_sa *sa);
 #endif /* __IPSEC_H__ */

@@ -40,12 +40,32 @@
 #include <rte_cryptodev.h>
 #include <rte_mbuf.h>
 #include <rte_hash.h>
+#include <rte_flow.h>
 
 #include "ipsec.h"
 #include "esp.h"
 
+
 static inline int
-create_session(struct ipsec_ctx *ipsec_ctx __rte_unused, struct ipsec_sa *sa)
+create_session_inline(struct ipsec_ctx *ipsec_ctx __rte_unused,
+		      struct ipsec_sa *sa)
+{
+	struct rte_flow_error err;
+
+	sa->flow = rte_flow_create(sa->portid, &sa->attr, sa->pattern,
+			sa->action, &err);
+	if (sa->flow == NULL) {
+		RTE_LOG(ERR, IPSEC, "Failed to create ipsec flow message: %s\n",
+				err.message);
+		return -1;
+	}
+
+	return 0;
+}
+
+static inline int
+create_session_cryptodev(struct ipsec_ctx *ipsec_ctx __rte_unused,
+			 struct ipsec_sa *sa)
 {
 	struct rte_cryptodev_info cdev_info;
 	unsigned long cdev_id_qp = 0;
@@ -91,6 +111,15 @@ create_session(struct ipsec_ctx *ipsec_ctx __rte_unused, struct ipsec_sa *sa)
 	return 0;
 }
 
+int
+create_session(struct ipsec_ctx *ipsec_ctx, struct ipsec_sa *sa)
+{
+	if (sa->portid != -1)
+		return create_session_inline(ipsec_ctx, sa);
+	else
+		return create_session_cryptodev(ipsec_ctx, sa);
+}
+
 static inline void
 enqueue_cop(struct cdev_qp *cqp, struct rte_crypto_op *cop)
 {
@@ -117,7 +146,8 @@ enqueue_cop(struct cdev_qp *cqp, struct rte_crypto_op *cop)
 static inline void
 ipsec_enqueue(ipsec_xform_fn xform_func, struct ipsec_ctx *ipsec_ctx,
 		struct rte_mbuf *pkts[], struct ipsec_sa *sas[],
-		uint16_t nb_pkts)
+		uint16_t nb_pkts,
+		uint8_t inflight_pkt_types[], uint16_t *nb_offloaded)
 {
 	int32_t ret = 0, i;
 	struct ipsec_mbuf_metadata *priv;
@@ -142,14 +172,11 @@ ipsec_enqueue(ipsec_xform_fn xform_func, struct ipsec_ctx *ipsec_ctx,
 		rte_prefetch0(&priv->sym_cop);
 		priv->cop.sym = &priv->sym_cop;
 
-		if ((unlikely(sa->crypto_session == NULL)) &&
+		if ((unlikely(sa->crypto_session == NULL && sa->flow == NULL)) &&
 				create_session(ipsec_ctx, sa)) {
 			rte_pktmbuf_free(pkts[i]);
 			continue;
 		}
-
-		rte_crypto_op_attach_sym_session(&priv->cop,
-				sa->crypto_session);
 
 		ret = xform_func(pkts[i], sa, &priv->cop);
 		if (unlikely(ret)) {
@@ -157,22 +184,77 @@ ipsec_enqueue(ipsec_xform_fn xform_func, struct ipsec_ctx *ipsec_ctx,
 			continue;
 		}
 
-		RTE_ASSERT(sa->cdev_id_qp < ipsec_ctx->nb_qps);
-		enqueue_cop(&ipsec_ctx->tbl[sa->cdev_id_qp], &priv->cop);
+		if (!OFFLOADED_SA(sa)) {
+			inflight_pkt_types[i] = IPSEC_INFLIGHT_PKT_CRYPTODEV;
+			rte_crypto_op_attach_sym_session(&priv->cop,
+							 sa->crypto_session);
+
+			RTE_ASSERT(sa->cdev_id_qp < ipsec_ctx->nb_qps);
+			enqueue_cop(&ipsec_ctx->tbl[sa->cdev_id_qp],
+				    &priv->cop);
+		} else {
+			inflight_pkt_types[i] = IPSEC_INFLIGHT_PKT_OFFLOADED;
+			(*nb_offloaded)++;
+		}
 	}
+}
+
+static int32_t next_offloaded_pkt_idx(uint8_t inflight_pkt_types[],
+		int32_t curr_idx, uint16_t max_pkts)
+{
+	int32_t i = 0;
+
+	for (i = curr_idx; i < max_pkts; ++i) {
+		if (inflight_pkt_types[i] == IPSEC_INFLIGHT_PKT_OFFLOADED)
+			break;
+	}
+	return i;
+}
+
+static int32_t next_cryptodev_pkt_idx(uint8_t inflight_pkt_types[],
+		int32_t curr_idx, uint16_t max_pkts)
+{
+	int32_t i = 0;
+
+	for (i = curr_idx; i < max_pkts; ++i) {
+		if (inflight_pkt_types[i] == IPSEC_INFLIGHT_PKT_CRYPTODEV)
+			break;
+	}
+	return i;
 }
 
 static inline int
 ipsec_dequeue(ipsec_xform_fn xform_func, struct ipsec_ctx *ipsec_ctx,
-		struct rte_mbuf *pkts[], uint16_t max_pkts)
+		struct rte_mbuf *pkts[], uint16_t max_pkts,
+		uint8_t inflight_pkt_types[], uint16_t nb_offloaded)
 {
-	int32_t nb_pkts = 0, ret = 0, i, j, nb_cops;
+	int32_t nb_pkts = 0, ret = 0, i, j, idx, nb_cops;
 	struct ipsec_mbuf_metadata *priv;
 	struct rte_crypto_op *cops[max_pkts];
 	struct ipsec_sa *sa;
 	struct rte_mbuf *pkt;
 
-	for (i = 0; i < ipsec_ctx->nb_qps && nb_pkts < max_pkts; i++) {
+	/* all offloaded pkts are in place already */
+	for (i = 0, idx = 0; i < nb_offloaded; ++i) {
+		idx = next_offloaded_pkt_idx(inflight_pkt_types, idx, max_pkts);
+
+		pkt = pkts[idx];
+		rte_prefetch0(pkt);
+		priv = get_priv(pkt);
+		sa = priv->sa;
+
+		RTE_ASSERT(sa != NULL);
+
+		ret = xform_func(pkt, sa, NULL);
+		if (unlikely(ret)) {
+			rte_pktmbuf_free(pkt);
+			pkt = NULL;
+		}
+		pkts[idx++] = pkt;
+	}
+	nb_pkts += nb_offloaded;
+
+	for (i = 0, idx = 0; i < ipsec_ctx->nb_qps && nb_pkts < max_pkts; i++) {
 		struct cdev_qp *cqp;
 
 		cqp = &ipsec_ctx->tbl[ipsec_ctx->last_qp++];
@@ -197,13 +279,29 @@ ipsec_dequeue(ipsec_xform_fn xform_func, struct ipsec_ctx *ipsec_ctx,
 			RTE_ASSERT(sa != NULL);
 
 			ret = xform_func(pkt, sa, cops[j]);
-			if (unlikely(ret))
+			if (unlikely(ret)) {
 				rte_pktmbuf_free(pkt);
-			else
-				pkts[nb_pkts++] = pkt;
+				pkt = NULL;
+			}
+
+			idx = next_cryptodev_pkt_idx(inflight_pkt_types, idx,
+						     max_pkts);
+			pkts[idx++] = pkt;
+			nb_pkts++;
 		}
 	}
 
+	for (i = 0; i < max_pkts; ++i)
+		if (!pkts[i])
+			goto err;
+
+	goto done;
+err:
+	for (; i < max_pkts; ++i) {
+		rte_pktmbuf_free(pkts[i]);
+		--nb_pkts;
+	}
+done:
 	/* return packets */
 	return nb_pkts;
 }
@@ -213,12 +311,16 @@ ipsec_inbound(struct ipsec_ctx *ctx, struct rte_mbuf *pkts[],
 		uint16_t nb_pkts, uint16_t len)
 {
 	struct ipsec_sa *sas[nb_pkts];
+	uint8_t inflight_pkt_types[nb_pkts];
+	uint16_t nb_offloaded;
 
 	inbound_sa_lookup(ctx->sa_ctx, pkts, sas, nb_pkts);
 
-	ipsec_enqueue(esp_inbound, ctx, pkts, sas, nb_pkts);
+	ipsec_enqueue(esp_inbound, ctx, pkts, sas, nb_pkts,
+			inflight_pkt_types, &nb_offloaded);
 
-	return ipsec_dequeue(esp_inbound_post, ctx, pkts, len);
+	return ipsec_dequeue(esp_inbound_post, ctx, pkts, len,
+			inflight_pkt_types, nb_offloaded);
 }
 
 uint16_t
@@ -226,10 +328,14 @@ ipsec_outbound(struct ipsec_ctx *ctx, struct rte_mbuf *pkts[],
 		uint32_t sa_idx[], uint16_t nb_pkts, uint16_t len)
 {
 	struct ipsec_sa *sas[nb_pkts];
+	uint8_t inflight_pkt_types[nb_pkts];
+	uint16_t nb_offloaded;
 
 	outbound_sa_lookup(ctx->sa_ctx, sa_idx, sas, nb_pkts);
 
-	ipsec_enqueue(esp_outbound, ctx, pkts, sas, nb_pkts);
+	ipsec_enqueue(esp_outbound, ctx, pkts, sas, nb_pkts,
+			inflight_pkt_types, &nb_offloaded);
 
-	return ipsec_dequeue(esp_outbound_post, ctx, pkts, len);
+	return ipsec_dequeue(esp_outbound_post, ctx, pkts, len,
+			inflight_pkt_types, nb_offloaded);
 }

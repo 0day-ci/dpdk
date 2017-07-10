@@ -46,6 +46,8 @@
 #include <rte_errno.h>
 #include <rte_ip.h>
 #include <rte_random.h>
+#include <rte_flow.h>
+#include <rte_ethdev.h>
 
 #include "ipsec.h"
 #include "esp.h"
@@ -213,6 +215,7 @@ parse_sa_tokens(char **tokens, uint32_t n_tokens,
 	uint32_t src_p = 0;
 	uint32_t dst_p = 0;
 	uint32_t mode_p = 0;
+	uint32_t portid_p = 0;
 
 	if (strcmp(tokens[0], "in") == 0) {
 		ri = &nb_sa_in;
@@ -407,6 +410,8 @@ parse_sa_tokens(char **tokens, uint32_t n_tokens,
 					return;
 				rule->src.ip.ip4 = rte_bswap32(
 					(uint32_t)ip.s_addr);
+				rule->src.ip.ip4 = rte_cpu_to_be_32(
+						rule->src.ip.ip4);
 			} else if (rule->flags == IP6_TUNNEL) {
 				struct in6_addr ip;
 
@@ -450,6 +455,8 @@ parse_sa_tokens(char **tokens, uint32_t n_tokens,
 					return;
 				rule->dst.ip.ip4 = rte_bswap32(
 					(uint32_t)ip.s_addr);
+				rule->dst.ip.ip4 = rte_cpu_to_be_32(
+						rule->dst.ip.ip4);
 			} else if (rule->flags == IP6_TUNNEL) {
 				struct in6_addr ip;
 
@@ -471,6 +478,23 @@ parse_sa_tokens(char **tokens, uint32_t n_tokens,
 			continue;
 		}
 
+		if (strcmp(tokens[ti], "inline_port") == 0) {
+			APP_CHECK_PRESENCE(portid_p, tokens[ti], status);
+			if (status->status < 0)
+				return;
+
+			INCREMENT_TOKEN_INDEX(ti, n_tokens, status);
+			if (status->status < 0)
+				return;
+
+			rule->portid = atoi(tokens[ti]);
+
+			if (status->status < 0)
+				return;
+			portid_p = 1;
+			continue;
+		}
+
 		/* unrecognizeable input */
 		APP_CHECK(0, status, "unrecognized input \"%s\"",
 			tokens[ti]);
@@ -488,6 +512,10 @@ parse_sa_tokens(char **tokens, uint32_t n_tokens,
 	APP_CHECK(mode_p == 1, status, "missing mode option");
 	if (status->status < 0)
 		return;
+
+	/* This SA isn't offload */
+	if (!portid_p)
+		rule->portid = -1;
 
 	*ri = *ri + 1;
 }
@@ -547,14 +575,6 @@ print_one_sa_rule(const struct ipsec_sa *sa, int inbound)
 	printf("\n");
 }
 
-struct sa_ctx {
-	struct ipsec_sa sa[IPSEC_SA_MAX_ENTRIES];
-	struct {
-		struct rte_crypto_sym_xform a;
-		struct rte_crypto_sym_xform b;
-	} xf[IPSEC_SA_MAX_ENTRIES];
-};
-
 static struct sa_ctx *
 sa_create(const char *name, int32_t socket_id)
 {
@@ -588,11 +608,13 @@ sa_add_rules(struct sa_ctx *sa_ctx, const struct ipsec_sa entries[],
 		uint32_t nb_entries, uint32_t inbound)
 {
 	struct ipsec_sa *sa;
-	uint32_t i, idx;
+	uint32_t i, idx, j;
+	struct rte_eth_dev_info dev_info;
 
 	for (i = 0; i < nb_entries; i++) {
 		idx = SPI2IDX(entries[i].spi);
 		sa = &sa_ctx->sa[idx];
+		j = 0;
 		if (sa->spi != 0) {
 			printf("Index %u already in use by SPI %u\n",
 					idx, sa->spi);
@@ -601,12 +623,75 @@ sa_add_rules(struct sa_ctx *sa_ctx, const struct ipsec_sa entries[],
 		*sa = entries[i];
 		sa->seq = 0;
 
-		switch (sa->flags) {
-		case IP4_TUNNEL:
-			sa->src.ip.ip4 = rte_cpu_to_be_32(sa->src.ip.ip4);
-			sa->dst.ip.ip4 = rte_cpu_to_be_32(sa->dst.ip.ip4);
+		if (sa->portid == -1)
+			goto not_offloaded;
+
+		rte_eth_dev_info_get(sa->portid, &dev_info);
+
+		if (inbound) {
+			if ((dev_info.rx_offload_capa &
+			     DEV_RX_OFFLOAD_IPSEC_CRYPTO) == 0) {
+				RTE_LOG(WARNING, PORT,
+					"hardware RX IPSec offload is not supported\n");
+				return -EINVAL;
+			}
+		} else { /* outbound */
+			if ((dev_info.tx_offload_capa &
+			     DEV_TX_OFFLOAD_IPSEC_CRYPTO_NEED_METADATA) == 0)
+				goto inline_with_metadata;
+			if ((dev_info.tx_offload_capa &
+			     DEV_TX_OFFLOAD_IPSEC_CRYPTO_HW_TRAILER) == 0) {
+				RTE_LOG(WARNING, PORT,
+					"hardware TX IPSec offload is not supported\n");
+				return -EINVAL;
+			}
 		}
 
+		sa->pattern[j++].type = RTE_FLOW_ITEM_TYPE_ETH;
+		switch (sa->flags) {
+		case IP4_TUNNEL:
+			sa->pattern[j].type = RTE_FLOW_ITEM_TYPE_IPV4;
+			sa->pattern[j].spec = &sa->ip_spec.ipv4;
+			sa->pattern[j++].mask = &rte_flow_item_ipv4_mask;
+			sa->ip_spec.ipv4.hdr.src_addr = sa->src.ip.ip4 =
+				rte_cpu_to_be_32(sa->src.ip.ip4);
+			sa->ip_spec.ipv4.hdr.dst_addr = sa->dst.ip.ip4 =
+				rte_cpu_to_be_32(sa->dst.ip.ip4);
+			break;
+		case IP6_TUNNEL:
+			sa->pattern[j].type = RTE_FLOW_ITEM_TYPE_IPV6;
+			sa->pattern[j].spec = &sa->ip_spec.ipv6;
+			sa->pattern[j++].mask = &rte_flow_item_ipv6_mask;
+			memcpy(sa->ip_spec.ipv6.hdr.src_addr,
+					sa->src.ip.ip6.ip6_b, 16);
+			memcpy(sa->ip_spec.ipv6.hdr.dst_addr,
+					sa->dst.ip.ip6.ip6_b, 16);
+			break;
+		case TRANSPORT:
+			rte_exit(EXIT_FAILURE,
+				 "Error creating offload SA with TRANSPORT, currently not supported\n");
+		}
+		sa->pattern[j].type = RTE_FLOW_ITEM_TYPE_ESP;
+		sa->pattern[j].spec = &sa->esp_spec;
+		sa->pattern[j++].mask = &rte_flow_item_esp_mask;
+		sa->esp_spec.hdr.spi = entries[i].spi;
+
+		sa->pattern[j++].type = RTE_FLOW_ITEM_TYPE_END;
+
+		memset(&sa->attr, 0, sizeof(struct rte_flow_attr));
+		j = 0;
+		sa->action[j].type = RTE_FLOW_ACTION_TYPE_CRYPTO;
+		sa->action[j++].conf = &sa->crypto_action;
+		sa->crypto_action.xform.type = RTE_CRYPTO_SYM_XFORM_IPSEC;
+		sa->crypto_action.xform.ipsec.algo = RTE_CRYPTO_CIPHER_AES_GCM;
+		sa->crypto_action.xform.ipsec.key.data = sa->cipher_key;
+		sa->crypto_action.xform.ipsec.key.length = sa->cipher_key_len;
+		sa->crypto_action.xform.ipsec.salt = sa->salt;
+
+		sa->action[j].type = RTE_FLOW_ITEM_TYPE_END;
+inline_with_metadata:
+		/* Implement TX ipsec inline crypto offload with metadata here! */
+not_offloaded:
 		if (inbound) {
 			sa_ctx->xf[idx].b.type = RTE_CRYPTO_SYM_XFORM_CIPHER;
 			sa_ctx->xf[idx].b.cipher.algo = sa->cipher_algo;
@@ -628,7 +713,11 @@ sa_add_rules(struct sa_ctx *sa_ctx, const struct ipsec_sa entries[],
 				sa->digest_len;
 			sa_ctx->xf[idx].a.auth.op =
 				RTE_CRYPTO_AUTH_OP_VERIFY;
-
+			if (sa->portid != -1) {
+				sa->attr.ingress = 1;
+				sa->crypto_action.xform.ipsec.op =
+						RTE_CRYPTO_CIPHER_OP_DECRYPT;
+			}
 		} else { /* outbound */
 			sa_ctx->xf[idx].a.type = RTE_CRYPTO_SYM_XFORM_CIPHER;
 			sa_ctx->xf[idx].a.cipher.algo = sa->cipher_algo;
@@ -650,6 +739,11 @@ sa_add_rules(struct sa_ctx *sa_ctx, const struct ipsec_sa entries[],
 				sa->digest_len;
 			sa_ctx->xf[idx].b.auth.op =
 				RTE_CRYPTO_AUTH_OP_GENERATE;
+			if (sa->portid != -1) {
+				sa->attr.egress = 1;
+				sa->crypto_action.xform.ipsec.op =
+						RTE_CRYPTO_CIPHER_OP_ENCRYPT;
+			}
 		}
 
 		sa_ctx->xf[idx].a.next = &sa_ctx->xf[idx].b;
