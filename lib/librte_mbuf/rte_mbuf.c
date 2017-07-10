@@ -324,6 +324,10 @@ const char *rte_get_rx_ol_flag_name(uint64_t mask)
 	case PKT_RX_QINQ_STRIPPED: return "PKT_RX_QINQ_STRIPPED";
 	case PKT_RX_LRO: return "PKT_RX_LRO";
 	case PKT_RX_TIMESTAMP: return "PKT_RX_TIMESTAMP";
+	case PKT_RX_IPSEC_CRYPTO:
+		return "PKT_RX_IPSEC_CRYPTO";
+	case PKT_RX_IPSEC_CRYPTO_FAILED:
+		return "PKT_RX_IPSEC_CRYPTO_FAILED";
 	default: return NULL;
 	}
 }
@@ -359,6 +363,12 @@ rte_get_rx_ol_flag_list(uint64_t mask, char *buf, size_t buflen)
 		{ PKT_RX_QINQ_STRIPPED, PKT_RX_QINQ_STRIPPED, NULL },
 		{ PKT_RX_LRO, PKT_RX_LRO, NULL },
 		{ PKT_RX_TIMESTAMP, PKT_RX_TIMESTAMP, NULL },
+		{ PKT_RX_IPSEC_CRYPTO_UNKNOWN,
+		  PKT_RX_IPSEC_CRYPTO_UNKNOWN, "PKT_RX_IPSEC_CRYPTO_UNKNOWN" },
+		{ PKT_RX_IPSEC_CRYPTO,
+		  PKT_RX_IPSEC_CRYPTO, NULL },
+		{ PKT_RX_IPSEC_CRYPTO_FAILED,
+		  PKT_RX_IPSEC_CRYPTO_FAILED, NULL },
 	};
 	const char *name;
 	unsigned int i;
@@ -410,6 +420,9 @@ const char *rte_get_tx_ol_flag_name(uint64_t mask)
 	case PKT_TX_TUNNEL_IPIP: return "PKT_TX_TUNNEL_IPIP";
 	case PKT_TX_TUNNEL_GENEVE: return "PKT_TX_TUNNEL_GENEVE";
 	case PKT_TX_MACSEC: return "PKT_TX_MACSEC";
+	case PKT_TX_IPSEC_CRYPTO_HW_TRAILER:
+		return "PKT_TX_IPSEC_CRYPTO_HW_TRAILER";
+	case PKT_TX_IPSEC_CRYPTO: return "PKT_TX_IPSEC_CRYPTO";
 	default: return NULL;
 	}
 }
@@ -441,6 +454,9 @@ rte_get_tx_ol_flag_list(uint64_t mask, char *buf, size_t buflen)
 		{ PKT_TX_TUNNEL_GENEVE, PKT_TX_TUNNEL_MASK,
 		  "PKT_TX_TUNNEL_NONE" },
 		{ PKT_TX_MACSEC, PKT_TX_MACSEC, NULL },
+		{ PKT_TX_IPSEC_CRYPTO_HW_TRAILER,
+		  PKT_TX_IPSEC_CRYPTO_HW_TRAILER, NULL },
+		{ PKT_TX_IPSEC_CRYPTO, PKT_TX_IPSEC_CRYPTO, NULL },
 	};
 	const char *name;
 	unsigned int i;

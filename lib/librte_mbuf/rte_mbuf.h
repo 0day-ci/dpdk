@@ -190,8 +190,37 @@ extern "C" {
 #define PKT_RX_TIMESTAMP     (1ULL << 17)
 
 /* add new RX flags here */
+/**
+ * When IPsec packet is decrypted by hardware, this flag is set in the RX
+ * mbuf to indicate that the m->crpyto fields is valid and is set according to
+ * the result of decryption.
+ */
+
+/**
+ * Mask of bits used to determine the status of RX IPsec crypto.
+ * - PKT_RX_IPSEC_CRYPTO_UNKNOWN     : no information about the RX IPsec crypto
+ * - PKT_RX_IPSEC_CRYPTO 	     : decryption and authentication were performed
+ * - PKT_RX_IPSEC_CRYPTO_FAILED      : ipsec processing failed.
+ */
+#define PKT_RX_IPSEC_CRYPTO_UNKNOWN         0
+#define PKT_RX_IPSEC_CRYPTO		   (1ULL << 18)
+#define PKT_RX_IPSEC_CRYPTO_FAILED    	   (1ULL << 19)
 
 /* add new TX flags here */
+
+/**
+ * Offload the IPsec encryption with software provided trailer.
+ * This flag must be set by the application to enable this
+ * offload feature for a packet to be transmitted.
+ */
+#define PKT_TX_IPSEC_CRYPTO		(1ULL << 42)
+
+/**
+ * Offload the IPsec encryption and trailer construction.
+ * This flag must be set by the application to enable this
+ * offload feature for a packet to be transmitted.
+ */
+#define PKT_TX_IPSEC_CRYPTO_HW_TRAILER	(1ULL << 43)
 
 /**
  * Offload the MACsec. This flag must be set by the application to enable
