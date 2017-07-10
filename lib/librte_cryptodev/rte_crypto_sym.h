@@ -346,11 +346,49 @@ struct rte_crypto_auth_xform {
 	 */
 };
 
+/**
+ * IPsec transformation data
+ *
+ * This structure contains data relating to an IPsec crypto
+ * transforms. The fields op, algo and key are common to all
+ * IPsec encryptions and MUST be set. The salt is useful for AEAD ciphers
+ * which must provide an out-of-band nonce for each SA.
+ */
+struct rte_crypto_ipsec_xform {
+	enum rte_crypto_cipher_operation op;
+	/**< IPsec operation type */
+	enum rte_crypto_cipher_algorithm algo;
+	/**<  Encryption algorithm selection */
+
+	struct {
+		uint8_t *data;	/**< pointer to key data */
+		size_t length;	/**< key length in bytes */
+	} key;
+	/**< Cipher key
+	 *
+	 * Cipher key length is in bytes. For AES it can be 128 bits (16 bytes),
+	 * 192 bits (24 bytes) or 256 bits (32 bytes).
+	 *
+	 * For the CCM mode of operation, the only supported key length is 128
+	 * bits (16 bytes).
+	 *
+	 **/
+
+	uint32_t salt; /* salt for this security association */
+	/** <Implicit IV
+	 *
+	 * Implicit IV is set once per SA as defined by RFC 4106 (ESP AES-GCM)
+	 *
+	 **/
+
+};
+
 /** Crypto transformation types */
 enum rte_crypto_sym_xform_type {
 	RTE_CRYPTO_SYM_XFORM_NOT_SPECIFIED = 0,	/**< No xform specified */
 	RTE_CRYPTO_SYM_XFORM_AUTH,		/**< Authentication xform */
-	RTE_CRYPTO_SYM_XFORM_CIPHER		/**< Cipher xform  */
+	RTE_CRYPTO_SYM_XFORM_CIPHER,		/**< Cipher xform */
+	RTE_CRYPTO_SYM_XFORM_IPSEC,		/**< IPsec xform */
 };
 
 /**
@@ -373,6 +411,8 @@ struct rte_crypto_sym_xform {
 		/**< Authentication / hash xform */
 		struct rte_crypto_cipher_xform cipher;
 		/**< Cipher xform */
+		struct rte_crypto_ipsec_xform ipsec;
+		/**< IPsec xform */
 	};
 };
 
