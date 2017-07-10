@@ -88,6 +88,21 @@ static struct rte_devargs *pci_devargs_lookup(struct rte_pci_device *dev)
 	return NULL;
 }
 
+void
+pci_name_set(struct rte_pci_device *dev)
+{
+	struct rte_devargs *devargs;
+
+	rte_pci_device_name(&dev->addr,
+			dev->name, sizeof(dev->name));
+	devargs = pci_devargs_lookup(dev);
+	dev->device.devargs = devargs;
+	if (devargs != NULL)
+		dev->device.name = dev->device.devargs->name;
+	else
+		dev->device.name = dev->name;
+}
+
 /* map a particular resource from a file */
 void *
 pci_map_resource(void *requested_addr, int fd, off_t offset, size_t size,
@@ -396,11 +411,7 @@ rte_pci_probe(void)
 	FOREACH_DEVICE_ON_PCIBUS(dev) {
 		probed++;
 
-		/* set devargs in PCI structure */
-		devargs = pci_devargs_lookup(dev);
-		if (devargs != NULL)
-			dev->device.devargs = devargs;
-
+		devargs = dev->device.devargs;
 		/* probe all or only whitelisted devices */
 		if (probe_all)
 			ret = pci_probe_all_drivers(dev);
