@@ -64,3 +64,10 @@ Deprecation Notices
   be removed in 17.11:
 
   - ``rte_eal_parse_devargs_str``, replaced by ``rte_eal_devargs_parse``
+
+* eal: An ABI change is planned for 17.11 to make dpdk aware of IOVA address
+  translation scheme.
+  Reference to phys address in eal data-structure or functions may change to
+  IOVA address or more appropriate name.
+  The change will be only for the name.
+  Functional aspects of the API or data-structure will remain same.
