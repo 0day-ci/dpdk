@@ -68,6 +68,7 @@ The lib directory contains::
     +-- librte_distributor  # Packet distributor
     +-- librte_eal          # Environment abstraction layer
     +-- librte_ether        # Generic interface to poll mode driver
+    +-- librte_gro          # Generic receive offload library
     +-- librte_hash         # Hash library
     +-- librte_ip_frag      # IP fragmentation library
     +-- librte_kni          # Kernel NIC interface
