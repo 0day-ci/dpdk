@@ -45,6 +45,7 @@ LIBABIVER := 6
 
 SRCS-y += rte_ethdev.c
 SRCS-y += rte_flow.c
+SRCS-y += rte_ethdev_profile.c
 
 #
 # Export include files

@@ -67,6 +67,7 @@
 
 #include "rte_ether.h"
 #include "rte_ethdev.h"
+#include "rte_ethdev_profile.h"
 
 static const char *MZ_RTE_ETH_DEV_DATA = "rte_eth_dev_data";
 struct rte_eth_dev rte_eth_devices[RTE_MAX_ETHPORTS];
@@ -824,6 +825,9 @@ rte_eth_dev_configure(uint8_t port_id, uint16_t nb_rx_q, uint16_t nb_tx_q,
 		rte_eth_dev_tx_queue_config(dev, 0);
 		return diag;
 	}
+
+	/* See rte_ethdev_profile.h to find comments on code below. */
+	rte_eth_rx_profile_init(port_id, dev);
 
 	return 0;
 }
