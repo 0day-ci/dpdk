@@ -1363,10 +1363,10 @@ qat_write_hw_desc_entry(struct rte_crypto_op *op, uint8_t *out_msg,
 		if (!do_aead) {
 			qat_req->comn_mid.dst_length =
 				qat_req->comn_mid.src_length =
-					rte_pktmbuf_data_len(op->sym->m_src);
+					op->sym->auth.data.length;
 			auth_param->u1.aad_adr = 0;
 			auth_param->auth_len = op->sym->auth.data.length;
-			auth_param->auth_off = op->sym->auth.data.offset;
+			auth_param->auth_off = 0;
 			auth_param->u2.aad_sz = 0;
 		}
 	}
