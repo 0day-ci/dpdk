@@ -78,6 +78,7 @@
 #include <rte_version.h>
 #include <rte_atomic.h>
 #include <malloc_heap.h>
+#include <rte_service_component.h>
 
 #include "eal_private.h"
 #include "eal_thread.h"
@@ -932,10 +933,27 @@ rte_eal_init(int argc, char **argv)
 	rte_eal_mp_remote_launch(sync_func, NULL, SKIP_MASTER);
 	rte_eal_mp_wait_lcore();
 
+	/* initialize services so vdevs register service during bus_probe. */
+	ret = rte_service_init();
+	if (ret) {
+		rte_eal_init_alert("rte_service_init() failed\n");
+		rte_errno = ENOEXEC;
+		return -1;
+	}
+
 	/* Probe all the buses and devices/drivers on them */
 	if (rte_bus_probe()) {
 		rte_eal_init_alert("Cannot probe devices\n");
 		rte_errno = ENOTSUP;
+		return -1;
+	}
+
+	/* initialize default service/lcore mappings and start running. Ignore
+	 * -ENOTSUP, as it indicates no service coremask passed to EAL.
+	 */
+	ret = rte_service_start_with_defaults();
+	if (ret < 0 && ret != -ENOTSUP) {
+		rte_errno = ENOEXEC;
 		return -1;
 	}
 
