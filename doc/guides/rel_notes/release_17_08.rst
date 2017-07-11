@@ -59,6 +59,14 @@ New Features
     RAW pattern items with QUEUE actions. There are four
     type of filter support for this feature on igb.
 
+* **Added Service Core functionality.**
+
+  The service core functionality added to EAL allows DPDK to run services such
+  as SW PMDs on lcores without the application manually running them. The
+  service core infrastructure allows flexibility of running multiple services
+  on the same service lcore, and provides the application with powerful APIs to
+  configure the mapping from service lcores to services.
+
 * **Added Generic Flow API support to enic.**
 
   Flow API support for outer Ethernet, VLAN, IPv4, IPv6, UDP, TCP, SCTP, VxLAN
