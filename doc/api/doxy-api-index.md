@@ -160,6 +160,7 @@ There are many libraries, so their headers may be grouped by topics:
   [common]             (@ref rte_common.h),
   [ABI compat]         (@ref rte_compat.h),
   [keepalive]          (@ref rte_keepalive.h),
+  [service cores]      (@ref rte_service.h),
   [device metrics]     (@ref rte_metrics.h),
   [bitrate statistics] (@ref rte_bitrate.h),
   [latency statistics] (@ref rte_latencystats.h),
