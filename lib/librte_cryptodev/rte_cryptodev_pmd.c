@@ -75,35 +75,6 @@ rte_cryptodev_vdev_parse_integer_arg(const char *key __rte_unused,
 	return 0;
 }
 
-struct rte_cryptodev *
-rte_cryptodev_vdev_pmd_init(const char *name, size_t dev_private_size,
-		int socket_id, struct rte_vdev_device *vdev)
-{
-	struct rte_cryptodev *cryptodev;
-
-	/* allocate device structure */
-	cryptodev = rte_cryptodev_pmd_allocate(name, socket_id);
-	if (cryptodev == NULL)
-		return NULL;
-
-	/* allocate private device structure */
-	if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
-		cryptodev->data->dev_private =
-				rte_zmalloc_socket("cryptodev device private",
-						dev_private_size,
-						RTE_CACHE_LINE_SIZE,
-						socket_id);
-
-		if (cryptodev->data->dev_private == NULL)
-			rte_panic("Cannot allocate memzone for private device"
-					" data");
-	}
-
-	cryptodev->device = &vdev->device;
-
-	return cryptodev;
-}
-
 int
 rte_cryptodev_vdev_parse_init_params(struct rte_crypto_vdev_init_params *params,
 		const char *input_args)

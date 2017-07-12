@@ -78,9 +78,34 @@ struct rte_crypto_vdev_init_params {
  *   - Cryptodev pointer if device is successfully created.
  *   - NULL if device cannot be created.
  */
-struct rte_cryptodev *
+static inline struct rte_cryptodev *
 rte_cryptodev_vdev_pmd_init(const char *name, size_t dev_private_size,
-		int socket_id, struct rte_vdev_device *vdev);
+		int socket_id, struct rte_vdev_device *dev)
+{
+	struct rte_cryptodev *cryptodev;
+
+	/* allocate device structure */
+	cryptodev = rte_cryptodev_pmd_allocate(name, socket_id);
+	if (cryptodev == NULL)
+		return NULL;
+
+	/* allocate private device structure */
+	if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+		cryptodev->data->dev_private =
+				rte_zmalloc_socket("cryptodev device private",
+						dev_private_size,
+						RTE_CACHE_LINE_SIZE,
+						socket_id);
+
+		if (cryptodev->data->dev_private == NULL)
+			rte_panic("Cannot allocate memzone for private device"
+					" data");
+	}
+
+	cryptodev->device = &dev->device;
+
+	return cryptodev;
+}
 
 /**
  * @internal
