@@ -186,6 +186,7 @@ The following are the appication command-line options:
            crypto_snow3g
            crypto_kasumi
            crypto_zuc
+           crypto_dpaa2_sec
 
 * ``--optype <name>``
 
