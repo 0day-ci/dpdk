@@ -54,6 +54,10 @@ Deprecation Notices
   Target release for removal of the legacy API will be defined once most
   PMDs have switched to rte_flow.
 
+* ABI/API changes are planned for 17.11 in the "rte_eth_dev_data" structure.
+  Change the definition of port_id from 8bits to 16bits in order to support
+  more than 256 devices in DPDK.
+
 * librte_table: The ``key_mask`` parameter will be added to all the hash tables
   that currently do not have it, as well as to the hash compute function prototype.
   The non-"do-sig" versions of the hash tables will be removed
