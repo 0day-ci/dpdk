@@ -30,56 +30,60 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _RTE_CRYPTODEV_VDEV_H_
-#define _RTE_CRYPTODEV_VDEV_H_
+#ifndef _RTE_CRYPTODEV_VDEV_PARAMS_H_
+#define _RTE_CRYPTODEV_VDEV_PARAMS_H_
 
-#include <rte_vdev.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <inttypes.h>
 
-#include "rte_cryptodev_pmd.h"
-#include "rte_cryptodev_vdev_params.h"
+#include "rte_cryptodev.h"
+
+#define RTE_CRYPTODEV_VDEV_DEFAULT_MAX_NB_QUEUE_PAIRS	8
+#define RTE_CRYPTODEV_VDEV_DEFAULT_MAX_NB_SESSIONS	2048
+
+#define RTE_CRYPTODEV_VDEV_NAME				("name")
+#define RTE_CRYPTODEV_VDEV_MAX_NB_QP_ARG		("max_nb_queue_pairs")
+#define RTE_CRYPTODEV_VDEV_MAX_NB_SESS_ARG		("max_nb_sessions")
+#define RTE_CRYPTODEV_VDEV_SOCKET_ID			("socket_id")
+
+static const char * const cryptodev_vdev_valid_params[] = {
+	RTE_CRYPTODEV_VDEV_NAME,
+	RTE_CRYPTODEV_VDEV_MAX_NB_QP_ARG,
+	RTE_CRYPTODEV_VDEV_MAX_NB_SESS_ARG,
+	RTE_CRYPTODEV_VDEV_SOCKET_ID
+};
 
 /**
  * @internal
- * Creates a new virtual crypto device and returns the pointer
- * to that device.
+ * Initialisation parameters for virtual crypto devices
+ */
+struct rte_crypto_vdev_init_params {
+	unsigned int max_nb_queue_pairs;
+	unsigned int max_nb_sessions;
+	uint8_t socket_id;
+	char name[RTE_CRYPTODEV_NAME_MAX_LEN];
+};
+
+/**
+ * @internal
+ * Parse virtual device initialisation parameters input arguments
  *
- * @param	name			PMD type name
- * @param	dev_private_size	Size of crypto PMDs private data
- * @param	socket_id		Socket to allocate resources on.
- * @param	vdev			Pointer to virtual device structure.
+ * @params	params		Initialisation parameters with defaults set.
+ * @params	input_args	Command line arguments
  *
  * @return
- *   - Cryptodev pointer if device is successfully created.
- *   - NULL if device cannot be created.
+ * 0 on successful parse
+ * <0 on failure to parse
  */
-static inline struct rte_cryptodev *
-rte_cryptodev_vdev_pmd_init(const char *name, size_t dev_private_size,
-		int socket_id, struct rte_vdev_device *dev)
-{
-	struct rte_cryptodev *cryptodev;
+int
+rte_cryptodev_vdev_parse_init_params(struct rte_crypto_vdev_init_params *params,
+		const char *input_args);
 
-	/* allocate device structure */
-	cryptodev = rte_cryptodev_pmd_allocate(name, socket_id);
-	if (cryptodev == NULL)
-		return NULL;
-
-	/* allocate private device structure */
-	if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
-		cryptodev->data->dev_private =
-				rte_zmalloc_socket("cryptodev device private",
-						dev_private_size,
-						RTE_CACHE_LINE_SIZE,
-						socket_id);
-
-		if (cryptodev->data->dev_private == NULL)
-			rte_panic("Cannot allocate memzone for private device"
-					" data");
-	}
-
-	cryptodev->device = &dev->device;
-
-	return cryptodev;
+#ifdef __cplusplus
 }
+#endif
 
-#endif /* _RTE_CRYPTODEV_VDEV_H_ */
+#endif /* _RTE_CRYPTODEV_VDEV_PARAMS_H_ */

@@ -32,7 +32,7 @@
 
 #include <rte_malloc.h>
 
-#include "rte_cryptodev_vdev.h"
+#include "rte_cryptodev_vdev_params.h"
 #include "rte_cryptodev_pci.h"
 #include "rte_cryptodev_pmd.h"
 
