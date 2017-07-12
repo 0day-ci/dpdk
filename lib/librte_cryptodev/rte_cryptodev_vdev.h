@@ -33,7 +33,6 @@
 #ifndef _RTE_CRYPTODEV_VDEV_H_
 #define _RTE_CRYPTODEV_VDEV_H_
 
-#include <rte_vdev.h>
 #include <inttypes.h>
 
 #include "rte_cryptodev.h"
@@ -72,15 +71,15 @@ struct rte_crypto_vdev_init_params {
  * @param	name			PMD type name
  * @param	dev_private_size	Size of crypto PMDs private data
  * @param	socket_id		Socket to allocate resources on.
- * @param	vdev			Pointer to virtual device structure.
+ * @param	dev			Pointer to device structure.
  *
  * @return
  *   - Cryptodev pointer if device is successfully created.
  *   - NULL if device cannot be created.
  */
 struct rte_cryptodev *
-rte_cryptodev_vdev_pmd_init(const char *name, size_t dev_private_size,
-		int socket_id, struct rte_vdev_device *vdev);
+rte_cryptodev_pmd_init(const char *name, size_t dev_private_size,
+		int socket_id, struct rte_device *dev);
 
 /**
  * @internal

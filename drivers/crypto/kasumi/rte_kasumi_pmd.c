@@ -592,9 +592,9 @@ cryptodev_kasumi_create(const char *name,
 	else
 		cpu_flags |= RTE_CRYPTODEV_FF_CPU_SSE;
 
-	dev = rte_cryptodev_vdev_pmd_init(init_params->name,
+	dev = rte_cryptodev_pmd_init(init_params->name,
 			sizeof(struct kasumi_private), init_params->socket_id,
-			vdev);
+			&vdev->device);
 	if (dev == NULL) {
 		KASUMI_LOG_ERR("failed to create cryptodev vdev");
 		goto init_error;

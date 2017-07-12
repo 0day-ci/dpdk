@@ -76,8 +76,8 @@ rte_cryptodev_vdev_parse_integer_arg(const char *key __rte_unused,
 }
 
 struct rte_cryptodev *
-rte_cryptodev_vdev_pmd_init(const char *name, size_t dev_private_size,
-		int socket_id, struct rte_vdev_device *vdev)
+rte_cryptodev_pmd_init(const char *name, size_t dev_private_size,
+		int socket_id, struct rte_device *dev)
 {
 	struct rte_cryptodev *cryptodev;
 
@@ -99,7 +99,7 @@ rte_cryptodev_vdev_pmd_init(const char *name, size_t dev_private_size,
 					" data");
 	}
 
-	cryptodev->device = &vdev->device;
+	cryptodev->device = dev;
 
 	/* initialise user call-back tail queue */
 	TAILQ_INIT(&(cryptodev->link_intr_cbs));

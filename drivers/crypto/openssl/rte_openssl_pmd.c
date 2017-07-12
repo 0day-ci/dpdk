@@ -1406,10 +1406,10 @@ cryptodev_openssl_create(const char *name,
 		snprintf(init_params->name, sizeof(init_params->name),
 				"%s", name);
 
-	dev = rte_cryptodev_vdev_pmd_init(init_params->name,
+	dev = rte_cryptodev_pmd_init(init_params->name,
 			sizeof(struct openssl_private),
 			init_params->socket_id,
-			vdev);
+			&vdev->device);
 	if (dev == NULL) {
 		OPENSSL_LOG_ERR("failed to create cryptodev vdev");
 		goto init_error;

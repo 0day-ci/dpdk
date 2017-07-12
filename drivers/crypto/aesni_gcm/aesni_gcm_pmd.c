@@ -529,9 +529,9 @@ aesni_gcm_create(const char *name,
 	else
 		vector_mode = RTE_AESNI_GCM_SSE;
 
-	dev = rte_cryptodev_vdev_pmd_init(init_params->name,
+	dev = rte_cryptodev_pmd_init(init_params->name,
 			sizeof(struct aesni_gcm_private), init_params->socket_id,
-			vdev);
+			&vdev->device);
 	if (dev == NULL) {
 		GCM_LOG_ERR("failed to create cryptodev vdev");
 		goto init_error;
