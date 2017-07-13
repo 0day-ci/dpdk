@@ -310,6 +310,7 @@ pci_scan_one(const char *dirname, const struct rte_pci_addr *addr)
 			dev->max_vfs = (uint16_t)tmp;
 	}
 
+#ifdef RTE_EAL_NUMA_AWARE_HUGEPAGES
 	/* get numa node, default to 0 if not present */
 	snprintf(filename, sizeof(filename), "%s/numa_node",
 		 dirname);
@@ -323,6 +324,9 @@ pci_scan_one(const char *dirname, const struct rte_pci_addr *addr)
 			"Set it 0 as default\n");
 		dev->device.numa_node = 0;
 	}
+#else
+	dev->device.numa_node = 0;
+#endif
 
 	rte_pci_device_name(addr, dev->name, sizeof(dev->name));
 	dev->device.name = dev->name;

@@ -595,6 +595,7 @@ unmap_all_hugepages_orig(struct hugepage_file *hugepg_tbl, struct hugepage_info 
         return 0;
 }
 
+#ifdef RTE_EAL_NUMA_AWARE_HUGEPAGES
 /*
  * Parse /proc/self/numa_maps to get the NUMA socket ID for each huge
  * page.
@@ -662,11 +663,9 @@ find_numasocket(struct hugepage_file *hugepg_tbl, struct hugepage_info *hpi)
 			if (hugepg_tbl[i].orig_va == va) {
 				hugepg_tbl[i].socket_id = socket_id;
 				hp_count++;
-#ifdef RTE_EAL_NUMA_AWARE_HUGEPAGES
 				RTE_LOG(DEBUG, EAL,
 					"Hugepage %s is on socket %d\n",
 					hugepg_tbl[i].filepath, socket_id);
-#endif
 			}
 		}
 	}
@@ -681,6 +680,7 @@ error:
 	fclose(f);
 	return -1;
 }
+#endif
 
 static int
 cmp_physaddr(const void *a, const void *b)
@@ -1160,13 +1160,13 @@ rte_eal_hugepage_init(void)
 				goto fail;
 			}
 		}
-
+#ifdef RTE_EAL_NUMA_AWARE_HUGEPAGES
 		if (find_numasocket(&tmp_hp[hp_offset], hpi) < 0){
 			RTE_LOG(DEBUG, EAL, "Failed to find NUMA socket for %u MB pages\n",
 					(unsigned)(hpi->hugepage_sz / 0x100000));
 			goto fail;
 		}
-
+#endif
 		qsort(&tmp_hp[hp_offset], hpi->num_pages[0],
 		      sizeof(struct hugepage_file), cmp_physaddr);
 
