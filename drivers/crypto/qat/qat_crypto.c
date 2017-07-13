@@ -1218,6 +1218,8 @@ qat_write_hw_desc_entry(struct rte_crypto_op *op, uint8_t *out_msg,
 			set_cipher_iv(ctx->auth_iv.length,
 				ctx->auth_iv.offset,
 				cipher_param, op, qat_req);
+			auth_ofs = op->sym->auth.data.offset;
+			auth_len = op->sym->auth.data.length;
 		} else {
 			auth_ofs = op->sym->auth.data.offset;
 			auth_len = op->sym->auth.data.length;
@@ -1361,12 +1363,7 @@ qat_write_hw_desc_entry(struct rte_crypto_op *op, uint8_t *out_msg,
 		}
 		/* GMAC */
 		if (!do_aead) {
-			qat_req->comn_mid.dst_length =
-				qat_req->comn_mid.src_length =
-					rte_pktmbuf_data_len(op->sym->m_src);
 			auth_param->u1.aad_adr = 0;
-			auth_param->auth_len = op->sym->auth.data.length;
-			auth_param->auth_off = op->sym->auth.data.offset;
 			auth_param->u2.aad_sz = 0;
 		}
 	}
