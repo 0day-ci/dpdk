@@ -1034,16 +1034,13 @@ priv_flow_process(struct pmd_internals *pmd,
 		if (err)
 			goto exit_item_not_supported;
 		if (flow && cur_item->convert) {
-			if (!pmd->flower_vlan_support &&
-			    cur_item->convert == tap_flow_create_vlan)
-				goto exit_item_not_supported;
 			err = cur_item->convert(items, &data);
 			if (err)
 				goto exit_item_not_supported;
 		}
 	}
 	if (flow) {
-		if (pmd->flower_vlan_support && data.vlan) {
+		if (data.vlan) {
 			nlattr_add16(&flow->msg.nh, TCA_FLOWER_KEY_ETH_TYPE,
 				     htons(ETH_P_8021Q));
 			nlattr_add16(&flow->msg.nh,
@@ -1393,10 +1390,6 @@ tap_flow_isolate(struct rte_eth_dev *dev,
 {
 	struct pmd_internals *pmd = dev->data->dev_private;
 
-	if (!pmd->flower_support)
-		return -rte_flow_error_set(
-			error, ENOTSUP, RTE_FLOW_ERROR_TYPE_UNSPECIFIED, NULL,
-			"rte_flow isolate requires TC flower kernel support");
 	if (set)
 		pmd->flow_isolate = 1;
 	else
@@ -1642,10 +1635,6 @@ tap_dev_filter_ctrl(struct rte_eth_dev *dev,
 		    enum rte_filter_op filter_op,
 		    void *arg)
 {
-	struct pmd_internals *pmd = dev->data->dev_private;
-
-	if (!pmd->flower_support)
-		return -ENOTSUP;
 	switch (filter_type) {
 	case RTE_ETH_FILTER_GENERIC:
 		if (filter_op != RTE_ETH_FILTER_GET)
