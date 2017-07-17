@@ -35,6 +35,7 @@
 #define _VIRTIO_PCI_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <rte_pci.h>
 #include <rte_ethdev.h>
@@ -253,7 +254,7 @@ struct virtio_hw {
 	uint64_t    req_guest_features;
 	uint64_t    guest_features;
 	uint32_t    max_queue_pairs;
-	uint16_t    started;
+	bool        started;
 	uint16_t	max_mtu;
 	uint16_t    vtnet_hdr_size;
 	uint8_t	    vlan_strip;
@@ -268,6 +269,7 @@ struct virtio_hw {
 	struct virtio_pci_common_cfg *common_cfg;
 	struct virtio_net_config *dev_cfg;
 	void	    *virtio_user_dev;
+	bool        opened;
 
 	struct virtqueue **vqs;
 };
