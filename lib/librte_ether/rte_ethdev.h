@@ -1113,6 +1113,9 @@ typedef int  (*eth_dev_set_link_down_t)(struct rte_eth_dev *dev);
 typedef void (*eth_dev_close_t)(struct rte_eth_dev *dev);
 /**< @internal Function used to close a configured Ethernet device. */
 
+typedef int (*eth_dev_reset_t)(struct rte_eth_dev *dev);
+/** <@internal Function used to reset a configured Ethernet device. */
+
 typedef void (*eth_promiscuous_enable_t)(struct rte_eth_dev *dev);
 /**< @internal Function used to enable the RX promiscuous mode of an Ethernet device. */
 
@@ -1433,6 +1436,7 @@ struct eth_dev_ops {
 	eth_dev_set_link_up_t      dev_set_link_up;   /**< Device link up. */
 	eth_dev_set_link_down_t    dev_set_link_down; /**< Device link down. */
 	eth_dev_close_t            dev_close;     /**< Close device. */
+	eth_dev_reset_t		   dev_reset;	  /**< Reset device. */
 	eth_link_update_t          link_update;   /**< Get device link state. */
 
 	eth_promiscuous_enable_t   promiscuous_enable; /**< Promiscuous ON. */
@@ -2136,6 +2140,35 @@ int rte_eth_dev_set_link_down(uint8_t port_id);
  *   The port identifier of the Ethernet device.
  */
 void rte_eth_dev_close(uint8_t port_id);
+
+/**
+ * Reset a Ethernet device and keep its port id.
+ *
+ * When a port has to be reset passively, the DPDK application can invoke this
+ * function. For example a PF is reset, all its VFs should also be reset.
+ * Normally, a DPDK application can invoke this function when
+ * RTE_ETH_EVENT_INTR_RESET event is detected. A DPDK application can also call
+ * this function to start an initiative port reset.
+ *
+ * When this function is called, it first stops the port and then call PMD
+ * specific dev_uninit( ) and  dev_init( ) to makes the port return to initial
+ * status in which no any Tx queue and no Rx queue are setup and the port has
+ * just be reset and not started. And the port keeps its port id after calling
+ * this function.
+ *
+ * After calling rte_eth_dev_reset( ), the application should go through
+ * rte_eth_dev_configure( ), rte_eth_rx_queue_setup( ),
+ * rte_eth_tx_queue_setup( ) and rte_eth_dev_start( ) again to restore
+ * its previous settings or to reconfigure itself with different settings.
+ *
+ * Note: to avoid unexpected behaviour, the application should stop calling Rx
+ *       and Rx function before calling rte_eth_dev_reset( ).For thread safety,
+ *       all these controlling operations had better be made in same thread.
+ *
+ * @param port_id
+ *   The port identifier of the Ethernet device.
+ */
+int rte_eth_dev_reset(uint8_t port_id);
 
 /**
  * Enable receipt in promiscuous mode for an Ethernet device.

@@ -155,6 +155,7 @@ DPDK_17.08 {
 	rte_eth_dev_adjust_nb_rx_tx_desc;
 	rte_flow_copy;
 	rte_flow_isolate;
+	rte_eth_dev_reset;
 	rte_tm_capabilities_get;
 	rte_tm_get_leaf_nodes;
 	rte_tm_hierarchy_commit;
