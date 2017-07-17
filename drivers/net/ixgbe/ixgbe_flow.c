@@ -488,9 +488,7 @@ ixgbe_parse_ntuple_filter(struct rte_eth_dev *dev,
 		return -rte_errno;
 	}
 
-	if (filter->queue >= IXGBE_MAX_RX_QUEUE_NUM ||
-		filter->priority > IXGBE_5TUPLE_MAX_PRI ||
-		filter->priority < IXGBE_5TUPLE_MIN_PRI)
+	if (filter->queue >= dev->data->nb_rx_queues)
 		return -rte_errno;
 
 	/* fixed value for ixgbe */
@@ -707,7 +705,7 @@ ixgbe_parse_ethertype_filter(struct rte_eth_dev *dev,
 		return -rte_errno;
 	}
 
-	if (filter->queue >= IXGBE_MAX_RX_QUEUE_NUM) {
+	if (filter->queue >= dev->data->nb_rx_queues) {
 		memset(filter, 0, sizeof(struct rte_eth_ethertype_filter));
 		rte_flow_error_set(error, EINVAL,
 			RTE_FLOW_ERROR_TYPE_ITEM,
@@ -984,6 +982,9 @@ ixgbe_parse_syn_filter(struct rte_eth_dev *dev,
 	ret = cons_parse_syn_filter(attr, pattern,
 					actions, filter, error);
 
+	if (filter->queue >= dev->data->nb_rx_queues)
+		return -rte_errno;
+
 	if (ret)
 		return ret;
 
@@ -1176,6 +1177,9 @@ ixgbe_parse_l2_tn_filter(struct rte_eth_dev *dev,
 			NULL, "Not supported by L2 tunnel filter");
 		return -rte_errno;
 	}
+
+	if (filter->queue >= dev->data->nb_rx_queues)
+		return -rte_errno;
 
 	return ret;
 }
@@ -2542,6 +2546,10 @@ step_next:
 	if (fdir_mode == RTE_FDIR_MODE_NONE ||
 	    fdir_mode != rule->mode)
 		return -ENOTSUP;
+
+	if (rule->queue >= dev->data->nb_rx_queues)
+		return -ENOTSUP;
+
 	return ret;
 }
 
