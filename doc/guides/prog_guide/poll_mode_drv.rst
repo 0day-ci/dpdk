@@ -525,3 +525,43 @@ call. As an end result, the application is able to achieve its goal of
 monitoring a single statistic ("rx_errors" in this case), and if that shows
 packets being dropped, it can easily retrieve a "set" of statistics using the
 IDs array parameter to ``rte_eth_xstats_get_by_id`` function.
+
+NIC Reset API
+~~~~~~~~~~~~~
+
+.. code-block:: c
+
+    int rte_eth_dev_reset(uint8_t port_id);
+
+Sometimes a port have to be reset passively. For example a PF is reset, all its
+VFs should also be reset by application itself to align with the PF. A DPDK
+application also can call this function to trigger an initative port reset.
+
+Normally, a DPDK application can invake this function when
+RTE_ETH_EVENT_INTR_RESET event is detected.
+
+It is duty of PMD to trigger RTE_ETH_EVENT_INTR_RESET event and application
+should also register some callback function to handle this event.
+When PMD needs to trigger a reset, it can trigger RTE_ETH_EVENT_INTR_RESET.
+On the received event of RTE_ETH_EVENT_INTR_RESET, application can begin to
+handle it:  stop working queues,  make rx and tx function not be called and
+then call rte_eth_dev_reset( ).For thread safety, all these controlling
+operations had better be made in same thread.
+
+For example, when PF is reset, PF send a message to notify VF this event and
+also trigger an interrupt to VF.  And then in the interrupt service routine
+DPDK VF detect this notification message and calls
+_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_RESET, NULL, NULL).
+So it means that PF reset trigger RTE_ETH_EVENT_INTR_RESET event in VF.
+The function _rte_eth_dev_callback_process( ) will call the registered
+callback function. The callback function can trigger application to handle
+all operations of VF reset including something like stopping working Rx/Tx
+queues and call this rte_eth_dev_reset().
+
+The rte_eth_dev_reset( ) itself is generic function which only does some HW
+reset operations through calling dev_unint() and dev_init(). And itself doesn't
+handle above synchronization which is handled by application.
+
+PMD itself should not call rte_eth_dev_reset( ). PMD can trigger application to
+handle reset event. It is duty of application to handle all synchronization
+befort it calls rte_eth_dev_reset( ).
