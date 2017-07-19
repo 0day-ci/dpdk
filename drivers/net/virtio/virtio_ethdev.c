@@ -1688,6 +1688,13 @@ virtio_dev_configure(struct rte_eth_dev *dev)
 		return -ENOTSUP;
 	}
 
+	if (dev->data->dev_conf.intr_conf.rxq) {
+		if (virtio_configure_intr(dev) < 0) {
+			PMD_DRV_LOG(ERR, "failed to configure interrupt");
+			return -ENOTSUP;
+		}
+	}
+
 	if (dev->data->dev_flags & RTE_ETH_DEV_INTR_LSC)
 		/* Enable vector (0) for Link State Intrerrupt */
 		if (VTPCI_OPS(hw)->set_config_irq(hw, 0) ==
