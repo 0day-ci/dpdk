@@ -185,5 +185,6 @@ DPDK_17.08 {
 	rte_tm_shared_wred_context_delete;
 	rte_tm_wred_profile_add;
 	rte_tm_wred_profile_delete;
+	rte_eth_dev_get_preferred_pool_ops;
 
 } DPDK_17.05;

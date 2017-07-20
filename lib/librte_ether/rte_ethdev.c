@@ -3415,3 +3415,21 @@ rte_eth_dev_adjust_nb_rx_tx_desc(uint8_t port_id,
 
 	return 0;
 }
+
+int
+rte_eth_dev_get_preferred_pool_ops(uint8_t port_id, char *pool)
+{
+	struct rte_eth_dev *dev;
+	const char *tmp;
+
+	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -ENODEV);
+
+	dev = &rte_eth_devices[port_id];
+
+	if (*dev->dev_ops->get_preferred_pool_ops == NULL) {
+		tmp = rte_eal_mbuf_default_mempool_ops();
+		snprintf(pool, RTE_MBUF_POOL_OPS_NAMESIZE, "%s", tmp);
+		return 0;
+	}
+	return (*dev->dev_ops->get_preferred_pool_ops)(dev, pool);
+}

@@ -1421,6 +1421,10 @@ typedef int (*eth_get_dcb_info)(struct rte_eth_dev *dev,
 				 struct rte_eth_dcb_info *dcb_info);
 /**< @internal Get dcb information on an Ethernet device */
 
+typedef int (*eth_get_preferred_pool_ops_t)(struct rte_eth_dev *dev,
+						char *pool);
+/**< @internal Get preferred pool handle for port */
+
 /**
  * @internal A structure containing the functions exported by an Ethernet driver.
  */
@@ -1540,6 +1544,8 @@ struct eth_dev_ops {
 
 	eth_tm_ops_get_t tm_ops_get;
 	/**< Get Traffic Management (TM) operations. */
+	eth_get_preferred_pool_ops_t get_preferred_pool_ops;
+	/**< Get preferred pool handle for port */
 };
 
 /**
@@ -4426,6 +4432,21 @@ rte_eth_dev_get_name_by_port(uint8_t port_id, char *name);
 int rte_eth_dev_adjust_nb_rx_tx_desc(uint8_t port_id,
 				     uint16_t *nb_rx_desc,
 				     uint16_t *nb_tx_desc);
+
+/**
+ * Get preferred pool handle for port
+ *
+ * @param port_id
+ *   port identifier of the device
+ * @param [out] pool
+ *   Preferred pool handle for this port.
+ *   Maximum length of preferred pool handle is RTE_MBUF_POOL_OPS_NAMESIZE.
+ * @return
+ *   - (0) if successful.
+ *   - (-ENOTSUP, -ENODEV or -EINVAL) on failure.
+ */
+int
+rte_eth_dev_get_preferred_pool_ops(uint8_t port_id, char *pool);
 
 #ifdef __cplusplus
 }
