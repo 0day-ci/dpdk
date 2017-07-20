@@ -83,6 +83,8 @@ enum {
 	OPT_VMWARE_TSC_MAP_NUM,
 #define OPT_XEN_DOM0          "xen-dom0"
 	OPT_XEN_DOM0_NUM,
+#define OPT_MBUF_POOL_OPS       "mbuf-pool-ops"
+	OPT_MBUF_POOL_OPS_NUM,
 	OPT_LONG_MAX_NUM
 };
 

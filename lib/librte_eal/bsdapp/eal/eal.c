@@ -112,6 +112,13 @@ struct internal_config internal_config;
 /* used by rte_rdtsc() */
 int rte_cycles_vmware_tsc_map;
 
+/* Return mbuf pool name */
+const char *
+rte_eal_mbuf_default_mempool_ops(void)
+{
+	return internal_config.mbuf_pool_name;
+}
+
 /* Return a pointer to the configuration structure */
 struct rte_config *
 rte_eal_get_configuration(void)
@@ -385,6 +392,16 @@ eal_parse_args(int argc, char **argv)
 			continue;
 
 		switch (opt) {
+		case OPT_MBUF_POOL_OPS_NUM:
+			ret = snprintf(internal_config.mbuf_pool_name,
+					sizeof(internal_config.mbuf_pool_name),
+					"%s", optarg);
+			if (ret < 0 || (uint32_t)ret >=
+			    sizeof(internal_config.mbuf_pool_name)) {
+				ret = -1;
+				goto out;
+			}
+			break;
 		case 'h':
 			eal_usage(prgname);
 			exit(EXIT_SUCCESS);

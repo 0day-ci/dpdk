@@ -96,6 +96,7 @@ eal_long_options[] = {
 	{OPT_VFIO_INTR,         1, NULL, OPT_VFIO_INTR_NUM        },
 	{OPT_VMWARE_TSC_MAP,    0, NULL, OPT_VMWARE_TSC_MAP_NUM   },
 	{OPT_XEN_DOM0,          0, NULL, OPT_XEN_DOM0_NUM         },
+	{OPT_MBUF_POOL_OPS,     1, NULL, OPT_MBUF_POOL_OPS_NUM},
 	{0,                     0, NULL, 0                        }
 };
 
@@ -162,6 +163,9 @@ eal_reset_internal_config(struct internal_config *internal_cfg)
 #endif
 	internal_cfg->vmware_tsc_map = 0;
 	internal_cfg->create_uio_dev = 0;
+	snprintf(internal_cfg->mbuf_pool_name,
+		 sizeof(internal_cfg->mbuf_pool_name), "%s",
+		 RTE_MBUF_DEFAULT_MEMPOOL_OPS);
 }
 
 static int
@@ -1165,5 +1169,6 @@ eal_common_usage(void)
 	       "  --"OPT_NO_PCI"            Disable PCI\n"
 	       "  --"OPT_NO_HPET"           Disable HPET\n"
 	       "  --"OPT_NO_SHCONF"         No shared config (mmap'd files)\n"
+	       "  --"OPT_MBUF_POOL_OPS"     Pool ops name for mbuf to use\n"
 	       "\n", RTE_MAX_LCORE);
 }

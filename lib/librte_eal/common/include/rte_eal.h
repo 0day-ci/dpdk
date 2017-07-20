@@ -54,6 +54,8 @@ extern "C" {
 
 /* Maximum thread_name length. */
 #define RTE_MAX_THREAD_NAME_LEN 16
+/* Maximum length of mbuf pool ops name. */
+#define RTE_MBUF_POOL_OPS_NAMESIZE 32
 
 /**
  * The lcore role (used in RTE or not).
@@ -286,6 +288,15 @@ static inline int rte_gettid(void)
 		RTE_PER_LCORE(_thread_id) = rte_sys_gettid();
 	return RTE_PER_LCORE(_thread_id);
 }
+
+/**
+ * Ops to get default pool name for mbuf
+ *
+ * @return
+ *   returns default pool name.
+ */
+const char *
+rte_eal_mbuf_default_mempool_ops(void);
 
 #define RTE_INIT(func) \
 static void __attribute__((constructor, used)) func(void)

@@ -200,6 +200,7 @@ DPDK_17.08 {
 	rte_bus_find;
 	rte_bus_find_by_device;
 	rte_bus_find_by_name;
+	rte_eal_mbuf_default_mempool_ops;
 
 } DPDK_17.05;
 

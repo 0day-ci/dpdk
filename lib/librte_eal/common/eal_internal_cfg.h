@@ -83,6 +83,7 @@ struct internal_config {
 	const char *hugefile_prefix;      /**< the base filename of hugetlbfs files */
 	const char *hugepage_dir;         /**< specific hugetlbfs directory to use */
 
+	char mbuf_pool_name[RTE_MBUF_POOL_OPS_NAMESIZE]; /**< mbuf pool name */
 	unsigned num_hugepage_sizes;      /**< how many sizes on this system */
 	struct hugepage_info hugepage_info[MAX_HUGEPAGE_SIZES];
 };
