@@ -177,6 +177,11 @@ New Features
   to verify functionality and measure the performance parameters of DPDK
   eventdev devices.
 
+* **Added NXP DPAA2 Eventdev PMD.**
+
+  Added the new dpaa2 eventdev driver for NXP DPAA2 devices. See the
+  "Event Device Drivers" document for more details on this new driver.
+
 
 Resolved Issues
 ---------------
