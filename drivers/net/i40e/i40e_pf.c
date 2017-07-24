@@ -267,8 +267,12 @@ i40e_pf_host_send_msg_to_vf(struct i40e_pf_vf *vf,
 	ret = i40e_aq_send_msg_to_vf(hw, abs_vf_id, opcode, retval,
 						msg, msglen, NULL);
 	if (ret) {
-		PMD_INIT_LOG(ERR, "Fail to send message to VF, err %u",
-			     hw->aq.asq_last_status);
+		if (vf->state == I40E_VF_INACTIVE)
+			PMD_DRV_LOG(WARNING, "Warning! VF %u is inactive now!",
+				abs_vf_id);
+		else
+			PMD_INIT_LOG(ERR, "Fail to send message to VF, err %u",
+				hw->aq.asq_last_status);
 	}
 
 	return ret;
