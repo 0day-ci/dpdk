@@ -609,21 +609,26 @@ rte_event_queue_setup(uint8_t dev_id, uint8_t queue_id,
 	return (*dev->dev_ops->queue_setup)(dev, queue_id, queue_conf);
 }
 
-uint8_t
+int16_t
 rte_event_queue_count(uint8_t dev_id)
 {
 	struct rte_eventdev *dev;
+	RTE_EVENTDEV_VALID_DEVID_OR_ERR_RET(dev_id, -EINVAL);
 
 	dev = &rte_eventdevs[dev_id];
 	return dev->data->nb_queues;
 }
 
-uint8_t
+int16_t
 rte_event_queue_priority(uint8_t dev_id, uint8_t queue_id)
 {
-	struct rte_eventdev *dev;
+	struct rte_eventdev *dev = &rte_eventdevs[dev_id];
+	RTE_EVENTDEV_VALID_DEVID_OR_ERR_RET(dev_id, -EINVAL);
+	if (!is_valid_queue(dev, queue_id)) {
+		RTE_EDEV_LOG_ERR("Invalid queue_id=%" PRIu8, queue_id);
+		return -EINVAL;
+	}
 
-	dev = &rte_eventdevs[dev_id];
 	if (dev->data->event_dev_cap & RTE_EVENT_DEV_CAP_QUEUE_QOS)
 		return dev->data->queues_prio[queue_id];
 	else
@@ -743,28 +748,37 @@ rte_event_port_setup(uint8_t dev_id, uint8_t port_id,
 	return 0;
 }
 
-uint8_t
+int16_t
 rte_event_port_dequeue_depth(uint8_t dev_id, uint8_t port_id)
 {
-	struct rte_eventdev *dev;
+	RTE_EVENTDEV_VALID_DEVID_OR_ERR_RET(dev_id, -EINVAL);
+	struct rte_eventdev *dev = &rte_eventdevs[dev_id];
+	if (!is_valid_port(dev, port_id)) {
+		RTE_EDEV_LOG_ERR("Invalid port_id=%" PRIu8, port_id);
+		return -EINVAL;
+	}
 
-	dev = &rte_eventdevs[dev_id];
 	return dev->data->ports_dequeue_depth[port_id];
 }
 
-uint8_t
+int16_t
 rte_event_port_enqueue_depth(uint8_t dev_id, uint8_t port_id)
 {
-	struct rte_eventdev *dev;
+	RTE_EVENTDEV_VALID_DEVID_OR_ERR_RET(dev_id, -EINVAL);
+	struct rte_eventdev *dev = &rte_eventdevs[dev_id];
+	if (!is_valid_port(dev, port_id)) {
+		RTE_EDEV_LOG_ERR("Invalid port_id=%" PRIu8, port_id);
+		return -EINVAL;
+	}
 
-	dev = &rte_eventdevs[dev_id];
 	return dev->data->ports_enqueue_depth[port_id];
 }
 
-uint8_t
+int16_t
 rte_event_port_count(uint8_t dev_id)
 {
 	struct rte_eventdev *dev;
+	RTE_EVENTDEV_VALID_DEVID_OR_ERR_RET(dev_id, -EINVAL);
 
 	dev = &rte_eventdevs[dev_id];
 	return dev->data->nb_ports;

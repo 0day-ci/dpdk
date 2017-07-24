@@ -591,7 +591,7 @@ wait_workers_to_join(int lcore, const rte_atomic32_t *count)
 static inline int
 launch_workers_and_wait(int (*master_worker)(void *),
 			int (*slave_workers)(void *), uint32_t total_events,
-			uint8_t nb_workers, uint8_t sched_type)
+			int16_t nb_workers, uint8_t sched_type)
 {
 	uint8_t port = 0;
 	int w_lcore;
@@ -651,14 +651,15 @@ static int
 test_multi_queue_enq_multi_port_deq(void)
 {
 	const unsigned int total_events = MAX_EVENTS;
-	uint8_t nr_ports;
+	int16_t nr_ports;
 	int ret;
 
 	ret = generate_random_events(total_events);
 	if (ret)
 		return TEST_FAILED;
 
-	nr_ports = RTE_MIN(rte_event_port_count(evdev), rte_lcore_count() - 1);
+	nr_ports = RTE_MIN(rte_event_port_count(evdev),
+			(int)rte_lcore_count() - 1);
 
 	if (!nr_ports) {
 		printf("%s: Not enough ports=%d or workers=%d\n", __func__,
@@ -698,7 +699,7 @@ test_queue_to_port_single_link(void)
 	}
 
 	nr_links = RTE_MIN(rte_event_port_count(evdev),
-				rte_event_queue_count(evdev));
+				(int)rte_event_queue_count(evdev));
 	const unsigned int total_events = MAX_EVENTS / nr_links;
 
 	/* Link queue x to port x and inject events to queue x through port x */
@@ -750,7 +751,8 @@ static int
 test_queue_to_port_multi_link(void)
 {
 	int ret, port0_events = 0, port1_events = 0;
-	uint8_t nr_queues, nr_ports, queue, port;
+	int16_t nr_queues, nr_ports, port;
+	uint8_t queue;
 
 	nr_queues = rte_event_queue_count(evdev);
 	nr_ports = rte_event_port_count(evdev);
@@ -854,10 +856,11 @@ test_multiport_flow_sched_type_test(uint8_t in_sched_type,
 			uint8_t out_sched_type)
 {
 	const unsigned int total_events = MAX_EVENTS;
-	uint8_t nr_ports;
+	int16_t nr_ports;
 	int ret;
 
-	nr_ports = RTE_MIN(rte_event_port_count(evdev), rte_lcore_count() - 1);
+	nr_ports = RTE_MIN(rte_event_port_count(evdev),
+			(int)rte_lcore_count() - 1);
 
 	if (!nr_ports) {
 		printf("%s: Not enough ports=%d or workers=%d\n", __func__,
@@ -1007,10 +1010,11 @@ test_multiport_queue_sched_type_test(uint8_t in_sched_type,
 			uint8_t out_sched_type)
 {
 	const unsigned int total_events = MAX_EVENTS;
-	uint8_t nr_ports;
+	int16_t nr_ports;
 	int ret;
 
-	nr_ports = RTE_MIN(rte_event_port_count(evdev), rte_lcore_count() - 1);
+	nr_ports = RTE_MIN(rte_event_port_count(evdev),
+			(int)rte_lcore_count() - 1);
 
 	if (rte_event_queue_count(evdev) < 2 ||  !nr_ports) {
 		printf("%s: Not enough queues=%d ports=%d or workers=%d\n",
@@ -1142,10 +1146,11 @@ worker_flow_based_pipeline_max_stages_rand_sched_type(void *arg)
 static int
 launch_multi_port_max_stages_random_sched_type(int (*fn)(void *))
 {
-	uint8_t nr_ports;
+	int16_t nr_ports;
 	int ret;
 
-	nr_ports = RTE_MIN(rte_event_port_count(evdev), rte_lcore_count() - 1);
+	nr_ports = RTE_MIN(rte_event_port_count(evdev),
+			(int)rte_lcore_count() - 1);
 
 	if (!nr_ports) {
 		printf("%s: Not enough ports=%d or workers=%d\n", __func__,
@@ -1288,9 +1293,10 @@ worker_ordered_flow_producer(void *arg)
 static inline int
 test_producer_consumer_ingress_order_test(int (*fn)(void *))
 {
-	uint8_t nr_ports;
+	int16_t nr_ports;
 
-	nr_ports = RTE_MIN(rte_event_port_count(evdev), rte_lcore_count() - 1);
+	nr_ports = RTE_MIN(rte_event_port_count(evdev),
+			(int)rte_lcore_count() - 1);
 
 	if (rte_lcore_count() < 3 || nr_ports < 2) {
 		printf("### Not enough cores for %s test.\n", __func__);

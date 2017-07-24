@@ -611,10 +611,10 @@ rte_event_queue_setup(uint8_t dev_id, uint8_t queue_id,
  *
  * @param dev_id
  *   Event device identifier.
- * @return
- *   - The number of configured event queues
+ * @retval Positive The number of configured event queues
+ * @retval -EINVAL Invalid device id
  */
-uint8_t
+int16_t
 rte_event_queue_count(uint8_t dev_id);
 
 /**
@@ -624,13 +624,13 @@ rte_event_queue_count(uint8_t dev_id);
  *   Event device identifier.
  * @param queue_id
  *   Event queue identifier.
- * @return
- *   - If the device has RTE_EVENT_DEV_CAP_QUEUE_QOS capability then the
- *    configured priority of the event queue in
- *    [RTE_EVENT_DEV_PRIORITY_HIGHEST, RTE_EVENT_DEV_PRIORITY_LOWEST] range
- *    else the value RTE_EVENT_DEV_PRIORITY_NORMAL
+ * @retval Positive If the device has RTE_EVENT_DEV_CAP_QUEUE_QOS capability
+ *         then the configured priority of the event queue in
+ *         [RTE_EVENT_DEV_PRIORITY_HIGHEST, RTE_EVENT_DEV_PRIORITY_LOWEST]
+ *         range else the value RTE_EVENT_DEV_PRIORITY_NORMAL
+ * @retval -EINVAL Invalid device id or queue id
  */
-uint8_t
+int16_t
 rte_event_queue_priority(uint8_t dev_id, uint8_t queue_id);
 
 /* Event port specific APIs */
@@ -722,12 +722,12 @@ rte_event_port_setup(uint8_t dev_id, uint8_t port_id,
  *   Event device identifier.
  * @param port_id
  *   Event port identifier.
- * @return
- *   - The number of configured dequeue queue depth
+ * @retval Positive The dequeue queue depth
+ * @retval -EINVAL Invalid device ID or port ID
  *
  * @see rte_event_dequeue_burst()
  */
-uint8_t
+int16_t
 rte_event_port_dequeue_depth(uint8_t dev_id, uint8_t port_id);
 
 /**
@@ -738,12 +738,12 @@ rte_event_port_dequeue_depth(uint8_t dev_id, uint8_t port_id);
  *   Event device identifier.
  * @param port_id
  *   Event port identifier.
- * @return
- *   - The number of configured enqueue queue depth
+ * @retval Positive The enqueue queue depth
+ * @retval -EINVAL Invalid device ID or port ID
  *
  * @see rte_event_enqueue_burst()
  */
-uint8_t
+int16_t
 rte_event_port_enqueue_depth(uint8_t dev_id, uint8_t port_id);
 
 /**
@@ -751,10 +751,10 @@ rte_event_port_enqueue_depth(uint8_t dev_id, uint8_t port_id);
  *
  * @param dev_id
  *   Event device identifier.
- * @return
- *   - The number of configured ports
+ * @retval Positive The number of configured ports
+ * @retval -EINVAL Invalid device id
  */
-uint8_t
+int16_t
 rte_event_port_count(uint8_t dev_id);
 
 /**
