@@ -1,5 +1,6 @@
 ..  BSD LICENSE
     Copyright 2012-2015 6WIND S.A.
+    Copyright 2015 Mellanox.
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -76,6 +77,7 @@ Compiling librte_pmd_mlx4 causes DPDK to be linked against libibverbs.
 Features
 --------
 
+- Multi arch support: x86 and Power8.
 - RSS, also known as RCA, is supported. In this mode the number of
   configured RX queues must be a power of two.
 - VLAN filtering is supported.
@@ -87,16 +89,7 @@ Features
 - Inner L3/L4 (IP, TCP and UDP) TX/RX checksum offloading and validation.
 - Outer L3 (IP) TX/RX checksum offloading and validation for VXLAN frames.
 - Secondary process TX is supported.
-
-Limitations
------------
-
-- RSS hash key cannot be modified.
-- RSS RETA cannot be configured
-- RSS always includes L3 (IPv4/IPv6) and L4 (UDP/TCP). They cannot be
-  dissociated.
-- Hardware counters are not implemented (they are software counters).
-- Secondary process RX is not supported.
+- Rx interrupts.
 
 Configuration
 -------------
@@ -244,8 +237,8 @@ DPDK and must be installed separately:
 
 Currently supported by DPDK:
 
-- Mellanox OFED **4.0-2.0.0.0**.
-- Firmware version **2.40.7000**.
+- Mellanox OFED **4.1**.
+- Firmware version **2.36.5000** and above.
 - Supported architectures:  **x86_64** and **POWER8**.
 
 Getting Mellanox OFED
@@ -272,6 +265,150 @@ Supported NICs
 --------------
 
 * Mellanox(R) ConnectX(R)-3 Pro 40G MCX354A-FCC_Ax (2*40G)
+
+Quick Start guide
+------------------
+
+1. Download latest Mellanox OFED. For more info check the  `prerequisites`_.
+
+2. Install the required libraries and kernel modules either by installing
+   only the required set, or by installing the entire Mellanox OFED:
+
+   For Bare metal use:
+
+   .. code-block:: console
+
+        ./mlnxofedinstall
+
+   For SR-IOV Hypervisors use:
+
+   .. code-block:: console
+
+        ./mlnxofedinstall --enable-sriov -hypervisor
+
+   For SR-IOV Virtual machine use:
+
+   .. code-block:: console
+
+        ./mlnxofedinstall --guest
+
+3. Verify the firmware is the correct one:
+
+   .. code-block:: console
+
+        ibv_devinfo
+
+4. Set all ports links to ethernet, follow instruction on the screen:
+
+   .. code-block:: console
+
+        connectx_port_config
+
+5. In case of bare metal or Hypervisor, config the optimized steering mode
+   by adding the following line to ``/etc/modprobe.d/mlx4_core.conf``:
+
+   .. code-block:: console
+
+        options mlx4_core log_num_mgm_entry_size=-7
+
+   .. note::
+
+        If VLAN filtering is used, set log_num_mgm_entry_size=-1.
+        Performance degradation can occur on this case
+
+6. Restart the driver:
+
+   .. code-block:: console
+
+        /etc/init.d/openibd restart
+   or:
+
+   .. code-block:: console
+
+        service openibd restart
+
+7. Enable MLX4 PMD on the ``.config`` file:
+
+    .. code-block:: console
+
+        CONFIG_RTE_LIBRTE_MLX4_PMD=y
+
+8. Compile DPDK and you are ready to go:
+
+    .. code-block:: console
+
+        make config T=<cpu arch, compiler, ..>
+        make
+
+
+Limitations and known issues
+----------------------------
+
+- RSS hash key cannot be modified.
+- RSS RETA cannot be configured
+- RSS always includes L3 (IPv4/IPv6) and L4 (UDP/TCP). They cannot be
+  dissociated.
+- Hardware counters are not implemented (they are software counters).
+- Secondary process RX is not supported.
+
+Performance tunning
+-------------------
+
+1. Verify the optimized steering mode is configured
+
+  .. code-block:: console
+
+        cat /sys/module/mlx4_core/parameters/log_num_mgm_entry_size
+
+2. Use environment variable MLX4_INLINE_RECV_SIZE=64 to get maximum
+   performance for 64B messages.
+
+3. Use the CPU near local NUMA node to which the PCIe adapter is connected,
+   for better performance. For Virtual Machines (VM), verify that the right CPU
+   and NUMA node are pinned for the VM according to the above. Run
+
+   .. code-block:: console
+
+        lstopo-no-graphics
+
+   to identify the NUMA node to which the PCIe adapter is connected.
+
+4. If more than one adapter is used, and root complex capabilities enables
+   to put both adapters on the same NUMA node without PCI bandwidth degredation,
+   it is recommended to locate both adapters on the same NUMA node.
+   This in order to forward packets from one to the other without
+   NUMA performance penalty.
+
+5. Disable pause frames
+
+   .. code-block:: console
+
+        ethtool -A <netdev> rx off tx off
+
+6. Verify IO non-posted prefetch is disabled by default. This can be checked
+   via the BIOS configuration. Please contact you server provider for more
+   information about the settings.
+
+.. hint::
+
+        On Some machines, depends on the machine intergrator, it is beneficial
+        to set the PCI max read request parameter to 1K. This can be
+        done in the following way:
+
+        To query the read request size use:
+
+        .. code-block:: console
+
+                setpci -s <NIC PCI address> 68.w
+
+        If the output is different than 3XXX, set it by:
+
+        .. code-block:: console
+
+                setpci -s <NIC PCI address> 68.w=3XXX
+
+        The XXX can be different on different systems. Make sure to configure
+        according to the setpci output.
 
 Usage example
 -------------
