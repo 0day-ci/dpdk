@@ -7211,9 +7211,14 @@ static void cmd_vf_mac_addr_parsed(void *parsed_result,
 	struct cmd_vf_mac_addr_result *res = parsed_result;
 	int ret = 0;
 
-	if (strcmp(res->what, "add") == 0)
+	if (strcmp(res->what, "add") != 0)
+		return;
+
+	ret = rte_pmd_i40e_add_vf_mac_addr(res->port_num, res->vf_num,
+					   &res->address);
+	if (ret == -ENOTSUP)
 		ret = rte_eth_dev_mac_addr_add(res->port_num,
-					&res->address, res->vf_num);
+					       &res->address, res->vf_num);
 	if(ret < 0)
 		printf("vf_mac_addr_cmd error: (%s)\n", strerror(-ret));
 
