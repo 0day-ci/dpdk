@@ -3292,7 +3292,7 @@ uint8_t *
 open_ddp_package_file(const char *file_path, uint32_t *size)
 {
 	FILE *fh = fopen(file_path, "rb");
-	uint32_t pkg_size;
+	off_t pkg_size;
 	uint8_t *buf = NULL;
 	int ret = 0;
 
@@ -3312,6 +3312,12 @@ open_ddp_package_file(const char *file_path, uint32_t *size)
 	}
 
 	pkg_size = ftell(fh);
+	if (pkg_size == -1) {
+		fclose(fh);
+		printf("%s: The stream specified is not a seekable stream\n"
+				, __func__);
+		return buf;
+	}
 
 	buf = (uint8_t *)malloc(pkg_size);
 	if (!buf) {
