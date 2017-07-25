@@ -103,11 +103,6 @@ struct mlx4_flow_items {
 	const enum rte_flow_item_type *const items;
 };
 
-struct rte_flow_drop {
-	struct ibv_qp *qp; /**< Verbs queue pair. */
-	struct ibv_cq *cq; /**< Verbs completion queue. */
-};
-
 /** Valid action for this PMD. */
 static const enum rte_flow_action_type valid_actions[] = {
 	RTE_FLOW_ACTION_TYPE_DROP,
@@ -795,13 +790,9 @@ mlx4_flow_validate(struct rte_eth_dev *dev,
 static void
 mlx4_flow_destroy_drop_queue(struct priv *priv)
 {
-	if (priv->flow_drop_queue) {
-		struct rte_flow_drop *fdq = priv->flow_drop_queue;
-
-		priv->flow_drop_queue = NULL;
-		claim_zero(ibv_destroy_qp(fdq->qp));
-		claim_zero(ibv_destroy_cq(fdq->cq));
-		rte_free(fdq);
+	if (priv->flow_drop_queue.cq) {
+		claim_zero(ibv_destroy_qp(priv->flow_drop_queue.qp));
+		claim_zero(ibv_destroy_cq(priv->flow_drop_queue.cq));
 	}
 }
 
@@ -819,20 +810,14 @@ mlx4_flow_create_drop_queue(struct priv *priv)
 {
 	struct ibv_qp *qp;
 	struct ibv_cq *cq;
-	struct rte_flow_drop *fdq;
 
-	fdq = rte_calloc(__func__, 1, sizeof(*fdq), 0);
-	if (!fdq) {
-		ERROR("Cannot allocate memory for drop struct");
-		goto err;
-	}
 	cq = ibv_exp_create_cq(priv->ctx, 1, NULL, NULL, 0,
 			      &(struct ibv_exp_cq_init_attr){
 					.comp_mask = 0,
 			      });
 	if (!cq) {
 		ERROR("Cannot create drop CQ");
-		goto err_create_cq;
+		goto err;
 	}
 	qp = ibv_exp_create_qp(priv->ctx,
 			      &(struct ibv_exp_qp_init_attr){
@@ -853,16 +838,13 @@ mlx4_flow_create_drop_queue(struct priv *priv)
 		ERROR("Cannot create drop QP");
 		goto err_create_qp;
 	}
-	*fdq = (struct rte_flow_drop){
+	priv->flow_drop_queue = (struct rte_flow_drop){
 		.qp = qp,
 		.cq = cq,
 	};
-	priv->flow_drop_queue = fdq;
 	return 0;
 err_create_qp:
 	claim_zero(ibv_destroy_cq(cq));
-err_create_cq:
-	rte_free(fdq);
 err:
 	return -1;
 }
@@ -977,7 +959,7 @@ priv_flow_create_action_queue(struct priv *priv,
 		return NULL;
 	}
 	if (action->drop) {
-		qp = priv->flow_drop_queue->qp;
+		qp = priv->flow_drop_queue.qp;
 	} else {
 		int ret;
 		unsigned int i;
@@ -1305,7 +1287,7 @@ mlx4_priv_flow_start(struct priv *priv)
 	for (flow = LIST_FIRST(&priv->flows);
 	     flow;
 	     flow = LIST_NEXT(flow, next)) {
-		qp = flow->qp ? flow->qp : priv->flow_drop_queue->qp;
+		qp = flow->qp ? flow->qp : priv->flow_drop_queue.qp;
 		flow->ibv_flow = ibv_create_flow(qp, flow->ibv_attr);
 		if (!flow->ibv_flow) {
 			DEBUG("Flow %p cannot be applied", (void *)flow);
