@@ -173,6 +173,10 @@ priv_get_ifname(const struct priv *priv, char (*ifname)[IF_NAMESIZE])
 	char match[IF_NAMESIZE] = "";
 
 	{
+		if (priv->ctx == NULL) {
+			DEBUG("The device is closed, cannot query interface name ");
+			return -1;
+		}
 		MKSTR(path, "%s/device/net", priv->ctx->device->ibdev_path);
 
 		dir = opendir(path);
