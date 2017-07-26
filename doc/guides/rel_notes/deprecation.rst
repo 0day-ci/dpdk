@@ -64,3 +64,9 @@ Deprecation Notices
   be removed in 17.11:
 
   - ``rte_eal_parse_devargs_str``, replaced by ``rte_eal_devargs_parse``
+
+* ethdev: The device flag advertizing hotplug capability
+  ``RTE_ETH_DEV_DETACHABLE`` is not needed anymore and will be removed in
+  v17.11. Drivers must fullfill any condition set by their bus and the latter
+  will be able to recognize this capability by checking those upon a detach
+  attempt.
