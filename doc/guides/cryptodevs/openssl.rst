@@ -88,6 +88,10 @@ sudo apt-get install libc6-dev-i386 (for i686-native-linuxapp-gcc target)
 This code was also verified on Fedora 24.
 This code was NOT yet verified on FreeBSD.
 
+In case openssl is cross compiled, openssl can be installed separately
+and path for openssl install directory can be given as
+export OPENSSL_PATH=<openssl install dir>
+
 Initialization
 --------------
 
