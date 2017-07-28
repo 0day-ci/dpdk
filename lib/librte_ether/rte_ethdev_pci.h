@@ -46,8 +46,6 @@
  * @param pci_dev
  * The *pci_dev* pointer is the address of the *rte_pci_device* structure.
  *
- * @return
- *   - 0 on success, negative on error
  */
 static inline void
 rte_eth_copy_pci_info(struct rte_eth_dev *eth_dev,
