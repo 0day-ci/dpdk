@@ -799,8 +799,11 @@ mlx4_flow_destroy_drop_queue(struct priv *priv)
 		struct rte_flow_drop *fdq = priv->flow_drop_queue;
 
 		priv->flow_drop_queue = NULL;
-		claim_zero(ibv_destroy_qp(fdq->qp));
-		claim_zero(ibv_destroy_cq(fdq->cq));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_destroy_qp(fdq->qp);
+		ibv_destroy_cq(fdq->cq);
 		rte_free(fdq);
 	}
 }
@@ -860,7 +863,10 @@ mlx4_flow_create_drop_queue(struct priv *priv)
 	priv->flow_drop_queue = fdq;
 	return 0;
 err_create_qp:
-	claim_zero(ibv_destroy_cq(cq));
+	/* Current verbs does not allow to check real
+	 * errors when the device was plugged out.
+	 */
+	ibv_destroy_cq(cq);
 err_create_cq:
 	rte_free(fdq);
 err:
@@ -1198,7 +1204,10 @@ priv_flow_destroy(struct priv *priv, struct rte_flow *flow)
 	(void)priv;
 	LIST_REMOVE(flow, next);
 	if (flow->ibv_flow)
-		claim_zero(ibv_destroy_flow(flow->ibv_flow));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_destroy_flow(flow->ibv_flow);
 	rte_free(flow->ibv_attr);
 	DEBUG("Flow destroyed %p", (void *)flow);
 	rte_free(flow);
@@ -1276,7 +1285,10 @@ mlx4_priv_flow_stop(struct priv *priv)
 	for (flow = LIST_FIRST(&priv->flows);
 	     flow;
 	     flow = LIST_NEXT(flow, next)) {
-		claim_zero(ibv_destroy_flow(flow->ibv_flow));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_destroy_flow(flow->ibv_flow);
 		flow->ibv_flow = NULL;
 		DEBUG("Flow %p removed", (void *)flow);
 	}

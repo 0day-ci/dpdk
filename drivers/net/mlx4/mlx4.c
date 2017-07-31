@@ -955,7 +955,10 @@ txq_alloc_elts(struct txq *txq, unsigned int elts_n)
 	return 0;
 error:
 	if (mr_linear != NULL)
-		claim_zero(ibv_dereg_mr(mr_linear));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_dereg_mr(mr_linear);
 
 	rte_free(elts_linear);
 	rte_free(elts);
@@ -992,7 +995,10 @@ txq_free_elts(struct txq *txq)
 	txq->elts_linear = NULL;
 	txq->mr_linear = NULL;
 	if (mr_linear != NULL)
-		claim_zero(ibv_dereg_mr(mr_linear));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_dereg_mr(mr_linear);
 
 	rte_free(elts_linear);
 	if (elts == NULL)
@@ -1052,9 +1058,15 @@ txq_cleanup(struct txq *txq)
 						&params));
 	}
 	if (txq->qp != NULL)
-		claim_zero(ibv_destroy_qp(txq->qp));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_destroy_qp(txq->qp);
 	if (txq->cq != NULL)
-		claim_zero(ibv_destroy_cq(txq->cq));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_destroy_cq(txq->cq);
 	if (txq->rd != NULL) {
 		struct ibv_exp_destroy_res_domain_attr attr = {
 			.comp_mask = 0,
@@ -1070,7 +1082,10 @@ txq_cleanup(struct txq *txq)
 		if (txq->mp2mr[i].mp == NULL)
 			break;
 		assert(txq->mp2mr[i].mr != NULL);
-		claim_zero(ibv_dereg_mr(txq->mp2mr[i].mr));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_dereg_mr(txq->mp2mr[i].mr);
 	}
 	memset(txq, 0, sizeof(*txq));
 }
@@ -1302,7 +1317,10 @@ txq_mp2mr(struct txq *txq, struct rte_mempool *mp)
 		DEBUG("%p: MR <-> MP table full, dropping oldest entry.",
 		      (void *)txq);
 		--i;
-		claim_zero(ibv_dereg_mr(txq->mp2mr[0].mr));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_dereg_mr(txq->mp2mr[0].mr);
 		memmove(&txq->mp2mr[0], &txq->mp2mr[1],
 			(sizeof(txq->mp2mr) - sizeof(txq->mp2mr[0])));
 	}
@@ -2355,7 +2373,10 @@ rxq_del_flow(struct rxq *rxq, unsigned int mac_index, unsigned int vlan_index)
 	      (void *)rxq,
 	      (*mac)[0], (*mac)[1], (*mac)[2], (*mac)[3], (*mac)[4], (*mac)[5],
 	      mac_index, priv->vlan_filter[vlan_index].id);
-	claim_zero(ibv_destroy_flow(rxq->mac_flow[mac_index][vlan_index]));
+	/* Current verbs does not allow to check real
+	 * errors when the device was plugged out.
+	 */
+	ibv_destroy_flow(rxq->mac_flow[mac_index][vlan_index]);
 	rxq->mac_flow[mac_index][vlan_index] = NULL;
 }
 
@@ -2736,7 +2757,10 @@ rxq_allmulticast_disable(struct rxq *rxq)
 	DEBUG("%p: disabling allmulticast mode", (void *)rxq);
 	if (rxq->allmulti_flow == NULL)
 		return;
-	claim_zero(ibv_destroy_flow(rxq->allmulti_flow));
+	/* Current verbs does not allow to check real
+	 * errors when the device was plugged out.
+	 */
+	ibv_destroy_flow(rxq->allmulti_flow);
 	rxq->allmulti_flow = NULL;
 	DEBUG("%p: allmulticast mode disabled", (void *)rxq);
 }
@@ -2796,7 +2820,10 @@ rxq_promiscuous_disable(struct rxq *rxq)
 	DEBUG("%p: disabling promiscuous mode", (void *)rxq);
 	if (rxq->promisc_flow == NULL)
 		return;
-	claim_zero(ibv_destroy_flow(rxq->promisc_flow));
+	/* Current verbs does not allow to check real
+	 * errors when the device was plugged out.
+	 */
+	ibv_destroy_flow(rxq->promisc_flow);
 	rxq->promisc_flow = NULL;
 	DEBUG("%p: promiscuous mode disabled", (void *)rxq);
 }
@@ -2847,9 +2874,15 @@ rxq_cleanup(struct rxq *rxq)
 		rxq_mac_addrs_del(rxq);
 	}
 	if (rxq->qp != NULL)
-		claim_zero(ibv_destroy_qp(rxq->qp));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_destroy_qp(rxq->qp);
 	if (rxq->cq != NULL)
-		claim_zero(ibv_destroy_cq(rxq->cq));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_destroy_cq(rxq->cq);
 	if (rxq->channel != NULL)
 		claim_zero(ibv_destroy_comp_channel(rxq->channel));
 	if (rxq->rd != NULL) {
@@ -2864,7 +2897,10 @@ rxq_cleanup(struct rxq *rxq)
 						      &attr));
 	}
 	if (rxq->mr != NULL)
-		claim_zero(ibv_dereg_mr(rxq->mr));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_dereg_mr(rxq->mr);
 	memset(rxq, 0, sizeof(*rxq));
 }
 
@@ -4374,7 +4410,10 @@ mlx4_dev_close(struct rte_eth_dev *dev)
 		priv_parent_list_cleanup(priv);
 	if (priv->pd != NULL) {
 		assert(priv->ctx != NULL);
-		claim_zero(ibv_dealloc_pd(priv->pd));
+		/* Current verbs does not allow to check real
+		 * errors when the device was plugged out.
+		 */
+		ibv_dealloc_pd(priv->pd);
 		claim_zero(ibv_close_device(priv->ctx));
 	} else
 		assert(priv->ctx == NULL);
@@ -6388,7 +6427,10 @@ mlx4_pci_probe(struct rte_pci_driver *pci_drv, struct rte_pci_device *pci_dev)
 port_error:
 		rte_free(priv);
 		if (pd)
-			claim_zero(ibv_dealloc_pd(pd));
+			/* Current verbs does not allow to check real
+			 * errors when the device was plugged out.
+			 */
+			ibv_dealloc_pd(pd);
 		if (ctx)
 			claim_zero(ibv_close_device(ctx));
 		if (eth_dev)
