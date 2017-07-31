@@ -1402,6 +1402,12 @@ rte_cryptodev_allocate_driver(const struct rte_driver *drv)
 	struct cryptodev_driver *driver;
 
 	driver = malloc(sizeof(*driver));
+
+	if (driver == NULL)
+		rte_exit(EXIT_FAILURE,
+			"Could not allocate memory for crypto driver %u\n",
+			nb_drivers);
+
 	driver->driver = drv;
 	driver->id = nb_drivers;
 
