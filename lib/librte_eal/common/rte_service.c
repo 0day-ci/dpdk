@@ -285,8 +285,9 @@ rte_service_unregister(struct rte_service_spec *spec)
 
 	s->internal_flags &= ~(SERVICE_F_REGISTERED);
 
+	const uint64_t one = 1;
 	for (i = 0; i < RTE_MAX_LCORE; i++)
-		lcore_states[i].service_mask &= ~(1 << service_id);
+		lcore_states[i].service_mask &= ~(one << service_id);
 
 	memset(&rte_services[service_id], 0,
 			sizeof(struct rte_service_spec_impl));
@@ -319,6 +320,7 @@ rte_service_runner_func(void *arg)
 {
 	RTE_SET_USED(arg);
 	uint32_t i;
+	const uint64_t one = 1;
 	const int lcore = rte_lcore_id();
 	struct core_state *cs = &lcore_states[lcore];
 
@@ -327,7 +329,7 @@ rte_service_runner_func(void *arg)
 		for (i = 0; i < rte_service_count; i++) {
 			struct rte_service_spec_impl *s = &rte_services[i];
 			if (s->runstate != RUNSTATE_RUNNING ||
-					!(service_mask & (1 << i)))
+					!(service_mask & (one << i)))
 				continue;
 
 			/* check do we need cmpset, if MT safe or <= 1 core
@@ -448,6 +450,7 @@ service_update(struct rte_service_spec *service, uint32_t lcore,
 {
 	uint32_t i;
 	int32_t sid = -1;
+	const uint64_t one = 1;
 
 	for (i = 0; i < RTE_SERVICE_NUM_MAX; i++) {
 		if ((struct rte_service_spec *)&rte_services[i] == service &&
@@ -465,16 +468,16 @@ service_update(struct rte_service_spec *service, uint32_t lcore,
 
 	if (set) {
 		if (*set) {
-			lcore_states[lcore].service_mask |=  (1 << sid);
+			lcore_states[lcore].service_mask |=  (one << sid);
 			rte_services[sid].num_mapped_cores++;
 		} else {
-			lcore_states[lcore].service_mask &= ~(1 << sid);
+			lcore_states[lcore].service_mask &= ~(one << sid);
 			rte_services[sid].num_mapped_cores--;
 		}
 	}
 
 	if (enabled)
-		*enabled = (lcore_states[lcore].service_mask & (1 << sid));
+		*enabled = (lcore_states[lcore].service_mask & (one << sid));
 
 	rte_smp_wmb();
 
@@ -599,6 +602,7 @@ rte_service_lcore_start(uint32_t lcore)
 int32_t
 rte_service_lcore_stop(uint32_t lcore)
 {
+	const uint64_t one = 1;
 	if (lcore >= RTE_MAX_LCORE)
 		return -EINVAL;
 
@@ -607,7 +611,7 @@ rte_service_lcore_stop(uint32_t lcore)
 
 	uint32_t i;
 	for (i = 0; i < RTE_SERVICE_NUM_MAX; i++) {
-		int32_t enabled = lcore_states[i].service_mask & (1 << i);
+		int32_t enabled = lcore_states[i].service_mask & (one << i);
 		int32_t service_running = rte_services[i].runstate !=
 						RUNSTATE_STOPPED;
 		int32_t only_core = rte_services[i].num_mapped_cores == 1;
