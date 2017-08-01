@@ -47,6 +47,7 @@
 #include <rte_eal.h>
 #include <rte_log.h>
 #include <rte_lcore.h>
+#include <rte_tailq.h>
 #include <rte_version.h>
 #include <rte_devargs.h>
 #include <rte_memcpy.h>
@@ -125,10 +126,66 @@ static const char *default_solib_dir = RTE_EAL_PMD_PATH;
 static const char dpdk_solib_path[] __attribute__((used)) =
 "DPDK_PLUGIN_PATH=" RTE_EAL_PMD_PATH;
 
+TAILQ_HEAD(device_option_list, device_option);
+
+struct device_option {
+	TAILQ_ENTRY(device_option) next;
+
+	enum rte_devtype type;
+	char optarg[];
+};
+
+static struct device_option_list devopt_list =
+TAILQ_HEAD_INITIALIZER(devopt_list);
 
 static int master_lcore_parsed;
 static int mem_parsed;
 static int core_parsed;
+
+static int
+eal_option_device_add(enum rte_devtype type, const char *optarg)
+{
+	struct device_option *deo;
+	size_t optlen;
+	int ret;
+
+	optlen = strlen(optarg) + 1;
+	deo = calloc(1, sizeof(*deo) + optlen);
+	if (deo == NULL) {
+		RTE_LOG(ERR, EAL, "Unable to allocate device option\n");
+		return -ENOMEM;
+	}
+
+	deo->type = type;
+	ret = snprintf(deo->optarg, optlen, "%s", optarg);
+	if (ret < 0) {
+		RTE_LOG(ERR, EAL, "Unable to copy device option\n");
+		free(deo);
+		return -EINVAL;
+	}
+	TAILQ_INSERT_TAIL(&devopt_list, deo, next);
+	return 0;
+}
+
+int
+eal_option_device_parse(void)
+{
+	struct device_option *deo;
+	void *tmp;
+	int ret = 0;
+
+	TAILQ_FOREACH_SAFE(deo, &devopt_list, next, tmp) {
+		if (ret == 0) {
+			ret = rte_eal_devargs_add(deo->type, deo->optarg);
+			if (ret)
+				RTE_LOG(ERR, EAL, "Unable to parse device '%s'\n",
+					deo->optarg);
+		}
+		TAILQ_REMOVE(&devopt_list, deo, next);
+		free(deo);
+	}
+	return ret;
+}
 
 void
 eal_reset_internal_config(struct internal_config *internal_cfg)
@@ -944,14 +1001,14 @@ eal_parse_common_option(int opt, const char *optarg,
 	switch (opt) {
 	/* blacklist */
 	case 'b':
-		if (rte_eal_devargs_add(RTE_DEVTYPE_BLACKLISTED_PCI,
+		if (eal_option_device_add(RTE_DEVTYPE_BLACKLISTED_PCI,
 				optarg) < 0) {
 			return -1;
 		}
 		break;
 	/* whitelist */
 	case 'w':
-		if (rte_eal_devargs_add(RTE_DEVTYPE_WHITELISTED_PCI,
+		if (eal_option_device_add(RTE_DEVTYPE_WHITELISTED_PCI,
 				optarg) < 0) {
 			return -1;
 		}
@@ -1061,7 +1118,7 @@ eal_parse_common_option(int opt, const char *optarg,
 		break;
 
 	case OPT_VDEV_NUM:
-		if (rte_eal_devargs_add(RTE_DEVTYPE_VIRTUAL,
+		if (eal_option_device_add(RTE_DEVTYPE_VIRTUAL,
 				optarg) < 0) {
 			return -1;
 		}
