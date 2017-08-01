@@ -675,16 +675,12 @@ rxq_trim_elts(struct rxq *rxq)
  *   Pointer to RX queue structure.
  * @param elts_n
  *   Number of elements to allocate.
- * @param[in] pool
- *   If not NULL, fetch buffers from this array instead of allocating them
- *   with rte_pktmbuf_alloc().
  *
  * @return
  *   0 on success, errno value on failure.
  */
 static int
-rxq_alloc_elts(struct rxq_ctrl *rxq_ctrl, unsigned int elts_n,
-	       struct rte_mbuf *(*pool)[])
+rxq_alloc_elts(struct rxq_ctrl *rxq_ctrl, unsigned int elts_n)
 {
 	const unsigned int sges_n = 1 << rxq_ctrl->rxq.sges_n;
 	unsigned int i;
@@ -696,15 +692,8 @@ rxq_alloc_elts(struct rxq_ctrl *rxq_ctrl, unsigned int elts_n,
 		volatile struct mlx5_wqe_data_seg *scat =
 			&(*rxq_ctrl->rxq.wqes)[i];
 
-		if (pool != NULL) {
-			buf = (*pool)[i];
-			assert(buf != NULL);
-			rte_pktmbuf_reset(buf);
-			rte_pktmbuf_refcnt_update(buf, 1);
-		} else
-			buf = rte_pktmbuf_alloc(rxq_ctrl->rxq.mp);
+		buf = rte_pktmbuf_alloc(rxq_ctrl->rxq.mp);
 		if (buf == NULL) {
-			assert(pool == NULL);
 			ERROR("%p: empty mbuf pool", (void *)rxq_ctrl);
 			ret = ENOMEM;
 			goto error;
@@ -736,7 +725,6 @@ rxq_alloc_elts(struct rxq_ctrl *rxq_ctrl, unsigned int elts_n,
 	assert(ret == 0);
 	return 0;
 error:
-	assert(pool == NULL);
 	elts_n = i;
 	for (i = 0; (i != elts_n); ++i) {
 		if ((*rxq_ctrl->rxq.elts)[i] != NULL)
@@ -1141,15 +1129,14 @@ rxq_ctrl_setup(struct rte_eth_dev *dev, struct rxq_ctrl *rxq_ctrl,
 		      (void *)dev, strerror(ret));
 		goto error;
 	}
-	/* Reuse buffers from original queue if possible. */
 	if (rxq_ctrl->rxq.elts_n) {
 		assert(1 << rxq_ctrl->rxq.elts_n == desc);
 		assert(rxq_ctrl->rxq.elts != tmpl.rxq.elts);
 		ret = rxq_trim_elts(&rxq_ctrl->rxq);
 		if (!ret)
-			ret = rxq_alloc_elts(&tmpl, desc, rxq_ctrl->rxq.elts);
+			ret = rxq_alloc_elts(&tmpl, desc);
 	} else
-		ret = rxq_alloc_elts(&tmpl, desc, NULL);
+		ret = rxq_alloc_elts(&tmpl, desc);
 	if (ret) {
 		ERROR("%p: RXQ allocation failed: %s",
 		      (void *)dev, strerror(ret));
