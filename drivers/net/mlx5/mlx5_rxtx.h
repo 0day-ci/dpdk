@@ -307,7 +307,6 @@ void priv_destroy_hash_rxqs(struct priv *);
 int priv_allow_flow_type(struct priv *, enum hash_rxq_flow_type);
 int priv_rehash_flows(struct priv *);
 void rxq_cleanup(struct rxq_ctrl *);
-int rxq_rehash(struct rte_eth_dev *, struct rxq_ctrl *);
 int rxq_ctrl_setup(struct rte_eth_dev *, struct rxq_ctrl *, uint16_t,
 		   unsigned int, const struct rte_eth_rxconf *,
 		   struct rte_mempool *);
