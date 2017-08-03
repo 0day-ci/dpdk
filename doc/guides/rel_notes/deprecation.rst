@@ -8,6 +8,9 @@ API and ABI deprecation notices are to be posted here.
 Deprecation Notices
 -------------------
 
+* eal: the support of Xen dom0 will be removed from EAL in 17.11; and with
+  that, drivers/net/xenvirt and examples/vhost_xen will also be removed.
+
 * eal: the following functions are deprecated starting from 17.05 and will
   be removed in 17.08:
 
