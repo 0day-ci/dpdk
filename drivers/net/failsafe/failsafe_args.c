@@ -145,22 +145,20 @@ fs_execute_cmd(struct sub_device *sdev, char *cmdline)
 	/* We only read one line */
 	if (fgets(output, sizeof(output) - 1, fp) == NULL) {
 		DEBUG("Could not read command output");
-		return -ENODEV;
+		ret = -ENODEV;
+		goto ret_pclose;
 	}
 	fs_sanitize_cmdline(output);
 	ret = fs_parse_device(sdev, output);
-	if (ret) {
+	if (ret)
 		ERROR("Parsing device '%s' failed", output);
-		goto ret_pclose;
-	}
 ret_pclose:
-	ret = pclose(fp);
-	if (ret) {
-		ret = errno;
+	if (pclose(fp)) {
+		if (ret == 0)
+			ret = errno;
 		ERROR("pclose: %s", strerror(errno));
-		errno = old_err;
-		return ret;
 	}
+	errno = old_err;
 	return ret;
 }
 
