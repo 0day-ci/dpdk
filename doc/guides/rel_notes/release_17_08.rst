@@ -177,6 +177,11 @@ New Features
   to verify functionality and measure the performance parameters of DPDK
   eventdev devices.
 
+* **Added Fail-Safe PMD**
+
+  Added the new Fail-Safe PMD. This virtual device allows applications to
+  support seamless hotplug of devices. See the :ref:`Fail-Safe documentation<fail_safe>`
+  for more details about this driver.
 
 Resolved Issues
 ---------------
@@ -204,7 +209,6 @@ EAL
 
 Drivers
 ~~~~~~~
-
 
 Libraries
 ~~~~~~~~~
