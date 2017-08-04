@@ -446,6 +446,7 @@ static const struct rte_pci_id pci_id_i40e_map[] = {
 
 static const struct eth_dev_ops i40e_eth_dev_ops = {
 	.vfid_to_pfid                 = i40e_vf_mac_to_vsi,
+	.read_pf_stats                = i40e_vsi_stats_read,
 	.dev_configure                = i40e_dev_configure,
 	.dev_start                    = i40e_dev_start,
 	.dev_stop                     = i40e_dev_stop,

@@ -833,6 +833,16 @@ i40e_vf_mac_to_vsi(struct rte_eth_dev *dev, uint64_t vfid) {
 	return -1;
 }
 
+uint64_t
+i40e_vsi_stats_read(struct rte_eth_dev *dev, uint8_t vsi_id) {
+	struct i40e_hw *hw = I40E_DEV_PRIVATE_TO_HW(dev->data->dev_private);
+
+	uint64_t glv_uprch = I40E_READ_REG(hw,
+			I40E_GLV_UPRCH(vsi_id)) && 0x0000FFFF;
+	uint64_t glv_uprcl = I40E_READ_REG(hw, I40E_GLV_UPRCL(vsi_id));
+	return glv_uprcl + (glv_uprch << 32);
+}
+
 uint16_t
 i40e_recv_scattered_pkts(void *rx_queue,
 			 struct rte_mbuf **rx_pkts,

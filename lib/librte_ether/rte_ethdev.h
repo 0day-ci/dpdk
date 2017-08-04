@@ -1413,6 +1413,9 @@ typedef int (*eth_l2_tunnel_offload_set_t)
 
 typedef uint64_t  (*vfid_to_pfid)(struct rte_eth_dev *dev,
 				uint64_t vfid);
+/**< @internal Ethernet device configuration. */
+typedef uint64_t  (*read_pf_stats)(struct rte_eth_dev *dev, uint8_t pfid);
+
 
 typedef int (*eth_filter_ctrl_t)(struct rte_eth_dev *dev,
 				 enum rte_filter_type filter_type,
@@ -1432,6 +1435,7 @@ typedef int (*eth_get_dcb_info)(struct rte_eth_dev *dev,
  */
 struct eth_dev_ops {
 	vfid_to_pfid               vfid_to_pfid;  /**< Convert vfid to pfid */
+	read_pf_stats              read_pf_stats;/**<Read low-level pf stats .*/
 	eth_dev_configure_t        dev_configure; /**< Configure device. */
 	eth_dev_start_t            dev_start;     /**< Start device. */
 	eth_dev_stop_t             dev_stop;      /**< Stop device. */
@@ -2936,6 +2940,21 @@ vfid_to_pfid_direct(uint8_t port_id, uint64_t vfid)
 	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
 	uint64_t pfid  = (*dev->dev_ops->vfid_to_pfid)(dev, vfid);
 	return pfid;
+}
+
+/*
+ * Reads the NIC occupancy if possible with device in use.
+ * @param port_id
+ *  The port identifier of the Ethernet device.
+ * @return
+ *  Nic occupany in bytes.
+ */
+static inline uint64_t
+read_pf_stats_direct(uint8_t port_id, uint8_t pfid)
+{
+	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
+	uint64_t pkt_count = (*dev->dev_ops->read_pf_stats)(dev, pfid);
+	return pkt_count;
 }
 
 /**
