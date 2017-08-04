@@ -1156,7 +1156,7 @@ eth_i40e_dev_init(struct rte_eth_dev *dev)
 	 * in firmware in the future.
 	 */
 	i40e_configure_registers(hw);
-
+	I40E_WRITE_REG(hw, I40E_PRTDCB_TC2PFC, 0xff);
 	/* Get hw capabilities */
 	ret = i40e_get_cap(hw);
 	if (ret != I40E_SUCCESS) {
