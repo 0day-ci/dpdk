@@ -192,6 +192,7 @@ union i40e_tx_offload {
 	};
 };
 
+uint64_t i40e_vf_mac_to_vsi(struct rte_eth_dev *dev, uint64_t vfid);
 int i40e_dev_rx_queue_start(struct rte_eth_dev *dev, uint16_t rx_queue_id);
 int i40e_dev_rx_queue_stop(struct rte_eth_dev *dev, uint16_t rx_queue_id);
 int i40e_dev_tx_queue_start(struct rte_eth_dev *dev, uint16_t tx_queue_id);

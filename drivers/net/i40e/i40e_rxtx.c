@@ -806,6 +806,33 @@ i40e_recv_pkts(void *rx_queue, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 	return nb_rx;
 }
 
+uint64_t
+i40e_vf_mac_to_vsi(struct rte_eth_dev *dev, uint64_t vfid) {
+	struct ether_addr *vf_mac_addr = (struct ether_addr *)&vfid;
+	struct ether_addr *mac;
+	struct i40e_pf *pf = I40E_DEV_PRIVATE_TO_PF(dev->data->dev_private);
+	int vsi_id = 0, i, x;
+	struct i40e_pf_vf *vf;
+	uint16_t vf_num = pf->vf_num;
+
+	for (x = 0; x < vf_num; x++) {
+		int mac_addr_matches = 1;
+		vf = &pf->vfs[x];
+		mac = &vf->mac_addr;
+
+		for (i = 0; i < ETHER_ADDR_LEN; i++) {
+			if (mac->addr_bytes[i] != vf_mac_addr->addr_bytes[i])
+				mac_addr_matches = 0;
+		}
+		if (mac_addr_matches) {
+			vsi_id = vf->vsi->vsi_id;
+			return vsi_id;
+		}
+	}
+
+	return -1;
+}
+
 uint16_t
 i40e_recv_scattered_pkts(void *rx_queue,
 			 struct rte_mbuf **rx_pkts,

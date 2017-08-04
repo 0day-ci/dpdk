@@ -1411,6 +1411,8 @@ typedef int (*eth_l2_tunnel_offload_set_t)
 	 uint8_t en);
 /**< @internal enable/disable the l2 tunnel offload functions */
 
+typedef uint64_t  (*vfid_to_pfid)(struct rte_eth_dev *dev,
+				uint64_t vfid);
 
 typedef int (*eth_filter_ctrl_t)(struct rte_eth_dev *dev,
 				 enum rte_filter_type filter_type,
@@ -1429,6 +1431,7 @@ typedef int (*eth_get_dcb_info)(struct rte_eth_dev *dev,
  * @internal A structure containing the functions exported by an Ethernet driver.
  */
 struct eth_dev_ops {
+	vfid_to_pfid               vfid_to_pfid;  /**< Convert vfid to pfid */
 	eth_dev_configure_t        dev_configure; /**< Configure device. */
 	eth_dev_start_t            dev_start;     /**< Start device. */
 	eth_dev_stop_t             dev_stop;      /**< Stop device. */
@@ -2925,6 +2928,14 @@ static inline int rte_eth_tx_descriptor_status(uint8_t port_id,
 	txq = dev->data->tx_queues[queue_id];
 
 	return (*dev->dev_ops->tx_descriptor_status)(txq, offset);
+}
+
+static inline uint64_t
+vfid_to_pfid_direct(uint8_t port_id, uint64_t vfid)
+{
+	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
+	uint64_t pfid  = (*dev->dev_ops->vfid_to_pfid)(dev, vfid);
+	return pfid;
 }
 
 /**
