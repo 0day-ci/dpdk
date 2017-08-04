@@ -58,6 +58,15 @@
 #include "channel_monitor.h"
 #include "power_manager.h"
 #include "vm_power_cli.h"
+#ifdef RTE_LIBRTE_IXGBE_PMD
+#include <rte_pmd_ixgbe.h>
+#endif
+#ifdef RTE_LIBRTE_I40E_PMD
+#include <rte_pmd_i40e.h>
+#endif
+#ifdef RTE_LIBRTE_BNXT_PMD
+#include <rte_pmd_bnxt.h>
+#endif
 
 #define RX_RING_SIZE 512
 #define TX_RING_SIZE 512
@@ -222,7 +231,7 @@ check_all_ports_link_status(uint8_t port_num, uint32_t port_mask)
 						(uint8_t)portid);
 				continue;
 			}
-		       /* clear all_ports_up flag if any link down */
+			/* clear all_ports_up flag if any link down */
 			if (link.link_status == ETH_LINK_DOWN) {
 				all_ports_up = 0;
 				break;
@@ -301,11 +310,58 @@ main(int argc, char **argv)
 
 	/* Initialize ports. */
 	for (portid = 0; portid < nb_ports; portid++) {
+		struct ether_addr eth;
+		int w, j;
+		int ret = -ENOTSUP;
+
 		if ((enabled_port_mask & (1 << portid)) == 0)
 			continue;
+
+		eth.addr_bytes[0] = 0xe0;
+		eth.addr_bytes[1] = 0xe0;
+		eth.addr_bytes[2] = 0xe0;
+		eth.addr_bytes[3] = 0xe0;
+		eth.addr_bytes[4] = portid + 0xf0;
+
 		if (port_init(portid, mbuf_pool) != 0)
 			rte_exit(EXIT_FAILURE, "Cannot init port %"PRIu8 "\n",
 					portid);
+
+		for (w = 0; w < MAX_VFS; w++) {
+			eth.addr_bytes[5] = w + 0xf0;
+
+#ifdef RTE_LIBRTE_IXGBE_PMD
+			if (ret == -ENOTSUP)
+				ret = rte_pmd_ixgbe_set_vf_mac_addr(portid,
+						w, &eth);
+#endif
+#ifdef RTE_LIBRTE_I40E_PMD
+			if (ret == -ENOTSUP)
+				ret = rte_pmd_i40e_set_vf_mac_addr(portid,
+						w, &eth);
+#endif
+#ifdef RTE_LIBRTE_BNXT_PMD
+			if (ret == -ENOTSUP)
+				ret = rte_pmd_bnxt_set_vf_mac_addr(portid,
+						w, &eth);
+#endif
+
+
+			ret = rte_pmd_i40e_set_vf_mac_addr(portid, w,
+					&eth);
+			switch (ret) {
+			case 0:
+				printf("Port %d VF %d MAC: ",
+						portid, w);
+				for (j = 0; j < 6; j++) {
+					printf("%02x", eth.addr_bytes[j]);
+					if (j < 5)
+						printf(":");
+				}
+				printf("\n");
+				break;
+			}
+		}
 	}
 
 	lcore_id = rte_get_next_lcore(-1, 1, 0);
