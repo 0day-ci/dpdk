@@ -250,3 +250,18 @@ power_manager_scale_core_max(unsigned core_num)
 	POWER_SCALE_CORE(max, core_num, ret);
 	return ret;
 }
+
+int
+power_manager_scale_core_med(unsigned int core_num)
+{
+	int ret = 0;
+
+	if (core_num >= POWER_MGR_MAX_CPUS)
+		return -1;
+	if (!(global_enabled_cpus & (1ULL << core_num)))
+		return -1;
+	rte_spinlock_lock(&global_core_freq_info[core_num].power_sl);
+	ret = rte_power_set_freq(core_num, 5);
+	rte_spinlock_unlock(&global_core_freq_info[core_num].power_sl);
+	return ret;
+}
