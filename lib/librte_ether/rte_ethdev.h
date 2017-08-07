@@ -686,7 +686,7 @@ struct rte_eth_txmode {
 /**
  * A structure used to configure an RX ring of an Ethernet port.
  */
-struct rte_eth_rxconf {
+struct rte_eth_rxq_conf {
 	struct rte_eth_thresh rx_thresh; /**< RX ring threshold registers. */
 	uint16_t rx_free_thresh; /**< Drives the freeing of RX descriptors. */
 	uint8_t rx_drop_en; /**< Drop packets if no descriptors are available. */
@@ -709,7 +709,7 @@ struct rte_eth_rxconf {
 /**
  * A structure used to configure a TX ring of an Ethernet port.
  */
-struct rte_eth_txconf {
+struct rte_eth_txq_conf {
 	struct rte_eth_thresh tx_thresh; /**< TX ring threshold registers. */
 	uint16_t tx_rs_thresh; /**< Drives the setting of RS bit on TXDs. */
 	uint16_t tx_free_thresh; /**< Start freeing TX buffers if there are
@@ -956,8 +956,10 @@ struct rte_eth_dev_info {
 	uint8_t hash_key_size; /**< Hash key size in bytes */
 	/** Bit mask of RSS offloads, the bit offset also means flow type */
 	uint64_t flow_type_rss_offloads;
-	struct rte_eth_rxconf default_rxconf; /**< Default RX configuration */
-	struct rte_eth_txconf default_txconf; /**< Default TX configuration */
+	struct rte_eth_rxq_conf default_rx_conf;
+	/**< Default RX queue configuration */
+	struct rte_eth_txq_conf default_tx_conf;
+	/**< Default TX queue configuration */
 	uint16_t vmdq_queue_base; /**< First queue ID for VMDQ pools. */
 	uint16_t vmdq_queue_num;  /**< Queue number for VMDQ pools. */
 	uint16_t vmdq_pool_base;  /**< First ID of VMDQ pools. */
@@ -975,7 +977,7 @@ struct rte_eth_dev_info {
  */
 struct rte_eth_rxq_info {
 	struct rte_mempool *mp;     /**< mempool used by that queue. */
-	struct rte_eth_rxconf conf; /**< queue config parameters. */
+	struct rte_eth_rxq_conf conf; /**< queue config parameters. */
 	uint8_t scattered_rx;       /**< scattered packets RX supported. */
 	uint16_t nb_desc;           /**< configured number of RXDs. */
 } __rte_cache_min_aligned;
@@ -985,7 +987,7 @@ struct rte_eth_rxq_info {
  * Used to retieve information about configured queue.
  */
 struct rte_eth_txq_info {
-	struct rte_eth_txconf conf; /**< queue config parameters. */
+	struct rte_eth_txq_conf conf; /**< queue config parameters. */
 	uint16_t nb_desc;           /**< configured number of TXDs. */
 } __rte_cache_min_aligned;
 
@@ -1185,7 +1187,7 @@ typedef int (*eth_rx_queue_setup_t)(struct rte_eth_dev *dev,
 				    uint16_t rx_queue_id,
 				    uint16_t nb_rx_desc,
 				    unsigned int socket_id,
-				    const struct rte_eth_rxconf *rx_conf,
+				    const struct rte_eth_rxq_conf *rx_conf,
 				    struct rte_mempool *mb_pool);
 /**< @internal Set up a receive queue of an Ethernet device. */
 
@@ -1193,7 +1195,7 @@ typedef int (*eth_tx_queue_setup_t)(struct rte_eth_dev *dev,
 				    uint16_t tx_queue_id,
 				    uint16_t nb_tx_desc,
 				    unsigned int socket_id,
-				    const struct rte_eth_txconf *tx_conf);
+				    const struct rte_eth_txq_conf *tx_conf);
 /**< @internal Setup a transmit queue of an Ethernet device. */
 
 typedef int (*eth_rx_enable_intr_t)(struct rte_eth_dev *dev,
@@ -1937,7 +1939,7 @@ void _rte_eth_dev_reset(struct rte_eth_dev *dev);
  */
 int rte_eth_rx_queue_setup(uint8_t port_id, uint16_t rx_queue_id,
 		uint16_t nb_rx_desc, unsigned int socket_id,
-		const struct rte_eth_rxconf *rx_conf,
+		const struct rte_eth_rxq_conf *rx_conf,
 		struct rte_mempool *mb_pool);
 
 /**
@@ -1985,7 +1987,7 @@ int rte_eth_rx_queue_setup(uint8_t port_id, uint16_t rx_queue_id,
  */
 int rte_eth_tx_queue_setup(uint8_t port_id, uint16_t tx_queue_id,
 		uint16_t nb_tx_desc, unsigned int socket_id,
-		const struct rte_eth_txconf *tx_conf);
+		const struct rte_eth_txq_conf *tx_conf);
 
 /**
  * Return the NUMA socket to which an Ethernet device is connected
@@ -2972,7 +2974,7 @@ static inline int rte_eth_tx_descriptor_status(uint8_t port_id,
  *
  * If the PMD is DEV_TX_OFFLOAD_MT_LOCKFREE capable, multiple threads can
  * invoke this function concurrently on the same tx queue without SW lock.
- * @see rte_eth_dev_info_get, struct rte_eth_txconf::txq_flags
+ * @see rte_eth_dev_info_get, struct rte_eth_txq_conf::txq_flags
  *
  * @param port_id
  *   The port identifier of the Ethernet device.

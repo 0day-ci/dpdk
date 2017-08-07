@@ -997,7 +997,7 @@ rte_eth_dev_close(uint8_t port_id)
 int
 rte_eth_rx_queue_setup(uint8_t port_id, uint16_t rx_queue_id,
 		       uint16_t nb_rx_desc, unsigned int socket_id,
-		       const struct rte_eth_rxconf *rx_conf,
+		       const struct rte_eth_rxq_conf *rx_conf,
 		       struct rte_mempool *mp)
 {
 	int ret;
@@ -1088,7 +1088,7 @@ rte_eth_rx_queue_setup(uint8_t port_id, uint16_t rx_queue_id,
 int
 rte_eth_tx_queue_setup(uint8_t port_id, uint16_t tx_queue_id,
 		       uint16_t nb_tx_desc, unsigned int socket_id,
-		       const struct rte_eth_txconf *tx_conf)
+		       const struct rte_eth_txq_conf *tx_conf)
 {
 	struct rte_eth_dev *dev;
 	struct rte_eth_dev_info dev_info;
