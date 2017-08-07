@@ -671,10 +671,14 @@ struct rte_pktmbuf_pool_private {
 
 #ifdef RTE_LIBRTE_MBUF_DEBUG
 
+#define RTE_MBUF_UNUSED_CNT 0
+
 /**  check mbuf type in debug mode */
 #define __rte_mbuf_sanity_check(m, is_h) rte_mbuf_sanity_check(m, is_h)
 
 #else /*  RTE_LIBRTE_MBUF_DEBUG */
+
+#define RTE_MBUF_UNUSED_CNT 1
 
 /**  check mbuf type in debug mode */
 #define __rte_mbuf_sanity_check(m, is_h) do { } while (0)
@@ -721,6 +725,9 @@ rte_mbuf_refcnt_set(struct rte_mbuf *m, uint16_t new_value)
 static inline uint16_t
 rte_mbuf_refcnt_update(struct rte_mbuf *m, int16_t value)
 {
+#ifdef RTE_LIBRTE_MBUF_DEBUG
+	RTE_ASSERT(rte_mbuf_refcnt_read(m) != 0);
+#endif
 	/*
 	 * The atomic_add is an expensive operation, so we don't want to
 	 * call it in the case where we know we are the uniq holder of
@@ -791,10 +798,9 @@ void
 rte_mbuf_sanity_check(const struct rte_mbuf *m, int is_header);
 
 #define MBUF_RAW_ALLOC_CHECK(m) do {				\
-	RTE_ASSERT(rte_mbuf_refcnt_read(m) == 1);		\
+	RTE_ASSERT(rte_mbuf_refcnt_read(m) == RTE_MBUF_UNUSED_CNT); \
 	RTE_ASSERT((m)->next == NULL);				\
 	RTE_ASSERT((m)->nb_segs == 1);				\
-	__rte_mbuf_sanity_check(m, 0);				\
 } while (0)
 
 /**
@@ -825,6 +831,10 @@ static inline struct rte_mbuf *rte_mbuf_raw_alloc(struct rte_mempool *mp)
 		return NULL;
 	m = (struct rte_mbuf *)mb;
 	MBUF_RAW_ALLOC_CHECK(m);
+#ifdef RTE_LIBRTE_MBUF_DEBUG
+	rte_mbuf_refcnt_set(m, 1);
+#endif
+	__rte_mbuf_sanity_check(m, 0);
 	return m;
 }
 
@@ -846,10 +856,9 @@ static __rte_always_inline void
 rte_mbuf_raw_free(struct rte_mbuf *m)
 {
 	RTE_ASSERT(RTE_MBUF_DIRECT(m));
-	RTE_ASSERT(rte_mbuf_refcnt_read(m) == 1);
+	RTE_ASSERT(rte_mbuf_refcnt_read(m) == RTE_MBUF_UNUSED_CNT);
 	RTE_ASSERT(m->next == NULL);
 	RTE_ASSERT(m->nb_segs == 1);
-	__rte_mbuf_sanity_check(m, 0);
 	rte_mempool_put(m->pool, m);
 }
 
@@ -1159,21 +1168,37 @@ static inline int rte_pktmbuf_alloc_bulk(struct rte_mempool *pool,
 	case 0:
 		while (idx != count) {
 			MBUF_RAW_ALLOC_CHECK(mbufs[idx]);
+#ifdef RTE_LIBRTE_MBUF_DEBUG
+			rte_mbuf_refcnt_set(mbufs[idx], 1);
+#endif
+			__rte_mbuf_sanity_check(mbufs[idx], 0);
 			rte_pktmbuf_reset(mbufs[idx]);
 			idx++;
 			/* fall-through */
 	case 3:
 			MBUF_RAW_ALLOC_CHECK(mbufs[idx]);
+#ifdef RTE_LIBRTE_MBUF_DEBUG
+			rte_mbuf_refcnt_set(mbufs[idx], 1);
+#endif
+			__rte_mbuf_sanity_check(mbufs[idx], 0);
 			rte_pktmbuf_reset(mbufs[idx]);
 			idx++;
 			/* fall-through */
 	case 2:
 			MBUF_RAW_ALLOC_CHECK(mbufs[idx]);
+#ifdef RTE_LIBRTE_MBUF_DEBUG
+			rte_mbuf_refcnt_set(mbufs[idx], 1);
+#endif
+			__rte_mbuf_sanity_check(mbufs[idx], 0);
 			rte_pktmbuf_reset(mbufs[idx]);
 			idx++;
 			/* fall-through */
 	case 1:
 			MBUF_RAW_ALLOC_CHECK(mbufs[idx]);
+#ifdef RTE_LIBRTE_MBUF_DEBUG
+			rte_mbuf_refcnt_set(mbufs[idx], 1);
+#endif
+			__rte_mbuf_sanity_check(mbufs[idx], 0);
 			rte_pktmbuf_reset(mbufs[idx]);
 			idx++;
 			/* fall-through */
@@ -1271,7 +1296,7 @@ static inline void rte_pktmbuf_detach(struct rte_mbuf *m)
 	if (rte_mbuf_refcnt_update(md, -1) == 0) {
 		md->next = NULL;
 		md->nb_segs = 1;
-		rte_mbuf_refcnt_set(md, 1);
+		rte_mbuf_refcnt_set(md, RTE_MBUF_UNUSED_CNT);
 		rte_mbuf_raw_free(md);
 	}
 }
@@ -1304,10 +1329,13 @@ rte_pktmbuf_prefree_seg(struct rte_mbuf *m)
 			m->next = NULL;
 			m->nb_segs = 1;
 		}
+#ifdef RTE_LIBRTE_MBUF_DEBUG
+		rte_mbuf_refcnt_set(m, RTE_MBUF_UNUSED_CNT);
+#endif
 
 		return m;
 
-       } else if (rte_atomic16_add_return(&m->refcnt_atomic, -1) == 0) {
+       } else if (rte_mbuf_refcnt_update(m, -1) == 0) {
 
 
 		if (RTE_MBUF_INDIRECT(m))
@@ -1317,7 +1345,7 @@ rte_pktmbuf_prefree_seg(struct rte_mbuf *m)
 			m->next = NULL;
 			m->nb_segs = 1;
 		}
-		rte_mbuf_refcnt_set(m, 1);
+		rte_mbuf_refcnt_set(m, RTE_MBUF_UNUSED_CNT);
 
 		return m;
 	}
