@@ -357,7 +357,14 @@ struct rte_eth_rxmode {
 		jumbo_frame      : 1, /**< Jumbo Frame Receipt enable. */
 		hw_strip_crc     : 1, /**< Enable CRC stripping by hardware. */
 		enable_scatter   : 1, /**< Enable scatter packets rx handler */
-		enable_lro       : 1; /**< Enable LRO */
+		enable_lro       : 1, /**< Enable LRO */
+		ignore		 : 1;
+		/**
+		 * When set the rxmode offloads should be ignored,
+		 * instead the Rx offloads will be set on rte_eth_rxq_conf.
+		 * This bit is temporary till rxmode Rx offloads API will
+		 * be deprecated.
+		 */
 };
 
 /**
@@ -691,6 +698,12 @@ struct rte_eth_rxq_conf {
 	uint16_t rx_free_thresh; /**< Drives the freeing of RX descriptors. */
 	uint8_t rx_drop_en; /**< Drop packets if no descriptors are available. */
 	uint8_t rx_deferred_start; /**< Do not start queue with rte_eth_dev_start(). */
+	uint64_t offloads;
+	/**
+	 * Enable Rx offloads using DEV_RX_OFFLOAD_* flags.
+	 * Supported only for devices which advertize the
+	 * RTE_ETH_DEV_RXQ_OFFLOAD capability.
+	 */
 };
 
 #define ETH_TXQ_FLAGS_NOMULTSEGS 0x0001 /**< nb_segs=1 for all mbufs */
@@ -907,6 +920,19 @@ struct rte_eth_conf {
 #define DEV_RX_OFFLOAD_QINQ_STRIP  0x00000020
 #define DEV_RX_OFFLOAD_OUTER_IPV4_CKSUM 0x00000040
 #define DEV_RX_OFFLOAD_MACSEC_STRIP     0x00000080
+#define DEV_RX_OFFLOAD_HEADER_SPLIT	0x00000100
+#define DEV_RX_OFFLOAD_VLAN_FILTER	0x00000200
+#define DEV_RX_OFFLOAD_VLAN_EXTEND	0x00000400
+#define DEV_RX_OFFLOAD_JUMBO_FRAME	0x00000800
+#define DEV_RX_OFFLOAD_CRC_STRIP	0x00001000
+#define DEV_RX_OFFLOAD_SCATTER		0x00002000
+#define DEV_RX_OFFLOAD_LRO		0x00004000
+#define DEV_RX_OFFLOAD_CHECKSUM (DEV_RX_OFFLOAD_IPV4_CKSUM | \
+				 DEV_RX_OFFLOAD_UDP_CKSUM | \
+				 DEV_RX_OFFLOAD_TCP_CKSUM)
+#define DEV_RX_OFFLOAD_VLAN (DEV_RX_OFFLOAD_VLAN_STRIP | \
+			     DEV_RX_OFFLOAD_VLAN_FILTER | \
+			     DEV_RX_OFFLOAD_VLAN_EXTEND)
 
 /**
  * TX offload capabilities of a device.
@@ -1723,6 +1749,8 @@ struct rte_eth_dev_data {
 #define RTE_ETH_DEV_BONDED_SLAVE 0x0004
 /** Device supports device removal interrupt */
 #define RTE_ETH_DEV_INTR_RMV     0x0008
+/** Device supports the rte_eth_rxq_conf offloads API */
+#define RTE_ETH_DEV_RXQ_OFFLOAD 0x0010
 
 /**
  * @internal
