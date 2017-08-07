@@ -287,12 +287,6 @@ static inline int rte_gettid(void)
 	return RTE_PER_LCORE(_thread_id);
 }
 
-#define RTE_INIT(func) \
-static void __attribute__((constructor, used)) func(void)
-
-#define RTE_INIT_PRIO(func, prio) \
-static void __attribute__((constructor(prio), used)) func(void)
-
 #ifdef __cplusplus
 }
 #endif

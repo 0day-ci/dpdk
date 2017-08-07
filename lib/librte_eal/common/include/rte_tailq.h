@@ -48,6 +48,8 @@ extern "C" {
 #include <stdio.h>
 #include <rte_debug.h>
 
+#include <exec-env/rte_eal.h>
+
 /** dummy structure type used by the rte_tailq APIs */
 struct rte_tailq_entry {
 	TAILQ_ENTRY(rte_tailq_entry) next; /**< Pointer entries for a tailq list */

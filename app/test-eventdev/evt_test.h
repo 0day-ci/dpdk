@@ -37,7 +37,7 @@
 #include <stdbool.h>
 #include <sys/queue.h>
 
-#include <rte_eal.h>
+#include <exec-env/rte_eal.h>
 
 enum evt_test_result {
 	EVT_TEST_SUCCESS,

@@ -52,6 +52,8 @@ extern "C" {
 #include <rte_log.h>
 #include <rte_dev.h>
 
+#include <exec-env/rte_eal.h>
+
 /** Double linked list of buses */
 TAILQ_HEAD(rte_bus_list, rte_bus);
 

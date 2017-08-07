@@ -43,6 +43,8 @@
 #include <rte_log.h>
 #include <rte_per_lcore.h>
 
+#include <exec-env/rte_eal.h>
+
 #include "eal_private.h"
 
 /* global log structure */
