@@ -719,6 +719,14 @@ struct rte_eth_rxq_conf {
 #define ETH_TXQ_FLAGS_NOXSUMS \
 		(ETH_TXQ_FLAGS_NOXSUMSCTP | ETH_TXQ_FLAGS_NOXSUMUDP | \
 		 ETH_TXQ_FLAGS_NOXSUMTCP)
+#define ETH_TXQ_FLAGS_IGNORE	0x8000
+	/**
+	 * When set the txq_flags should be ignored,
+	 * instead the Tx offloads will be set on offloads field
+	 * located on rte_eth_txq_conf struct.
+	 * This flag is temporary till the rte_eth_txq_conf.txq_flags
+	 * API will be deprecated.
+	 */
 /**
  * A structure used to configure a TX ring of an Ethernet port.
  */
@@ -730,6 +738,12 @@ struct rte_eth_txq_conf {
 
 	uint32_t txq_flags; /**< Set flags for the Tx queue */
 	uint8_t tx_deferred_start; /**< Do not start queue with rte_eth_dev_start(). */
+	uint64_t offloads;
+	/**
+	 * Enable Tx offloads using DEV_TX_OFFLOAD_* flags.
+	 * Supported only for devices which advertize the
+	 * RTE_ETH_DEV_TXQ_OFFLOAD capability.
+	 */
 };
 
 /**
@@ -955,6 +969,8 @@ struct rte_eth_conf {
 /**< Multiple threads can invoke rte_eth_tx_burst() concurrently on the same
  * tx queue without SW lock.
  */
+#define DEV_TX_OFFLOAD_MULTI_SEGS	0x00008000
+/**< multi segment send is supported. */
 
 struct rte_pci_device;
 
@@ -1751,6 +1767,8 @@ struct rte_eth_dev_data {
 #define RTE_ETH_DEV_INTR_RMV     0x0008
 /** Device supports the rte_eth_rxq_conf offloads API */
 #define RTE_ETH_DEV_RXQ_OFFLOAD 0x0010
+/** Device supports the rte_eth_txq_conf offloads API */
+#define RTE_ETH_DEV_TXQ_OFFLOAD 0x0020
 
 /**
  * @internal
