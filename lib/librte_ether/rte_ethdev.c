@@ -994,6 +994,63 @@ rte_eth_dev_close(uint8_t port_id)
 	dev->data->tx_queues = NULL;
 }
 
+/**
+ * A copy function from rxmode offloads API to rte_eth_rxq_conf
+ * offloads API, to enable PMDs to support only one of the APIs.
+ */
+static void
+rte_eth_copy_rxmode_offloads(struct rte_eth_rxmode *rxmode,
+			     struct rte_eth_rxq_conf *rxq_conf)
+{
+	if (rxmode->header_split == 1)
+		rxq_conf->offloads |= DEV_RX_OFFLOAD_HEADER_SPLIT;
+	if (rxmode->hw_ip_checksum == 1)
+		rxq_conf->offloads |= DEV_RX_OFFLOAD_CHECKSUM;
+	if (rxmode->hw_vlan_filter == 1)
+		rxq_conf->offloads |= DEV_RX_OFFLOAD_VLAN_FILTER;
+	if (rxmode->hw_vlan_strip == 1)
+		rxq_conf->offloads |= DEV_RX_OFFLOAD_VLAN_STRIP;
+	if (rxmode->hw_vlan_extend == 1)
+		rxq_conf->offloads |= DEV_RX_OFFLOAD_VLAN_EXTEND;
+	if (rxmode->jumbo_frame == 1)
+		rxq_conf->offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+	if (rxmode->hw_strip_crc == 1)
+		rxq_conf->offloads |= DEV_RX_OFFLOAD_CRC_STRIP;
+	if (rxmode->enable_scatter == 1)
+		rxq_conf->offloads |= DEV_RX_OFFLOAD_SCATTER;
+	if (rxmode->enable_lro == 1)
+		rxq_conf->offloads |= DEV_RX_OFFLOAD_LRO;
+}
+
+/**
+ * A copy function between rte_eth_rxq_conf offloads API to rxmode
+ * offloads API, to enable application to be agnostic to the PMD supported
+ * offload API.
+ */
+static void
+rte_eth_copy_rxq_offloads(struct rte_eth_rxmode *rxmode,
+			  struct rte_eth_rxq_conf *rxq_conf)
+{
+	if (rxq_conf->offloads & DEV_RX_OFFLOAD_HEADER_SPLIT)
+		rxmode->header_split = 1;
+	if (rxq_conf->offloads & DEV_RX_OFFLOAD_CHECKSUM)
+		rxmode->hw_ip_checksum = 1;
+	if (rxq_conf->offloads & DEV_RX_OFFLOAD_VLAN_FILTER)
+		rxmode->hw_vlan_filter = 1;
+	if (rxq_conf->offloads & DEV_RX_OFFLOAD_VLAN_STRIP)
+		rxmode->hw_vlan_strip = 1;
+	if (rxq_conf->offloads & DEV_RX_OFFLOAD_VLAN_EXTEND)
+		rxmode->hw_vlan_extend = 1;
+	if (rxq_conf->offloads & DEV_RX_OFFLOAD_JUMBO_FRAME)
+		rxmode->jumbo_frame = 1;
+	if (rxq_conf->offloads & DEV_RX_OFFLOAD_CRC_STRIP)
+		rxmode->hw_strip_crc = 1;
+	if (rxq_conf->offloads & DEV_RX_OFFLOAD_SCATTER)
+		rxmode->enable_scatter = 1;
+	if (rxq_conf->offloads & DEV_RX_OFFLOAD_LRO)
+		rxmode->enable_lro = 1;
+}
+
 int
 rte_eth_rx_queue_setup(uint8_t port_id, uint16_t rx_queue_id,
 		       uint16_t nb_rx_desc, unsigned int socket_id,
@@ -1074,6 +1131,37 @@ rte_eth_rx_queue_setup(uint8_t port_id, uint16_t rx_queue_id,
 	if (rx_conf == NULL)
 		rx_conf = &dev_info.default_rxconf;
 
+	if ((dev->data->dev_flags & RTE_ETH_DEV_RXQ_OFFLOAD) &&
+	    (dev->data->dev_conf.rxmode.ignore == 0)) {
+		rte_eth_copy_rxmode_offloads(&dev->data->dev_conf.rxmode,
+					     rx_conf);
+	} else if ((!(dev->data->dev_flags & RTE_ETH_DEV_RXQ_OFFLOAD)) &&
+		   (dev->data->dev_conf.rxmode.ignore == 1)) {
+		int ret;
+		struct rte_eth_rxmode rxmode;
+
+		rte_eth_copy_rxq_offloads(&rxmode, rx_conf);
+		if (memcmp(&rxmode, &dev->data->dev_conf.rxmode,
+			   sizeof(rxmode))) {
+			/*
+			 * device which work with rxmode offloads API requires
+			 * a re-configuration in order to apply the new offloads
+			 * configuration.
+			 */
+			dev->data->dev_conf.rxmode = rxmode;
+			ret = rte_eth_dev_configure(port_id,
+					dev->data->nb_rx_queues,
+					dev->data->nb_tx_queues,
+					&dev->data->dev_conf);
+			if (ret < 0) {
+				RTE_PMD_DEBUG_TRACE(
+					"unable to re-configure port %d "
+					"in order to apply rxq offloads "
+					"configuration\n", port_id);
+			}
+		}
+	}
+
 	ret = (*dev->dev_ops->rx_queue_setup)(dev, rx_queue_id, nb_rx_desc,
 					      socket_id, rx_conf, mp);
 	if (!ret) {
@@ -1083,6 +1171,51 @@ rte_eth_rx_queue_setup(uint8_t port_id, uint16_t rx_queue_id,
 	}
 
 	return ret;
+}
+
+/**
+ * A copy function from txq_flags to rte_eth_txq_conf offloads API,
+ * to enable PMDs to support only one of the APIs.
+ */
+static void
+rte_eth_copy_txq_flags(struct rte_eth_txq_conf *txq_conf)
+{
+	uint32_t txq_flags = txq_conf->txq_flags
+	uint64_t *offloads = &txq_conf->offloads;
+
+	if (!(txq_flags & ETH_TXQ_FLAGS_NOMULTSEGS))
+		*offloads |= DEV_TX_OFFLOAD_MULTI_SEGS;
+	if (!(txq_flags & ETH_TXQ_FLAGS_NOVLANOFFL))
+		*offloads |= DEV_TX_OFFLOAD_VLAN_INSERT;
+	if (!(txq_flags & ETH_TXQ_FLAGS_NOXSUMSCTP))
+		*offloads |= DEV_TX_OFFLOAD_SCTP_CKSUM;
+	if (!(txq_flags & ETH_TXQ_FLAGS_NOXSUMUDP))
+		*offloads |= DEV_TX_OFFLOAD_UDP_CKSUM;
+	if (!(txq_flags & ETH_TXQ_FLAGS_NOXSUMTCP))
+		*offloads |= DEV_TX_OFFLOAD_TCP_CKSUM;
+}
+
+/**
+ * A copy function between rte_eth_txq_conf offloads API to txq_flags
+ * offloads API, to enable application to be agnostic to the PMD supported
+ * API.
+ */
+static void
+rte_eth_copy_txq_offloads(struct rte_eth_txq_conf *txq_conf)
+{
+	uint32_t *txq_flags = &txq_conf->txq_flags
+	uint64_t offloads = txq_conf->offloads;
+
+	if (!(offloads & DEV_TX_OFFLOAD_MULTI_SEGS))
+		*txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS;
+	if (!(offloads & DEV_TX_OFFLOAD_VLAN_INSERT))
+		*txq_flags |= ETH_TXQ_FLAGS_NOVLANOFFL;
+	if (!(offloads & DEV_TX_OFFLOAD_SCTP_CKSUM))
+		*txq_flags |= ETH_TXQ_FLAGS_NOXSUMSCTP;
+	if (!(offloads & DEV_TX_OFFLOAD_UDP_CKSUM))
+		*txq_flags |= ETH_TXQ_FLAGS_NOXSUMUDP;
+	if (!(offloads & DEV_TX_OFFLOAD_TCP_CKSUM))
+		*txq_flags |= ETH_TXQ_FLAGS_NOXSUMTCP;
 }
 
 int
@@ -1135,6 +1268,13 @@ rte_eth_tx_queue_setup(uint8_t port_id, uint16_t tx_queue_id,
 
 	if (tx_conf == NULL)
 		tx_conf = &dev_info.default_txconf;
+
+	if ((dev->data->dev_flags & RTE_ETH_DEV_TXQ_OFFLOAD) &&
+	    (!(tx_conf->txq_flags & ETH_TXQ_FLAGS_IGNORE)))
+		rte_eth_copy_txq_flags(tx_conf);
+	else if (!(dev->data->dev_flags & RTE_ETH_DEV_TXQ_OFFLOAD) &&
+		   (tx_conf->txq_flags & ETH_TXQ_FLAGS_IGNORE))
+		rte_eth_copy_txq_offloads(tx_conf);
 
 	return (*dev->dev_ops->tx_queue_setup)(dev, tx_queue_id, nb_tx_desc,
 					       socket_id, tx_conf);
