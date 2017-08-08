@@ -64,3 +64,18 @@ Deprecation Notices
   be removed in 17.11:
 
   - ``rte_cryptodev_create_vdev``
+
+* cryptodev: new parameters - ``rte_security_capabilities`` and
+  ``rte_security_ops`` will be added to ``rte_cryptodev_info`` and
+  ``rte_cryptodev`` respectively to support security protocol offloaded
+  operations.
+
+* cryptodev: new parameter ``rte_security_session`` will be added in the union
+  of the structure ``rte_crypto_sym_op``, so that the user can choose either to
+  use ``rte_cryptodev_sym_session`` or ``rte_crypto_sym_xform`` or
+  ``rte_security_session``.
+
+* ethdev: new parameters - ``rte_security_capabilities`` and
+  ``rte_security_ops`` will be added to ``rte_eth_dev_info`` and
+  ``rte_eth_dev`` respectively  to support security operations like
+  ipsec inline.
