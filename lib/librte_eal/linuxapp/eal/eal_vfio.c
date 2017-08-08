@@ -722,6 +722,35 @@ vfio_type1_dma_map(int vfio_container_fd)
 	return 0;
 }
 
+static inline int
+clz64(uint64_t val)
+{
+	return val ? __builtin_clzll(val) : 64;
+}
+
+static inline bool
+is_power_of_2(uint64_t value)
+{
+	if (!value)
+		return false;
+
+	return !(value & (value - 1));
+}
+
+static inline uint64_t
+roundup_next_pow2(uint64_t value)
+{
+	uint8_t nlz = clz64(value);
+
+	if (is_power_of_2(value))
+		return value;
+
+	if (!nlz)
+		return 0;
+
+	return 1ULL << (64 - nlz);
+}
+
 static int
 vfio_spapr_dma_map(int vfio_container_fd)
 {
@@ -759,15 +788,22 @@ vfio_spapr_dma_map(int vfio_container_fd)
 		return -1;
 	}
 
-	/* calculate window size based on number of hugepages configured */
-	create.window_size = rte_eal_get_physmem_size();
+	/* physicaly pages are sorted descending i.e. ms[0].phys_addr is max */
+	/* create DMA window from 0 to max(phys_addr + len) */
+	/* sPAPR requires window size to be a power of 2 */
+	create.window_size = roundup_next_pow2(ms[0].phys_addr + ms[0].len);
 	create.page_shift = __builtin_ctzll(ms->hugepage_sz);
-	create.levels = 2;
+	create.levels = 1;
 
 	ret = ioctl(vfio_container_fd, VFIO_IOMMU_SPAPR_TCE_CREATE, &create);
 	if (ret) {
 		RTE_LOG(ERR, EAL, "  cannot create new DMA window, "
 				"error %i (%s)\n", errno, strerror(errno));
+		return -1;
+	}
+
+	if (create.start_addr != 0) {
+		RTE_LOG(ERR, EAL, "  DMA window start address != 0\n");
 		return -1;
 	}
 
