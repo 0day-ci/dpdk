@@ -58,6 +58,23 @@ rte_rdtsc(void)
 	asm volatile("mrs %0, cntvct_el0" : "=r" (tsc));
 	return tsc;
 }
+
+/**
+ * Get the number of rdtsc cycles in one second if the architecture supports.
+ *
+ * @return
+ *   The number of rdtsc cycles in one second. Return zero if the architecture
+ *   support is not available.
+ */
+static inline uint64_t
+rte_rdtsc_arch_hz(void)
+{
+	uint64_t freq;
+
+	asm volatile("mrs %0, cntfrq_el0" : "=r" (freq));
+	return freq;
+}
+
 #else
 /**
  * This is an alternative method to enable rte_rdtsc() with high resolution
@@ -84,6 +101,19 @@ rte_rdtsc(void)
 
 	asm volatile("mrs %0, pmccntr_el0" : "=r"(tsc));
 	return tsc;
+}
+
+/**
+ * Get the number of rdtsc cycles in one second if the architecture supports.
+ *
+ * @return
+ *   The number of rdtsc cycles in one second. Return zero if the architecture
+ *   support is not available.
+ */
+static inline uint64_t
+rte_rdtsc_arch_hz(void)
+{
+	return 0;
 }
 #endif
 
