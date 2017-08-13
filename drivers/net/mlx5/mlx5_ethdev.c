@@ -1124,47 +1124,75 @@ mlx5_ibv_device_to_pci_addr(const struct ibv_device *device,
 }
 
 /**
- * Link status handler.
+ * Update the link status.
+ * Set alarm if the device link status is inconsistent.
  *
  * @param priv
  *   Pointer to private structure.
- * @param dev
- *   Pointer to the rte_eth_dev structure.
  *
  * @return
- *   Nonzero if the callback process can be called immediately.
+ *   Zero if alarm is not set and the link status is consistent.
  */
 static int
-priv_dev_link_status_handler(struct priv *priv, struct rte_eth_dev *dev)
+priv_link_status_alarm_update(struct priv *priv)
+{
+	struct rte_eth_link *link = &priv->dev->data->dev_link;
+
+	mlx5_link_update(priv->dev, 0);
+	if (((link->link_speed == 0) && link->link_status) ||
+		((link->link_speed != 0) && !link->link_status)) {
+		if (!priv->pending_alarm) {
+			/* Inconsistent status, check again later. */
+			priv->pending_alarm = 1;
+			rte_eal_alarm_set(MLX5_ALARM_TIMEOUT_US,
+				mlx5_dev_link_status_handler,
+				priv->dev);
+		}
+		return 1;
+	} else if (unlikely(priv->pending_alarm)) {
+		/* In case of link interrupt while link alarm was setting. */
+		priv->pending_alarm = 0;
+		rte_eal_alarm_cancel(mlx5_dev_link_status_handler, priv->dev);
+	}
+	return 0;
+}
+
+/**
+ * Device status handler.
+ *
+ * @param priv
+ *   Pointer to private structure.
+ * @param events
+ *   Pointer to event flags holder.
+ *
+ * @return
+ *   Events bitmap of callback process which can be called immediately.
+ */
+static uint32_t
+priv_dev_status_handler(struct priv *priv)
 {
 	struct ibv_async_event event;
-	struct rte_eth_link *link = &dev->data->dev_link;
-	int ret = 0;
+	uint32_t ret = 0;
 
 	/* Read all message and acknowledge them. */
 	for (;;) {
 		if (ibv_get_async_event(priv->ctx, &event))
 			break;
-
-		if (event.event_type != IBV_EVENT_PORT_ACTIVE &&
-		    event.event_type != IBV_EVENT_PORT_ERR)
+		if ((event.event_type == IBV_EVENT_PORT_ACTIVE ||
+			event.event_type == IBV_EVENT_PORT_ERR) &&
+			(priv->dev->data->dev_conf.intr_conf.lsc == 1))
+			ret |= (1 << RTE_ETH_EVENT_INTR_LSC);
+		else if (event.event_type == IBV_EVENT_DEVICE_FATAL &&
+			priv->dev->data->dev_conf.intr_conf.rmv == 1)
+			ret |= (1 << RTE_ETH_EVENT_INTR_RMV);
+		else
 			DEBUG("event type %d on port %d not handled",
-			      event.event_type, event.element.port_num);
+				event.event_type, event.element.port_num);
 		ibv_ack_async_event(&event);
 	}
-	mlx5_link_update(dev, 0);
-	if (((link->link_speed == 0) && link->link_status) ||
-	    ((link->link_speed != 0) && !link->link_status)) {
-		if (!priv->pending_alarm) {
-			/* Inconsistent status, check again later. */
-			priv->pending_alarm = 1;
-			rte_eal_alarm_set(MLX5_ALARM_TIMEOUT_US,
-					  mlx5_dev_link_status_handler,
-					  dev);
-		}
-	} else {
-		ret = 1;
-	}
+	if (ret & (1 << RTE_ETH_EVENT_INTR_LSC))
+		if (priv_link_status_alarm_update(priv))
+			ret &= ~(1 << RTE_ETH_EVENT_INTR_LSC);
 	return ret;
 }
 
@@ -1184,11 +1212,11 @@ mlx5_dev_link_status_handler(void *arg)
 	priv_lock(priv);
 	assert(priv->pending_alarm == 1);
 	priv->pending_alarm = 0;
-	ret = priv_dev_link_status_handler(priv, dev);
+	ret = priv_link_status_alarm_update(priv);
 	priv_unlock(priv);
-	if (ret)
+	if (!ret)
 		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL,
-					      NULL);
+			NULL);
 }
 
 /**
@@ -1204,14 +1232,17 @@ mlx5_dev_interrupt_handler(void *cb_arg)
 {
 	struct rte_eth_dev *dev = cb_arg;
 	struct priv *priv = dev->data->dev_private;
-	int ret;
+	uint32_t events;
 
 	priv_lock(priv);
-	ret = priv_dev_link_status_handler(priv, dev);
+	events = priv_dev_status_handler(priv);
 	priv_unlock(priv);
-	if (ret)
+	if (events & (1 << RTE_ETH_EVENT_INTR_LSC))
 		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_LSC, NULL,
-					      NULL);
+			NULL);
+	if (events & (1 << RTE_ETH_EVENT_INTR_RMV))
+		_rte_eth_dev_callback_process(dev, RTE_ETH_EVENT_INTR_RMV, NULL,
+			NULL);
 }
 
 /**
@@ -1225,7 +1256,8 @@ mlx5_dev_interrupt_handler(void *cb_arg)
 void
 priv_dev_interrupt_handler_uninstall(struct priv *priv, struct rte_eth_dev *dev)
 {
-	if (!dev->data->dev_conf.intr_conf.lsc)
+	if (!dev->data->dev_conf.intr_conf.lsc &&
+		!dev->data->dev_conf.intr_conf.rmv)
 		return;
 	rte_intr_callback_unregister(&priv->intr_handle,
 				     mlx5_dev_interrupt_handler,
@@ -1250,7 +1282,8 @@ priv_dev_interrupt_handler_install(struct priv *priv, struct rte_eth_dev *dev)
 {
 	int rc, flags;
 
-	if (!dev->data->dev_conf.intr_conf.lsc)
+	if (!dev->data->dev_conf.intr_conf.lsc &&
+		!dev->data->dev_conf.intr_conf.rmv)
 		return;
 	assert(priv->ctx->async_fd > 0);
 	flags = fcntl(priv->ctx->async_fd, F_GETFL);
@@ -1258,6 +1291,7 @@ priv_dev_interrupt_handler_install(struct priv *priv, struct rte_eth_dev *dev)
 	if (rc < 0) {
 		INFO("failed to change file descriptor async event queue");
 		dev->data->dev_conf.intr_conf.lsc = 0;
+		dev->data->dev_conf.intr_conf.rmv = 0;
 	} else {
 		priv->intr_handle.fd = priv->ctx->async_fd;
 		priv->intr_handle.type = RTE_INTR_HANDLE_EXT;
