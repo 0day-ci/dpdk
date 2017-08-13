@@ -104,6 +104,19 @@ __rte_rdtsc_pmccntr(void)
 
 #endif /* RTE_ARM_EAL_RDTSC_USE_PMU */
 
+/**
+ * Get the number of rdtsc cycles in one second if the architecture supports.
+ *
+ * @return
+ *   The number of rdtsc cycles in one second. Return zero if the architecture
+ *   support is not available.
+ */
+static inline uint64_t
+rte_rdtsc_arch_hz(void)
+{
+	return 0;
+}
+
 static inline uint64_t
 rte_rdtsc_precise(void)
 {
