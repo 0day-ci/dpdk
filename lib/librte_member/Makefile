@@ -36,6 +36,8 @@ LIB = librte_member.a
 
 CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR) -O3
 
+LDLIBS += -lm
+
 EXPORT_MAP := rte_member_version.map
 
 LIBABIVER := 1

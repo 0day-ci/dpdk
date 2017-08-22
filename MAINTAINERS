@@ -734,6 +734,13 @@ F: test/test/test_meter.c
 F: examples/qos_meter/
 F: doc/guides/sample_app_ug/qos_metering.rst
 
+Membership - EXPERIMENTAL
+M: Yipeng Wang <yipeng1.wang@intel.com>
+M: Sameh Gobriel <sameh.gobriel@intel.com>
+F: lib/librte_member/
+F: doc/guides/prog_guide/member_lib.rst
+F: test/test/test_member*
+
 
 Other libraries
 ---------------
