@@ -1564,6 +1564,8 @@ static const struct eth_dev_ops bnxt_dev_ops = {
 	.txq_info_get = bnxt_txq_info_get_op,
 	.dev_led_on = bnxt_dev_led_on_op,
 	.dev_led_off = bnxt_dev_led_off_op,
+	.xstats_get_by_id = bnxt_dev_xstats_get_by_id_op,
+	.xstats_get_names_by_id = bnxt_dev_xstats_get_names_by_id_op,
 };
 
 static bool bnxt_vf_pciid(uint16_t id)
