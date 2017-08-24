@@ -1517,6 +1517,28 @@ bnxt_dev_led_off_op(struct rte_eth_dev *dev)
 	return bnxt_hwrm_port_led_cfg(bp, false);
 }
 
+static uint32_t
+bnxt_rx_queue_count_op(struct rte_eth_dev *dev, uint16_t rx_queue_id)
+{
+	uint32_t desc = 0, raw_cons = 0, cons;
+	struct bnxt_cp_ring_info *cpr;
+	struct bnxt_rx_queue *rxq;
+	struct rx_pkt_cmpl *rxcmp;
+
+	rxq = dev->data->rx_queues[rx_queue_id];
+	cpr = rxq->cp_ring;
+
+	while (raw_cons < rxq->nb_rx_desc) {
+		cons = RING_CMP(cpr->cp_ring_struct, raw_cons++);
+		rxcmp = (struct rx_pkt_cmpl *)&cpr->cp_desc_ring[cons];
+
+		if (CMP_VALID(rxcmp, raw_cons, cpr->cp_ring_struct))
+			desc++;
+	}
+
+	return desc;
+}
+
 /*
  * Initialization
  */
@@ -1566,6 +1588,7 @@ static const struct eth_dev_ops bnxt_dev_ops = {
 	.dev_led_off = bnxt_dev_led_off_op,
 	.xstats_get_by_id = bnxt_dev_xstats_get_by_id_op,
 	.xstats_get_names_by_id = bnxt_dev_xstats_get_names_by_id_op,
+	.rx_queue_count = bnxt_rx_queue_count_op,
 };
 
 static bool bnxt_vf_pciid(uint16_t id)
