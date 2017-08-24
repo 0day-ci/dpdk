@@ -332,7 +332,7 @@ int bnxt_hwrm_cfa_vlan_antispoof_cfg(struct bnxt *bp, uint16_t fid,
 	return rc;
 }
 
-int bnxt_hwrm_clear_filter(struct bnxt *bp,
+int bnxt_hwrm_clear_l2_filter(struct bnxt *bp,
 			   struct bnxt_filter_info *filter)
 {
 	int rc = 0;
@@ -356,7 +356,7 @@ int bnxt_hwrm_clear_filter(struct bnxt *bp,
 	return 0;
 }
 
-int bnxt_hwrm_set_filter(struct bnxt *bp,
+int bnxt_hwrm_set_l2_filter(struct bnxt *bp,
 			 uint16_t dst_id,
 			 struct bnxt_filter_info *filter)
 {
@@ -366,7 +366,7 @@ int bnxt_hwrm_set_filter(struct bnxt *bp,
 	uint32_t enables = 0;
 
 	if (filter->fw_l2_filter_id != UINT64_MAX)
-		bnxt_hwrm_clear_filter(bp, filter);
+		bnxt_hwrm_clear_l2_filter(bp, filter);
 
 	HWRM_PREP(req, CFA_L2_FILTER_ALLOC);
 
@@ -1752,7 +1752,12 @@ int bnxt_clear_hwrm_vnic_filters(struct bnxt *bp, struct bnxt_vnic_info *vnic)
 	int rc = 0;
 
 	STAILQ_FOREACH(filter, &vnic->filter, next) {
-		rc = bnxt_hwrm_clear_filter(bp, filter);
+		if (filter->filter_type == HWRM_CFA_EM_FILTER)
+			rc = bnxt_hwrm_clear_em_filter(bp, filter);
+		else if (filter->filter_type == HWRM_CFA_NTUPLE_FILTER)
+			rc = bnxt_hwrm_clear_ntuple_filter(bp, filter);
+		else
+			rc = bnxt_hwrm_clear_l2_filter(bp, filter);
 		if (rc)
 			break;
 	}
@@ -1765,7 +1770,7 @@ int bnxt_set_hwrm_vnic_filters(struct bnxt *bp, struct bnxt_vnic_info *vnic)
 	int rc = 0;
 
 	STAILQ_FOREACH(filter, &vnic->filter, next) {
-		rc = bnxt_hwrm_set_filter(bp, vnic->fw_vnic_id, filter);
+		rc = bnxt_hwrm_set_l2_filter(bp, vnic->fw_vnic_id, filter);
 		if (rc)
 			break;
 	}
@@ -3128,4 +3133,195 @@ int bnxt_hwrm_func_qcfg_vf_dflt_vnic_id(struct bnxt *bp, int vf)
 exit:
 	rte_free(vnic_ids);
 	return -1;
+}
+
+int bnxt_hwrm_set_em_filter(struct bnxt *bp,
+			 uint16_t dst_id,
+			 struct bnxt_filter_info *filter)
+{
+	int rc = 0;
+	struct hwrm_cfa_em_flow_alloc_input req = {.req_type = 0 };
+	struct hwrm_cfa_em_flow_alloc_output *resp = bp->hwrm_cmd_resp_addr;
+	uint32_t enables = 0;
+
+	if (filter->fw_em_filter_id != UINT64_MAX)
+		bnxt_hwrm_clear_em_filter(bp, filter);
+
+	HWRM_PREP(req, CFA_EM_FLOW_ALLOC);
+
+	req.flags = rte_cpu_to_le_32(filter->flags);
+
+	enables = filter->enables |
+	      HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_DST_ID;
+	req.dst_id = rte_cpu_to_le_16(dst_id);
+
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_L2_FILTER_ID)
+		req.l2_filter_id = filter->fw_l2_filter_id;
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_SRC_MACADDR)
+		memcpy(req.src_macaddr, filter->src_macaddr,
+		       ETHER_ADDR_LEN);
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_DST_MACADDR)
+		memcpy(req.dst_macaddr, filter->dst_macaddr,
+		       ETHER_ADDR_LEN);
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_OVLAN_VID)
+		req.ovlan_vid = filter->l2_ovlan;
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_IVLAN_VID)
+		req.ivlan_vid = filter->l2_ivlan;
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_ETHERTYPE)
+		req.ethertype = filter->ethertype;
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_SRC_IPADDR)
+		req.src_ipaddr[0] = filter->src_ipaddr[0];
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_DST_IPADDR)
+		req.dst_ipaddr[0] = filter->dst_ipaddr[0];
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_SRC_PORT)
+		req.src_port = filter->src_port;
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_DST_PORT)
+		req.dst_port = filter->dst_port;
+	if (enables &
+	    HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_MIRROR_VNIC_ID)
+		req.mirror_vnic_id = filter->mirror_vnic_id;
+
+	req.enables = rte_cpu_to_le_32(enables);
+
+	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
+
+	HWRM_CHECK_RESULT();
+
+	filter->fw_em_filter_id = rte_le_to_cpu_64(resp->em_filter_id);
+	HWRM_UNLOCK();
+
+	return rc;
+}
+
+int bnxt_hwrm_clear_em_filter(struct bnxt *bp, struct bnxt_filter_info *filter)
+{
+	int rc = 0;
+	struct hwrm_cfa_em_flow_free_input req = {.req_type = 0 };
+	struct hwrm_cfa_em_flow_free_output *resp = bp->hwrm_cmd_resp_addr;
+
+	if (filter->fw_em_filter_id == UINT64_MAX)
+		return 0;
+
+	HWRM_PREP(req, CFA_EM_FLOW_FREE);
+
+	req.em_filter_id = rte_cpu_to_le_64(filter->fw_em_filter_id);
+
+	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
+
+	HWRM_CHECK_RESULT();
+	HWRM_UNLOCK();
+
+	filter->fw_l2_filter_id = -1;
+
+	return 0;
+}
+
+int bnxt_hwrm_set_ntuple_filter(struct bnxt *bp,
+			 uint16_t dst_id,
+			 struct bnxt_filter_info *filter)
+{
+	int rc = 0;
+	struct hwrm_cfa_ntuple_filter_alloc_input req = {.req_type = 0 };
+	struct hwrm_cfa_ntuple_filter_alloc_output *resp =
+						bp->hwrm_cmd_resp_addr;
+	uint32_t enables = 0;
+
+	if (filter->fw_ntuple_filter_id != UINT64_MAX)
+		bnxt_hwrm_clear_ntuple_filter(bp, filter);
+
+	HWRM_PREP(req, CFA_NTUPLE_FILTER_ALLOC);
+
+	req.flags = rte_cpu_to_le_32(filter->flags);
+
+	enables = filter->enables |
+	      HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_ID;
+	req.dst_id = rte_cpu_to_le_16(dst_id);
+
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_L2_FILTER_ID)
+		req.l2_filter_id = filter->fw_l2_filter_id;
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_SRC_MACADDR)
+		memcpy(req.src_macaddr, filter->src_macaddr,
+		       ETHER_ADDR_LEN);
+	//if (enables &
+	    //HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_MACADDR)
+		//memcpy(req.dst_macaddr, filter->dst_macaddr,
+		       //ETHER_ADDR_LEN);
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_ETHERTYPE)
+		req.ethertype = filter->ethertype;
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_SRC_IPADDR)
+		req.src_ipaddr[0] = filter->src_ipaddr[0];
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_SRC_IPADDR_MASK)
+		req.src_ipaddr_mask[0] = filter->src_ipaddr_mask[0];
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_IPADDR)
+		req.dst_ipaddr[0] = filter->dst_ipaddr[0];
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_IPADDR_MASK)
+		req.dst_ipaddr_mask[0] = filter->dst_ipaddr_mask[0];
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_SRC_PORT)
+		req.src_port = filter->src_port;
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_SRC_PORT_MASK)
+		req.src_port_mask = filter->src_port_mask;
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_PORT)
+		req.dst_port = filter->dst_port;
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_PORT_MASK)
+		req.dst_port_mask = filter->dst_port_mask;
+	if (enables &
+	    HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_MIRROR_VNIC_ID)
+		req.mirror_vnic_id = filter->mirror_vnic_id;
+
+	req.enables = rte_cpu_to_le_32(enables);
+
+	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
+
+	HWRM_CHECK_RESULT();
+
+	filter->fw_ntuple_filter_id = rte_le_to_cpu_64(resp->ntuple_filter_id);
+	HWRM_UNLOCK();
+
+	return rc;
+}
+
+int bnxt_hwrm_clear_ntuple_filter(struct bnxt *bp,
+				struct bnxt_filter_info *filter)
+{
+	int rc = 0;
+	struct hwrm_cfa_ntuple_filter_free_input req = {.req_type = 0 };
+	struct hwrm_cfa_ntuple_filter_free_output *resp =
+						bp->hwrm_cmd_resp_addr;
+
+	if (filter->fw_ntuple_filter_id == UINT64_MAX)
+		return 0;
+
+	HWRM_PREP(req, CFA_NTUPLE_FILTER_FREE);
+
+	req.ntuple_filter_id = rte_cpu_to_le_64(filter->fw_ntuple_filter_id);
+
+	rc = bnxt_hwrm_send_message(bp, &req, sizeof(req));
+
+	HWRM_CHECK_RESULT();
+	HWRM_UNLOCK();
+
+	filter->fw_l2_filter_id = -1;
+
+	return 0;
 }

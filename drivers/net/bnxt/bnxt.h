@@ -171,6 +171,13 @@ struct bnxt_cos_queue_info {
 	uint8_t	profile;
 };
 
+struct rte_flow {
+	TAILQ_ENTRY(rte_flow) node;
+	struct bnxt_filter_info *filter;
+};
+
+TAILQ_HEAD(bnxt_flow_list, rte_flow);
+
 #define BNXT_HWRM_SHORT_REQ_LEN		sizeof(struct hwrm_short_input)
 struct bnxt {
 	void				*bar0;
@@ -261,6 +268,7 @@ struct bnxt {
 
 	struct bnxt_led_info	leds[BNXT_MAX_LED];
 	uint8_t			num_leds;
+	struct bnxt_flow_list   flow_list;
 };
 
 int bnxt_link_update_op(struct rte_eth_dev *eth_dev, int wait_to_complete);
@@ -269,4 +277,5 @@ int bnxt_rcv_msg_from_vf(struct bnxt *bp, uint16_t vf_id, void *msg);
 #define RX_PROD_AGG_BD_TYPE_RX_PROD_AGG		0x6
 
 bool is_bnxt_supported(struct rte_eth_dev *dev);
+extern const struct rte_flow_ops bnxt_flow_ops;
 #endif

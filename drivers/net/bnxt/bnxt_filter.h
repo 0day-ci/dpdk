@@ -40,8 +40,15 @@ struct bnxt;
 struct bnxt_filter_info {
 	STAILQ_ENTRY(bnxt_filter_info)	next;
 	uint64_t		fw_l2_filter_id;
+	uint64_t		fw_em_filter_id;
+	uint64_t		fw_ntuple_filter_id;
 #define INVALID_MAC_INDEX	((uint16_t)-1)
 	uint16_t		mac_index;
+#define HWRM_CFA_L2_FILTER     0
+#define HWRM_CFA_EM_FILTER     1
+#define HWRM_CFA_NTUPLE_FILTER 2
+	uint8_t                 filter_type;    //L2 or EM or NTUPLE filter
+	uint16_t                dst_id;
 
 	/* Filter Characteristics */
 	uint32_t		flags;
@@ -65,6 +72,19 @@ struct bnxt_filter_info {
 	uint64_t		l2_filter_id_hint;
 	uint32_t		src_id;
 	uint8_t			src_type;
+	uint8_t                 src_macaddr[6];
+	uint8_t                 dst_macaddr[6];
+	uint32_t                dst_ipaddr[4];
+	uint32_t                dst_ipaddr_mask[4];
+	uint32_t                src_ipaddr[4];
+	uint32_t                src_ipaddr_mask[4];
+	uint16_t                dst_port;
+	uint16_t                dst_port_mask;
+	uint16_t                src_port;
+	uint16_t                src_port_mask;
+	uint16_t                ip_protocol;
+	uint16_t                ip_addr_type;
+	uint16_t                ethertype;
 };
 
 struct bnxt_filter_info *bnxt_alloc_filter(struct bnxt *bp);
@@ -74,4 +94,34 @@ void bnxt_free_all_filters(struct bnxt *bp);
 void bnxt_free_filter_mem(struct bnxt *bp);
 int bnxt_alloc_filter_mem(struct bnxt *bp);
 
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_SRC_MACADDR	\
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_SRC_MACADDR
+#define EM_FLOW_ALLOC_INPUT_EN_SRC_MACADDR	\
+	HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_SRC_MACADDR
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_DST_MACADDR	\
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_MACADDR
+#define EM_FLOW_ALLOC_INPUT_EN_DST_MACADDR	\
+	HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_DST_MACADDR
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_ETHERTYPE   \
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_ETHERTYPE
+#define EM_FLOW_ALLOC_INPUT_EN_ETHERTYPE       \
+	HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_ETHERTYPE
+#define EM_FLOW_ALLOC_INPUT_EN_OVLAN_VID       \
+	HWRM_CFA_EM_FLOW_ALLOC_INPUT_ENABLES_OVLAN_VID
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_SRC_IPADDR  \
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_SRC_IPADDR
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_SRC_IPADDR_MASK     \
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_SRC_IPADDR_MASK
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_DST_IPADDR  \
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_IPADDR
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_DST_IPADDR_MASK     \
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_IPADDR_MASK
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_SRC_PORT    \
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_SRC_PORT
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_SRC_PORT_MASK       \
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_SRC_PORT_MASK
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_DST_PORT    \
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_PORT
+#define NTUPLE_FLTR_ALLOC_INPUT_EN_DST_PORT_MASK       \
+	HWRM_CFA_NTUPLE_FILTER_ALLOC_INPUT_ENABLES_DST_PORT_MASK
 #endif
