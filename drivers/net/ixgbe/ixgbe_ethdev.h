@@ -440,6 +440,11 @@ struct ixgbe_macsec_stats {
 	uint64_t in_pkts_notusingsa;
 };
 
+/* Struct to track emulated stats */
+struct ixgbe_sw_stats {
+	uint64_t tx_pkts;
+};
+
 /* The configuration of bandwidth */
 struct ixgbe_bw_conf {
 	uint8_t tc_num; /* Number of TCs. */
@@ -514,6 +519,7 @@ struct ixgbe_adapter {
 	struct ixgbe_hw             hw;
 	struct ixgbe_hw_stats       stats;
 	struct ixgbe_macsec_stats   macsec_stats;
+	struct ixgbe_sw_stats       sw_stats;
 	struct ixgbe_hw_fdir_info   fdir;
 	struct ixgbe_interrupt      intr;
 	struct ixgbe_stat_mapping_registers stat_mappings;
@@ -546,6 +552,9 @@ struct ixgbe_adapter {
 
 #define IXGBE_DEV_PRIVATE_TO_MACSEC_STATS(adapter) \
 	(&((struct ixgbe_adapter *)adapter)->macsec_stats)
+
+#define IXGBE_DEV_PRIVATE_TO_SW_STATS(adapter) \
+	(&((struct ixgbe_adapter *)adapter)->sw_stats)
 
 #define IXGBE_DEV_PRIVATE_TO_INTR(adapter) \
 	(&((struct ixgbe_adapter *)adapter)->intr)

@@ -347,23 +347,34 @@ ixgbe_xmit_pkts_simple(void *tx_queue, struct rte_mbuf **tx_pkts,
 		       uint16_t nb_pkts)
 {
 	uint16_t nb_tx;
+	struct ixgbe_tx_queue *txq = (struct ixgbe_tx_queue *)tx_queue;
+	struct ixgbe_sw_stats *sw_stats = (struct ixgbe_sw_stats *)
+		IXGBE_DEV_PRIVATE_TO_SW_STATS(
+			rte_eth_devices[txq->port_id].data->dev_private);
 
 	/* Try to transmit at least chunks of TX_MAX_BURST pkts */
-	if (likely(nb_pkts <= RTE_PMD_IXGBE_TX_MAX_BURST))
-		return tx_xmit_pkts(tx_queue, tx_pkts, nb_pkts);
+	if (likely(nb_pkts <= RTE_PMD_IXGBE_TX_MAX_BURST)) {
+		nb_tx = tx_xmit_pkts(tx_queue, tx_pkts, nb_pkts);
+	} else {
+		/*
+		 * transmit more than the max burst,
+		 * in chunks of TX_MAX_BURST
+		 */
+		nb_tx = 0;
+		while (nb_pkts) {
+			uint16_t ret, n;
 
-	/* transmit more than the max burst, in chunks of TX_MAX_BURST */
-	nb_tx = 0;
-	while (nb_pkts) {
-		uint16_t ret, n;
-
-		n = (uint16_t)RTE_MIN(nb_pkts, RTE_PMD_IXGBE_TX_MAX_BURST);
-		ret = tx_xmit_pkts(tx_queue, &(tx_pkts[nb_tx]), n);
-		nb_tx = (uint16_t)(nb_tx + ret);
-		nb_pkts = (uint16_t)(nb_pkts - ret);
-		if (ret < n)
-			break;
+			n = (uint16_t)RTE_MIN(
+					nb_pkts, RTE_PMD_IXGBE_TX_MAX_BURST);
+			ret = tx_xmit_pkts(tx_queue, &tx_pkts[nb_tx], n);
+			nb_tx = (uint16_t)(nb_tx + ret);
+			nb_pkts = (uint16_t)(nb_pkts - ret);
+			if (ret < n)
+				break;
+		}
 	}
+
+	sw_stats->tx_pkts += nb_tx;
 
 	return nb_tx;
 }
@@ -375,6 +386,9 @@ ixgbe_xmit_pkts_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
 {
 	uint16_t nb_tx = 0;
 	struct ixgbe_tx_queue *txq = (struct ixgbe_tx_queue *)tx_queue;
+	struct ixgbe_sw_stats *sw_stats = (struct ixgbe_sw_stats *)
+		IXGBE_DEV_PRIVATE_TO_SW_STATS(
+			rte_eth_devices[txq->port_id].data->dev_private);
 
 	while (nb_pkts) {
 		uint16_t ret, num;
@@ -387,6 +401,8 @@ ixgbe_xmit_pkts_vec(void *tx_queue, struct rte_mbuf **tx_pkts,
 		if (ret < num)
 			break;
 	}
+
+	sw_stats->tx_pkts += nb_tx;
 
 	return nb_tx;
 }
@@ -636,6 +652,7 @@ uint16_t
 ixgbe_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
 		uint16_t nb_pkts)
 {
+	struct ixgbe_sw_stats *sw_stats;
 	struct ixgbe_tx_queue *txq;
 	struct ixgbe_tx_entry *sw_ring;
 	struct ixgbe_tx_entry *txe, *txn;
@@ -941,6 +958,10 @@ end_of_tx:
 		   (unsigned) tx_id, (unsigned) nb_tx);
 	IXGBE_PCI_REG_WRITE_RELAXED(txq->tdt_reg_addr, tx_id);
 	txq->tx_tail = tx_id;
+
+	sw_stats = (struct ixgbe_sw_stats *)IXGBE_DEV_PRIVATE_TO_SW_STATS(
+			rte_eth_devices[txq->port_id].data->dev_private);
+	sw_stats->tx_pkts += nb_tx;
 
 	return nb_tx;
 }

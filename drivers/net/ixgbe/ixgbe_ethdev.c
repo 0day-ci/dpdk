@@ -728,6 +728,14 @@ static const struct rte_ixgbe_xstats_name_off rte_ixgbe_stats_strings[] = {
 #define IXGBE_NB_HW_STATS (sizeof(rte_ixgbe_stats_strings) / \
 			   sizeof(rte_ixgbe_stats_strings[0]))
 
+/* SW statistics */
+static const struct rte_ixgbe_xstats_name_off rte_ixgbe_sw_strings[] = {
+	{"tx_pkts", offsetof(struct ixgbe_sw_stats, tx_pkts)},
+};
+
+#define IXGBE_NB_SW_STATS (sizeof(rte_ixgbe_sw_strings) / \
+			   sizeof(rte_ixgbe_sw_strings[0]))
+
 /* MACsec statistics */
 static const struct rte_ixgbe_xstats_name_off rte_ixgbe_macsec_strings[] = {
 	{"out_pkts_untagged", offsetof(struct ixgbe_macsec_stats,
@@ -3084,6 +3092,8 @@ ixgbe_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 			IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct ixgbe_hw_stats *hw_stats =
 			IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct ixgbe_sw_stats *sw_stats =
+			IXGBE_DEV_PRIVATE_TO_SW_STATS(dev->data->dev_private);
 	struct ixgbe_macsec_stats *macsec_stats =
 			IXGBE_DEV_PRIVATE_TO_MACSEC_STATS(
 				dev->data->dev_private);
@@ -3129,7 +3139,10 @@ ixgbe_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 			  hw_stats->fclast;
 
 	/* Tx Errors */
-	stats->oerrors  = 0;
+	if (sw_stats->tx_pkts > stats->opackets)
+		stats->oerrors = sw_stats->tx_pkts - stats->opackets;
+	else
+		stats->oerrors = 0;
 }
 
 static void
@@ -3137,18 +3150,21 @@ ixgbe_dev_stats_reset(struct rte_eth_dev *dev)
 {
 	struct ixgbe_hw_stats *stats =
 			IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct ixgbe_sw_stats *sw_stats =
+			IXGBE_DEV_PRIVATE_TO_SW_STATS(dev->data->dev_private);
 
 	/* HW registers are cleared on read */
 	ixgbe_dev_stats_get(dev, NULL);
 
 	/* Reset software totals */
 	memset(stats, 0, sizeof(*stats));
+	memset(sw_stats, 0, sizeof(*sw_stats));
 }
 
 /* This function calculates the number of xstats based on the current config */
 static unsigned
 ixgbe_xstats_calc_num(void) {
-	return IXGBE_NB_HW_STATS + IXGBE_NB_MACSEC_STATS +
+	return IXGBE_NB_HW_STATS + IXGBE_NB_MACSEC_STATS + IXGBE_NB_SW_STATS +
 		(IXGBE_NB_RXQ_PRIO_STATS * IXGBE_NB_RXQ_PRIO_VALUES) +
 		(IXGBE_NB_TXQ_PRIO_STATS * IXGBE_NB_TXQ_PRIO_VALUES);
 }
@@ -3172,6 +3188,15 @@ static int ixgbe_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 				sizeof(xstats_names[count].name),
 				"%s",
 				rte_ixgbe_stats_strings[i].name);
+			count++;
+		}
+
+		/* SW Stats */
+		for (i = 0; i < IXGBE_NB_SW_STATS; i++) {
+			snprintf(xstats_names[count].name,
+				sizeof(xstats_names[count].name),
+				"%s",
+				rte_ixgbe_sw_strings[i].name);
 			count++;
 		}
 
@@ -3235,6 +3260,15 @@ static int ixgbe_dev_xstats_get_names_by_id(
 				count++;
 			}
 
+			/* SW Stats */
+			for (i = 0; i < IXGBE_NB_SW_STATS; i++) {
+				snprintf(xstats_names[count].name,
+					sizeof(xstats_names[count].name),
+					"%s",
+					rte_ixgbe_sw_strings[i].name);
+				count++;
+			}
+
 			/* MACsec Stats */
 			for (i = 0; i < IXGBE_NB_MACSEC_STATS; i++) {
 				snprintf(xstats_names[count].name,
@@ -3290,17 +3324,23 @@ static int ixgbe_dev_xstats_get_names_by_id(
 static int ixgbevf_dev_xstats_get_names(__rte_unused struct rte_eth_dev *dev,
 	struct rte_eth_xstat_name *xstats_names, unsigned limit)
 {
-	unsigned i;
+	unsigned int i, j;
 
-	if (limit < IXGBEVF_NB_XSTATS && xstats_names != NULL)
+	if (limit < (IXGBEVF_NB_XSTATS + IXGBE_NB_SW_STATS) &&
+		xstats_names != NULL)
 		return -ENOMEM;
 
-	if (xstats_names != NULL)
+	if (xstats_names != NULL) {
 		for (i = 0; i < IXGBEVF_NB_XSTATS; i++)
 			snprintf(xstats_names[i].name,
 				sizeof(xstats_names[i].name),
 				"%s", rte_ixgbevf_stats_strings[i].name);
-	return IXGBEVF_NB_XSTATS;
+		for (j = 0; j < IXGBE_NB_SW_STATS; j++, i++)
+			snprintf(xstats_names[i].name,
+				sizeof(xstats_names[i].name),
+				"%s", rte_ixgbe_sw_strings[j].name);
+	}
+	return (IXGBEVF_NB_XSTATS + IXGBE_NB_SW_STATS);
 }
 
 static int
@@ -3311,6 +3351,8 @@ ixgbe_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 			IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 	struct ixgbe_hw_stats *hw_stats =
 			IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct ixgbe_sw_stats *sw_stats =
+			IXGBE_DEV_PRIVATE_TO_SW_STATS(dev->data->dev_private);
 	struct ixgbe_macsec_stats *macsec_stats =
 			IXGBE_DEV_PRIVATE_TO_MACSEC_STATS(
 				dev->data->dev_private);
@@ -3341,6 +3383,14 @@ ixgbe_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 	for (i = 0; i < IXGBE_NB_HW_STATS; i++) {
 		xstats[count].value = *(uint64_t *)(((char *)hw_stats) +
 				rte_ixgbe_stats_strings[i].offset);
+		xstats[count].id = count;
+		count++;
+	}
+
+	/* SW Stats */
+	for (i = 0; i < IXGBE_NB_SW_STATS; i++) {
+		xstats[count].value = *(uint64_t *)(((char *)sw_stats) +
+				rte_ixgbe_sw_strings[i].offset);
 		xstats[count].id = count;
 		count++;
 	}
@@ -3387,6 +3437,9 @@ ixgbe_dev_xstats_get_by_id(struct rte_eth_dev *dev, const uint64_t *ids,
 		struct ixgbe_hw_stats *hw_stats =
 				IXGBE_DEV_PRIVATE_TO_STATS(
 						dev->data->dev_private);
+		struct ixgbe_sw_stats *sw_stats =
+				IXGBE_DEV_PRIVATE_TO_SW_STATS(
+						dev->data->dev_private);
 		struct ixgbe_macsec_stats *macsec_stats =
 				IXGBE_DEV_PRIVATE_TO_MACSEC_STATS(
 					dev->data->dev_private);
@@ -3418,6 +3471,13 @@ ixgbe_dev_xstats_get_by_id(struct rte_eth_dev *dev, const uint64_t *ids,
 		for (i = 0; i < IXGBE_NB_HW_STATS; i++) {
 			values[count] = *(uint64_t *)(((char *)hw_stats) +
 					rte_ixgbe_stats_strings[i].offset);
+			count++;
+		}
+
+		/* SW Stats */
+		for (i = 0; i < IXGBE_NB_SW_STATS; i++) {
+			values[count] = *(uint64_t *)(((char *)sw_stats) +
+					rte_ixgbe_sw_strings[i].offset);
 			count++;
 		}
 
@@ -3521,10 +3581,12 @@ ixgbevf_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 {
 	struct ixgbevf_hw_stats *hw_stats = (struct ixgbevf_hw_stats *)
 			IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
-	unsigned i;
+	struct ixgbe_sw_stats *sw_stats = (struct ixgbe_sw_stats *)
+			IXGBE_DEV_PRIVATE_TO_SW_STATS(dev->data->dev_private);
+	unsigned int i, j;
 
-	if (n < IXGBEVF_NB_XSTATS)
-		return IXGBEVF_NB_XSTATS;
+	if (n < (IXGBEVF_NB_XSTATS + IXGBE_NB_SW_STATS))
+		return (IXGBEVF_NB_XSTATS + IXGBE_NB_SW_STATS);
 
 	ixgbevf_update_stats(dev);
 
@@ -3537,8 +3599,13 @@ ixgbevf_dev_xstats_get(struct rte_eth_dev *dev, struct rte_eth_xstat *xstats,
 		xstats[i].value = *(uint64_t *)(((char *)hw_stats) +
 			rte_ixgbevf_stats_strings[i].offset);
 	}
+	for (j = 0; j < IXGBE_NB_SW_STATS; j++, i++) {
+		xstats[i].id = i;
+		xstats[i].value = *(uint64_t *)(((char *)sw_stats) +
+			rte_ixgbe_sw_strings[j].offset);
+	}
 
-	return IXGBEVF_NB_XSTATS;
+	return (IXGBEVF_NB_XSTATS + IXGBE_NB_SW_STATS);
 }
 
 static void
@@ -3546,6 +3613,8 @@ ixgbevf_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 {
 	struct ixgbevf_hw_stats *hw_stats = (struct ixgbevf_hw_stats *)
 			  IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct ixgbe_sw_stats *sw_stats = (struct ixgbe_sw_stats *)
+			  IXGBE_DEV_PRIVATE_TO_SW_STATS(dev->data->dev_private);
 
 	ixgbevf_update_stats(dev);
 
@@ -3556,6 +3625,11 @@ ixgbevf_dev_stats_get(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
 	stats->ibytes = hw_stats->vfgorc;
 	stats->opackets = hw_stats->vfgptc;
 	stats->obytes = hw_stats->vfgotc;
+
+	if (sw_stats->tx_pkts > stats->opackets)
+		stats->oerrors = sw_stats->tx_pkts - stats->opackets;
+	else
+		stats->oerrors = 0;
 }
 
 static void
@@ -3563,6 +3637,8 @@ ixgbevf_dev_stats_reset(struct rte_eth_dev *dev)
 {
 	struct ixgbevf_hw_stats *hw_stats = (struct ixgbevf_hw_stats *)
 			IXGBE_DEV_PRIVATE_TO_STATS(dev->data->dev_private);
+	struct ixgbe_sw_stats *sw_stats = (struct ixgbe_sw_stats *)
+			  IXGBE_DEV_PRIVATE_TO_SW_STATS(dev->data->dev_private);
 
 	/* Sync HW register to the last stats */
 	ixgbevf_dev_stats_get(dev, NULL);
@@ -3572,6 +3648,8 @@ ixgbevf_dev_stats_reset(struct rte_eth_dev *dev)
 	hw_stats->vfgorc = 0;
 	hw_stats->vfgptc = 0;
 	hw_stats->vfgotc = 0;
+
+	memset(sw_stats, 0, sizeof(*sw_stats));
 }
 
 static int
