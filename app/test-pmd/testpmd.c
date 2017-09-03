@@ -393,6 +393,10 @@ static void check_all_ports_link_status(uint32_t port_mask);
 static int eth_event_callback(uint8_t port_id,
 			      enum rte_eth_event_type type,
 			      void *param, void *ret_param);
+static int eth_uevent_callback(struct rte_device *dev,
+			      enum rte_eal_uevent_type type,
+			      void *param, void *ret_param);
+
 
 /*
  * Check if all the ports are started.
@@ -1413,6 +1417,7 @@ start_port(portid_t pid)
 	struct rte_port *port;
 	struct ether_addr mac_addr;
 	enum rte_eth_event_type event_type;
+	enum rte_eal_uevent_type uevent_type;
 
 	if (port_id_is_invalid(pid, ENABLED_WARN))
 		return 0;
@@ -1544,6 +1549,18 @@ start_port(portid_t pid)
 			if (diag) {
 				printf("Failed to setup even callback for event %d\n",
 					event_type);
+				return -1;
+			}
+		}
+
+		for (uevent_type = RTE_EAL_UEVENT_UNKNOWN;
+		     uevent_type < RTE_EAL_UEVENT_MAX;
+		     uevent_type++) {
+			diag = rte_eal_uev_callback_register(&port->dev_info.pci_dev->device,uevent_type,
+							eth_uevent_callback, NULL);
+			if (diag) {
+				printf("Failed to setup uevent callback for uevent %d\n",
+					uevent_type);
 				return -1;
 			}
 		}
@@ -1842,6 +1859,16 @@ rmv_event_callback(void *arg)
 			dev->device->name);
 }
 
+static void
+rmv_uevent_callback(void *arg)
+{
+	struct rte_device *dev = (struct rte_device *)arg;
+	printf("removing device %s\n", dev->name);
+	if (rte_eal_dev_detach(dev))
+		RTE_LOG(ERR, USER1, "Failed to detach device %s\n",
+			dev->name);
+}
+
 /* This function is used by the interrupt thread */
 static int
 eth_event_callback(uint8_t port_id, enum rte_eth_event_type type, void *param,
@@ -1875,6 +1902,41 @@ eth_event_callback(uint8_t port_id, enum rte_eth_event_type type, void *param,
 	case RTE_ETH_EVENT_INTR_RMV:
 		if (rte_eal_alarm_set(100000,
 				rmv_event_callback, (void *)(intptr_t)port_id))
+			fprintf(stderr, "Could not set up deferred device removal\n");
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+/* This function is used by the interrupt thread */
+static int
+eth_uevent_callback(struct rte_device *dev, enum rte_eal_uevent_type type, void *param,
+		  void *ret_param)
+{
+	static const char * const event_desc[] = {
+		[RTE_EAL_UEVENT_UNKNOWN] = "Unknown",
+		[RTE_EAL_UEVENT_REMOVE] = "remove",
+	};
+
+	RTE_SET_USED(param);
+	RTE_SET_USED(ret_param);
+
+	if (type >= RTE_EAL_UEVENT_MAX) {
+		fprintf(stderr, "%s called upon invalid event %d\n",
+			__func__, type);
+		fflush(stderr);
+	} else if (event_print_mask & (UINT32_C(1) << type)) {
+		printf("%s event\n",
+			event_desc[type]);
+		fflush(stdout);
+	}
+
+	switch (type) {
+	case RTE_EAL_UEVENT_REMOVE:
+		if (rte_eal_alarm_set(100000,
+				rmv_uevent_callback, (void *)dev))
 			fprintf(stderr, "Could not set up deferred device removal\n");
 		break;
 	default:
