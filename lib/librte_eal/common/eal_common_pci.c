@@ -110,6 +110,26 @@ pci_name_set(struct rte_pci_device *dev)
 		dev->device.name = dev->name;
 }
 
+/* map a private resource from an address*/
+void *
+pci_map_private_resource(void *requested_addr, off_t offset, size_t size)
+{
+	void *mapaddr;
+
+	mapaddr = mmap(requested_addr, size,
+			   PROT_READ | PROT_WRITE,
+			   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+	if (mapaddr == MAP_FAILED) {
+		RTE_LOG(ERR, EAL, "%s(): cannot mmap(%p, 0x%lx, 0x%lx): %s (%p)\n",
+			__func__, requested_addr,
+			(unsigned long)size, (unsigned long)offset,
+			strerror(errno), mapaddr);
+	} else
+		RTE_LOG(DEBUG, EAL, "  PCI memory mapped at %p\n", mapaddr);
+
+	return mapaddr;
+}
+
 /* map a particular resource from a file */
 void *
 pci_map_resource(void *requested_addr, int fd, off_t offset, size_t size,

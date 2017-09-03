@@ -231,10 +231,61 @@ pci_uio_free_resource(struct rte_pci_device *dev,
 		close(dev->intr_handle.uio_cfg_fd);
 		dev->intr_handle.uio_cfg_fd = -1;
 	}
+	if (dev->intr_handle.uevent_fd >= 0) {
+		close(dev->intr_handle.uevent_fd);
+		dev->intr_handle.uevent_fd = -1;
+	}
 	if (dev->intr_handle.fd >= 0) {
 		close(dev->intr_handle.fd);
 		dev->intr_handle.fd = -1;
 		dev->intr_handle.type = RTE_INTR_HANDLE_UNKNOWN;
+	}
+}
+
+int
+pci_uio_remap_resource(struct rte_pci_device *dev)
+{
+	int i;
+	uint64_t phaddr;
+	void *map_address;
+
+		/* Map all BARs */
+		for (i = 0; i != PCI_MAX_RESOURCE; i++) {
+			/* skip empty BAR */
+			phaddr = dev->mem_resource[i].phys_addr;
+			if (phaddr == 0)
+				continue;
+			map_address = pci_map_private_resource(dev->mem_resource[i].addr, 0,
+					(size_t)dev->mem_resource[i].len);
+			if (map_address == MAP_FAILED)
+				goto error;
+			memset(map_address, 0xFF, (size_t)dev->mem_resource[i].len);
+			dev->mem_resource[i].addr = map_address;
+		}
+
+	return 0;
+error:
+	return -1;
+}
+
+void
+pci_uio_uev_handler(void *param)
+{
+
+	struct rte_pci_device *dev = (struct rte_pci_device *)param;
+	struct rte_eal_uevent event;
+	int ret;
+
+	/* check device uevent */
+	if (rte_eal_uev_receive(dev->intr_handle.uevent_fd, &event) == 0) {
+		if (event.subsystem == RTE_EAL_UEVENT_SUBSYSTEM_UIO) {
+			if (event.type == RTE_EAL_UEVENT_REMOVE) {
+				/*remap the resource to be fake before removal processing */
+				ret = pci_uio_remap_resource(dev);
+				if (!ret)
+					_rte_eal_uev_callback_process(&dev->device, RTE_EAL_UEVENT_REMOVE, NULL, NULL);
+			}
+		}
 	}
 }
 
@@ -246,6 +297,7 @@ pci_uio_alloc_resource(struct rte_pci_device *dev,
 	char cfgname[PATH_MAX];
 	char devname[PATH_MAX]; /* contains the /dev/uioX */
 	int uio_num;
+	struct rte_intr_handle *intr_handle;
 	struct rte_pci_addr *loc;
 
 	loc = &dev->addr;
@@ -275,6 +327,16 @@ pci_uio_alloc_resource(struct rte_pci_device *dev,
 			cfgname, strerror(errno));
 		goto error;
 	}
+
+	dev->intr_handle.uevent_fd = rte_eal_uev_fd_new();
+	intr_handle = &dev->intr_handle;
+
+	rte_eal_uev_enable(intr_handle->uevent_fd);
+	TAILQ_INIT(&(dev->device.uev_cbs));
+
+	/* register callback func to eal lib */
+	rte_intr_callback_register(intr_handle,
+				   pci_uio_uev_handler, dev);
 
 	if (dev->kdrv == RTE_KDRV_IGB_UIO)
 		dev->intr_handle.type = RTE_INTR_HANDLE_UIO;

@@ -670,11 +670,16 @@ eal_intr_process_interrupts(struct epoll_event *events, int nfds)
 			RTE_SET_USED(r);
 			return -1;
 		}
+
 		rte_spinlock_lock(&intr_lock);
-		TAILQ_FOREACH(src, &intr_sources, next)
+		TAILQ_FOREACH(src, &intr_sources, next) {
 			if (src->intr_handle.fd ==
 					events[n].data.fd)
 				break;
+			else if (src->intr_handle.uevent_fd ==
+					events[n].data.fd)
+				break;
+		}
 		if (src == NULL){
 			rte_spinlock_unlock(&intr_lock);
 			continue;
@@ -736,17 +741,13 @@ eal_intr_process_interrupts(struct epoll_event *events, int nfds)
 		rte_spinlock_lock(&intr_lock);
 
 		if (call) {
-
 			/* Finally, call all callbacks. */
 			TAILQ_FOREACH(cb, &src->callbacks, next) {
-
 				/* make a copy and unlock. */
 				active_cb = *cb;
 				rte_spinlock_unlock(&intr_lock);
-
 				/* call the actual callback */
 				active_cb.cb_fn(active_cb.cb_arg);
-
 				/*get the lock back. */
 				rte_spinlock_lock(&intr_lock);
 			}
@@ -859,7 +860,24 @@ eal_intr_thread_main(__rte_unused void *arg)
 			}
 			else
 				numfds++;
+
+			/**
+			 * add device uevent file descriptor
+			 * into wait list for uevent monitoring.
+			 */
+			ev.events = EPOLLIN | EPOLLPRI | EPOLLRDHUP | EPOLLHUP;
+			ev.data.fd = src->intr_handle.uevent_fd;
+			if (epoll_ctl(pfd, EPOLL_CTL_ADD,
+					src->intr_handle.uevent_fd, &ev) < 0){
+				rte_panic("Error adding uevent_fd %d epoll_ctl"
+					", %s\n",
+					src->intr_handle.uevent_fd,
+					strerror(errno));
+			} else
+				numfds++;
 		}
+
+
 		rte_spinlock_unlock(&intr_lock);
 		/* serve the interrupt */
 		eal_intr_handle_interrupts(pfd, numfds);

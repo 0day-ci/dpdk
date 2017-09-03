@@ -90,6 +90,7 @@ struct rte_intr_handle {
 					for uio_pci_generic */
 	};
 	int fd;	 /**< interrupt event file descriptor */
+	int uevent_fd;	 /**< uevent file descriptor */
 	enum rte_intr_handle_type type;  /**< handle type */
 	uint32_t max_intr;             /**< max interrupt requested */
 	uint32_t nb_efd;               /**< number of available efd(event fd) */
@@ -235,5 +236,4 @@ rte_intr_allow_others(struct rte_intr_handle *intr_handle);
  */
 int
 rte_intr_cap_multiple(struct rte_intr_handle *intr_handle);
-
 #endif /* _RTE_LINUXAPP_INTERRUPTS_H_ */

@@ -394,6 +394,23 @@ void rte_pci_unmap_device(struct rte_pci_device *dev);
 
 /**
  * @internal
+ * Map to a particular private resource.
+ *
+ * @param requested_addr
+ *      The starting address for the new mapping range.
+ * @param offset
+ *      The offset for the mapping range.
+ * @param size
+ *      The size for the mapping range.
+ * @return
+ *   - On success, the function returns a pointer to the mapped area.
+ *   - On error, the value MAP_FAILED is returned.
+ */
+void *pci_map_private_resource(void *requested_addr, off_t offset,
+		size_t size);
+
+/**
+ * @internal
  * Map a particular resource from a file.
  *
  * @param requested_addr

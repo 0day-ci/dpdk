@@ -52,6 +52,13 @@ extern "C" {
 #include <rte_config.h>
 #include <rte_log.h>
 
+struct rte_device;
+
+struct rte_eal_uev_callback;
+/** @internal Structure to keep track of registered callbacks */
+TAILQ_HEAD(rte_eal_uev_cb_list, rte_eal_uev_callback);
+
+
 __attribute__((format(printf, 2, 0)))
 static inline void
 rte_pmd_debug_trace(const char *func_name, const char *fmt, ...)
@@ -163,6 +170,8 @@ struct rte_device {
 	const struct rte_driver *driver;/**< Associated driver */
 	int numa_node;                /**< NUMA node connection */
 	struct rte_devargs *devargs;  /**< Device user arguments */
+	/** User application callbacks for device uevent monitoring  */
+	struct rte_eal_uev_cb_list uev_cbs;
 };
 
 /**
@@ -245,6 +254,133 @@ int rte_eal_hotplug_add(const char *busname, const char *devname,
  *   0 on success, negative on error.
  */
 int rte_eal_hotplug_remove(const char *busname, const char *devname);
+
+#define RTE_EAL_UEVENT_MSG_LEN 4096
+#define RTE_EAL_UEVENT_SUBSYSTEM_UIO 1
+#define RTE_EAL_UEVENT_SUBSYSTEM_VFIO 2
+
+/**
+ * The eth device event type for interrupt, and maybe others in the future.
+ */
+enum rte_eal_uevent_type {
+	RTE_EAL_UEVENT_UNKNOWN,  /**< unknown event type */
+	RTE_EAL_UEVENT_ADD, /**< lsc interrupt event */
+	RTE_EAL_UEVENT_REMOVE,
+				/**< queue state event (enabled/disabled) */
+	RTE_EAL_UEVENT_CHANGE,
+			/**< reset interrupt event, sent to VF on PF reset */
+	RTE_EAL_UEVENT_MOVE,  /**< message from the VF received by PF */
+	RTE_EAL_UEVENT_ONLINE,   /**< MACsec offload related event */
+	RTE_EAL_UEVENT_OFFLINE, /**< device removal event */
+	RTE_EAL_UEVENT_MAX       /**< max value of this enum */
+};
+
+struct rte_eal_uevent {
+	enum rte_eal_uevent_type type;	/**< uevent action type */
+	int subsystem;				/**< subsystem id */
+};
+
+/**
+ * create  the device uevent file descriptor.
+ * @return
+ *   - On success, the device uevent fd.
+ *   - On failure, a negative value.
+ */
+int
+rte_eal_uev_fd_new(void);
+
+/**
+ * Bind  the netlink to enable  uevent receiving.
+ *
+ * @param fd
+ *   The fd which the uevent associated to
+ * @return
+ *   - On success, zero.
+ *   - On failure, a negative value.
+ */
+int
+rte_eal_uev_enable(int fd);
+
+/**
+ * It read out the uevent from the specific file descriptor.
+ *
+ * @param fd
+ *   The fd which the uevent associated to
+ * @param uevent
+ *   Pointer to the uevent which read from the monitoring fd.
+ * @return
+ *   - On success, zero.
+ *   - On failure, a negative value.
+ */
+int
+rte_eal_uev_receive(int fd, struct rte_eal_uevent *uevent);
+
+typedef int (*rte_eal_uev_cb_fn)(struct rte_device *dev,
+		enum rte_eal_uevent_type event, void *cb_arg, void *ret_param);
+/**< user application callback to be registered for interrupts */
+
+/**
+ * Register a callback function for specific device..
+ *
+ * @param dev
+ *  Pointer to struct rte_device.
+ * @param event
+ *  Uevent interested.
+ * @param cb_fn
+ *  User supplied callback function to be called.
+ * @param cb_arg
+ *  Pointer to the parameters for the registered callback.
+ *
+ * @return
+ *  - On success, zero.
+ *  - On failure, a negative value.
+ */
+int rte_eal_uev_callback_register(struct rte_device *dev,
+			enum rte_eal_uevent_type event,
+			rte_eal_uev_cb_fn cb_fn, void *cb_arg);
+
+/**
+ * Unregister a callback function for specific device.
+ *
+ * @param device
+ *  Pointer to struct rte_device.
+ * @param event
+ *  Uevent interested.
+ * @param cb_fn
+ *  User supplied callback function to be called.
+ * @param cb_arg
+ *  Pointer to the parameters for the registered callback. -1 means to
+ *  remove all for the same callback address and same event.
+ *
+ * @return
+ *  - On success, zero.
+ *  - On failure, a negative value.
+ */
+int rte_eal_uev_callback_unregister(struct rte_device *dev,
+			enum rte_eal_uevent_type event,
+		rte_eal_uev_cb_fn cb_fn, void *cb_arg);
+
+/**
+ * @internal Executes all the user application registered callbacks for
+ * the specific device. It is for DPDK internal user only. User
+ * application should not call it directly.
+ *
+ * @param dev
+ *  Pointer to struct rte_device.
+ * @param event
+ *  rte device uevent type.
+ * @param cb_arg
+ *  callback parameter.
+ * @param ret_param
+ *  To pass data back to user application.
+ *  This allows the user application to decide if a particular function
+ *  is permitted or not.
+ *
+ * @return
+ *  int
+ */
+int _rte_eal_uev_callback_process(struct rte_device *dev,
+		enum rte_eal_uevent_type event, void *cb_arg, void *ret_param);
 
 /**
  * Device comparison function.

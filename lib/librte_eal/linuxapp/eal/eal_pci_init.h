@@ -52,10 +52,14 @@ void *pci_find_max_end_va(void);
 int pci_parse_one_sysfs_resource(char *line, size_t len, uint64_t *phys_addr,
 	uint64_t *end_addr, uint64_t *flags);
 
+void pci_uio_uev_handler(void *param);
 int pci_uio_alloc_resource(struct rte_pci_device *dev,
 		struct mapped_pci_resource **uio_res);
 void pci_uio_free_resource(struct rte_pci_device *dev,
 		struct mapped_pci_resource *uio_res);
+
+int pci_uio_remap_resource(struct rte_pci_device *dev);
+
 int pci_uio_map_resource_by_index(struct rte_pci_device *dev, int res_idx,
 		struct mapped_pci_resource *uio_res, int map_idx);
 

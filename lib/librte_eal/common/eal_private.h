@@ -192,6 +192,8 @@ int pci_uio_map_resource(struct rte_pci_device *dev);
  */
 void pci_uio_unmap_resource(struct rte_pci_device *dev);
 
+void pci_uio_uev_handler(void *parm);
+
 /**
  * Allocate uio resource for PCI device
  *
@@ -220,6 +222,18 @@ int pci_uio_alloc_resource(struct rte_pci_device *dev,
  */
 void pci_uio_free_resource(struct rte_pci_device *dev,
 		struct mapped_pci_resource *uio_res);
+
+/**
+ * remap the pci uio resource..
+ *
+ * @param dev
+ *   Point to the struct rte pci device.
+ * @return
+ *   - On success, zero.
+ *   - On failure, a negative value.
+ */
+int
+pci_uio_remap_resource(struct rte_pci_device *dev);
 
 /**
  * Map device memory to uio resource
