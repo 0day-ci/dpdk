@@ -241,6 +241,7 @@ EXPERIMENTAL {
 DPDK_17.11 {
 	global:
 
-	rte_reciprocal_value;
+	rte_reciprocal_value_u32;
+	rte_reciprocal_value_u64;
 
 } DPDK_17.08;
