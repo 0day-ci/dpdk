@@ -31,18 +31,13 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-#include <stdint.h>
-
-#include <rte_common.h>
-
-#include "rte_reciprocal.h"
+#include <rte_reciprocal.h>
 
 /* find largest set bit.
  * portable and slow but does not matter for this usage.
  */
 static inline int
-fls(uint32_t x)
+fls_u32(uint32_t x)
 {
 	int b;
 
@@ -54,14 +49,14 @@ fls(uint32_t x)
 	return 0;
 }
 
-struct rte_reciprocal
-rte_reciprocal_value(uint32_t d)
+struct rte_reciprocal_u32
+rte_reciprocal_value_u32(uint32_t d)
 {
-	struct rte_reciprocal R;
+	struct rte_reciprocal_u32 R;
 	uint64_t m;
 	int l;
 
-	l = fls(d - 1);
+	l = fls_u32(d - 1);
 	m = ((1ULL << 32) * ((1ULL << l) - d));
 	m /= d;
 
@@ -69,6 +64,105 @@ rte_reciprocal_value(uint32_t d)
 	R.m = m;
 	R.sh1 = RTE_MIN(l, 1);
 	R.sh2 = RTE_MAX(l - 1, 0);
+
+	return R;
+}
+
+/* Code taken from Hacker's Delight:
+ * http://www.hackersdelight.org/HDcode/divlu.c.
+ * License permits inclusion here per:
+ * http://www.hackersdelight.org/permissions.htm
+ */
+static inline uint64_t
+divide_128_div_64_to_64(uint64_t u1, uint64_t u0, uint64_t v, uint64_t *r)
+{
+	const uint64_t b = (1ULL << 32); /* Number base (16 bits). */
+	uint64_t un1, un0,           /* Norm. dividend LSD's. */
+			 vn1, vn0,           /* Norm. divisor digits. */
+			 q1, q0,             /* Quotient digits. */
+			 un64, un21, un10,   /* Dividend digit pairs. */
+			 rhat;               /* A remainder. */
+	int s;                       /* Shift amount for norm. */
+
+    /* If overflow, set rem. to an impossible value. */
+	if (u1 >= v) {
+		if (r != NULL)
+			*r = (uint64_t) -1;
+		return (uint64_t) -1;
+	}
+
+	/* Count leading zeros. */
+	s = __builtin_clzll(v);
+	if (s > 0) {
+		v = v << s;
+		un64 = (u1 << s) | ((u0 >> (64 - s)) & (-s >> 31));
+		un10 = u0 << s;
+	} else {
+
+		un64 = u1 | u0;
+		un10 = u0;
+	}
+
+	vn1 = v >> 32;
+	vn0 = v & 0xFFFFFFFF;
+
+	un1 = un10 >> 32;
+	un0 = un10 & 0xFFFFFFFF;
+
+	q1 = un64/vn1;
+	rhat = un64 - q1*vn1;
+again1:
+	if (q1 >= b || q1*vn0 > b*rhat + un1) {
+		q1 = q1 - 1;
+		rhat = rhat + vn1;
+		if (rhat < b)
+			goto again1;
+	}
+
+	un21 = un64*b + un1 - q1*v;
+
+	q0 = un21/vn1;
+	rhat = un21 - q0*vn1;
+again2:
+	if (q0 >= b || q0*vn0 > b*rhat + un0) {
+		q0 = q0 - 1;
+		rhat = rhat + vn1;
+		if (rhat < b)
+			goto again2;
+	}
+
+	if (r != NULL)
+		*r = (un21*b + un0 - q0*v) >> s;
+	return q1*b + q0;
+}
+
+struct rte_reciprocal_u64
+rte_reciprocal_value_u64(uint64_t d)
+{
+	struct rte_reciprocal_u64 R;
+
+	const uint32_t fld = 63 - __builtin_clzll(d);
+
+	if ((d & (d - 1)) == 0) {
+		R.m = 0;
+		R.sh1 = (fld - 1) | 0x40;
+	} else {
+		uint64_t rem;
+		uint64_t multiplier;
+		uint8_t more;
+
+		multiplier = divide_128_div_64_to_64(1ULL << fld, 0, d, &rem);
+		multiplier += multiplier;
+
+		const uint64_t twice_rem = rem + rem;
+		if (twice_rem >= d || twice_rem < rem)
+			multiplier += 1;
+		more = fld;
+		R.m = 1 + multiplier;
+		R.sh1 = more | 0x40;
+	}
+
+	R.sh1 &= 0x3F;
 
 	return R;
 }
