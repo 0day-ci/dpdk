@@ -41,7 +41,8 @@
 /* find largest set bit.
  * portable and slow but does not matter for this usage.
  */
-static inline int fls(uint32_t x)
+static inline int
+fls(uint32_t x)
 {
 	int b;
 
@@ -53,7 +54,8 @@ static inline int fls(uint32_t x)
 	return 0;
 }
 
-struct rte_reciprocal rte_reciprocal_value(uint32_t d)
+struct rte_reciprocal
+rte_reciprocal_value(uint32_t d)
 {
 	struct rte_reciprocal R;
 	uint64_t m;

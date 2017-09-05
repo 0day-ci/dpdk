@@ -29,13 +29,15 @@ struct rte_reciprocal {
 	uint8_t sh1, sh2;
 };
 
-static inline uint32_t rte_reciprocal_divide(uint32_t a, struct rte_reciprocal R)
+static inline uint32_t
+rte_reciprocal_divide(uint32_t a, struct rte_reciprocal R)
 {
 	uint32_t t = (uint32_t)(((uint64_t)a * R.m) >> 32);
 
 	return (t + ((a - t) >> R.sh1)) >> R.sh2;
 }
 
-struct rte_reciprocal rte_reciprocal_value(uint32_t d);
+struct rte_reciprocal
+rte_reciprocal_value(uint32_t d);
 
 #endif /* _RTE_RECIPROCAL_H_ */
