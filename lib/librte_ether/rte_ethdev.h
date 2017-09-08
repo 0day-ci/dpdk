@@ -935,6 +935,113 @@ struct rte_pci_device;
 /**
  * Ethernet device information
  */
+
+/* Types of port connector. */
+#define RTE_ETH_CONNECTOR_TP        0x00 /**< Twisted Pair */
+#define RTE_ETH_CONNECTOR_AUI       0x01 /**< Attachment Unit Interface */
+#define RTE_ETH_CONNECTOR_MII       0x02 /**< Media-Independent Interface */
+#define RTE_ETH_CONNECTOR_FIBRE     0x03 /**< Fiber */
+#define RTE_ETH_CONNECTOR_DA        0x05 /**< Direct Attach */
+#define RTE_ETH_CONNECTOR_NONE      0xef
+#define RTE_ETH_CONNECTOR_OTHER     0xff
+
+/* Link modes. */
+#define RTE_ETH_LINK_MODE_10baseT_Half_BIT            0
+#define RTE_ETH_LINK_MODE_10baseT_Full_BIT            1
+#define RTE_ETH_LINK_MODE_100baseT_Half_BIT           2
+#define RTE_ETH_LINK_MODE_100baseT_Full_BIT           3
+#define RTE_ETH_LINK_MODE_1000baseT_Half_BIT          4
+#define RTE_ETH_LINK_MODE_1000baseT_Full_BIT          5
+#define RTE_ETH_LINK_MODE_Autoneg_BIT                 6
+#define RTE_ETH_LINK_MODE_TP_BIT                      7
+#define RTE_ETH_LINK_MODE_AUI_BIT                     8
+#define RTE_ETH_LINK_MODE_MII_BIT                     9
+#define RTE_ETH_LINK_MODE_FIBRE_BIT                  10
+#define RTE_ETH_LINK_MODE_BNC_BIT                    11
+#define RTE_ETH_LINK_MODE_10000baseT_Full_BIT        12
+#define RTE_ETH_LINK_MODE_Pause_BIT                  13
+#define RTE_ETH_LINK_MODE_Asym_Pause_BIT             14
+#define RTE_ETH_LINK_MODE_2500baseX_Full_BIT         15
+#define RTE_ETH_LINK_MODE_Backplane_BIT              16
+#define RTE_ETH_LINK_MODE_1000baseKX_Full_BIT        17
+#define RTE_ETH_LINK_MODE_10000baseKX4_Full_BIT      18
+#define RTE_ETH_LINK_MODE_10000baseKR_Full_BIT       19
+#define RTE_ETH_LINK_MODE_10000baseR_FEC_BIT         20
+#define RTE_ETH_LINK_MODE_20000baseMLD2_Full_BIT     21
+#define RTE_ETH_LINK_MODE_20000baseKR2_Full_BIT      22
+#define RTE_ETH_LINK_MODE_40000baseKR4_Full_BIT      23
+#define RTE_ETH_LINK_MODE_40000baseCR4_Full_BIT      24
+#define RTE_ETH_LINK_MODE_40000baseSR4_Full_BIT      25
+#define RTE_ETH_LINK_MODE_40000baseLR4_Full_BIT      26
+#define RTE_ETH_LINK_MODE_56000baseKR4_Full_BIT      27
+#define RTE_ETH_LINK_MODE_56000baseCR4_Full_BIT      28
+#define RTE_ETH_LINK_MODE_56000baseSR4_Full_BIT      29
+#define RTE_ETH_LINK_MODE_56000baseLR4_Full_BIT      30
+#define RTE_ETH_LINK_MODE_25000baseCR_Full_BIT       31
+#define RTE_ETH_LINK_MODE_25000baseKR_Full_BIT       32
+#define RTE_ETH_LINK_MODE_25000baseSR_Full_BIT       33
+#define RTE_ETH_LINK_MODE_50000baseCR2_Full_BIT      34
+#define RTE_ETH_LINK_MODE_50000baseKR2_Full_BIT      35
+#define RTE_ETH_LINK_MODE_100000baseKR4_Full_BIT     36
+#define RTE_ETH_LINK_MODE_100000baseSR4_Full_BIT     37
+#define RTE_ETH_LINK_MODE_100000baseCR4_Full_BIT     38
+#define RTE_ETH_LINK_MODE_100000baseLR4_ER4_Full_BIT 39
+#define RTE_ETH_LINK_MODE_50000baseSR2_Full_BIT      40
+#define RTE_ETH_LINK_MODE_1000baseX_Full_BIT         41
+#define RTE_ETH_LINK_MODE_10000baseCR_Full_BIT       42
+#define RTE_ETH_LINK_MODE_10000baseSR_Full_BIT       43
+#define RTE_ETH_LINK_MODE_10000baseLR_Full_BIT       44
+#define RTE_ETH_LINK_MODE_10000baseLRM_Full_BIT      45
+#define RTE_ETH_LINK_MODE_10000baseER_Full_BIT       46
+#define RTE_ETH_LINK_MODE_2500baseT_Full_BIT         47
+#define RTE_ETH_LINK_MODE_5000baseT_Full_BIT         48
+
+#define RTE_ETH_LINK_MODE_BIT(link_mode_base_name)		\
+	(RTE_ETH_LINK_MODE_ ## link_mode_base_name ## _BIT)
+
+/**
+ * Provide a set of inline functions to make PMDs and DPDK applications
+ * independent of the actual layout of the bitmaps used to represent
+ * the set of supported link modes and the set of advertised link modes.
+ * Hence, if more then 64 bits (say 70 bits for instance) are needed for
+ * new link modes:
+ * 1) the "rte_eth_link_modes" data structure can be modified as follows:
+ *    struct rte_eth_link_modes {
+ *           uint16_t bitmap[5];
+ *    };
+ * 2) the rte_eth_link_mode_ functions below can be adapted to compute from
+ *    the link mode bit the corresponding index of the 16-bit entry in the
+ *    bitmap array and, within it, the appropriate bit to set/reset/get/test.
+ */
+struct rte_eth_link_modes {
+	uint64_t bitmap64; /**< Link modes bitmap (RTE_ETH_LINK_MODE_) */
+};
+
+static inline void
+rte_eth_link_mode_zero(struct rte_eth_link_modes *lk_modes)
+{
+	lk_modes->bitmap64 = 0;
+}
+
+static inline void
+rte_eth_link_mode_set(struct rte_eth_link_modes *lk_modes, int lk_mode_bit)
+{
+	lk_modes->bitmap64 |= (1ULL << lk_mode_bit);
+}
+
+static inline void
+rte_eth_link_mode_reset(struct rte_eth_link_modes *lk_modes, int lk_mode_bit)
+{
+	lk_modes->bitmap64 &= ~(1ULL << lk_mode_bit);
+}
+
+static inline int
+rte_eth_link_mode_is_set(struct rte_eth_link_modes *lk_modes, int lk_mode_bit)
+{
+	return ((uint64_t)(lk_modes->bitmap64 & (1ULL << lk_mode_bit)) ==
+		(uint64_t) (1ULL << lk_mode_bit));
+}
+
 struct rte_eth_dev_info {
 	struct rte_pci_device *pci_dev; /**< Device PCI information. */
 	const char *driver_name; /**< Device Driver name. */
@@ -967,6 +1074,11 @@ struct rte_eth_dev_info {
 	/** Configured number of rx/tx queues */
 	uint16_t nb_rx_queues; /**< Number of RX queues. */
 	uint16_t nb_tx_queues; /**< Number of TX queues. */
+	/** Information useful for administrative purposes. */
+	struct rte_eth_link_modes supported_modes; /**< Supported link modes */
+	struct rte_eth_link_modes advertised_modes; /**< Advertised   "      */
+	uint8_t connector; /**< RTE_ETH_CONNECTOR_ */
+	uint8_t autoneg_enabled : 1; /**< autonegotiation enabled (1) or not */
 };
 
 /**
