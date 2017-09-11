@@ -242,3 +242,10 @@ EXPERIMENTAL {
 	rte_service_unregister;
 
 } DPDK_17.08;
+
+DPDK_17.11 {
+	global:
+
+	rte_eal_mbuf_default_mempool_ops;
+
+} DPDK_17.08;

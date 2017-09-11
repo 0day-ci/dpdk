@@ -287,6 +287,15 @@ static inline int rte_gettid(void)
 	return RTE_PER_LCORE(_thread_id);
 }
 
+/**
+ * Get default pool name for mbuf
+ *
+ * @return
+ *   returns default pool name.
+ */
+const char *
+rte_eal_mbuf_default_mempool_ops(void);
+
 #define RTE_INIT(func) \
 static void __attribute__((constructor, used)) func(void)
 

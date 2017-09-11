@@ -121,6 +121,13 @@ struct internal_config internal_config;
 /* used by rte_rdtsc() */
 int rte_cycles_vmware_tsc_map;
 
+/* Return mbuf pool name */
+const char *
+rte_eal_mbuf_default_mempool_ops(void)
+{
+	return internal_config.mbuf_pool_name;
+}
+
 /* Return a pointer to the configuration structure */
 struct rte_config *
 rte_eal_get_configuration(void)
@@ -608,6 +615,10 @@ eal_parse_args(int argc, char **argv)
 
 		case OPT_CREATE_UIO_DEV_NUM:
 			internal_config.create_uio_dev = 1;
+			break;
+
+		case OPT_MBUF_POOL_OPS_NUM:
+			internal_config.mbuf_pool_name = optarg;
 			break;
 
 		default:
