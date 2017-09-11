@@ -120,3 +120,9 @@ Deprecation Notices
   The non-"do-sig" versions of the hash tables will be removed
   (including the ``signature_offset`` parameter)
   and the "do-sig" versions renamed accordingly.
+
+* ring: The alignment constraints on the ring structure will be relaxed
+  to one cache line instead of two, and an empty cache line padding will
+  be added between the producer and consumer structures. The size of the
+  structure and the offset of the fields will remain the same on
+  platforms with 64B cache line, but will change on other platforms.
