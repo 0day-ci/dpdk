@@ -295,6 +295,8 @@ txq_ctrl_setup(struct rte_eth_dev *dev, struct txq_ctrl *txq_ctrl,
 		.comp_mask = IBV_EXP_QP_INIT_ATTR_PD,
 	};
 	if (priv->txq_inline && (priv->txqs_n >= priv->txqs_inline)) {
+		unsigned int ds_cnt;
+
 		tmpl.txq.max_inline =
 			((priv->txq_inline + (RTE_CACHE_LINE_SIZE - 1)) /
 			 RTE_CACHE_LINE_SIZE);
@@ -326,6 +328,31 @@ txq_ctrl_setup(struct rte_eth_dev *dev, struct txq_ctrl *txq_ctrl,
 		} else {
 			attr.init.cap.max_inline_data =
 				tmpl.txq.max_inline * RTE_CACHE_LINE_SIZE;
+		}
+		/*
+		 * Check if the inline size is too large in a way which
+		 * can make the wqe DS to overflow.
+		 * Considering in calculation:
+		 *	WQE CTRL (1 DS)
+		 *	WQE ETH  (1 DS)
+		 *	inline part (N DS)
+		 */
+		ds_cnt = 2 +
+			(attr.init.cap.max_inline_data / MLX5_WQE_DWORD_SIZE);
+		if (ds_cnt > MLX5_MAX_DS) {
+			unsigned int max_inline = (MLX5_MAX_DS - 2) *
+						   MLX5_WQE_DWORD_SIZE;
+
+			/* Ceil down*/
+			max_inline = max_inline - (max_inline %
+						   RTE_CACHE_LINE_SIZE);
+			WARN("txq inline is too large (%d) setting it to "
+			     "the maximum possible: %d\n",
+			     priv->txq_inline, max_inline);
+			tmpl.txq.max_inline = max_inline / RTE_CACHE_LINE_SIZE;
+			attr.init.cap.max_inline_data = max_inline;
+			if (priv->mps == MLX5_MPW_ENHANCED)
+				tmpl.txq.inline_max_packet_sz = max_inline;
 		}
 	}
 	if (priv->tso) {

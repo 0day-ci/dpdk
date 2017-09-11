@@ -668,6 +668,10 @@ next_seg:
 		else
 			j += sg;
 next_pkt:
+		if (ds > MLX5_MAX_DS) {
+			txq->stats.oerrors++;
+			break;
+		}
 		++elts_head;
 		++pkts;
 		++i;

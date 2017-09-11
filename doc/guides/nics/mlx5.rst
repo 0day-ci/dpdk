@@ -124,6 +124,8 @@ Limitations
 
   Will match any ipv4 packet (VLAN included).
 
+- A multi segment mbuf must have less than 50 segments. That means mbuf->nb_segs < 50.
+
 Configuration
 -------------
 
