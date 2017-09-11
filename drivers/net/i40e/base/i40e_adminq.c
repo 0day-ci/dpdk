@@ -1047,7 +1047,7 @@ enum i40e_status_code i40e_clean_arq_element(struct i40e_hw *hw,
 	u16 desc_idx;
 	u16 datalen;
 	u16 flags;
-	u16 ntu;
+	u16 ntu = 0;
 
 	/* pre-clean the event info */
 	i40e_memset(&e->desc, 0, sizeof(e->desc), I40E_NONDMA_MEM);
