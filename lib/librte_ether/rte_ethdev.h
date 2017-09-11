@@ -1425,6 +1425,10 @@ typedef int (*eth_get_dcb_info)(struct rte_eth_dev *dev,
 				 struct rte_eth_dcb_info *dcb_info);
 /**< @internal Get dcb information on an Ethernet device */
 
+typedef int (*eth_pools_ops_supported_t)(struct rte_eth_dev *dev,
+						const char *pool);
+/**< @internal Get the supported pools for a port */
+
 /**
  * @internal A structure containing the functions exported by an Ethernet driver.
  */
@@ -1544,6 +1548,8 @@ struct eth_dev_ops {
 
 	eth_tm_ops_get_t tm_ops_get;
 	/**< Get Traffic Management (TM) operations. */
+	eth_pools_ops_supported_t pools_ops_supported;
+	/**< Get the supported pools for a port */
 };
 
 /**
@@ -4435,6 +4441,24 @@ rte_eth_dev_get_name_by_port(uint8_t port_id, char *name);
 int rte_eth_dev_adjust_nb_rx_tx_desc(uint8_t port_id,
 				     uint16_t *nb_rx_desc,
 				     uint16_t *nb_tx_desc);
+
+
+/**
+ * Get the supported pools for a port
+ *
+ * @param port_id
+ *   Port identifier of the Ethernet device.
+ * @param [in] pool
+ *   The supported pool handle for this port.
+ *   Maximum length of pool handle name is RTE_MEMPOOL_OPS_NAMESIZE.
+ * @return
+ *   - 0: best mempool ops choice for this port.
+ *   - 1: mempool ops are supported for this port.
+ *   - -ENOTSUP: mempool ops not supported for this port.
+ *   - <0: (-ENODEV, EINVAL) on failure.
+ */
+int
+rte_eth_dev_pools_ops_supported(uint8_t port_id, const char *pool);
 
 #ifdef __cplusplus
 }
