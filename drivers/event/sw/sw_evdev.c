@@ -437,6 +437,17 @@ sw_dev_configure(const struct rte_eventdev *dev)
 	return 0;
 }
 
+static int
+sw_eth_rx_adapter_caps_get(const struct rte_eventdev *dev,
+			uint8_t eth_port_id,
+			uint32_t *caps)
+{
+	RTE_SET_USED(dev);
+	RTE_SET_USED(eth_port_id);
+	*caps = RTE_EVENT_ETH_RX_ADAPTER_SW_CAP;
+	return 0;
+}
+
 static void
 sw_info_get(struct rte_eventdev *dev, struct rte_event_dev_info *info)
 {
@@ -751,6 +762,8 @@ sw_probe(struct rte_vdev_device *vdev)
 			.port_release = sw_port_release,
 			.port_link = sw_port_link,
 			.port_unlink = sw_port_unlink,
+
+			.eth_rx_adapter_caps_get = sw_eth_rx_adapter_caps_get,
 
 			.xstats_get = sw_xstats_get,
 			.xstats_get_names = sw_xstats_get_names,
