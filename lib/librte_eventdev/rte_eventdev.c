@@ -128,6 +128,25 @@ rte_event_dev_info_get(uint8_t dev_id, struct rte_event_dev_info *dev_info)
 	return 0;
 }
 
+int
+rte_event_eth_rx_adapter_caps_get(uint8_t dev_id, uint8_t eth_port_id,
+				uint32_t *caps)
+{
+	struct rte_eventdev *dev;
+
+	RTE_EVENTDEV_VALID_DEVID_OR_ERR_RET(dev_id, -EINVAL);
+	dev = &rte_eventdevs[dev_id];
+
+	if (caps == NULL)
+		return -EINVAL;
+	*caps = 0;
+
+	RTE_FUNC_PTR_OR_ERR_RET(*dev->dev_ops->eth_rx_adapter_caps_get,
+				-ENOTSUP);
+	return (*dev->dev_ops->eth_rx_adapter_caps_get)
+						(dev, eth_port_id, caps);
+}
+
 static inline int
 rte_event_dev_queue_config(struct rte_eventdev *dev, uint8_t nb_queues)
 {

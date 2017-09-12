@@ -51,3 +51,11 @@ DPDK_17.08 {
 	rte_event_ring_init;
 	rte_event_ring_lookup;
 } DPDK_17.05;
+
+
+DPDK_17.11 {
+	global:
+
+	rte_event_eth_rx_adapter_caps_get;
+
+} DPDK_17.08;
