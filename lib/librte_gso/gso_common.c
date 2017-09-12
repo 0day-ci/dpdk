@@ -39,6 +39,7 @@
 #include <rte_ether.h>
 #include <rte_ip.h>
 #include <rte_tcp.h>
+#include <rte_udp.h>
 
 #include "gso_common.h"
 
@@ -193,10 +194,55 @@ update_inner_tcp4_header(struct rte_mbuf *pkt, uint8_t ipid_delta,
 	}
 }
 
+static inline void
+update_outer_ipv4_header(struct rte_mbuf *pkt, uint16_t id)
+{
+	struct ipv4_hdr *ipv4_hdr;
+
+	ipv4_hdr = (struct ipv4_hdr *)(rte_pktmbuf_mtod(pkt, char *) +
+			pkt->outer_l2_len);
+	ipv4_hdr->total_length = rte_cpu_to_be_16(pkt->pkt_len -
+			pkt->outer_l2_len);
+	ipv4_hdr->packet_id = rte_cpu_to_be_16(id);
+}
+
+static inline void
+update_outer_udp_header(struct rte_mbuf *pkt)
+{
+	struct udp_hdr *udp_hdr;
+	uint16_t length;
+
+	length = pkt->outer_l2_len + pkt->outer_l3_len;
+	udp_hdr = (struct udp_hdr *)(rte_pktmbuf_mtod(pkt, char *) +
+			length);
+	udp_hdr->dgram_len = rte_cpu_to_be_16(pkt->pkt_len - length);
+}
+
+static inline void
+update_ipv4_vxlan_tcp4_header(struct rte_mbuf *pkt, uint8_t ipid_delta,
+		struct rte_mbuf **segs, uint16_t nb_segs)
+{
+	struct ipv4_hdr *ipv4_hdr;
+	uint16_t i, id;
+
+	ipv4_hdr = (struct ipv4_hdr *)(rte_pktmbuf_mtod(pkt, char *) +
+			pkt->outer_l2_len);
+	id = rte_be_to_cpu_16(ipv4_hdr->packet_id);
+	for (i = 0; i < nb_segs; i++) {
+		update_outer_ipv4_header(segs[i], id);
+		id += ipid_delta;
+		update_outer_udp_header(segs[i]);
+	}
+	/* Update inner TCP/IPv4 headers */
+	update_inner_tcp4_header(pkt, ipid_delta, segs, nb_segs);
+}
+
 void
 gso_update_pkt_headers(struct rte_mbuf *pkt, uint8_t ipid_delta,
 		struct rte_mbuf **segs, uint16_t nb_segs)
 {
-	if (is_ipv4_tcp(pkt->packet_type))
+	if (is_ipv4_vxlan_ipv4_tcp(pkt->packet_type))
+		update_ipv4_vxlan_tcp4_header(pkt, ipid_delta, segs, nb_segs);
+	else if (is_ipv4_tcp(pkt->packet_type))
 		update_inner_tcp4_header(pkt, ipid_delta, segs, nb_segs);
 }

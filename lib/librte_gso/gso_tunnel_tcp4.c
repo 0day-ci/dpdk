@@ -31,60 +31,55 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <errno.h>
+#include <rte_ether.h>
+#include <rte_ip.h>
 
-#include <rte_log.h>
-
-#include "rte_gso.h"
 #include "gso_common.h"
-#include "gso_tcp4.h"
 #include "gso_tunnel_tcp4.h"
 
 int
-rte_gso_segment(struct rte_mbuf *pkt,
-		struct rte_gso_ctx gso_ctx,
+gso_tunnel_tcp4_segment(struct rte_mbuf *pkt,
+		uint16_t gso_size,
+		uint8_t ipid_delta,
+		struct rte_mempool *direct_pool,
+		struct rte_mempool *indirect_pool,
 		struct rte_mbuf **pkts_out,
 		uint16_t nb_pkts_out)
 {
-	struct rte_mempool *direct_pool, *indirect_pool;
-	struct rte_mbuf *pkt_seg;
-	uint16_t gso_size;
-	uint8_t ipid_delta;
+	struct ipv4_hdr *inner_ipv4_hdr;
+	uint16_t pyld_unit_size, hdr_offset;
+	uint16_t tcp_dl;
 	int ret = 1;
 
-	if (pkt == NULL || pkts_out == NULL || nb_pkts_out < 1)
-		return -EINVAL;
-
-	if (gso_ctx.gso_size >= pkt->pkt_len ||
-			(pkt->packet_type & gso_ctx.gso_types) !=
-			pkt->packet_type) {
+	hdr_offset = pkt->outer_l2_len + pkt->outer_l3_len + pkt->l2_len;
+	inner_ipv4_hdr = (struct ipv4_hdr *)(rte_pktmbuf_mtod(pkt, char *) +
+			hdr_offset);
+	/*
+	 * Don't process the packet whose DF bit of the inner IPv4
+	 * header isn't set.
+	 */
+	if (unlikely((inner_ipv4_hdr->fragment_offset & rte_cpu_to_be_16(
+						IPV4_HDR_DF_MASK)) == 0)) {
 		pkts_out[0] = pkt;
 		return ret;
 	}
 
-	direct_pool = gso_ctx.direct_pool;
-	indirect_pool = gso_ctx.indirect_pool;
-	gso_size = gso_ctx.gso_size;
-	ipid_delta = gso_ctx.ipid_flag == RTE_GSO_IPID_INCREASE;
-
-	if (is_ipv4_vxlan_ipv4_tcp(pkt->packet_type)) {
-		ret = gso_tunnel_tcp4_segment(pkt, gso_size, ipid_delta,
-				direct_pool, indirect_pool,
-				pkts_out, nb_pkts_out);
-	} else if (is_ipv4_tcp(pkt->packet_type)) {
-		ret = gso_tcp4_segment(pkt, gso_size, ipid_delta,
-				direct_pool, indirect_pool,
-				pkts_out, nb_pkts_out);
-	} else
-		RTE_LOG(WARNING, GSO, "Unsupported packet type\n");
-
-	if (ret > 1) {
-		pkt_seg = pkt;
-		while (pkt_seg) {
-			rte_mbuf_refcnt_update(pkt_seg, -1);
-			pkt_seg = pkt_seg->next;
-		}
+	tcp_dl = rte_be_to_cpu_16(inner_ipv4_hdr->total_length) -
+		pkt->l3_len - pkt->l4_len;
+	/* Don't process the packet without data */
+	if (unlikely(tcp_dl == 0)) {
+		pkts_out[0] = pkt;
+		return ret;
 	}
+
+	hdr_offset += pkt->l3_len + pkt->l4_len;
+	pyld_unit_size = gso_size - hdr_offset - ETHER_CRC_LEN;
+
+	/* Segment the payload */
+	ret = gso_do_segment(pkt, hdr_offset, pyld_unit_size, direct_pool,
+			indirect_pool, pkts_out, nb_pkts_out);
+	if (ret > 1)
+		gso_update_pkt_headers(pkt, ipid_delta, pkts_out, ret);
 
 	return ret;
 }

@@ -56,6 +56,39 @@ static inline uint8_t is_ipv4_tcp(uint32_t ptype)
 	}
 }
 
+#define IS_INNER_IPV4_HDR(ptype) (((ptype) == RTE_PTYPE_INNER_L3_IPV4) | \
+			((ptype) == RTE_PTYPE_INNER_L3_IPV4_EXT) | \
+			((ptype) == RTE_PTYPE_INNER_L3_IPV4_EXT_UNKNOWN))
+
+#define ETHER_UDP_VXLAN_ETHER_TCP_PKT (RTE_PTYPE_L2_ETHER | \
+		RTE_PTYPE_L4_UDP | RTE_PTYPE_TUNNEL_VXLAN | \
+		RTE_PTYPE_INNER_L2_ETHER | RTE_PTYPE_INNER_L4_TCP)
+#define ETHER_VLAN_UDP_VXLAN_ETHER_TCP_PKT (RTE_PTYPE_L2_ETHER_VLAN | \
+		RTE_PTYPE_L4_UDP | RTE_PTYPE_TUNNEL_VXLAN | \
+		RTE_PTYPE_INNER_L2_ETHER | RTE_PTYPE_INNER_L4_TCP)
+#define ETHER_UDP_VXLAN_ETHER_VLAN_TCP_PKT (RTE_PTYPE_L2_ETHER | \
+		RTE_PTYPE_L4_UDP | RTE_PTYPE_TUNNEL_VXLAN | \
+		RTE_PTYPE_INNER_L2_ETHER_VLAN | RTE_PTYPE_INNER_L4_TCP)
+#define ETHER_VLAN_UDP_VXLAN_ETHER_VLAN_TCP_PKT (RTE_PTYPE_L2_ETHER_VLAN | \
+		RTE_PTYPE_L4_UDP | RTE_PTYPE_TUNNEL_VXLAN | \
+		RTE_PTYPE_INNER_L2_ETHER_VLAN | RTE_PTYPE_INNER_L4_TCP)
+static inline uint8_t is_ipv4_vxlan_ipv4_tcp(uint32_t ptype)
+{
+	uint32_t type;
+
+	type = ptype & (~(RTE_PTYPE_L3_MASK | RTE_PTYPE_INNER_L3_MASK));
+	switch (type) {
+	case ETHER_UDP_VXLAN_ETHER_TCP_PKT:
+	case ETHER_VLAN_UDP_VXLAN_ETHER_TCP_PKT:
+	case ETHER_UDP_VXLAN_ETHER_VLAN_TCP_PKT:
+	case ETHER_VLAN_UDP_VXLAN_ETHER_VLAN_TCP_PKT:
+		return (RTE_ETH_IS_IPV4_HDR(ptype) > 0) ?
+			IS_INNER_IPV4_HDR(ptype & RTE_PTYPE_INNER_L3_MASK) : 0;
+	default:
+		return 0;
+	}
+}
+
 /**
  * Internal function which updates relevant packet headers, following
  * segmentation. This is required to update, for example, the IPv4
