@@ -67,7 +67,8 @@ rte_gso_segment(struct rte_mbuf *pkt,
 	gso_size = gso_ctx.gso_size;
 	ipid_delta = gso_ctx.ipid_flag == RTE_GSO_IPID_INCREASE;
 
-	if (is_ipv4_vxlan_ipv4_tcp(pkt->packet_type)) {
+	if (is_ipv4_vxlan_ipv4_tcp(pkt->packet_type) ||
+			is_ipv4_gre_ipv4_tcp(pkt->packet_type)) {
 		ret = gso_tunnel_tcp4_segment(pkt, gso_size, ipid_delta,
 				direct_pool, indirect_pool,
 				pkts_out, nb_pkts_out);

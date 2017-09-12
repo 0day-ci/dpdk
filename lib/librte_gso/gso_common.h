@@ -89,6 +89,25 @@ static inline uint8_t is_ipv4_vxlan_ipv4_tcp(uint32_t ptype)
 	}
 }
 
+#define ETHER_GRE_TCP (RTE_PTYPE_L2_ETHER | RTE_PTYPE_TUNNEL_GRE | \
+		RTE_PTYPE_INNER_L4_TCP)
+#define ETHER_VLAN_GRE_TCP (RTE_PTYPE_L2_ETHER_VLAN | RTE_PTYPE_TUNNEL_GRE | \
+		RTE_PTYPE_INNER_L4_TCP)
+static inline uint8_t is_ipv4_gre_ipv4_tcp(uint32_t ptype)
+{
+	uint32_t type;
+
+	type = ptype & (~(RTE_PTYPE_L3_MASK | RTE_PTYPE_INNER_L3_MASK));
+	switch (type) {
+	case ETHER_GRE_TCP:
+	case ETHER_VLAN_GRE_TCP:
+		return (RTE_ETH_IS_IPV4_HDR(ptype) > 0) ?
+			IS_INNER_IPV4_HDR(ptype & RTE_PTYPE_INNER_L3_MASK) : 0;
+	default:
+		return 0;
+	}
+}
+
 /**
  * Internal function which updates relevant packet headers, following
  * segmentation. This is required to update, for example, the IPv4
