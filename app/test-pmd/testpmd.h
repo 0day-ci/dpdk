@@ -36,6 +36,7 @@
 
 #include <rte_pci.h>
 #include <rte_gro.h>
+#include <rte_gso.h>
 
 #define RTE_PORT_ALL            (~(portid_t)0x0)
 
@@ -205,6 +206,7 @@ struct rte_port {
  * CPU id. configuration table.
  */
 struct fwd_lcore {
+	struct rte_gso_ctx gso_ctx;     /**< GSO context */
 	struct rte_mempool *mbp; /**< The mbuf pool to use by this core */
 	streamid_t stream_idx;   /**< index of 1st stream in "fwd_streams" */
 	streamid_t stream_nb;    /**< number of streams in "fwd_streams" */
@@ -442,6 +444,13 @@ struct gro_status {
 };
 extern struct gro_status gro_ports[RTE_MAX_ETHPORTS];
 
+#define GSO_MAX_PKT_BURST 2048
+struct gso_status {
+	uint8_t enable;
+};
+extern struct gso_status gso_ports[RTE_MAX_ETHPORTS];
+extern uint16_t gso_max_segment_size;
+
 static inline unsigned int
 lcore_num(void)
 {
@@ -641,6 +650,7 @@ void get_5tuple_filter(uint8_t port_id, uint16_t index);
 int rx_queue_id_is_invalid(queueid_t rxq_id);
 int tx_queue_id_is_invalid(queueid_t txq_id);
 void setup_gro(const char *mode, uint8_t port_id);
+void setup_gso(const char *mode, uint8_t port_id);
 
 /* Functions to manage the set of filtered Multicast MAC addresses */
 void mcast_addr_add(uint8_t port_id, struct ether_addr *mc_addr);

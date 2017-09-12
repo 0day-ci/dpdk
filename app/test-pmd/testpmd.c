@@ -400,6 +400,9 @@ static int eth_event_callback(uint8_t port_id,
  */
 static int all_ports_started(void);
 
+struct gso_status gso_ports[RTE_MAX_ETHPORTS];
+uint16_t gso_max_segment_size = ETHER_MAX_LEN;
+
 /*
  * Helper function to check if socket is already discovered.
  * If yes, return positive value. If not, return zero.
@@ -570,6 +573,7 @@ init_config(void)
 	unsigned int nb_mbuf_per_pool;
 	lcoreid_t  lc_id;
 	uint8_t port_per_socket[RTE_MAX_NUMA_NODES];
+	uint32_t gso_types = 0;
 
 	memset(port_per_socket,0,RTE_MAX_NUMA_NODES);
 
@@ -654,6 +658,12 @@ init_config(void)
 
 	init_port_config();
 
+	gso_types = RTE_PTYPE_L2_ETHER_VLAN | RTE_PTYPE_L2_ETHER |
+		RTE_PTYPE_INNER_L2_ETHER | RTE_PTYPE_INNER_L2_ETHER_VLAN |
+		RTE_PTYPE_L3_IPV4_EXT_UNKNOWN | RTE_PTYPE_L4_TCP |
+		RTE_PTYPE_L4_UDP | RTE_PTYPE_TUNNEL_VXLAN |
+		RTE_PTYPE_INNER_L3_IPV4_EXT_UNKNOWN | RTE_PTYPE_INNER_L4_TCP |
+		RTE_PTYPE_TUNNEL_GRE;
 	/*
 	 * Records which Mbuf pool to use by each logical core, if needed.
 	 */
@@ -664,6 +674,12 @@ init_config(void)
 		if (mbp == NULL)
 			mbp = mbuf_pool_find(0);
 		fwd_lcores[lc_id]->mbp = mbp;
+		/* initialize GSO context */
+		fwd_lcores[lc_id]->gso_ctx.direct_pool = mbp;
+		fwd_lcores[lc_id]->gso_ctx.indirect_pool = mbp;
+		fwd_lcores[lc_id]->gso_ctx.gso_types = gso_types;
+		fwd_lcores[lc_id]->gso_ctx.gso_size = ETHER_MAX_LEN;
+		fwd_lcores[lc_id]->gso_ctx.ipid_flag = RTE_GSO_IPID_INCREASE;
 	}
 
 	/* Configuration of packet forwarding streams. */
