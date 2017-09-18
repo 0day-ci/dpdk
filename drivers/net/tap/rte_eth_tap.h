@@ -40,6 +40,8 @@
 #include <net/if.h>
 
 #include <linux/if_tun.h>
+#include <linux/ethtool.h>
+#include <linux/sockios.h>
 
 #include <rte_ethdev.h>
 #include <rte_ether.h>

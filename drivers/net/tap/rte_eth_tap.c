@@ -546,6 +546,7 @@ apply:
 	case SIOCGIFHWADDR:
 	case SIOCSIFHWADDR:
 	case SIOCSIFMTU:
+	case SIOCETHTOOL:
 		break;
 	default:
 		RTE_ASSERT(!"unsupported request type: must not happen");
@@ -586,6 +587,32 @@ static int
 tap_dev_start(struct rte_eth_dev *dev)
 {
 	int err;
+	struct ifreq ifr;
+	struct ethtool_cmd edata = {0};
+	struct pmd_internals *pmd = dev->data->dev_private;
+
+	/*set & get speed to device*/
+	edata.speed = pmd_link.link_speed;
+	edata.cmd = ETHTOOL_SSET;
+	ifr.ifr_data = (caddr_t)&edata;
+	if (tap_ioctl(pmd, SIOCETHTOOL, &ifr, 0, LOCAL_ONLY) < 0) {
+		RTE_LOG(WARNING, PMD,
+			"Could not set param speed %d for ifindex for %s.\n",
+				pmd_link.link_speed,
+				pmd->name);
+
+		/* fetch current speed of created device */
+		edata.cmd = ETHTOOL_GSET;
+		ifr.ifr_data = (caddr_t)&edata;
+		if (tap_ioctl(pmd, SIOCETHTOOL, &ifr, 0, LOCAL_ONLY) < 0)
+			return 0;
+
+		pmd_link.link_speed = edata.speed;
+		RTE_LOG(INFO, PMD, "get speed %d for ifindex for %s.\n",
+			pmd_link.link_speed,
+			pmd->name);
+	}
+	dev->data->dev_link = pmd_link;
 
 	err = tap_intr_handle_set(dev, 1);
 	if (err)
