@@ -176,7 +176,7 @@ sw_port_setup(struct rte_eventdev *dev, uint8_t port_id,
 			dev->data->socket_id,
 			RING_F_SP_ENQ | RING_F_SC_DEQ | RING_F_EXACT_SZ);
 	if (p->rx_worker_ring == NULL) {
-		SW_LOG_ERR("Error creating RX worker ring for port %d\n",
+		SW_LOG_ERR("Error creating RX worker ring for port %d",
 				port_id);
 		return -1;
 	}
@@ -195,7 +195,7 @@ sw_port_setup(struct rte_eventdev *dev, uint8_t port_id,
 			RING_F_SP_ENQ | RING_F_SC_DEQ | RING_F_EXACT_SZ);
 	if (p->cq_worker_ring == NULL) {
 		rte_event_ring_free(p->rx_worker_ring);
-		SW_LOG_ERR("Error creating CQ worker ring for port %d\n",
+		SW_LOG_ERR("Error creating CQ worker ring for port %d",
 				port_id);
 		return -1;
 	}
@@ -360,10 +360,10 @@ sw_queue_setup(struct rte_eventdev *dev, uint8_t queue_id,
 			type = RTE_SCHED_TYPE_PARALLEL;
 			break;
 		case RTE_EVENT_QUEUE_CFG_ALL_TYPES:
-			SW_LOG_ERR("QUEUE_CFG_ALL_TYPES not supported\n");
+			SW_LOG_ERR("QUEUE_CFG_ALL_TYPES not supported");
 			return -ENOTSUP;
 		default:
-			SW_LOG_ERR("Unknown queue type %d requested\n",
+			SW_LOG_ERR("Unknown queue type %d requested",
 				   conf->event_queue_cfg);
 			return -EINVAL;
 		}
@@ -618,13 +618,13 @@ sw_start(struct rte_eventdev *dev)
 
 	/* check a service core is mapped to this service */
 	if (!rte_service_runstate_get(sw->service_id))
-		SW_LOG_ERR("Warning: No Service core enabled on service %s\n",
+		SW_LOG_ERR("Warning: No Service core enabled on service %s",
 				sw->service_name);
 
 	/* check all ports are set up */
 	for (i = 0; i < sw->port_count; i++)
 		if (sw->ports[i].rx_worker_ring == NULL) {
-			SW_LOG_ERR("Port %d not configured\n", i);
+			SW_LOG_ERR("Port %d not configured", i);
 			return -ESTALE;
 		}
 
@@ -632,7 +632,7 @@ sw_start(struct rte_eventdev *dev)
 	for (i = 0; i < sw->qid_count; i++)
 		if (sw->qids[i].iq[0] == NULL ||
 				sw->qids[i].cq_num_mapped_cqs == 0) {
-			SW_LOG_ERR("Queue %d not configured\n", i);
+			SW_LOG_ERR("Queue %d not configured", i);
 			return -ENOLINK;
 		}
 
