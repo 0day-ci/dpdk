@@ -183,6 +183,7 @@ uint16_t mbuf_data_size = DEFAULT_MBUF_DATA_SIZE; /**< Mbuf data space size. */
 uint32_t param_total_num_mbufs = 0;  /**< number of mbufs in all pools - if
                                       * specified on command-line. */
 uint16_t stats_period; /**< Period to show statistics (disabled by default) */
+uint8_t  f_quit = 0; /* Receive LSC INTERRUPTION to stop show statistics periodically */
 /*
  * Configuration of packet segments used by the "txonly" processing engine.
  */
@@ -2285,6 +2286,8 @@ init_port(void)
 static void
 force_quit(void)
 {
+	f_quit = 1;
+
 	pmd_test_exit();
 	prompt_exit();
 }
@@ -2444,7 +2447,7 @@ main(int argc, char** argv)
 			/* Convert to number of cycles */
 			timer_period = stats_period * rte_get_timer_hz();
 
-			while (1) {
+			while (!f_quit) {
 				cur_time = rte_get_timer_cycles();
 				diff_time += cur_time - prev_time;
 
