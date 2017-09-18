@@ -41,6 +41,11 @@ New Features
      Also, make sure to start the actual text at the margin.
      =========================================================
 
+* **Added SoftNIC PMD.**
+
+  Added new SoftNIC PMD. This virtual device offers applications a software
+  fallback support for traffic management.
+
 
 Resolved Issues
 ---------------
@@ -190,6 +195,7 @@ The libraries prepended with a plus sign were incremented in this version.
      librte_pipeline.so.3
      librte_pmd_bond.so.1
      librte_pmd_ring.so.2
+   + librte_pmd_softnic.so.1
      librte_port.so.3
      librte_power.so.1
      librte_reorder.so.1

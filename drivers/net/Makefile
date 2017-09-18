@@ -110,4 +110,9 @@ DIRS-$(CONFIG_RTE_LIBRTE_PMD_VHOST) += vhost
 endif # $(CONFIG_RTE_LIBRTE_VHOST)
 DEPDIRS-vhost = $(core-libs) librte_vhost
 
+ifeq ($(CONFIG_RTE_LIBRTE_SCHED),y)
+DIRS-$(CONFIG_RTE_LIBRTE_PMD_SOFTNIC) += softnic
+endif # $(CONFIG_RTE_LIBRTE_SCHED)
+DEPDIRS-softnic = $(core-libs) librte_sched
+
 include $(RTE_SDK)/mk/rte.subdir.mk
