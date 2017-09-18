@@ -130,6 +130,34 @@ API Changes
   * Rework start and stop APIs into ``rte_service_runstate_set``
   * Added API to set runstate of service implementation to indicate readyness
 
+* **PCI bus API moved outside of the EAL**
+
+  The PCI bus previously implemented within the EAL has been moved.
+  A first part has been added as an RTE library providing PCI helpers to
+  parse device locations or other such utilities.
+  A second part consisting in the actual bus driver has been moved to its
+  proper subdirectory, without changing its functionalities.
+
+  As such, several PCI-related functions are not proposed by the EAL anymore:
+
+  * rte_pci_detach
+  * rte_pci_dump
+  * rte_pci_ioport_map
+  * rte_pci_ioport_read
+  * rte_pci_ioport_unmap
+  * rte_pci_ioport_write
+  * rte_pci_map_device
+  * rte_pci_probe
+  * rte_pci_probe_one
+  * rte_pci_read_config
+  * rte_pci_register
+  * rte_pci_scan
+  * rte_pci_unmap_device
+  * rte_pci_unregister
+  * rte_pci_write_config
+
+  These functions are made available either as part of ``librte_pci`` or
+  ``librte_bus_pci``.
 
 ABI Changes
 -----------
