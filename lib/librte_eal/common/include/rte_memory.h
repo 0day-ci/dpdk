@@ -195,6 +195,17 @@ unsigned rte_memory_get_nchannel(void);
  */
 unsigned rte_memory_get_nrank(void);
 
+/**
+ * Drivers based on uio will not load unless physical
+ * addresses are obtainable. It is only possible to get
+ * physical addresses when running as a privileged user.
+ *
+ * @return
+ *   1 if the system is able to obtain physical addresses.
+ *   0 if using DMA addresses through an IOMMU.
+ */
+int rte_eal_using_phys_addrs(void);
+
 #ifdef RTE_LIBRTE_XEN_DOM0
 
 /**< Internal use only - should DOM0 memory mapping be used */

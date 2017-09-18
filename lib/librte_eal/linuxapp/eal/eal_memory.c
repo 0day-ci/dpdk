@@ -1542,7 +1542,7 @@ error:
 	return -1;
 }
 
-bool
+int
 rte_eal_using_phys_addrs(void)
 {
 	return phys_addrs_available;
