@@ -562,11 +562,14 @@ void lthread_run(void)
  * Return the scheduler for this lcore
  *
  */
-struct lthread_sched *_lthread_sched_get(int lcore_id)
+struct lthread_sched *_lthread_sched_get(unsigned int lcore_id)
 {
-	if (lcore_id > LTHREAD_MAX_LCORES)
-		return NULL;
-	return schedcore[lcore_id];
+	struct lthread_sched *res = NULL;
+
+	if (lcore_id < LTHREAD_MAX_LCORES)
+		res = schedcore[lcore_id];
+
+	return res;
 }
 
 /*
