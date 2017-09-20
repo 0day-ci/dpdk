@@ -509,17 +509,43 @@ vhost_user_set_mem_table(struct virtio_net *dev, struct VhostUserMsg *pmsg)
 	uint64_t mmap_size;
 	uint64_t mmap_offset;
 	uint64_t alignment;
-	uint32_t i;
+	uint32_t i, j;
 	int fd;
 
-	if (dev->mem) {
-		free_mem_region(dev);
-		rte_free(dev->mem);
-		dev->mem = NULL;
+	/* Handle hot unplug case */
+	if (dev->mem && dev->mem->nregions) {
+		i = 0;
+		j = 0;
+		while ((i < memory.nregions) && (j < dev->mem->nregions)) {
+			reg = &dev->mem->regions[j];
+			/* munmap this region if it is hot unplugged */
+			if (reg->guest_user_addr
+				!= memory.regions[i].userspace_addr) {
+				if (reg->host_user_addr) {
+					munmap(reg->mmap_addr, reg->mmap_size);
+					close(reg->fd);
+				}
+				reg->guest_user_addr = 0;
+				j++;
+			} else {
+				i++;
+				j++;
+			}
+		}
+
+		/* munmap these regions because they have been hot unplugged */
+		for (; j < dev->mem->nregions; j++) {
+			reg = &dev->mem->regions[j];
+			if (reg->host_user_addr) {
+				munmap(reg->mmap_addr, reg->mmap_size);
+				close(reg->fd);
+			}
+			reg->guest_user_addr = 0;
+		}
 	}
 
-	dev->nr_guest_pages = 0;
 	if (!dev->guest_pages) {
+		dev->nr_guest_pages = 0;
 		dev->max_guest_pages = 8;
 		dev->guest_pages = malloc(dev->max_guest_pages *
 						sizeof(struct guest_page));
@@ -532,7 +558,7 @@ vhost_user_set_mem_table(struct virtio_net *dev, struct VhostUserMsg *pmsg)
 		}
 	}
 
-	dev->mem = rte_zmalloc("vhost-mem-table", sizeof(struct rte_vhost_memory) +
+	dev->mem = rte_realloc(dev->mem, sizeof(struct rte_vhost_memory) +
 		sizeof(struct rte_vhost_mem_region) * memory.nregions, 0);
 	if (dev->mem == NULL) {
 		RTE_LOG(ERR, VHOST_CONFIG,
@@ -545,6 +571,38 @@ vhost_user_set_mem_table(struct virtio_net *dev, struct VhostUserMsg *pmsg)
 	for (i = 0; i < memory.nregions; i++) {
 		fd  = pmsg->fds[i];
 		reg = &dev->mem->regions[i];
+
+		/* This region should be skipped if it is initialized before */
+		if (reg->guest_user_addr == memory.regions[i].userspace_addr) {
+			alignment = get_blk_size(fd);
+			if (alignment == (uint64_t)-1) {
+				RTE_LOG(ERR, VHOST_CONFIG,
+					"couldn't get hugepage size "
+					"through fstat\n");
+				goto err_mmap;
+			}
+			RTE_LOG(INFO, VHOST_CONFIG,
+				"guest memory region(old)"
+				" %u, size: 0x%" PRIx64 "\n"
+				"\t guest physical addr: 0x%" PRIx64 "\n"
+				"\t guest virtual  addr: 0x%" PRIx64 "\n"
+				"\t host  virtual  addr: 0x%" PRIx64 "\n"
+				"\t mmap addr : 0x%" PRIx64 "\n"
+				"\t mmap size : 0x%" PRIx64 "\n"
+				"\t mmap align: 0x%" PRIx64 "\n"
+				"\t mmap off  : 0x%" PRIx64 "\n",
+				i, reg->size,
+				reg->guest_phys_addr,
+				reg->guest_user_addr,
+				reg->host_user_addr,
+				(uint64_t)(uintptr_t)reg->mmap_addr,
+				reg->mmap_size,
+				alignment,
+				(uint64_t)(uintptr_t)reg->host_user_addr -
+					(uint64_t)(uintptr_t)reg->mmap_addr
+				);
+				continue;
+		}
 
 		reg->guest_phys_addr = memory.regions[i].guest_phys_addr;
 		reg->guest_user_addr = memory.regions[i].userspace_addr;
