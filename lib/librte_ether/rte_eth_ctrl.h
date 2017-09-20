@@ -525,6 +525,15 @@ struct rte_eth_tunnel_flow {
 };
 
 /**
+ * A structure used to define the input for raw flow
+ */
+struct rte_eth_raw_flow {
+	uint16_t flow;   /**< flow type. */
+	void *packet;    /**< pre-constructed packet buffer. */
+	uint16_t length; /**< buffer length. */
+};
+
+/**
  * An union contains the inputs for all types of flow
  * Items in flows need to be in big endian
  */
@@ -540,6 +549,7 @@ union rte_eth_fdir_flow {
 	struct rte_eth_ipv6_flow   ipv6_flow;
 	struct rte_eth_mac_vlan_flow mac_vlan_flow;
 	struct rte_eth_tunnel_flow   tunnel_flow;
+	struct rte_eth_raw_flow    raw_flow;
 };
 
 /**
