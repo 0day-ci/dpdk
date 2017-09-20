@@ -1093,6 +1093,7 @@ i40e_add_del_fdir_filter(struct rte_eth_dev *dev,
 	struct i40e_fdir_filter *fdir_filter, *node;
 	struct i40e_fdir_filter check_filter; /* Check if the filter exists */
 	int ret = 0;
+	uint16_t flow_type = filter->input.flow_type;
 
 	if (dev->data->dev_conf.fdir_conf.mode != RTE_FDIR_MODE_PERFECT) {
 		PMD_DRV_LOG(ERR, "FDIR is not enabled, please"
@@ -1100,7 +1101,11 @@ i40e_add_del_fdir_filter(struct rte_eth_dev *dev,
 		return -ENOTSUP;
 	}
 
-	if (!I40E_VALID_FLOW(filter->input.flow_type)) {
+	/*
+	 * This check against statically defined flow types will be removed
+	 * once we implement dynamic mappings of flow types to pctypes
+	 */
+	if (flow_type != RTE_ETH_FLOW_RAW && !I40E_VALID_FLOW(flow_type)) {
 		PMD_DRV_LOG(ERR, "invalid flow_type input.");
 		return -EINVAL;
 	}
@@ -1132,20 +1137,30 @@ i40e_add_del_fdir_filter(struct rte_eth_dev *dev,
 
 	memset(pkt, 0, I40E_FDIR_PKT_LEN);
 
-	ret = i40e_fdir_construct_pkt(pf, &filter->input, pkt);
-	if (ret < 0) {
-		PMD_DRV_LOG(ERR, "construct packet for fdir fails.");
-		return ret;
+	if (flow_type == RTE_ETH_FLOW_RAW) {
+		if (filter->input.flow.raw_flow.length > I40E_FDIR_PKT_LEN ||
+		    !filter->input.flow.raw_flow.packet ||
+		    !I40E_VALID_FLOW(filter->input.flow.raw_flow.flow)) {
+			PMD_DRV_LOG(ERR, "Invalid raw flow filter parameters!");
+		}
+		memcpy(pkt, filter->input.flow.raw_flow.packet,
+		       filter->input.flow.raw_flow.length);
+		flow_type = filter->input.flow.raw_flow.flow;
+	} else {
+		ret = i40e_fdir_construct_pkt(pf, &filter->input, pkt);
+		if (ret < 0) {
+			PMD_DRV_LOG(ERR, "construct packet for fdir fails.");
+			return ret;
+		}
 	}
 
 	if (hw->mac.type == I40E_MAC_X722) {
 		/* get translated pctype value in fd pctype register */
 		pctype = (enum i40e_filter_pctype)i40e_read_rx_ctl(
 			hw, I40E_GLQF_FD_PCTYPES(
-			(int)i40e_flowtype_to_pctype(
-			filter->input.flow_type)));
+			(int)i40e_flowtype_to_pctype(flow_type)));
 	} else
-		pctype = i40e_flowtype_to_pctype(filter->input.flow_type);
+		pctype = i40e_flowtype_to_pctype(flow_type);
 
 	ret = i40e_fdir_filter_programming(pf, pctype, filter, add);
 	if (ret < 0) {
