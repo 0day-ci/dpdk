@@ -2692,6 +2692,15 @@ skip_link_setup:
 				     " no intr multiplex");
 	}
 
+	/* When a PF port is bound to VFIO-PCI only miscellaneous interrupt
+	*  is mapped to VFIO vector 0 in ixgbe_dev_init( ).
+	*  If previous VFIO interrupt mapping set in ixgbe_dev_init( ) is
+	*  not cleared, it will fail when following rte_intr_enable( ) tries
+	*  to map Rx queue interrupt to other VFIO vectors.
+	*  So clear uio/vfio intr/evevnfd first to avoid failure.
+	*/
+	rte_intr_disable(intr_handle);
+
 	/* check if rxq interrupt is enabled */
 	if (dev->data->dev_conf.intr_conf.rxq != 0 &&
 	    rte_intr_dp_is_en(intr_handle))
