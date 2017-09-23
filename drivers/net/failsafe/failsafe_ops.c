@@ -232,7 +232,6 @@ fs_dev_configure(struct rte_eth_dev *dev)
 			dev->data->dev_conf.intr_conf.lsc = 0;
 		}
 		DEBUG("Configuring sub-device %d", i);
-		sdev->remove = 0;
 		ret = rte_eth_dev_configure(PORT_ID(sdev),
 					dev->data->nb_rx_queues,
 					dev->data->nb_tx_queues,
@@ -310,7 +309,7 @@ fs_dev_set_link_up(struct rte_eth_dev *dev)
 	uint8_t i;
 	int ret;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE) {
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev) {
 		DEBUG("Calling rte_eth_dev_set_link_up on sub_device %d", i);
 		ret = rte_eth_dev_set_link_up(PORT_ID(sdev));
 		if (ret) {
@@ -329,7 +328,7 @@ fs_dev_set_link_down(struct rte_eth_dev *dev)
 	uint8_t i;
 	int ret;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE) {
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev) {
 		DEBUG("Calling rte_eth_dev_set_link_down on sub_device %d", i);
 		ret = rte_eth_dev_set_link_down(PORT_ID(sdev));
 		if (ret) {
@@ -517,7 +516,7 @@ fs_promiscuous_enable(struct rte_eth_dev *dev)
 	struct sub_device *sdev;
 	uint8_t i;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE)
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev)
 		rte_eth_promiscuous_enable(PORT_ID(sdev));
 }
 
@@ -527,7 +526,7 @@ fs_promiscuous_disable(struct rte_eth_dev *dev)
 	struct sub_device *sdev;
 	uint8_t i;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE)
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev)
 		rte_eth_promiscuous_disable(PORT_ID(sdev));
 }
 
@@ -537,7 +536,7 @@ fs_allmulticast_enable(struct rte_eth_dev *dev)
 	struct sub_device *sdev;
 	uint8_t i;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE)
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev)
 		rte_eth_allmulticast_enable(PORT_ID(sdev));
 }
 
@@ -547,7 +546,7 @@ fs_allmulticast_disable(struct rte_eth_dev *dev)
 	struct sub_device *sdev;
 	uint8_t i;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE)
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev)
 		rte_eth_allmulticast_disable(PORT_ID(sdev));
 }
 
@@ -559,7 +558,7 @@ fs_link_update(struct rte_eth_dev *dev,
 	uint8_t i;
 	int ret;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE) {
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev) {
 		DEBUG("Calling link_update on sub_device %d", i);
 		ret = (SUBOPS(sdev, link_update))(ETH(sdev), wait_to_complete);
 		if (ret && ret != -1) {
@@ -597,7 +596,7 @@ fs_stats_reset(struct rte_eth_dev *dev)
 	struct sub_device *sdev;
 	uint8_t i;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE)
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev)
 		rte_eth_stats_reset(PORT_ID(sdev));
 }
 
@@ -692,7 +691,7 @@ fs_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
 	uint8_t i;
 	int ret;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE) {
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev) {
 		DEBUG("Calling rte_eth_dev_set_mtu on sub_device %d", i);
 		ret = rte_eth_dev_set_mtu(PORT_ID(sdev), mtu);
 		if (ret) {
@@ -711,7 +710,7 @@ fs_vlan_filter_set(struct rte_eth_dev *dev, uint16_t vlan_id, int on)
 	uint8_t i;
 	int ret;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE) {
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev) {
 		DEBUG("Calling rte_eth_dev_vlan_filter on sub_device %d", i);
 		ret = rte_eth_dev_vlan_filter(PORT_ID(sdev), vlan_id, on);
 		if (ret) {
@@ -745,7 +744,7 @@ fs_flow_ctrl_set(struct rte_eth_dev *dev,
 	uint8_t i;
 	int ret;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE) {
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev) {
 		DEBUG("Calling rte_eth_dev_flow_ctrl_set on sub_device %d", i);
 		ret = rte_eth_dev_flow_ctrl_set(PORT_ID(sdev), fc_conf);
 		if (ret) {
@@ -766,7 +765,7 @@ fs_mac_addr_remove(struct rte_eth_dev *dev, uint32_t index)
 	/* No check: already done within the rte_eth_dev_mac_addr_remove
 	 * call for the fail-safe device.
 	 */
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE)
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev)
 		rte_eth_dev_mac_addr_remove(PORT_ID(sdev),
 				&dev->data->mac_addrs[index]);
 	PRIV(dev)->mac_addr_pool[index] = 0;
@@ -783,7 +782,7 @@ fs_mac_addr_add(struct rte_eth_dev *dev,
 	uint8_t i;
 
 	RTE_ASSERT(index < FAILSAFE_MAX_ETHADDR);
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE) {
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev) {
 		ret = rte_eth_dev_mac_addr_add(PORT_ID(sdev), mac_addr, vmdq);
 		if (ret) {
 			ERROR("Operation rte_eth_dev_mac_addr_add failed for sub_device %"
@@ -805,7 +804,7 @@ fs_mac_addr_set(struct rte_eth_dev *dev, struct ether_addr *mac_addr)
 	struct sub_device *sdev;
 	uint8_t i;
 
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE)
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev)
 		rte_eth_dev_default_mac_addr_set(PORT_ID(sdev), mac_addr);
 }
 
@@ -824,7 +823,7 @@ fs_filter_ctrl(struct rte_eth_dev *dev,
 		*(const void **)arg = &fs_flow_ops;
 		return 0;
 	}
-	FOREACH_SUBDEV_STATE(sdev, i, dev, DEV_ACTIVE) {
+	FOREACH_SUBDEV_ACTIVE_SAFE(sdev, i, dev) {
 		DEBUG("Calling rte_eth_dev_filter_ctrl on sub_device %d", i);
 		ret = rte_eth_dev_filter_ctrl(PORT_ID(sdev), type, op, arg);
 		if (ret) {

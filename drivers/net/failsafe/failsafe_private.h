@@ -221,9 +221,21 @@ extern int mac_from_arg;
  * state: (enum dev_state), minimum acceptable device state
  */
 #define FOREACH_SUBDEV_STATE(s, i, dev, state)				\
-	for (i = fs_find_next((dev), 0, state);				\
+	for (i = fs_find_next((dev), 0, state, 0);			\
 	     i < PRIV(dev)->subs_tail && (s = &PRIV(dev)->subs[i]);	\
-	     i = fs_find_next((dev), i + 1, state))
+	     i = fs_find_next((dev), i + 1, state, 0))
+
+/**
+ * Stateful iterator construct over fail-safe sub-devices
+ * in ACTIVE state and not removed due to RMV event
+ * s:     (struct sub_device *), iterator
+ * i:     (uint8_t), increment
+ * dev:   (struct rte_eth_dev *), fail-safe ethdev
+ */
+#define FOREACH_SUBDEV_ACTIVE_SAFE(s, i, dev)				\
+	for (i = fs_find_next((dev), 0, DEV_ACTIVE, 1);			\
+	     i < PRIV(dev)->subs_tail && (s = &PRIV(dev)->subs[i]);	\
+	     i = fs_find_next((dev), i + 1, DEV_ACTIVE, 1))
 
 /**
  * Iterator construct over fail-safe sub-devices:
@@ -296,11 +308,15 @@ extern int mac_from_arg;
 
 static inline uint8_t
 fs_find_next(struct rte_eth_dev *dev, uint8_t sid,
-		enum dev_state min_state)
+		enum dev_state min_state, int check_remove)
 {
 	while (sid < PRIV(dev)->subs_tail) {
-		if (PRIV(dev)->subs[sid].state >= min_state)
-			break;
+		if (PRIV(dev)->subs[sid].state >= min_state) {
+			if (check_remove == 0)
+				break;
+			if (PRIV(dev)->subs[sid].remove == 0)
+				break;
+		}
 		sid++;
 	}
 	if (sid >= PRIV(dev)->subs_tail)

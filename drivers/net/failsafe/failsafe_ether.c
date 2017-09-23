@@ -378,6 +378,7 @@ failsafe_eth_dev_state_sync(struct rte_eth_dev *dev)
 				      i);
 				goto err_remove;
 			}
+			sdev->remove = 0;
 		}
 	}
 	/*
