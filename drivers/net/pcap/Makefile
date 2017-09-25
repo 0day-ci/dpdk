@@ -43,7 +43,7 @@ LDLIBS += -lpcap
 
 EXPORT_MAP := rte_pmd_pcap_version.map
 
-LIBABIVER := 1
+LIBABIVER := 2
 
 #
 # all source are stored in SRCS-y

@@ -12,7 +12,7 @@ LDLIBS += -lz
 
 EXPORT_MAP := rte_pmd_bnx2x_version.map
 
-LIBABIVER := 1
+LIBABIVER := 2
 
 ifeq ($(CONFIG_RTE_TOOLCHAIN_ICC),y)
 CFLAGS += -wd188 #188: enumerated type mixed with another type

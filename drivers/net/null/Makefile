@@ -41,7 +41,7 @@ CFLAGS += $(WERROR_FLAGS)
 
 EXPORT_MAP := rte_pmd_null_version.map
 
-LIBABIVER := 2
+LIBABIVER := 3
 
 #
 # all source are stored in SRCS-y

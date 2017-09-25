@@ -42,7 +42,7 @@ CFLAGS += $(WERROR_FLAGS) -I$(SRCDIR)
 
 EXPORT_MAP := rte_pmd_avp_version.map
 
-LIBABIVER := 1
+LIBABIVER := 2
 
 # install public header files to enable compilation of the hypervisor level
 # dpdk application
