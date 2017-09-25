@@ -699,6 +699,8 @@ rte_pmd_init_internals(struct rte_vdev_device *dev,
 			        pair->value);
 			goto error;
 		}
+#else
+		RTE_SET_USED(qdisc_bypass);
 #endif
 
 		rc = setsockopt(qsockfd, SOL_PACKET, PACKET_RX_RING, req, sizeof(*req));
