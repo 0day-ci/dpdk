@@ -28,7 +28,7 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-.. _multi_process_app:
+.. _sample_app_multi_process_app:
 
 Multi-process Sample Application
 ================================

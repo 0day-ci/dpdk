@@ -28,7 +28,7 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-.. _l2_fwd_app_real_and_virtual:
+.. _sample_app_l2_fwd:
 
 L2 Forwarding Sample Application (in Real and Virtualized Environments)
 =======================================================================

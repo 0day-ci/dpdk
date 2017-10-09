@@ -36,7 +36,7 @@ load balancer, for more information about the EFD Library please refer to the
 DPDK programmer's guide.
 
 This sample application is a variant of the
-:ref:`client-server sample application <multi_process_app>`
+:ref:`client-server sample application <sample_app_multi_process_app>`
 where a specific target node is specified for every and each flow
 (not in a round-robin fashion as the original load balancing sample application).
 

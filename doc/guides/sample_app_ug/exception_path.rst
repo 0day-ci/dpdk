@@ -115,7 +115,7 @@ The following sections provide some explanation of the code.
 Initialization
 ~~~~~~~~~~~~~~
 
-Setup of the mbuf pool, driver and queues is similar to the setup done in the :ref:`l2_fwd_app_real_and_virtual`.
+Setup of the mbuf pool, driver and queues is similar to the setup done in the :ref:`sample_app_l2_fwd`.
 In addition, the TAP interfaces must also be created.
 A TAP interface is created for each lcore that is being used.
 The code for creating the TAP interface is as follows:
