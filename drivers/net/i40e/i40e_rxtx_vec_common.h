@@ -124,11 +124,13 @@ i40e_tx_free_bufs(struct i40e_tx_queue *txq)
 	  */
 	txep = &txq->sw_ring[txq->tx_next_dd - (n - 1)];
 	m = rte_pktmbuf_prefree_seg(txep[0].mbuf);
+	txep[0].mbuf = NULL;
 	if (likely(m != NULL)) {
 		free[0] = m;
 		nb_free = 1;
 		for (i = 1; i < n; i++) {
 			m = rte_pktmbuf_prefree_seg(txep[i].mbuf);
+			txep[i].mbuf = NULL;
 			if (likely(m != NULL)) {
 				if (likely(m->pool == free[0]->pool)) {
 					free[nb_free++] = m;
@@ -145,6 +147,7 @@ i40e_tx_free_bufs(struct i40e_tx_queue *txq)
 	} else {
 		for (i = 1; i < n; i++) {
 			m = rte_pktmbuf_prefree_seg(txep[i].mbuf);
+			txep[i].mbuf = NULL;
 			if (m != NULL)
 				rte_mempool_put(m->pool, m);
 		}
