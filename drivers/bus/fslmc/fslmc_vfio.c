@@ -63,9 +63,7 @@
 
 #include "portal/dpaa2_hw_pvt.h"
 #include "portal/dpaa2_hw_dpio.h"
-
-#define FSLMC_VFIO_LOG(level, fmt, args...) \
-	RTE_LOG(level, EAL, fmt "\n", ##args)
+#include "fslmc_logs.h"
 
 /** Pathname of FSL-MC devices directory. */
 #define SYSFS_FSL_MC_DEVICES "/sys/bus/fsl-mc/devices"

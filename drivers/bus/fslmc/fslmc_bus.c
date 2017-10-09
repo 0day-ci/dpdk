@@ -34,7 +34,6 @@
 #include <dirent.h>
 #include <stdbool.h>
 
-#include <rte_log.h>
 #include <rte_bus.h>
 #include <rte_eal_memconfig.h>
 #include <rte_malloc.h>
@@ -42,11 +41,9 @@
 #include <rte_memcpy.h>
 #include <rte_ethdev.h>
 
-#include <rte_fslmc.h>
-#include <fslmc_vfio.h>
-
-#define FSLMC_BUS_LOG(level, fmt, args...) \
-	RTE_LOG(level, EAL, fmt "\n", ##args)
+#include "rte_fslmc.h"
+#include "fslmc_vfio.h"
+#include "fslmc_logs.h"
 
 #define VFIO_IOMMU_GROUP_PATH "/sys/kernel/iommu_groups"
 
