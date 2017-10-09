@@ -41,11 +41,12 @@
 #include <rte_eal.h>
 #include <rte_dev.h>
 #include <rte_bus.h>
-#include <rte_vdev.h>
 #include <rte_common.h>
 #include <rte_devargs.h>
 #include <rte_memory.h>
 #include <rte_errno.h>
+
+#include "rte_vdev.h"
 
 /* Forward declare to access virtual bus name */
 static struct rte_bus rte_vdev_bus;

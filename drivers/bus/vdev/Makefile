@@ -1,6 +1,6 @@
 #   BSD LICENSE
 #
-#   Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
+#   Copyright(c) 2017 Intel Corporation. All rights reserved.
 #   All rights reserved.
 #
 #   Redistribution and use in source and binary forms, with or without
@@ -31,30 +31,25 @@
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-INC := rte_branch_prediction.h rte_common.h
-INC += rte_debug.h rte_eal.h rte_errno.h rte_launch.h rte_lcore.h
-INC += rte_log.h rte_memory.h rte_memzone.h rte_pci.h
-INC += rte_per_lcore.h rte_random.h
-INC += rte_tailq.h rte_interrupts.h rte_alarm.h
-INC += rte_string_fns.h rte_version.h
-INC += rte_eal_memconfig.h rte_malloc_heap.h
-INC += rte_hexdump.h rte_devargs.h rte_bus.h rte_dev.h
-INC += rte_pci_dev_feature_defs.h rte_pci_dev_features.h
-INC += rte_malloc.h rte_keepalive.h rte_time.h
-INC += rte_service.h rte_service_component.h
+#
+# library name
+#
+LIB = librte_bus_vdev.a
 
-GENERIC_INC := rte_atomic.h rte_byteorder.h rte_cycles.h rte_prefetch.h
-GENERIC_INC += rte_spinlock.h rte_memcpy.h rte_cpuflags.h rte_rwlock.h
-GENERIC_INC += rte_vect.h rte_pause.h rte_io.h
+CFLAGS += -O3
+CFLAGS += $(WERROR_FLAGS)
 
-# defined in mk/arch/$(RTE_ARCH)/rte.vars.mk
-ARCH_DIR ?= $(RTE_ARCH)
-ARCH_INC := $(notdir $(wildcard $(RTE_SDK)/lib/librte_eal/common/include/arch/$(ARCH_DIR)/*.h))
+# versioning export map
+EXPORT_MAP := rte_bus_vdev_version.map
 
-SYMLINK-$(CONFIG_RTE_LIBRTE_EAL)-include := $(addprefix include/,$(INC))
-SYMLINK-$(CONFIG_RTE_LIBRTE_EAL)-include += \
-	$(addprefix include/arch/$(ARCH_DIR)/,$(ARCH_INC))
-SYMLINK-$(CONFIG_RTE_LIBRTE_EAL)-include/generic := \
-	$(addprefix include/generic/,$(GENERIC_INC))
+# library version
+LIBABIVER := 1
 
-include $(RTE_SDK)/mk/rte.install.mk
+SRCS-y += vdev.c
+
+#
+# Export include files
+#
+SYMLINK-y-include += rte_vdev.h
+
+include $(RTE_SDK)/mk/rte.lib.mk

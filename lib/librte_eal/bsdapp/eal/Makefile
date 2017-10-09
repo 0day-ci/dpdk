@@ -68,7 +68,6 @@ SRCS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) += eal_common_timer.c
 SRCS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) += eal_common_memzone.c
 SRCS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) += eal_common_log.c
 SRCS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) += eal_common_launch.c
-SRCS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) += eal_common_vdev.c
 SRCS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) += eal_common_pci.c
 SRCS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) += eal_common_pci_uio.c
 SRCS-$(CONFIG_RTE_EXEC_ENV_BSDAPP) += eal_common_memory.c

@@ -38,4 +38,6 @@ DEPDIRS-dpaa = $(core-libs)
 DIRS-$(CONFIG_RTE_LIBRTE_FSLMC_BUS) += fslmc
 DEPDIRS-fslmc = $(core-libs)
 
+DIRS-$(CONFIG_RTE_LIBRTE_VDEV_BUS) += vdev
+
 include $(RTE_SDK)/mk/rte.subdir.mk
