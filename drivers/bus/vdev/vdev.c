@@ -47,6 +47,7 @@
 #include <rte_errno.h>
 
 #include "rte_vdev.h"
+#include "vdev_logs.h"
 
 /* Forward declare to access virtual bus name */
 static struct rte_bus rte_vdev_bus;
@@ -103,7 +104,7 @@ vdev_probe_all_drivers(struct rte_vdev_device *dev)
 
 	name = rte_vdev_device_name(dev);
 
-	RTE_LOG(DEBUG, EAL, "Search driver %s to probe device %s\n", name,
+	VDEV_LOG(DEBUG, "Search driver %s to probe device %s\n", name,
 		rte_vdev_device_name(dev));
 
 	if (vdev_parse(name, &driver))
@@ -189,7 +190,7 @@ rte_vdev_init(const char *name, const char *args)
 	ret = vdev_probe_all_drivers(dev);
 	if (ret) {
 		if (ret > 0)
-			RTE_LOG(ERR, EAL, "no driver found for %s\n", name);
+			VDEV_LOG(ERR, "no driver found for %s\n", name);
 		goto fail;
 	}
 
@@ -212,7 +213,7 @@ vdev_remove_driver(struct rte_vdev_device *dev)
 	const struct rte_vdev_driver *driver;
 
 	if (!dev->device.driver) {
-		RTE_LOG(DEBUG, EAL, "no driver attach to device %s\n", name);
+		VDEV_LOG(DEBUG, "no driver attach to device %s\n", name);
 		return 1;
 	}
 
@@ -293,7 +294,7 @@ vdev_probe(void)
 			continue;
 
 		if (vdev_probe_all_drivers(dev)) {
-			RTE_LOG(ERR, EAL, "failed to initialize %s device\n",
+			VDEV_LOG(ERR, "failed to initialize %s device\n",
 				rte_vdev_device_name(dev));
 			return -1;
 		}
