@@ -81,11 +81,6 @@ Deprecation Notices
   ``rte_cryptodev`` respectively to support security protocol offloaded
   operations.
 
-* cryptodev: the following function is deprecated starting from 17.08 and will
-  be removed in 17.11:
-
-  - ``rte_cryptodev_create_vdev``
-
 * cryptodev: the following function will be static in 17.11 and included
   by all crypto drivers, therefore, will not be public:
 
