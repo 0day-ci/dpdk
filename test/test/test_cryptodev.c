@@ -8935,6 +8935,12 @@ static struct unit_test_suite cryptodev_armv8_testsuite  = {
 		TEST_CASE_ST(ut_setup, ut_teardown,
 			auth_decryption_AES128CBC_HMAC_SHA1_fail_tag_corrupt),
 
+		/** Out of place tests */
+		TEST_CASE_ST(ut_setup, ut_teardown,
+			test_mb_AES_GCM_authenticated_encryption_oop),
+		TEST_CASE_ST(ut_setup, ut_teardown,
+			test_mb_AES_GCM_authenticated_decryption_oop),
+
 		TEST_CASES_END() /**< NULL terminate unit test array */
 	}
 };
