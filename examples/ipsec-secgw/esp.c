@@ -205,13 +205,13 @@ esp_inbound_post(struct rte_mbuf *m, struct ipsec_sa *sa,
 		if (likely(ip->ip_v == IPVERSION)) {
 			memmove(ip4, ip, ip->ip_hl * 4);
 			ip4->ip_p = *nexthdr;
-			ip4->ip_len = htons(rte_pktmbuf_data_len(m));
+			ip4->ip_len = htons(rte_pktmbuf_pkt_len(m));
 		} else {
 			ip6 = (struct ip6_hdr *)ip4;
 			/* XXX No option headers supported */
 			memmove(ip6, ip, sizeof(struct ip6_hdr));
 			ip6->ip6_nxt = *nexthdr;
-			ip6->ip6_plen = htons(rte_pktmbuf_data_len(m));
+			ip6->ip6_plen = htons(rte_pktmbuf_pkt_len(m));
 		}
 	} else
 		ipip_inbound(m, sizeof(struct esp_hdr) + sa->iv_len);
