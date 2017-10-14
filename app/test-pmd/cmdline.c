@@ -7133,11 +7133,17 @@ struct cmd_set_vf_rxmode {
 };
 
 static void
-cmd_set_vf_rxmode_parsed(void *parsed_result,
-		       __attribute__((unused)) struct cmdline *cl,
-		       __attribute__((unused)) void *data)
+cmd_set_vf_rxmode_parsed(
+#if defined(RTE_LIBRTE_IXGBE_PMD) || defined(RTE_LIBRTE_BNXT_PMD)
+		void *parsed_result,
+#else
+		__attribute__((unused)) void *parsed_result,
+#endif
+		__attribute__((unused)) struct cmdline *cl,
+		__attribute__((unused)) void *data)
 {
 	int ret = -ENOTSUP;
+#if defined(RTE_LIBRTE_IXGBE_PMD) || defined(RTE_LIBRTE_BNXT_PMD)
 	uint16_t rx_mode = 0;
 	struct cmd_set_vf_rxmode *res = parsed_result;
 
@@ -7152,6 +7158,7 @@ cmd_set_vf_rxmode_parsed(void *parsed_result,
 		else if (!strncmp(res->mode, "MPE",3))
 			rx_mode |= ETH_VMDQ_ACCEPT_MULTICAST;
 	}
+#endif
 
 #ifdef RTE_LIBRTE_IXGBE_PMD
 	if (ret == -ENOTSUP)

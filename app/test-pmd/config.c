@@ -3094,7 +3094,17 @@ set_queue_rate_limit(portid_t port_id, uint16_t queue_idx, uint16_t rate)
 }
 
 int
-set_vf_rate_limit(portid_t port_id, uint16_t vf, uint16_t rate, uint64_t q_msk)
+set_vf_rate_limit(
+		portid_t port_id,
+#if defined(RTE_LIBRTE_IXGBE_PMD) || defined(RTE_LIBRTE_BNXT_PMD)
+		uint16_t vf,
+		uint16_t rate,
+		uint64_t q_msk)
+#else
+		__attribute__((unused)) uint16_t vf,
+		__attribute__((unused)) uint16_t rate,
+		__attribute__((unused)) uint64_t q_msk)
+#endif
 {
 	int diag = -ENOTSUP;
 
