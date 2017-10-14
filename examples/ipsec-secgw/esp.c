@@ -229,25 +229,26 @@ esp_outbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 	uint8_t *padding, *new_ip, nlp;
 	struct rte_crypto_sym_op *sym_cop;
 	int32_t i;
-	uint16_t pad_payload_len, pad_len, ip_hdr_len;
+	uint16_t pad_payload_len, pad_len = 0;
+	uint16_t inner_ip_hdr_len = 0, ip_hdr_len = 0;
 
 	RTE_ASSERT(m != NULL);
 	RTE_ASSERT(sa != NULL);
+	RTE_ASSERT(sa->flags == IP4_TUNNEL || sa->flags == IP6_TUNNEL ||
+		   sa->flags == TRANSPORT);
 	RTE_ASSERT(cop != NULL);
-
-	ip_hdr_len = 0;
 
 	ip4 = rte_pktmbuf_mtod(m, struct ip *);
 	if (likely(ip4->ip_v == IPVERSION)) {
-		if (unlikely(sa->flags == TRANSPORT)) {
-			ip_hdr_len = ip4->ip_hl * 4;
+		ip_hdr_len = ip4->ip_hl * 4;
+		if (unlikely(sa->flags == TRANSPORT))
 			nlp = ip4->ip_p;
-		} else
+		else
 			nlp = IPPROTO_IPIP;
 	} else if (ip4->ip_v == IP6_VERSION) {
+		/* XXX No option headers supported */
+		ip_hdr_len = sizeof(struct ip6_hdr);
 		if (unlikely(sa->flags == TRANSPORT)) {
-			/* XXX No option headers supported */
-			ip_hdr_len = sizeof(struct ip6_hdr);
 			ip6 = (struct ip6_hdr *)ip4;
 			nlp = ip6->ip6_nxt;
 		} else
@@ -259,22 +260,28 @@ esp_outbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 	}
 
 	/* Padded payload length */
-	pad_payload_len = RTE_ALIGN_CEIL(rte_pktmbuf_pkt_len(m) -
-			ip_hdr_len + 2, sa->block_size);
-	pad_len = pad_payload_len + ip_hdr_len - rte_pktmbuf_pkt_len(m);
-
-	RTE_ASSERT(sa->flags == IP4_TUNNEL || sa->flags == IP6_TUNNEL ||
-			sa->flags == TRANSPORT);
-
-	if (likely(sa->flags == IP4_TUNNEL))
+	if (unlikely(sa->flags == TRANSPORT)) {
+		pad_payload_len = RTE_ALIGN_CEIL(rte_pktmbuf_pkt_len(m) +
+						 sizeof(nlp) + 1 - ip_hdr_len,
+						 sa->block_size);
+		pad_len = pad_payload_len + ip_hdr_len - rte_pktmbuf_pkt_len(m);
+	} else {
+		inner_ip_hdr_len = ip_hdr_len;
 		ip_hdr_len = sizeof(struct ip);
-	else if (sa->flags == IP6_TUNNEL)
-		ip_hdr_len = sizeof(struct ip6_hdr);
-	else if (sa->flags != TRANSPORT) {
-		RTE_LOG(ERR, IPSEC_ESP, "Unsupported SA flags: 0x%x\n",
-				sa->flags);
-		return -EINVAL;
+		if (sa->flags == IP6_TUNNEL)
+			ip_hdr_len = sizeof(struct ip6_hdr);
+
+		pad_payload_len = RTE_ALIGN_CEIL(rte_pktmbuf_pkt_len(m) +
+						 sizeof(nlp) + 1,
+						 sa->block_size);
+		pad_len = pad_payload_len - rte_pktmbuf_pkt_len(m);
 	}
+	RTE_LOG(DEBUG, IPSEC_ESP, "rte_pktmbuf_pkt_len=%u "
+		"inner_ip_hdr_len=%u ip_hdr_len=%u "
+		"pad_payload_len=%u pad_len=%u\n",
+		rte_pktmbuf_pkt_len(m),
+		inner_ip_hdr_len, ip_hdr_len,
+		pad_payload_len, pad_len);
 
 	/* Check maximum packet size */
 	if (unlikely(ip_hdr_len + sizeof(struct esp_hdr) + sa->iv_len +
