@@ -112,47 +112,6 @@
 static uint16_t nb_rxd = IPSEC_SECGW_RX_DESC_DEFAULT;
 static uint16_t nb_txd = IPSEC_SECGW_TX_DESC_DEFAULT;
 
-#if RTE_BYTE_ORDER != RTE_LITTLE_ENDIAN
-#define __BYTES_TO_UINT64(a, b, c, d, e, f, g, h) \
-	(((uint64_t)((a) & 0xff) << 56) | \
-	((uint64_t)((b) & 0xff) << 48) | \
-	((uint64_t)((c) & 0xff) << 40) | \
-	((uint64_t)((d) & 0xff) << 32) | \
-	((uint64_t)((e) & 0xff) << 24) | \
-	((uint64_t)((f) & 0xff) << 16) | \
-	((uint64_t)((g) & 0xff) << 8)  | \
-	((uint64_t)(h) & 0xff))
-#else
-#define __BYTES_TO_UINT64(a, b, c, d, e, f, g, h) \
-	(((uint64_t)((h) & 0xff) << 56) | \
-	((uint64_t)((g) & 0xff) << 48) | \
-	((uint64_t)((f) & 0xff) << 40) | \
-	((uint64_t)((e) & 0xff) << 32) | \
-	((uint64_t)((d) & 0xff) << 24) | \
-	((uint64_t)((c) & 0xff) << 16) | \
-	((uint64_t)((b) & 0xff) << 8) | \
-	((uint64_t)(a) & 0xff))
-#endif
-#define ETHADDR(a, b, c, d, e, f) (__BYTES_TO_UINT64(a, b, c, d, e, f, 0, 0))
-
-#define ETHADDR_TO_UINT64(addr) __BYTES_TO_UINT64( \
-		addr.addr_bytes[0], addr.addr_bytes[1], \
-		addr.addr_bytes[2], addr.addr_bytes[3], \
-		addr.addr_bytes[4], addr.addr_bytes[5], \
-		0, 0)
-
-/* port/source ethernet addr and destination ethernet addr */
-struct ethaddr_info {
-	uint64_t src, dst;
-};
-
-struct ethaddr_info ethaddr_tbl[RTE_MAX_ETHPORTS] = {
-	{ 0, ETHADDR(0x00, 0x16, 0x3e, 0x7e, 0x94, 0x9a) },
-	{ 0, ETHADDR(0x00, 0x16, 0x3e, 0x22, 0xa1, 0xd9) },
-	{ 0, ETHADDR(0x00, 0x16, 0x3e, 0x08, 0x69, 0x26) },
-	{ 0, ETHADDR(0x00, 0x16, 0x3e, 0x49, 0x9e, 0xdd) }
-};
-
 /* mask of enabled ports */
 static uint32_t enabled_port_mask;
 static uint32_t unprotected_port_mask;
@@ -195,6 +154,7 @@ struct lcore_conf {
 	struct ipsec_ctx outbound;
 	struct rt_ctx *rt4_ctx;
 	struct rt_ctx *rt6_ctx;
+	struct eth_ctx *eth_addr;
 } __rte_cache_aligned;
 
 static struct lcore_conf lcore_conf[RTE_MAX_LCORE];
@@ -290,7 +250,7 @@ prepare_traffic(struct rte_mbuf **pkts, struct ipsec_traffic *t,
 }
 
 static inline void
-prepare_tx_pkt(struct rte_mbuf *pkt, uint8_t port)
+prepare_tx_pkt(struct rte_mbuf *pkt, uint64_t *src, uint64_t *dst)
 {
 	struct ip *ip;
 	struct ether_hdr *ethhdr;
@@ -313,25 +273,24 @@ prepare_tx_pkt(struct rte_mbuf *pkt, uint8_t port)
 		ethhdr->ether_type = rte_cpu_to_be_16(ETHER_TYPE_IPv6);
 	}
 
-	memcpy(&ethhdr->s_addr, &ethaddr_tbl[port].src,
-			sizeof(struct ether_addr));
-	memcpy(&ethhdr->d_addr, &ethaddr_tbl[port].dst,
-			sizeof(struct ether_addr));
+	memcpy(&ethhdr->s_addr, src, sizeof(struct ether_addr));
+	memcpy(&ethhdr->d_addr, dst, sizeof(struct ether_addr));
 }
 
 static inline void
-prepare_tx_burst(struct rte_mbuf *pkts[], uint16_t nb_pkts, uint8_t port)
+prepare_tx_burst(struct rte_mbuf *pkts[], uint64_t *src, uint64_t *dst,
+		 uint16_t nb_pkts)
 {
 	int32_t i;
 	const int32_t prefetch_offset = 2;
 
 	for (i = 0; i < (nb_pkts - prefetch_offset); i++) {
 		rte_mbuf_prefetch_part2(pkts[i + prefetch_offset]);
-		prepare_tx_pkt(pkts[i], port);
+		prepare_tx_pkt(pkts[i], src, dst);
 	}
 	/* Process left packets */
 	for (; i < nb_pkts; i++)
-		prepare_tx_pkt(pkts[i], port);
+		prepare_tx_pkt(pkts[i], src, dst);
 }
 
 /* Send burst of packets on an output interface */
@@ -341,11 +300,14 @@ send_burst(struct lcore_conf *qconf, uint16_t n, uint8_t port)
 	struct rte_mbuf **m_table;
 	int32_t ret;
 	uint16_t queueid;
+	uint64_t *src, *dst;
 
 	queueid = qconf->tx_queue_id[port];
 	m_table = (struct rte_mbuf **)qconf->tx_mbufs[port].m_table;
+	src = &qconf->eth_addr[port].src;
+	dst = &qconf->eth_addr[port].dst;
 
-	prepare_tx_burst(m_table, n, port);
+	prepare_tx_burst(m_table, src, dst, n);
 
 	ret = rte_eth_tx_burst(port, queueid, m_table, n);
 	if (unlikely(ret < n)) {
@@ -706,6 +668,7 @@ main_loop(__attribute__((unused)) void *dummy)
 
 	qconf->rt4_ctx = socket_ctx[socket_id].rt_ip4;
 	qconf->rt6_ctx = socket_ctx[socket_id].rt_ip6;
+	qconf->eth_addr = socket_ctx[socket_id].eth_addr;
 	qconf->inbound.sp4_ctx = socket_ctx[socket_id].sp_ip4_in;
 	qconf->inbound.sp6_ctx = socket_ctx[socket_id].sp_ip6_in;
 	qconf->inbound.sa_ctx = socket_ctx[socket_id].sa_in;
@@ -1045,14 +1008,6 @@ parse_args(int32_t argc, char **argv)
 	return ret;
 }
 
-static void
-print_ethaddr(const char *name, const struct ether_addr *eth_addr)
-{
-	char buf[ETHER_ADDR_FMT_SIZE];
-	ether_format_addr(buf, ETHER_ADDR_FMT_SIZE, eth_addr);
-	printf("%s%s", name, buf);
-}
-
 /* Check the link status of all ports in up to 9s, and print them finally */
 static void
 check_all_ports_link_status(uint8_t port_num, uint32_t port_mask)
@@ -1339,16 +1294,10 @@ port_init(uint8_t portid)
 	uint16_t tx_queueid, rx_queueid, queue, lcore_id;
 	int32_t ret, socket_id;
 	struct lcore_conf *qconf;
-	struct ether_addr ethaddr;
 
 	rte_eth_dev_info_get(portid, &dev_info);
 
 	printf("Configuring device port %u:\n", portid);
-
-	rte_eth_macaddr_get(portid, &ethaddr);
-	ethaddr_tbl[portid].src = ETHADDR_TO_UINT64(ethaddr);
-	print_ethaddr("Address: ", &ethaddr);
-	printf("\n");
 
 	nb_rx_queue = get_port_nb_rx_queues(portid);
 	nb_tx_queue = nb_lcores;
@@ -1498,6 +1447,8 @@ main(int32_t argc, char **argv)
 		sp6_init(&socket_ctx[socket_id], socket_id);
 
 		rt_init(&socket_ctx[socket_id], socket_id);
+
+		eth_init(&socket_ctx[socket_id], socket_id, enabled_port_mask);
 
 		pool_init(&socket_ctx[socket_id], socket_id, NB_MBUF);
 	}

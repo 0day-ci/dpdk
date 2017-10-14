@@ -153,6 +153,10 @@ struct cdev_key {
 	uint8_t aead_algo;
 };
 
+struct eth_ctx {
+	uint64_t src, dst;
+};
+
 struct socket_ctx {
 	struct sa_ctx *sa_in;
 	struct sa_ctx *sa_out;
@@ -162,6 +166,7 @@ struct socket_ctx {
 	struct sp_ctx *sp_ip6_out;
 	struct rt_ctx *rt_ip4;
 	struct rt_ctx *rt_ip6;
+	struct eth_ctx *eth_addr;
 	struct rte_mempool *mbuf_pool;
 	struct rte_mempool *session_pool;
 };
@@ -236,5 +241,8 @@ sa_init(struct socket_ctx *ctx, int32_t socket_id);
 
 void
 rt_init(struct socket_ctx *ctx, int32_t socket_id);
+
+void
+eth_init(struct socket_ctx *ctx, int32_t socket_id, uint32_t mask);
 
 #endif /* __IPSEC_H__ */

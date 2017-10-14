@@ -292,6 +292,30 @@ parse_ipv6_addr(const char *token, struct in6_addr *ipv6, uint32_t *mask)
 }
 
 int
+parse_eth_addr(const char *token, struct ether_addr *addr)
+{
+	char addr_str[256] = {0};
+	int i, values[6];
+
+	if (strlen(token) >= 256)
+		return -EINVAL;
+
+	strncpy(addr_str, token, strlen(token));
+
+	if (6 != sscanf(addr_str, "%02X:%02X:%02X:%02X:%02X:%02X",
+			&values[0], &values[1],
+			&values[2], &values[3],
+			&values[4], &values[5])) {
+		return -EINVAL;
+	}
+
+	for (i = 0; i < 6; ++i)
+		addr->addr_bytes[i] = (uint8_t)values[i];
+
+	return 0;
+}
+
+int
 parse_range(const char *token, uint16_t *low, uint16_t *high)
 {
 	char ch;
@@ -469,11 +493,55 @@ cmdline_parse_inst_t cfg_rt_add_rule = {
 	},
 };
 
+/* eth add parse */
+struct cfg_eth_add_cfg_item {
+	cmdline_fixed_string_t eth_keyword;
+	cmdline_multi_string_t multi_string;
+};
+
+static void
+cfg_eth_add_cfg_item_parsed(void *parsed_result,
+	__rte_unused struct cmdline *cl, void *data)
+{
+	struct cfg_eth_add_cfg_item *params = parsed_result;
+	char *tokens[32];
+	uint32_t n_tokens = RTE_DIM(tokens);
+	struct parse_status *status = (struct parse_status *)data;
+
+	APP_CHECK(parse_tokenize_string(
+		params->multi_string, tokens, &n_tokens) == 0,
+		status, "too many arguments\n");
+	if (status->status < 0)
+		return;
+
+	parse_eth_tokens(tokens, n_tokens, status);
+}
+
+static cmdline_parse_token_string_t cfg_eth_add_eth_str =
+	TOKEN_STRING_INITIALIZER(struct cfg_eth_add_cfg_item,
+		eth_keyword, "eth");
+
+static cmdline_parse_token_string_t cfg_eth_add_multi_str =
+	TOKEN_STRING_INITIALIZER(struct cfg_eth_add_cfg_item, multi_string,
+		TOKEN_STRING_MULTI);
+
+cmdline_parse_inst_t cfg_eth_add_rule = {
+	.f = cfg_eth_add_cfg_item_parsed,
+	.data = NULL,
+	.help_str = "",
+	.tokens = {
+		(void *) &cfg_eth_add_eth_str,
+		(void *) &cfg_eth_add_multi_str,
+		NULL,
+	},
+};
+
 /** set of cfg items */
 cmdline_parse_ctx_t ipsec_ctx[] = {
 	(cmdline_parse_inst_t *)&cfg_sp_add_rule,
 	(cmdline_parse_inst_t *)&cfg_sa_add_rule,
 	(cmdline_parse_inst_t *)&cfg_rt_add_rule,
+	(cmdline_parse_inst_t *)&cfg_eth_add_rule,
 	NULL,
 };
 
@@ -499,6 +567,7 @@ parse_cfg_file(const char *cfg_filename)
 	cfg_sp_add_rule.data = &status;
 	cfg_sa_add_rule.data = &status;
 	cfg_rt_add_rule.data = &status;
+	cfg_eth_add_rule.data = &status;
 
 	do {
 		char oneline[1024];
