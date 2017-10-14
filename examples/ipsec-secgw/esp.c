@@ -355,8 +355,7 @@ esp_outbound(struct rte_mbuf *m, struct ipsec_sa *sa,
 		aad = get_aad(m);
 		memcpy(aad, esp, 8);
 		sym_cop->aead.aad.data = aad;
-		sym_cop->aead.aad.phys_addr = rte_pktmbuf_mtophys_offset(m,
-				aad - rte_pktmbuf_mtod(m, uint8_t *));
+		sym_cop->aead.aad.phys_addr = rte_mem_virt2phy(aad);
 
 		sym_cop->aead.digest.data = rte_pktmbuf_mtod_offset(m, uint8_t *,
 			rte_pktmbuf_pkt_len(m) - sa->digest_len);
