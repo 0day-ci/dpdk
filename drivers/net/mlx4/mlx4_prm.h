@@ -78,6 +78,11 @@ enum {
 	MLX4_CQE_L2_TUNNEL_IPOK = (int)(1u << 31),
 };
 
+/* Completion queue events, numbers and masks. */
+#define MLX4_CQ_DB_GEQ_N_MASK 0x3
+#define MLX4_CQ_DB_CI_MASK 0xffffff
+#define MLX4_CQ_DOORBELL 0x20
+
 /* Send queue information. */
 struct mlx4_sq {
 	uint8_t *buf; /**< SQ buffer. */
@@ -100,6 +105,10 @@ struct mlx4_cq {
 	uint32_t cqe_64:1; /**< CQ entry size is 64 bytes. */
 	uint32_t cons_index; /**< Last queue entry that was handled. */
 	uint32_t *set_ci_db; /**< Pointer to the completion queue doorbell. */
+	uint32_t *arm_db; /**< Pointer to doorbell for arming Rx events. */
+	int arm_sn; /**< Rx event counter. */
+	void *cq_uar; /**< CQ user access region. */
+	uint32_t cqn; /**< CQ number. */
 };
 
 /**

@@ -404,7 +404,7 @@ mlx4_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 	struct priv *priv = dev->data->dev_private;
 	struct mlx4dv_obj mlxdv;
 	struct mlx4dv_rwq dv_rwq;
-	struct mlx4dv_cq dv_cq;
+	struct mlx4dv_cq dv_cq = { .comp_mask = MLX4DV_CQ_MASK_UAR, };
 	uint32_t mb_len = rte_pktmbuf_data_room_size(mp);
 	struct rte_mbuf *(*elts)[rte_align32pow2(desc)];
 	struct rte_flow_error error;
@@ -601,6 +601,10 @@ mlx4_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
 	rxq->mcq.cqe_cnt = dv_cq.cqe_cnt;
 	rxq->mcq.set_ci_db = dv_cq.set_ci_db;
 	rxq->mcq.cqe_64 = (dv_cq.cqe_size & 64) ? 1 : 0;
+	rxq->mcq.arm_db = dv_cq.arm_db;
+	rxq->mcq.arm_sn = dv_cq.arm_sn;
+	rxq->mcq.cqn = dv_cq.cqn;
+	rxq->mcq.cq_uar = dv_cq.cq_uar;
 	ret = mlx4_rxq_alloc_elts(rxq);
 	if (ret) {
 		ERROR("%p: RXQ allocation failed: %s",
