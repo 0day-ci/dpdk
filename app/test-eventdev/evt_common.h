@@ -36,6 +36,7 @@
 #include <rte_common.h>
 #include <rte_debug.h>
 #include <rte_eventdev.h>
+#include <rte_service.h>
 
 #define CLNRM  "\x1b[0m"
 #define CLRED  "\x1b[31m"
@@ -111,6 +112,46 @@ evt_sched_type2queue_cfg(uint8_t sched_type)
 		rte_panic("Invalid sched_type %d\n", sched_type);
 	}
 	return ret;
+}
+
+
+static inline int
+evt_service_setup(uint8_t dev_id)
+{
+	uint32_t service_id;
+	int32_t core_cnt;
+	unsigned int lcore = 0;
+	uint32_t core_array[RTE_MAX_LCORE];
+	uint8_t cnt;
+	uint8_t min_cnt = UINT8_MAX;
+
+	if (evt_has_distributed_sched(dev_id))
+		return 0;
+
+	if (!rte_service_lcore_count())
+		return -ENOENT;
+
+	if (!rte_event_dev_service_id_get(dev_id, &service_id)) {
+		core_cnt = rte_service_lcore_list(core_array,
+				RTE_MAX_LCORE);
+		if (core_cnt < 0)
+			return -ENOENT;
+		/* Get the core which has least number of services running. */
+		while (core_cnt--) {
+			/* Reset default mapping */
+			rte_service_map_lcore_set(service_id,
+					core_array[core_cnt], 0);
+			cnt = rte_service_lcore_count_services(
+					core_array[core_cnt]);
+			if (cnt < min_cnt) {
+				lcore = core_array[core_cnt];
+				min_cnt = cnt;
+			}
+		}
+		if (rte_service_map_lcore_set(service_id, lcore, 1))
+			return -ENOENT;
+	}
+	return 0;
 }
 
 #endif /*  _EVT_COMMON_*/
