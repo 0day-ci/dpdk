@@ -49,6 +49,7 @@
 #include <rte_cycles.h>
 #include <rte_eventdev.h>
 #include <rte_pause.h>
+#include <rte_service_component.h>
 
 #include "test.h"
 
@@ -320,6 +321,19 @@ struct test_event_dev_stats {
 	uint64_t qid_tx_pkts[MAX_QIDS];
 };
 
+static inline void
+wait_schedule(int evdev)
+{
+	static const char * const dev_names[] = {"dev_sched_calls"};
+	uint64_t val;
+
+	val = rte_event_dev_xstats_by_name_get(evdev, dev_names[0],
+			0);
+	while ((rte_event_dev_xstats_by_name_get(evdev, dev_names[0], 0) - val)
+			< 2)
+		;
+}
+
 static inline int
 test_event_dev_stats_get(int dev_id, struct test_event_dev_stats *stats)
 {
@@ -392,9 +406,9 @@ run_prio_packet_test(struct test *t)
 		RTE_EVENT_DEV_PRIORITY_HIGHEST
 	};
 	unsigned int i;
+	struct rte_event ev_arr[2];
 	for (i = 0; i < RTE_DIM(MAGIC_SEQN); i++) {
 		/* generate pkt and enqueue */
-		struct rte_event ev;
 		struct rte_mbuf *arp = rte_gen_arp(0, t->mbuf_pool);
 		if (!arp) {
 			printf("%d: gen of pkt failed\n", __LINE__);
@@ -402,20 +416,20 @@ run_prio_packet_test(struct test *t)
 		}
 		arp->seqn = MAGIC_SEQN[i];
 
-		ev = (struct rte_event){
+		ev_arr[i] = (struct rte_event){
 			.priority = PRIORITY[i],
 			.op = RTE_EVENT_OP_NEW,
 			.queue_id = t->qid[0],
 			.mbuf = arp
 		};
-		err = rte_event_enqueue_burst(evdev, t->port[0], &ev, 1);
-		if (err < 0) {
-			printf("%d: error failed to enqueue\n", __LINE__);
-			return -1;
-		}
+	}
+	err = rte_event_enqueue_burst(evdev, t->port[0], ev_arr, 2);
+	if (err < 0) {
+		printf("%d: error failed to enqueue\n", __LINE__);
+		return -1;
 	}
 
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	struct test_event_dev_stats stats;
 	err = test_event_dev_stats_get(evdev, &stats);
@@ -425,8 +439,8 @@ run_prio_packet_test(struct test *t)
 	}
 
 	if (stats.port_rx_pkts[t->port[0]] != 2) {
-		printf("%d: error stats incorrect for directed port\n",
-				__LINE__);
+		printf("%d: error stats incorrect for directed port %"PRIu64"\n",
+				__LINE__, stats.port_rx_pkts[t->port[0]]);
 		rte_event_dev_dump(evdev, stdout);
 		return -1;
 	}
@@ -439,6 +453,7 @@ run_prio_packet_test(struct test *t)
 		rte_event_dev_dump(evdev, stdout);
 		return -1;
 	}
+
 	if (ev.mbuf->seqn != MAGIC_SEQN[1]) {
 		printf("%d: first packet out not highest priority\n",
 				__LINE__);
@@ -507,7 +522,7 @@ test_single_directed_packet(struct test *t)
 	}
 
 	/* Run schedule() as dir packets may need to be re-ordered */
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	struct test_event_dev_stats stats;
 	err = test_event_dev_stats_get(evdev, &stats);
@@ -574,7 +589,7 @@ test_directed_forward_credits(struct test *t)
 			printf("%d: error failed to enqueue\n", __LINE__);
 			return -1;
 		}
-		rte_event_schedule(evdev);
+		wait_schedule(evdev);
 
 		uint32_t deq_pkts;
 		deq_pkts = rte_event_dequeue_burst(evdev, 0, &ev, 1, 0);
@@ -736,7 +751,7 @@ burst_packets(struct test *t)
 			return -1;
 		}
 	}
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	/* Check stats for all NUM_PKTS arrived to sched core */
 	struct test_event_dev_stats stats;
@@ -825,7 +840,7 @@ abuse_inflights(struct test *t)
 	}
 
 	/* schedule */
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	struct test_event_dev_stats stats;
 
@@ -963,7 +978,7 @@ xstats_tests(struct test *t)
 		}
 	}
 
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	/* Device names / values */
 	int num_stats = rte_event_dev_xstats_names_get(evdev,
@@ -974,8 +989,8 @@ xstats_tests(struct test *t)
 	ret = rte_event_dev_xstats_get(evdev,
 					RTE_EVENT_DEV_XSTATS_DEVICE,
 					0, ids, values, num_stats);
-	static const uint64_t expected[] = {3, 3, 0, 1, 0, 0};
-	for (i = 0; (signed int)i < ret; i++) {
+	static const uint64_t expected[] = {3, 3, 0};
+	for (i = 0; (signed int)i < 3; i++) {
 		if (expected[i] != values[i]) {
 			printf(
 				"%d Error xstat %d (id %d) %s : %"PRIu64
@@ -994,7 +1009,7 @@ xstats_tests(struct test *t)
 	ret = rte_event_dev_xstats_get(evdev,
 					RTE_EVENT_DEV_XSTATS_DEVICE,
 					0, ids, values, num_stats);
-	for (i = 0; (signed int)i < ret; i++) {
+	for (i = 0; (signed int)i < 3; i++) {
 		if (expected_zero[i] != values[i]) {
 			printf(
 				"%d Error, xstat %d (id %d) %s : %"PRIu64
@@ -1290,7 +1305,7 @@ port_reconfig_credits(struct test *t)
 			}
 		}
 
-		rte_event_schedule(evdev);
+		wait_schedule(evdev);
 
 		struct rte_event ev[NPKTS];
 		int deq = rte_event_dequeue_burst(evdev, t->port[0], ev,
@@ -1516,14 +1531,12 @@ xstats_id_reset_tests(struct test *t)
 		}
 	}
 
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	static const char * const dev_names[] = {
-		"dev_rx", "dev_tx", "dev_drop", "dev_sched_calls",
-		"dev_sched_no_iq_enq", "dev_sched_no_cq_enq",
-	};
+		"dev_rx", "dev_tx", "dev_drop"};
 	uint64_t dev_expected[] = {NPKTS, NPKTS, 0, 1, 0, 0};
-	for (i = 0; (int)i < ret; i++) {
+	for (i = 0; (int)i < 3; i++) {
 		unsigned int id;
 		uint64_t val = rte_event_dev_xstats_by_name_get(evdev,
 								dev_names[i],
@@ -1888,26 +1901,26 @@ qid_priorities(struct test *t)
 	}
 
 	/* enqueue 3 packets, setting seqn and QID to check priority */
+	struct rte_event ev_arr[3];
 	for (i = 0; i < 3; i++) {
-		struct rte_event ev;
 		struct rte_mbuf *arp = rte_gen_arp(0, t->mbuf_pool);
 		if (!arp) {
 			printf("%d: gen of pkt failed\n", __LINE__);
 			return -1;
 		}
-		ev.queue_id = t->qid[i];
-		ev.op = RTE_EVENT_OP_NEW;
-		ev.mbuf = arp;
+		ev_arr[i].queue_id = t->qid[i];
+		ev_arr[i].op = RTE_EVENT_OP_NEW;
+		ev_arr[i].mbuf = arp;
 		arp->seqn = i;
 
-		int err = rte_event_enqueue_burst(evdev, t->port[0], &ev, 1);
-		if (err != 1) {
-			printf("%d: Failed to enqueue\n", __LINE__);
-			return -1;
-		}
+	}
+	int err = rte_event_enqueue_burst(evdev, t->port[0], ev_arr, 3);
+	if (err != 3) {
+		printf("%d: Failed to enqueue\n", __LINE__);
+		return -1;
 	}
 
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	/* dequeue packets, verify priority was upheld */
 	struct rte_event ev[32];
@@ -1988,7 +2001,7 @@ load_balancing(struct test *t)
 		}
 	}
 
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	struct test_event_dev_stats stats;
 	err = test_event_dev_stats_get(evdev, &stats);
@@ -2088,7 +2101,7 @@ load_balancing_history(struct test *t)
 	}
 
 	/* call the scheduler */
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	/* Dequeue the flow 0 packet from port 1, so that we can then drop */
 	struct rte_event ev;
@@ -2105,7 +2118,7 @@ load_balancing_history(struct test *t)
 	rte_event_enqueue_burst(evdev, t->port[1], &release_ev, 1);
 
 	/* call the scheduler */
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	/*
 	 * Set up the next set of flows, first a new flow to fill up
@@ -2138,7 +2151,7 @@ load_balancing_history(struct test *t)
 	}
 
 	/* schedule */
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	err = test_event_dev_stats_get(evdev, &stats);
 	if (err) {
@@ -2182,7 +2195,7 @@ load_balancing_history(struct test *t)
 		while (rte_event_dequeue_burst(evdev, i, &ev, 1, 0))
 			rte_event_enqueue_burst(evdev, i, &release_ev, 1);
 	}
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	cleanup(t);
 	return 0;
@@ -2248,7 +2261,7 @@ invalid_qid(struct test *t)
 	}
 
 	/* call the scheduler */
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	err = test_event_dev_stats_get(evdev, &stats);
 	if (err) {
@@ -2333,7 +2346,7 @@ single_packet(struct test *t)
 		return -1;
 	}
 
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	err = test_event_dev_stats_get(evdev, &stats);
 	if (err) {
@@ -2376,7 +2389,7 @@ single_packet(struct test *t)
 		printf("%d: Failed to enqueue\n", __LINE__);
 		return -1;
 	}
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	err = test_event_dev_stats_get(evdev, &stats);
 	if (stats.port_inflight[wrk_enq] != 0) {
@@ -2464,7 +2477,7 @@ inflight_counts(struct test *t)
 	}
 
 	/* schedule */
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	err = test_event_dev_stats_get(evdev, &stats);
 	if (err) {
@@ -2520,7 +2533,7 @@ inflight_counts(struct test *t)
 	 * As the scheduler core decrements inflights, it needs to run to
 	 * process packets to act on the drop messages
 	 */
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	err = test_event_dev_stats_get(evdev, &stats);
 	if (stats.port_inflight[p1] != 0) {
@@ -2555,7 +2568,7 @@ inflight_counts(struct test *t)
 	 * As the scheduler core decrements inflights, it needs to run to
 	 * process packets to act on the drop messages
 	 */
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	err = test_event_dev_stats_get(evdev, &stats);
 	if (stats.port_inflight[p2] != 0) {
@@ -2649,7 +2662,7 @@ parallel_basic(struct test *t, int check_order)
 		}
 	}
 
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	/* use extra slot to make logic in loops easier */
 	struct rte_event deq_ev[w3_port + 1];
@@ -2676,7 +2689,7 @@ parallel_basic(struct test *t, int check_order)
 			return -1;
 		}
 	}
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	/* dequeue from the tx ports, we should get 3 packets */
 	deq_pkts = rte_event_dequeue_burst(evdev, t->port[tx_port], deq_ev,
@@ -2754,7 +2767,7 @@ holb(struct test *t) /* test to check we avoid basic head-of-line blocking */
 		printf("%d: Error doing first enqueue\n", __LINE__);
 		goto err;
 	}
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	if (rte_event_dev_xstats_by_name_get(evdev, "port_0_cq_ring_used", NULL)
 			!= 1)
@@ -2779,7 +2792,7 @@ holb(struct test *t) /* test to check we avoid basic head-of-line blocking */
 			printf("%d: Error with enqueue\n", __LINE__);
 			goto err;
 		}
-		rte_event_schedule(evdev);
+		wait_schedule(evdev);
 	} while (rte_event_dev_xstats_by_name_get(evdev,
 				rx_port_free_stat, NULL) != 0);
 
@@ -2789,7 +2802,7 @@ holb(struct test *t) /* test to check we avoid basic head-of-line blocking */
 		printf("%d: Error with enqueue\n", __LINE__);
 		goto err;
 	}
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	/* check that the other port still has an empty CQ */
 	if (rte_event_dev_xstats_by_name_get(evdev, other_port_used_stat, NULL)
@@ -2812,7 +2825,7 @@ holb(struct test *t) /* test to check we avoid basic head-of-line blocking */
 		printf("%d: Error with enqueue\n", __LINE__);
 		goto err;
 	}
-	rte_event_schedule(evdev);
+	wait_schedule(evdev);
 
 	if (rte_event_dev_xstats_by_name_get(evdev, other_port_used_stat, NULL)
 			!= 1) {
@@ -3002,7 +3015,7 @@ worker_loopback(struct test *t)
 	while (rte_eal_get_lcore_state(p_lcore) != FINISHED ||
 			rte_eal_get_lcore_state(w_lcore) != FINISHED) {
 
-		rte_event_schedule(evdev);
+		wait_schedule(evdev);
 
 		uint64_t new_cycles = rte_get_timer_cycles();
 
@@ -3029,7 +3042,7 @@ worker_loopback(struct test *t)
 			cycles = new_cycles;
 		}
 	}
-	rte_event_schedule(evdev); /* ensure all completions are flushed */
+	wait_schedule(evdev); /* ensure all completions are flushed */
 
 	rte_eal_mp_wait_lcore();
 
@@ -3064,6 +3077,7 @@ test_sw_eventdev(void)
 			printf("Error finding newly created eventdev\n");
 			return -1;
 		}
+		rte_service_start_with_defaults();
 	}
 
 	/* Only create mbuf pool once, reuse for each test run */
