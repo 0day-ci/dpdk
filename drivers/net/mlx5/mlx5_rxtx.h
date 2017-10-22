@@ -584,9 +584,11 @@ mlx5_tx_mb2mr(struct mlx5_txq_data *txq, struct rte_mbuf *mb)
  *   Pointer to TX queue structure.
  * @param wqe
  *   Pointer to the last WQE posted in the NIC.
+ * @param mb
+ *   Request for write memory barrier after BF update.
  */
 static __rte_always_inline void
-mlx5_tx_dbrec(struct mlx5_txq_data *txq, volatile struct mlx5_wqe *wqe)
+mlx5_tx_dbrec(struct mlx5_txq_data *txq, volatile struct mlx5_wqe *wqe, int mb)
 {
 	uint64_t *dst = (uint64_t *)((uintptr_t)txq->bf_reg);
 	volatile uint64_t *src = ((volatile uint64_t *)wqe);
@@ -596,6 +598,8 @@ mlx5_tx_dbrec(struct mlx5_txq_data *txq, volatile struct mlx5_wqe *wqe)
 	/* Ensure ordering between DB record and BF copy. */
 	rte_wmb();
 	*dst = *src;
+	if (mb)
+		rte_wmb();
 }
 
 #endif /* RTE_PMD_MLX5_RXTX_H_ */

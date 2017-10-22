@@ -732,7 +732,7 @@ next_wqe:
 	txq->stats.opackets += i;
 #endif
 	/* Ring QP doorbell. */
-	mlx5_tx_dbrec(txq, (volatile struct mlx5_wqe *)last_wqe);
+	mlx5_tx_dbrec(txq, (volatile struct mlx5_wqe *)last_wqe, 1);
 	return i;
 }
 
@@ -948,7 +948,7 @@ mlx5_tx_burst_mpw(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 	/* Ring QP doorbell. */
 	if (mpw.state == MLX5_MPW_STATE_OPENED)
 		mlx5_mpw_close(txq, &mpw);
-	mlx5_tx_dbrec(txq, mpw.wqe);
+	mlx5_tx_dbrec(txq, mpw.wqe, 1);
 	txq->elts_head = elts_head;
 	return i;
 }
@@ -1245,7 +1245,7 @@ mlx5_tx_burst_mpw_inline(void *dpdk_txq, struct rte_mbuf **pkts,
 		mlx5_mpw_inline_close(txq, &mpw);
 	else if (mpw.state == MLX5_MPW_STATE_OPENED)
 		mlx5_mpw_close(txq, &mpw);
-	mlx5_tx_dbrec(txq, mpw.wqe);
+	mlx5_tx_dbrec(txq, mpw.wqe, 1);
 	txq->elts_head = elts_head;
 	return i;
 }
@@ -1596,7 +1596,7 @@ mlx5_tx_burst_empw(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 	else if (mpw.state == MLX5_MPW_STATE_OPENED)
 		mlx5_mpw_close(txq, &mpw);
 	/* Ring QP doorbell. */
-	mlx5_tx_dbrec(txq, mpw.wqe);
+	mlx5_tx_dbrec(txq, mpw.wqe, 1);
 	txq->elts_head = elts_head;
 	return i;
 }

@@ -226,7 +226,7 @@ txq_scatter_v(struct mlx5_txq_data *txq, struct rte_mbuf **pkts,
 #ifdef MLX5_PMD_SOFT_COUNTERS
 	txq->stats.opackets += n;
 #endif
-	mlx5_tx_dbrec(txq, wqe);
+	mlx5_tx_dbrec(txq, wqe, 1);
 	return n;
 }
 
@@ -344,7 +344,7 @@ txq_burst_v(struct mlx5_txq_data *txq, struct rte_mbuf **pkts, uint16_t pkts_n,
 	txq->wqe_ci += (nb_dword_in_hdr + pkts_n + (nb_dword_per_wqebb - 1)) /
 		       nb_dword_per_wqebb;
 	/* Ring QP doorbell. */
-	mlx5_tx_dbrec(txq, wqe);
+	mlx5_tx_dbrec(txq, wqe, pkts_n < MLX5_VPMD_TX_MAX_BURST);
 	return pkts_n;
 }
 
