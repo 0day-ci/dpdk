@@ -46,6 +46,7 @@
 #include <rte_cycles.h>
 #include <rte_ethdev.h>
 #include <rte_eventdev.h>
+#include <rte_service.h>
 
 #define MAX_NUM_STAGES 8
 #define BATCH_SIZE 16
@@ -233,22 +234,12 @@ producer(void)
 }
 
 static inline void
-schedule_devices(uint8_t dev_id, unsigned int lcore_id)
+schedule_devices(unsigned int lcore_id)
 {
 	if (fdata->rx_core[lcore_id] && (fdata->rx_single ||
 	    rte_atomic32_cmpset(&(fdata->rx_lock), 0, 1))) {
 		producer();
 		rte_atomic32_clear((rte_atomic32_t *)&(fdata->rx_lock));
-	}
-
-	if (fdata->sched_core[lcore_id] && (fdata->sched_single ||
-	    rte_atomic32_cmpset(&(fdata->sched_lock), 0, 1))) {
-		rte_event_schedule(dev_id);
-		if (cdata.dump_dev_signal) {
-			rte_event_dev_dump(0, stdout);
-			cdata.dump_dev_signal = 0;
-		}
-		rte_atomic32_clear((rte_atomic32_t *)&(fdata->sched_lock));
 	}
 
 	if (fdata->tx_core[lcore_id] && (fdata->tx_single ||
@@ -294,7 +285,7 @@ worker(void *arg)
 	while (!fdata->done) {
 		uint16_t i;
 
-		schedule_devices(dev_id, lcore_id);
+		schedule_devices(lcore_id);
 
 		if (!fdata->worker_core[lcore_id]) {
 			rte_pause();
@@ -661,6 +652,27 @@ struct port_link {
 };
 
 static int
+setup_scheduling_service(unsigned int lcore, uint8_t dev_id)
+{
+	int ret;
+	uint32_t service_id;
+	ret = rte_event_dev_service_id_get(dev_id, &service_id);
+	if (ret == -ESRCH) {
+		printf("Event device [%d] doesn't need scheduling service\n",
+				dev_id);
+		return 0;
+	}
+	if (!ret) {
+		rte_service_runstate_set(service_id, 1);
+		rte_service_lcore_add(lcore);
+		rte_service_map_lcore_set(service_id, lcore, 1);
+		rte_service_lcore_start(lcore);
+	}
+
+	return ret;
+}
+
+static int
 setup_eventdev(struct prod_data *prod_data,
 		struct cons_data *cons_data,
 		struct worker_data *worker_data)
@@ -839,6 +851,14 @@ setup_eventdev(struct prod_data *prod_data,
 	*cons_data = (struct cons_data){.dev_id = dev_id,
 					.port_id = i };
 
+	for (i = 0; i < MAX_NUM_CORE; i++) {
+		if (fdata->sched_core[i]
+				&& setup_scheduling_service(i, dev_id)) {
+			printf("Error setting up schedulig service on %d", i);
+			return -1;
+		}
+	}
+
 	if (rte_event_dev_start(dev_id) < 0) {
 		printf("Error starting eventdev\n");
 		return -1;
@@ -944,8 +964,7 @@ main(int argc, char **argv)
 
 		if (!fdata->rx_core[lcore_id] &&
 			!fdata->worker_core[lcore_id] &&
-			!fdata->tx_core[lcore_id] &&
-			!fdata->sched_core[lcore_id])
+			!fdata->tx_core[lcore_id])
 			continue;
 
 		if (fdata->rx_core[lcore_id])
@@ -957,10 +976,6 @@ main(int argc, char **argv)
 			printf(
 				"[%s()] lcore %d executing NIC Tx, and using eventdev port %u\n",
 				__func__, lcore_id, cons_data.port_id);
-
-		if (fdata->sched_core[lcore_id])
-			printf("[%s()] lcore %d executing scheduler\n",
-					__func__, lcore_id);
 
 		if (fdata->worker_core[lcore_id])
 			printf(
