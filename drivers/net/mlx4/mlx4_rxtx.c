@@ -285,8 +285,6 @@ mlx4_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 	struct txq *txq = (struct txq *)dpdk_txq;
 	unsigned int elts_head = txq->elts_head;
 	const unsigned int elts_n = txq->elts_n;
-	unsigned int elts_comp = 0;
-	unsigned int bytes_sent = 0;
 	unsigned int i;
 	unsigned int max;
 	struct mlx4_sq *sq = &txq->msq;
@@ -498,8 +496,7 @@ mlx4_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 						       MLX4_BIT_WQE_OWN : 0));
 		sq->head += nr_txbbs;
 		elt->buf = buf;
-		bytes_sent += buf->pkt_len;
-		++elts_comp;
+		txq->stats.obytes += buf->pkt_len;
 		elts_head = elts_head_next;
 	}
 	/* Take a shortcut if nothing must be sent. */
@@ -507,13 +504,12 @@ mlx4_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 		return 0;
 	/* Increment send statistics counters. */
 	txq->stats.opackets += i;
-	txq->stats.obytes += bytes_sent;
 	/* Make sure that descriptors are written before doorbell record. */
 	rte_wmb();
 	/* Ring QP doorbell. */
 	rte_write32(txq->msq.doorbell_qpn, txq->msq.db);
 	txq->elts_head = elts_head;
-	txq->elts_comp += elts_comp;
+	txq->elts_comp += i;
 	return i;
 }
 
