@@ -310,7 +310,6 @@ mlx4_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 		uint32_t owner_opcode = MLX4_OPCODE_SEND;
 		struct mlx4_wqe_ctrl_seg *ctrl;
 		struct mlx4_wqe_data_seg *dseg;
-		struct rte_mbuf *sbuf;
 		union {
 			uint32_t flags;
 			uint16_t flags16[2];
@@ -363,12 +362,12 @@ mlx4_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 		dseg = (struct mlx4_wqe_data_seg *)((uintptr_t)ctrl +
 				sizeof(struct mlx4_wqe_ctrl_seg));
 		/* Fill the data segments with buffer information. */
-		for (sbuf = buf; sbuf != NULL; sbuf = sbuf->next, dseg++) {
-			addr = rte_pktmbuf_mtod(sbuf, uintptr_t);
+		if (likely(buf->nb_segs == 1)) {
+			addr = rte_pktmbuf_mtod(buf, uintptr_t);
 			rte_prefetch0((volatile void *)addr);
 			/* Handle WQE wraparound. */
-			if (unlikely(dseg >=
-			    (struct mlx4_wqe_data_seg *)sq->eob))
+			if (unlikely(dseg >= (struct mlx4_wqe_data_seg *)
+					sq->eob))
 				dseg = (struct mlx4_wqe_data_seg *)sq->buf;
 			dseg->addr = rte_cpu_to_be_64(addr);
 			/* Memory region key (big endian). */
@@ -392,44 +391,90 @@ mlx4_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts, uint16_t pkts_n)
 				break;
 			}
 	#endif /* NDEBUG */
-			if (likely(sbuf->data_len)) {
-				byte_count = rte_cpu_to_be_32(sbuf->data_len);
-			} else {
+			/* Need a barrier here before writing the byte_count. */
+			rte_io_wmb();
+			dseg->byte_count = rte_cpu_to_be_32(buf->data_len);
+		} else {
+			/* Fill the data segments with buffer information. */
+			struct rte_mbuf *sbuf;
+
+			for (sbuf = buf;
+				 sbuf != NULL;
+				 sbuf = sbuf->next, dseg++) {
+				addr = rte_pktmbuf_mtod(sbuf, uintptr_t);
+				rte_prefetch0((volatile void *)addr);
+				/* Handle WQE wraparound. */
+				if (unlikely(dseg >=
+					(struct mlx4_wqe_data_seg *)sq->eob))
+					dseg = (struct mlx4_wqe_data_seg *)
+							sq->buf;
+				dseg->addr = rte_cpu_to_be_64(addr);
+				/* Memory region key (big endian). */
+				dseg->lkey = mlx4_txq_mp2mr(txq,
+						mlx4_txq_mb2mp(sbuf));
+		#ifndef NDEBUG
+				if (unlikely(dseg->lkey ==
+					rte_cpu_to_be_32((uint32_t)-1))) {
+					/* MR does not exist. */
+					DEBUG("%p: unable to get MP <-> MR association",
+						  (void *)txq);
+					/*
+					 * Restamp entry in case of failure.
+					 * Make sure that size is written
+					 * correctly, note that we give
+					 * ownership to the SW, not the HW.
+					 */
+					ctrl->fence_size =
+						(wqe_real_size >> 4) & 0x3f;
+					mlx4_txq_stamp_freed_wqe(sq, head_idx,
+					    (sq->head & sq->txbb_cnt) ? 0 : 1);
+					elt->buf = NULL;
+					break;
+				}
+		#endif /* NDEBUG */
+				if (likely(sbuf->data_len)) {
+					byte_count =
+					  rte_cpu_to_be_32(sbuf->data_len);
+				} else {
+					/*
+					 * Zero length segment is treated as
+					 * inline segment with zero data.
+					 */
+					byte_count = RTE_BE32(0x80000000);
+				}
 				/*
-				 * Zero length segment is treated as inline
-				 * segment with zero data.
+				 * If the data segment is not at the beginning
+				 * of a Tx basic block (TXBB) then write the
+				 * byte count, else postpone the writing to
+				 * just before updating the control segment.
 				 */
-				byte_count = RTE_BE32(0x80000000);
+				if ((uintptr_t)dseg &
+					(uintptr_t)(MLX4_TXBB_SIZE - 1)) {
+					/*
+					 * Need a barrier here before writing
+					 * the byte_count fields to make sure
+					 * that all the data is visible before
+					 * the byte_count field is set.
+					 * Otherwise, if the segment begins a
+					 * new cacheline, the HCA prefetcher
+					 * could grab the 64-byte chunk and get
+					 * a valid (!= 0xffffffff) byte count
+					 * but stale data, and end up sending
+					 * the wrong data.
+					 */
+					rte_io_wmb();
+					dseg->byte_count = byte_count;
+				} else {
+					/*
+					 * This data segment starts at the
+					 * beginning of a new TXBB, so we
+					 * need to postpone its byte_count
+					 * writing for later.
+					 */
+					pv[pv_counter].dseg = dseg;
+					pv[pv_counter++].val = byte_count;
+				}
 			}
-			/*
-			 * If the data segment is not at the beginning
-			 * of a Tx basic block (TXBB) then write the
-			 * byte count, else postpone the writing to
-			 * just before updating the control segment.
-			 */
-			if ((uintptr_t)dseg & (uintptr_t)(MLX4_TXBB_SIZE - 1)) {
-				/*
-				 * Need a barrier here before writing the
-				 * byte_count fields to make sure that all the
-				 * data is visible before the byte_count field
-				 * is set. otherwise, if the segment begins a
-				 * new cacheline, the HCA prefetcher could grab
-				 * the 64-byte chunk and get a valid
-				 * (!= 0xffffffff) byte count but stale data,
-				 * and end up sending the wrong data.
-				 */
-				rte_io_wmb();
-				dseg->byte_count = byte_count;
-			} else {
-				/*
-				 * This data segment starts at the beginning of
-				 * a new TXBB, so we need to postpone its
-				 * byte_count writing for later.
-				 */
-				pv[pv_counter].dseg = dseg;
-				pv[pv_counter++].val = byte_count;
-			}
-		}
 		/* Write the first DWORD of each TXBB save earlier. */
 		if (pv_counter) {
 			/* Need a barrier before writing the byte_count. */
