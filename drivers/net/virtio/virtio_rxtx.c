@@ -396,6 +396,13 @@ virtqueue_enqueue_xmit(struct virtnet_tx *txvq, struct rte_mbuf *cookie,
 		vq->vq_desc_tail_idx = idx;
 	vq->vq_free_cnt = (uint16_t)(vq->vq_free_cnt - needed);
 	vq_update_avail_ring(vq, head_idx);
+
+	/* when can_push is true, vtnet_hdr_size is added to pkt_len
+	 * of mbuf. It should be subtracted in order to make stats function
+	 * work in the right way.
+	 */
+	if (can_push)
+		cookie->pkt_len -= head_size;
 }
 
 void
