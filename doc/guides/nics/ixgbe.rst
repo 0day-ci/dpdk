@@ -227,6 +227,17 @@ So when the user sets different MTUs on PF and VF ports in one physical port,
 the real MTU for all these PF and VF ports is the largest value set.
 This behavior is based on the kernel driver behavior.
 
+VF MAC address setting
+~~~~~~~~~~~~~~~~~~~~~~
+
+On ixgbe, the concept pool can be used for different things. It depends on the
+mode. In VMDq mode, the pool means a VMDq pool. In IOV mode, the pool means a
+VF.
+When setting the parameters of a pool, in VMDq mode, it's for a VMDq pool, in
+IOV mode, it's for a VF.
+There's no RTE API to add a VF's MAC address from PF. On ixgbe, there's a
+workaround to do it. "rte_eth_dev_mac_addr_add" also can be used to add a VF's
+MAC address.
 
 Supported Chipsets and NICs
 ---------------------------
