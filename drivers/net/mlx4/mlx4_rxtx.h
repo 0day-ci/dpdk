@@ -53,6 +53,7 @@
 
 #include "mlx4.h"
 #include "mlx4_prm.h"
+#include "mlx4_utils.h"
 
 /** Rx queue counters. */
 struct mlx4_rxq_stats {
@@ -160,7 +161,6 @@ void mlx4_rx_queue_release(void *dpdk_rxq);
 
 /* mlx4_rxtx.c */
 
-uint32_t mlx4_txq_mp2mr(struct txq *txq, struct rte_mempool *mp);
 uint16_t mlx4_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts,
 		       uint16_t pkts_n);
 uint16_t mlx4_rx_burst(void *dpdk_rxq, struct rte_mbuf **pkts,
@@ -169,6 +169,8 @@ uint16_t mlx4_tx_burst_removed(void *dpdk_txq, struct rte_mbuf **pkts,
 			       uint16_t pkts_n);
 uint16_t mlx4_rx_burst_removed(void *dpdk_rxq, struct rte_mbuf **pkts,
 			       uint16_t pkts_n);
+uint32_t mlx4_txq_add_mr(struct txq *txq, struct rte_mempool *mp,
+				unsigned int i);
 
 /* mlx4_txq.c */
 
@@ -177,4 +179,52 @@ int mlx4_tx_queue_setup(struct rte_eth_dev *dev, uint16_t idx,
 			const struct rte_eth_txconf *conf);
 void mlx4_tx_queue_release(void *dpdk_txq);
 
+/**
+ * Get memory pool (MP) from mbuf. If mbuf is indirect, the pool from which
+ * the cloned mbuf is allocated is returned instead.
+ *
+ * @param buf
+ *   Pointer to mbuf.
+ *
+ * @return
+ *   Memory pool where data is located for given mbuf.
+ */
+static __rte_always_inline struct rte_mempool *
+mlx4_txq_mb2mp(struct rte_mbuf *buf)
+{
+	if (unlikely(RTE_MBUF_INDIRECT(buf)))
+		return rte_mbuf_from_indirect(buf)->pool;
+	return buf->pool;
+}
+
+/**
+ * Get memory region (MR) <-> memory pool (MP) association from txq->mp2mr[].
+ * Call mlx4_txq_add_mr() if MP is not registered yet.
+ *
+ * @param txq
+ *   Pointer to Tx queue structure.
+ * @param[in] mp
+ *   Memory pool for which a memory region lkey must be returned.
+ *
+ * @return
+ *   mr->lkey on success, (uint32_t)-1 on failure.
+ */
+static __rte_always_inline uint32_t
+mlx4_txq_mp2mr(struct txq *txq, struct rte_mempool *mp)
+{
+	unsigned int i;
+
+	for (i = 0; (i != RTE_DIM(txq->mp2mr)); ++i) {
+		if (unlikely(txq->mp2mr[i].mp == NULL)) {
+			/* Unknown MP, add a new MR for it. */
+			break;
+		}
+		if (txq->mp2mr[i].mp == mp) {
+			assert(txq->mp2mr[i].lkey != (uint32_t)-1);
+			assert(txq->mp2mr[i].mr->lkey == txq->mp2mr[i].lkey);
+			return txq->mp2mr[i].lkey;
+		}
+	}
+	return mlx4_txq_add_mr(txq, mp, i);
+}
 #endif /* MLX4_RXTX_H_ */

@@ -220,54 +220,25 @@ mlx4_txq_complete(struct txq *txq)
 	return 0;
 }
 
-/**
- * Get memory pool (MP) from mbuf. If mbuf is indirect, the pool from which
- * the cloned mbuf is allocated is returned instead.
- *
- * @param buf
- *   Pointer to mbuf.
- *
- * @return
- *   Memory pool where data is located for given mbuf.
- */
-static struct rte_mempool *
-mlx4_txq_mb2mp(struct rte_mbuf *buf)
-{
-	if (unlikely(RTE_MBUF_INDIRECT(buf)))
-		return rte_mbuf_from_indirect(buf)->pool;
-	return buf->pool;
-}
 
 /**
- * Get memory region (MR) <-> memory pool (MP) association from txq->mp2mr[].
- * Add MP to txq->mp2mr[] if it's not registered yet. If mp2mr[] is full,
- * remove an entry first.
+ * Add memory region (MR) <-> memory pool (MP) association to txq->mp2mr[].
+ * If mp2mr[] is full, remove an entry first.
  *
  * @param txq
  *   Pointer to Tx queue structure.
  * @param[in] mp
- *   Memory pool for which a memory region lkey must be returned.
+ *   Memory pool for which a memory region lkey must be added
+ * @param[in] i
+ *   Index in memory pool (MP) where to add memory region (MR)
  *
  * @return
- *   mr->lkey on success, (uint32_t)-1 on failure.
+ *   Added mr->lkey on success, (uint32_t)-1 on failure.
  */
-uint32_t
-mlx4_txq_mp2mr(struct txq *txq, struct rte_mempool *mp)
+uint32_t mlx4_txq_add_mr(struct txq *txq, struct rte_mempool *mp, uint32_t i)
 {
-	unsigned int i;
 	struct ibv_mr *mr;
 
-	for (i = 0; (i != RTE_DIM(txq->mp2mr)); ++i) {
-		if (unlikely(txq->mp2mr[i].mp == NULL)) {
-			/* Unknown MP, add a new MR for it. */
-			break;
-		}
-		if (txq->mp2mr[i].mp == mp) {
-			assert(txq->mp2mr[i].lkey != (uint32_t)-1);
-			assert(txq->mp2mr[i].mr->lkey == txq->mp2mr[i].lkey);
-			return txq->mp2mr[i].lkey;
-		}
-	}
 	/* Add a new entry, register MR first. */
 	DEBUG("%p: discovered new memory pool \"%s\" (%p)",
 	      (void *)txq, mp->name, (void *)mp);
