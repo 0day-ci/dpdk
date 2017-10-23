@@ -135,7 +135,7 @@ struct txq {
 	struct {
 		const struct rte_mempool *mp; /**< Cached memory pool. */
 		struct ibv_mr *mr; /**< Memory region (for mp). */
-		uint32_t lkey; /**< mr->lkey copy. */
+		uint32_t be_lkey; /**< mr->lkey copy. (big endian) */
 	} mp2mr[MLX4_PMD_TX_MP_CACHE]; /**< MP to MR translation table. */
 	struct priv *priv; /**< Back pointer to private data. */
 	unsigned int socket; /**< CPU socket ID for allocations. */
@@ -220,9 +220,11 @@ mlx4_txq_mp2mr(struct txq *txq, struct rte_mempool *mp)
 			break;
 		}
 		if (txq->mp2mr[i].mp == mp) {
-			assert(txq->mp2mr[i].lkey != (uint32_t)-1);
-			assert(txq->mp2mr[i].mr->lkey == txq->mp2mr[i].lkey);
-			return txq->mp2mr[i].lkey;
+			assert(txq->mp2mr[i].be_lkey !=
+				rte_cpu_to_be_32((uint32_t)-1));
+			assert(txq->mp2mr[i].mr->lkey ==
+				rte_be_to_cpu_32(txq->mp2mr[i].be_lkey));
+			return txq->mp2mr[i].be_lkey;
 		}
 	}
 	return mlx4_txq_add_mr(txq, mp, i);

@@ -260,10 +260,10 @@ uint32_t mlx4_txq_add_mr(struct txq *txq, struct rte_mempool *mp, uint32_t i)
 	/* Store the new entry. */
 	txq->mp2mr[i].mp = mp;
 	txq->mp2mr[i].mr = mr;
-	txq->mp2mr[i].lkey = mr->lkey;
+	txq->mp2mr[i].be_lkey = rte_cpu_to_be_32(mr->lkey);
 	DEBUG("%p: new MR lkey for MP \"%s\" (%p): 0x%08" PRIu32,
-	      (void *)txq, mp->name, (void *)mp, txq->mp2mr[i].lkey);
-	return txq->mp2mr[i].lkey;
+	      (void *)txq, mp->name, (void *)mp, mr->lkey);
+	return txq->mp2mr[i].be_lkey;
 }
 
 /**
@@ -289,7 +289,6 @@ mlx4_post_send(struct txq *txq, struct rte_mbuf *pkt)
 		uint16_t flags16[2];
 	} srcrb;
 	uint32_t head_idx = sq->head & sq->txbb_cnt_mask;
-	uint32_t lkey;
 	uintptr_t addr;
 	uint32_t owner_opcode = MLX4_OPCODE_SEND;
 	uint32_t byte_count;
@@ -323,10 +322,10 @@ mlx4_post_send(struct txq *txq, struct rte_mbuf *pkt)
 		if (unlikely(dseg >= (struct mlx4_wqe_data_seg *)sq->eob))
 			dseg = (struct mlx4_wqe_data_seg *)sq->buf;
 		dseg->addr = rte_cpu_to_be_64(addr);
-		/* Memory region key for this memory pool. */
-		lkey = mlx4_txq_mp2mr(txq, mlx4_txq_mb2mp(buf));
+		/* Memory region key (big endian) for this memory pool. */
+		dseg->lkey = mlx4_txq_mp2mr(txq, mlx4_txq_mb2mp(buf));
 #ifndef NDEBUG
-		if (unlikely(lkey == (uint32_t)-1)) {
+		if (unlikely(dseg->lkey == rte_cpu_to_be_32((uint32_t)-1))) {
 			/* MR does not exist. */
 			DEBUG("%p: unable to get MP <-> MR association",
 			      (void *)txq);
@@ -341,7 +340,6 @@ mlx4_post_send(struct txq *txq, struct rte_mbuf *pkt)
 			return -EFAULT;
 		}
 #endif /* NDEBUG */
-		dseg->lkey = rte_cpu_to_be_32(lkey);
 		if (likely(buf->data_len)) {
 			byte_count = rte_cpu_to_be_32(buf->data_len);
 		} else {
