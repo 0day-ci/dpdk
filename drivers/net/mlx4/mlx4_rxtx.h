@@ -160,6 +160,7 @@ void mlx4_rx_queue_release(void *dpdk_rxq);
 
 /* mlx4_rxtx.c */
 
+void mlx4_set_ptype_table(void);
 uint32_t mlx4_txq_mp2mr(struct txq *txq, struct rte_mempool *mp);
 uint16_t mlx4_tx_burst(void *dpdk_txq, struct rte_mbuf **pkts,
 		       uint16_t pkts_n);

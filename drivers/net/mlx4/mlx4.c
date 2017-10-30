@@ -712,6 +712,8 @@ RTE_INIT(rte_mlx4_pmd_init);
 static void
 rte_mlx4_pmd_init(void)
 {
+	/* Build the static table for ptype conversion. */
+	mlx4_set_ptype_table();
 	/*
 	 * RDMAV_HUGEPAGES_SAFE tells ibv_fork_init() we intend to use
 	 * huge pages. Calling ibv_fork_init() during init allows
