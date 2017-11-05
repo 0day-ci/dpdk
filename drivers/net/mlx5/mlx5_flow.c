@@ -2270,22 +2270,27 @@ priv_flow_start(struct priv *priv, struct mlx5_flows *list)
 			continue;
 		}
 		for (i = 0; i != hash_rxq_init_n; ++i) {
+			uint64_t hash_fields = hash_rxq_init[i].hash_fields;
 			if (!flow->frxq[i].ibv_attr)
 				continue;
 			flow->frxq[i].hrxq =
 				mlx5_priv_hrxq_get(priv, flow->rss_conf.rss_key,
 						   flow->rss_conf.rss_key_len,
-						   hash_rxq_init[i].hash_fields,
+						   hash_fields,
 						   (*flow->queues),
-						   flow->queues_n);
+						   hash_fields ?
+						   flow->queues_n :
+						   1);
 			if (flow->frxq[i].hrxq)
 				goto flow_create;
 			flow->frxq[i].hrxq =
 				mlx5_priv_hrxq_new(priv, flow->rss_conf.rss_key,
 						   flow->rss_conf.rss_key_len,
-						   hash_rxq_init[i].hash_fields,
+						   hash_fields,
 						   (*flow->queues),
-						   flow->queues_n);
+						   hash_fields ?
+						   flow->queues_n :
+						   1);
 			if (!flow->frxq[i].hrxq) {
 				DEBUG("Flow %p cannot be applied",
 				      (void *)flow);
