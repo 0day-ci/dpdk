@@ -265,6 +265,38 @@ prepare_one_packet(struct rte_mbuf *pkt, struct ipsec_traffic *t)
 		RTE_LOG(ERR, IPSEC, "Unsupported packet type\n");
 		rte_pktmbuf_free(pkt);
 	}
+
+	/* Check if the packet has been processed inline. For inline protocol
+	 * processed packets, mbuf would have some metadata which can be
+	 * used to determine the security session. The SA used to create the
+	 * security session will be determined and will be saved in the mbuf.
+	 * This is required for performing the IPsec SP-SA selector check.
+	 */
+
+	if (pkt->ol_flags & PKT_RX_SEC_OFFLOAD) {
+		uint64_t cookie;
+		struct rte_security_session *sess;
+		struct ipsec_sa *in_sa;
+		struct ipsec_mbuf_metadata *priv;
+		struct rte_security_ctx *ctx = (struct rte_security_ctx *)
+						rte_eth_dev_get_sec_ctx(
+						pkt->port);
+		if (pkt->udata64 == 0) {
+			/* Metadata not set */
+			return;
+		}
+
+		/* Get the security session from the metadata */
+		sess = rte_security_session_get(ctx, pkt->udata64);
+
+		/* Get the cookie registered by the application */
+		cookie = rte_security_cookie_get(ctx, sess);
+
+		in_sa = (struct ipsec_sa *)cookie;
+
+		priv = get_priv(pkt);
+		priv->sa = in_sa;
+	}
 }
 
 static inline void
@@ -401,11 +433,17 @@ inbound_sp_sa(struct sp_ctx *sp, struct sa_ctx *sa, struct traffic_type *ip,
 			ip->pkts[j++] = m;
 			continue;
 		}
-		if (res & DISCARD || i < lim) {
+		if (res & DISCARD) {
 			rte_pktmbuf_free(m);
 			continue;
 		}
+
 		/* Only check SPI match for processed IPSec packets */
+		if (i < lim && ((m->ol_flags & PKT_RX_SEC_OFFLOAD) == 0)) {
+			rte_pktmbuf_free(m);
+			continue;
+		}
+
 		sa_idx = ip->res[i] & PROTECT_MASK;
 		if (sa_idx == 0 || !inbound_sa_check(sa, m, sa_idx)) {
 			rte_pktmbuf_free(m);
