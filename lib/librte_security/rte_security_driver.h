@@ -107,6 +107,36 @@ typedef int (*security_session_stats_get_t)(void *device,
 		struct rte_security_stats *stats);
 
 /**
+ * Get the security session from the metadata set in mbuf.
+ *
+ * @param	device		Crypto/eth device pointer
+ * @param	mdata		Metadata set in mbuf during rx offload
+ * @param	sess		Pointer to return the security session retrieved
+ *
+ * @return
+ *  - Returns 0 if the security session was successfully retrieved.
+ *  - Returns -EINVAL if input parameters are invalid.
+ */
+typedef int (*security_session_get_t)(void *device,
+		uint64_t mdata,
+		struct rte_security_session **sess);
+
+/**
+ * Get the cookie associated with the security session.
+ *
+ * @param	device		Crypto/eth device pointer
+ * @param	sess		Security session
+ * @param	cookie		Cookie associated with the security session
+ *
+ * @return
+ *  - Returns 0 if the cookie was successfully retrieved.
+ *  - Returns -EINVAL if input parameters are invalid.
+ */
+typedef int (*security_cookie_get_t)(void *device,
+		struct rte_security_session *sess,
+		uint64_t *cookie);
+
+/**
  * Update the mbuf with provided metadata.
  *
  * @param	sess		Security session structure
@@ -143,6 +173,10 @@ struct rte_security_ops {
 	/**< Get security session statistics. */
 	security_session_destroy_t session_destroy;
 	/**< Clear a security sessions private data. */
+	security_session_get_t session_get;
+	/**< Get the security session associated with the metadata */
+	security_cookie_get_t cookie_get;
+	/**< Get the cookie associated with the security session */
 	security_set_pkt_metadata_t set_pkt_metadata;
 	/**< Update mbuf metadata. */
 	security_capabilities_get_t capabilities_get;

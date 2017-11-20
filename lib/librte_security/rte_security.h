@@ -273,6 +273,8 @@ struct rte_security_session_conf {
 	/**< Configuration parameters for security session */
 	struct rte_crypto_sym_xform *crypto_xform;
 	/**< Security Session Crypto Transformations */
+	uint64_t cookie;
+	/**< Cookie registered by application */
 };
 
 struct rte_security_session {
@@ -325,6 +327,34 @@ rte_security_session_update(struct rte_security_ctx *instance,
 int
 rte_security_session_destroy(struct rte_security_ctx *instance,
 			     struct rte_security_session *sess);
+
+/**
+ * Get the security session from the metadata set in mbuf.
+ *
+ * @param   instance	security instance
+ * @param   mdata	metadata set in mbuf during rx offload
+ * @return
+ *  - On success, pointer to session
+ *  - On failure, NULL
+ */
+struct rte_security_session *
+rte_security_session_get(struct rte_security_ctx *instance,
+			 uint64_t mdata);
+
+/**
+ * Get the cookie set by application while creating the session. This could be
+ * used to identify the SA associated with the session.
+ *
+ * @param   instance	security instance
+ * @param   sess	security session
+ *
+ * @return
+ *  - On success, cookie
+ *  - On failure, 0
+ */
+uint64_t
+rte_security_cookie_get(struct rte_security_ctx *instance,
+			struct rte_security_session *sess);
 
 /**
  *  Updates the buffer with device-specific defined metadata

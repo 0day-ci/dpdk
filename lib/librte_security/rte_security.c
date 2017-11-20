@@ -98,6 +98,32 @@ rte_security_session_destroy(struct rte_security_ctx *instance,
 	return ret;
 }
 
+struct rte_security_session *
+rte_security_session_get(struct rte_security_ctx *instance,
+			 uint64_t mdata)
+{
+	struct rte_security_session *sess = NULL;
+
+	RTE_FUNC_PTR_OR_ERR_RET(*instance->ops->session_get, NULL);
+	if (instance->ops->session_get(instance->device, mdata, &sess))
+		return NULL;
+
+	return sess;
+}
+
+uint64_t
+rte_security_cookie_get(struct rte_security_ctx *instance,
+			struct rte_security_session *sess)
+{
+	uint64_t cookie = 0;
+
+	RTE_FUNC_PTR_OR_ERR_RET(*instance->ops->cookie_get, 0);
+	if (instance->ops->cookie_get(instance->device, sess, &cookie))
+		return 0;
+
+	return cookie;
+}
+
 int
 rte_security_set_pkt_metadata(struct rte_security_ctx *instance,
 			      struct rte_security_session *sess,
