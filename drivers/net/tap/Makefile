@@ -54,6 +54,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_PMD_TAP) += rte_eth_tap.c
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_TAP) += tap_flow.c
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_TAP) += tap_netlink.c
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_TAP) += tap_tcmsgs.c
+SRCS-$(CONFIG_RTE_LIBRTE_PMD_TAP) += tap_intr.c
 
 include $(RTE_SDK)/mk/rte.lib.mk
 
