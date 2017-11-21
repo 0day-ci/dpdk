@@ -315,6 +315,7 @@ Networking Drivers
 M: Ferruh Yigit <ferruh.yigit@intel.com>
 T: git://dpdk.org/next/dpdk-next-net
 F: doc/guides/nics/features/default.ini
+F: doc/guides/nics/todo.rst
 
 Link bonding
 M: Declan Doherty <declan.doherty@intel.com>
