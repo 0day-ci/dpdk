@@ -72,3 +72,14 @@ This is the list for tracking required PMD changes triggered by library modifica
  |                   | | thunderx, vhost, virtio,     |          |                |                                   |
  |                   | | vmxnet3                      |          |                |                                   |
  +-------------------+--------------------------------+----------+----------------+-----------------------------------+
+ | new offload flags | | af_packet, ark, avp, bnx2x,  | v18.05   | ce17eddefc20   | Use new ethdev offloads filed     |
+ |                   | | bnxt, bonding, cxgbe, dpaa,  |          | cba7f53b717d   | to get requested offload list     |
+ |                   | | dpaa2, e1000, ena, enic,     |          |                | instead of bitfield values.       |
+ |                   | | failsafe, fm10k, i40e, ixgbe,|          |                |                                   |
+ |                   | | kni, liquidio, mlx4, mlx5,   |          |                |                                   |
+ |                   | | mrvl, nfp, null, octeontx,   |          |                |                                   |
+ |                   | | pcap, qede, ring, sfc,       |          |                |                                   |
+ |                   | | softnic, szedata2, tap,      |          |                |                                   |
+ |                   | | thunderx, vhost, virtio,     |          |                |                                   |
+ |                   | | vmxnet3                      |          |                |                                   |
+ +-------------------+--------------------------------+----------+----------------+-----------------------------------+
