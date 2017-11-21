@@ -50,3 +50,14 @@ This is the list for tracking required PMD changes triggered by library modifica
  |                   | | thunderx, vhost,             |          |                |                                   |
  |                   | | vmxnet3                      |          |                |                                   |
  +-------------------+--------------------------------+----------+----------------+-----------------------------------+
+ | dynamic logging   | | af_packet, ark, avp, bnx2x,  | v18.08   | c1b5fa94a46f   | Switch to dynamic logging         |
+ |                   | | bnxt, bonding, cxgbe, dpaa,  |          |                | functions, remove static debug    |
+ |                   | | dpaa2, e1000, ena, enic,     |          |                | config options.                   |
+ |                   | | failsafe, fm10k, ixgbe,      |          |                |                                   |
+ |                   | | kni, liquidio, mlx4, mlx5,   |          |                |                                   |
+ |                   | | mrvl, nfp, null, octeontx,   |          |                |                                   |
+ |                   | | pcap, qede, ring, sfc,       |          |                |                                   |
+ |                   | | softnic, szedata2, tap,      |          |                |                                   |
+ |                   | | thunderx, vhost, virtio,     |          |                |                                   |
+ |                   | | vmxnet3                      |          |                |                                   |
+ +-------------------+--------------------------------+----------+----------------+-----------------------------------+
