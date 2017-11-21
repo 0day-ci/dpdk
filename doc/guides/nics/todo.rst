@@ -83,3 +83,14 @@ This is the list for tracking required PMD changes triggered by library modifica
  |                   | | thunderx, vhost, virtio,     |          |                |                                   |
  |                   | | vmxnet3                      |          |                |                                   |
  +-------------------+--------------------------------+----------+----------------+-----------------------------------+
+ | | check new mbuf  | | af_packet, ark, avp, bnx2x,  | v18.02   | 380a7aab1ae2   | mbuf flag PKT_RX_VLAN_PKT renamed |
+ | | VLAN flag       | | bnxt, bonding, cxgbe, dpaa,  |          |                | to PKT_RX_VLAN and its meaning    |
+ | | PKT_RX_VLAN     | | dpaa2, e1000, ena, enic,     |          |                | changed, confirm PMD uses new     |
+ |                   | | failsafe, fm10k, i40e, ixgbe,|          |                | flag correct.                     |
+ |                   | | kni, liquidio, mlx4, mlx5,   |          |                |                                   |
+ |                   | | mrvl, nfp, null, octeontx,   |          |                |                                   |
+ |                   | | pcap, qede, ring, sfc,       |          |                |                                   |
+ |                   | | softnic, szedata2, tap,      |          |                |                                   |
+ |                   | | thunderx, vhost, virtio,     |          |                |                                   |
+ |                   | | vmxnet3                      |          |                |                                   |
+ +-------------------+--------------------------------+----------+----------------+-----------------------------------+
