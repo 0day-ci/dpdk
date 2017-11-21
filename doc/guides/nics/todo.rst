@@ -61,3 +61,14 @@ This is the list for tracking required PMD changes triggered by library modifica
  |                   | | thunderx, vhost, virtio,     |          |                |                                   |
  |                   | | vmxnet3                      |          |                |                                   |
  +-------------------+--------------------------------+----------+----------------+-----------------------------------+
+ | | descriptor      | | af_packet, ark, avp, bnx2x,  | v19.02   | b1b700ce7d6f   | Replace descriptor_done API with  |
+ | | status API      | | bnxt, bonding, cxgbe, dpaa,  |          |                | rx_descriptor_status and          |
+ |                   | | dpaa2, ena, enic,            |          |                | tx_descriptor_status APIs.        |
+ |                   | | failsafe, fm10k,             |          |                |                                   |
+ |                   | | kni, liquidio, mlx4,         |          |                |                                   |
+ |                   | | mrvl, nfp, null, octeontx,   |          |                |                                   |
+ |                   | | pcap, qede, ring, sfc,       |          |                |                                   |
+ |                   | | softnic, szedata2, tap,      |          |                |                                   |
+ |                   | | thunderx, vhost, virtio,     |          |                |                                   |
+ |                   | | vmxnet3                      |          |                |                                   |
+ +-------------------+--------------------------------+----------+----------------+-----------------------------------+
