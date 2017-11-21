@@ -36,8 +36,17 @@ This is the list for tracking required PMD changes triggered by library modifica
 
 .. table:: PMDs internal TODO list
 
- +------+------+----------+----------------+------+
- | TODO | PMDs | Deadline | Related Commit | Note |
- +======+======+==========+================+======+
- |      |      |          |                |      |
- +------+------+----------+----------------+------+
+ +-------------------+--------------------------------+----------+----------------+-----------------------------------+
+ | TODO              | PMDs                           | Deadline | Related Commit | Note                              |
+ +===================+================================+==========+================+===================================+
+ | mbuf organisation | | af_packet, ark, avp, bnx2x,  | v18.02   | 8f094a9ac5d7   | Remove unnecessary mbuf field     |
+ |                   | | bnxt, bonding, cxgbe, dpaa,  |          |                | initialization.                   |
+ |                   | | dpaa2, e1000, ena,           |          |                |                                   |
+ |                   | | failsafe, fm10k,             |          |                |                                   |
+ |                   | | kni, mlx4,                   |          |                |                                   |
+ |                   | | mrvl, nfp, octeontx,         |          |                |                                   |
+ |                   | | pcap, qede, ring, sfc,       |          |                |                                   |
+ |                   | | softnic, szedata2, tap,      |          |                |                                   |
+ |                   | | thunderx, vhost,             |          |                |                                   |
+ |                   | | vmxnet3                      |          |                |                                   |
+ +-------------------+--------------------------------+----------+----------------+-----------------------------------+
