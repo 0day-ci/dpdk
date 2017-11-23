@@ -101,30 +101,26 @@ The library has the following API's
      *   Handle to flow classifier instance
      * @param params
      *   Parameters for flow_classify table creation
-     * @param table_id
-     *   Table ID. Valid only within the scope of table IDs of the current
-     *   classifier. Only returned after a successful invocation.
      * @return
      *   0 on success, error code otherwise
      */
     int
     rte_flow_classify_table_create(struct rte_flow_classifier *cls,
-           struct rte_flow_classify_table_params *params,
-           uint32_t *table_id);
+           struct rte_flow_classify_table_params *params);
 
     /**
      * Add a flow classify rule to the flow_classifier table.
      *
      * @param[in] cls
      *   Flow classifier handle
-     * @param[in] table_id
-     *   id of table
      * @param[in] attr
      *   Flow rule attributes
      * @param[in] pattern
      *   Pattern specification (list terminated by the END pattern item).
      * @param[in] actions
      *   Associated actions (list terminated by the END pattern item).
+     * @param[out] key_found
+     *   returns 1 if rule present already, 0 otherwise.
      * @param[out] error
      *   Perform verbose error reporting if not NULL. Structure
      *   initialised in case of error only.
@@ -133,10 +129,10 @@ The library has the following API's
      */
     struct rte_flow_classify_rule *
     rte_flow_classify_table_entry_add(struct rte_flow_classifier *cls,
-            uint32_t table_id,
             const struct rte_flow_attr *attr,
             const struct rte_flow_item pattern[],
             const struct rte_flow_action actions[],
+            int *key_found;
             struct rte_flow_error *error);
 
     /**
@@ -144,8 +140,6 @@ The library has the following API's
      *
      * @param[in] cls
      *   Flow classifier handle
-     * @param[in] table_id
-     *   id of table
      * @param[in] rule
      *   Flow classify rule
      * @return
@@ -153,16 +147,37 @@ The library has the following API's
      */
     int
     rte_flow_classify_table_entry_delete(struct rte_flow_classifier *cls,
-            uint32_t table_id,
             struct rte_flow_classify_rule *rule);
+
+    /**
+     * Flow classifier run.
+     *
+     * As a result of lookup operation, flow classifer idenfies the
+     * table entries that are hit and executes the actions on the packets.
+     *
+     * @param[in] cls
+     *   Flow classifier handle
+     * @param[in] pkts
+     *   Pointer to packets to process
+     * @param[in] nb_pkts
+     *   Number of packets to process
+     * @param[in] pkt_offset
+     *    Offset to store action metadata in the mbuf headroom
+     *
+     * @return
+     *   0 on success, error code otherwise.
+     */
+     int
+     rte_flow_classifier_run(struct rte_flow_classifier *cls,
+             struct rte_mbuf **pkts,
+             const uint16_t nb_pkts,
+             uint32_t pkt_offset);
 
     /**
      * Query flow classifier for given rule.
      *
      * @param[in] cls
      *   Flow classifier handle
-     * @param[in] table_id
-     *   id of table
      * @param[in] pkts
      *   Pointer to packets to process
      * @param[in] nb_pkts
@@ -177,7 +192,6 @@ The library has the following API's
      */
     int
     rte_flow_classifier_query(struct rte_flow_classifier *cls,
-            uint32_t table_id,
             struct rte_mbuf **pkts,
             const uint16_t nb_pkts,
             struct rte_flow_classify_rule *rule,
@@ -200,16 +214,13 @@ application before calling the API.
         /** CPU socket ID where memory for the flow classifier and its */
         /** elements (tables) should be allocated */
         int socket_id;
-
-        /** Table type */
-        enum rte_flow_classify_table_type type;
     };
 
 The ``Classifier`` has the following internal structures:
 
 .. code-block:: c
 
-    struct rte_table {
+    struct rte_cls_table {
         /* Input parameters */
         struct rte_table_ops ops;
         uint32_t entry_size;
@@ -225,11 +236,16 @@ The ``Classifier`` has the following internal structures:
         /* Input parameters */
         char name[RTE_FLOW_CLASSIFIER_MAX_NAME_SZ];
         int socket_id;
-        enum rte_flow_classify_table_type type;
 
-        /* Internal tables */
-        struct rte_table tables[RTE_FLOW_CLASSIFY_TABLE_MAX];
+        /* Internal */
+        /* ntuple_fliter */
+        struct rte_eth_ntuple_filter ntuple_filter;
+
+        /* clasifier tables */
+        struct rte_cls_table tables[RTE_FLOW_CLASSIFY_TABLE_MAX];
+        uint32_t table_mask;
         uint32_t num_tables;
+
         uint16_t nb_pkts;
         struct rte_flow_classify_table_entry
             *entries[RTE_PORT_IN_BURST_SIZE_MAX];
@@ -252,9 +268,8 @@ application before calling the API.
         /** Opaque param to be passed to the table create operation */
         void *arg_create;
 
-        /** Memory size to be reserved per classifier object entry for */
-        /** storing meta data */
-        uint32_t table_metadata_size;
+        /** Classifier table type */
+        enum rte_flow_classify_table_type type;
      };
 
 To create an ACL table the ``rte_table_acl_params`` structure must be
@@ -321,7 +336,7 @@ IPv4 5-tuple pattern, attributes and actions and returns the 5-tuple data in the
 .. code-block:: c
 
     static int
-    flow_classify_parse_flow(
+    flow_classify_parse_flow(struct rte_flow_classifier *cls,
                    const struct rte_flow_attr *attr,
                    const struct rte_flow_item pattern[],
                    const struct rte_flow_action actions[],
@@ -355,24 +370,24 @@ parses the Flow rule.
 
     struct rte_flow_classify {
         uint32_t id;  /* unique ID of classify object */
-        struct rte_flow_action action; /* action when match found */
-	struct classify_rules rules; /* union of rules */
+        enum rte_flow_classify_table_type tbl_type; /* rule table */
+        struct classify_rules rules; /* union of rules */
         union {
             struct acl_keys key;
         } u;
         int key_found; /* rule key found in table */
-        void *entry; /* pointer to buffer to hold rule meta data */
-        void *entry_ptr; /* handle to the table entry for rule meta data */
+        struct rte_flow_classify_table_entry entry;  /* rule meta data */
+       void *entry_ptr; /* handle to the table entry for rule meta data */
     };
 
-It then calls the ``table[table_id].ops.f_add`` API to add the rule to the ACL
+It then calls the ``table.ops.f_add`` API to add the rule to the ACL
 table.
 
 Deleting Flow Rules
 ~~~~~~~~~~~~~~~~~~~
 
 The ``rte_flow_classify_table_entry_delete`` API calls the
-``table[table_id].ops.f_delete`` API to delete a rule from the ACL table.
+``table.ops.f_delete`` API to delete a rule from the ACL table.
 
 Packet Matching
 ~~~~~~~~~~~~~~~
@@ -380,7 +395,7 @@ Packet Matching
 The ``rte_flow_classifier_query`` API is used to find packets which match a
 given flow Flow rule in the table.
 This API calls the flow_classify_run internal function which calls the
-``table[table_id].ops.f_lookup`` API to see if any packets in a burst match any
+``table.ops.f_lookup`` API to see if any packets in a burst match any
 of the Flow rules in the table.
 The meta data for the highest priority rule matched for each packet is returned
 in the entries array in the ``rte_flow_classify`` object.
