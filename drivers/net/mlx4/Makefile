@@ -44,7 +44,9 @@ SRCS-$(CONFIG_RTE_LIBRTE_MLX4_PMD) += mlx4_rxq.c
 SRCS-$(CONFIG_RTE_LIBRTE_MLX4_PMD) += mlx4_rxtx.c
 SRCS-$(CONFIG_RTE_LIBRTE_MLX4_PMD) += mlx4_txq.c
 SRCS-$(CONFIG_RTE_LIBRTE_MLX4_PMD) += mlx4_utils.c
-
+ifeq ($(CONFIG_RTE_LIBRTE_MLX4_DLL),y)
+SRCS-$(CONFIG_RTE_LIBRTE_MLX4_PMD) += lib/mlx4_dll.c
+endif
 # Basic CFLAGS.
 CFLAGS += -O3
 CFLAGS += -std=c11 -Wall -Wextra
@@ -54,7 +56,11 @@ CFLAGS += -D_BSD_SOURCE
 CFLAGS += -D_DEFAULT_SOURCE
 CFLAGS += -D_XOPEN_SOURCE=600
 CFLAGS += $(WERROR_FLAGS)
+ifeq ($(CONFIG_RTE_LIBRTE_MLX4_DLL),y)
+LDLIBS += -ldl
+else
 LDLIBS += -libverbs -lmlx4
+endif
 LDLIBS += -lrte_eal -lrte_mbuf -lrte_mempool -lrte_ring
 LDLIBS += -lrte_ethdev -lrte_net -lrte_kvargs
 LDLIBS += -lrte_bus_pci
@@ -81,7 +87,11 @@ endif
 ifdef CONFIG_RTE_LIBRTE_MLX4_TX_MP_CACHE
 CFLAGS += -DMLX4_PMD_TX_MP_CACHE=$(CONFIG_RTE_LIBRTE_MLX4_TX_MP_CACHE)
 endif
-
+ifeq ($(CONFIG_RTE_LIBRTE_MLX4_DLL),y)
+CFLAGS += -DMLX4_PMD_DLL
+else
+CFLAGS += -UMLX4_PMD_DLL
+endif
 ifeq ($(CONFIG_RTE_LIBRTE_MLX4_DEBUG_BROKEN_VERBS),y)
 CFLAGS += -DMLX4_PMD_DEBUG_BROKEN_VERBS
 endif

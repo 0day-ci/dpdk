@@ -37,54 +37,54 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <rte_log.h>
-#include <mlx5_utils.h>
-#include "mlx5_dll.h"
+#include "../mlx4_utils.h"
+#include "mlx4_dll.h"
 
 #define VERBS_LIB_DIR "/usr/lib64/libibverbs"
-#define MLX5_LIB_DIR "/usr/lib64/libmlx5"
+#define MLX5_LIB_DIR "/usr/lib64/libmlx4"
 #define DIR_LENGTH 25
 /**
- * Load a libibverbs and libmlx5 symbols table.
+ * Load a libibverbs and libmlx4 symbols table.
  *
  * @return
  *   0 on success.
  */
-int mlx5_load_libs(void)
+int mlx4_load_libs(void)
 {
 	void *dlhandle;
 	int ret;
 
-	dlhandle = mlx5_lib_load("ibverbs.so");
+	dlhandle = mlx4_lib_load("ibverbs.so");
 	if (dlhandle == NULL) {
 		ERROR("cannot load ibverbs.so");
 		return -1;
 	}
-	ret = mlx5_lverbs_function_register(dlhandle);
+	ret = mlx4_lverbs_function_register(dlhandle);
 	if (ret == -1) {
 		ERROR("cannot register a function in libverbs.so ");
 		return ret;
 	}
-	dlhandle = mlx5_lib_load("mlx5.so");
+	dlhandle = mlx4_lib_load("mlx4.so");
 	if (dlhandle == NULL) {
-		ERROR("cannot load mlx5.so");
+		ERROR("cannot load mlx4.so");
 		return -1;
 	}
-	ret = mlx5_lmlx5_function_register(dlhandle);
+	ret = mlx4_lmlx4_function_register(dlhandle);
 	if (ret == -1) {
-		ERROR("cannot register a function in lmlx5.so  ");
+		ERROR("cannot register a function in lmlx4.so  ");
 		return ret;
 	}
 	return 0;
 }
 /**
- * Load a libibverbs or libmlx5 symbols table.
+ * Load a libibverbs or libmlx4 symbols table.
  *
  * @param name[in]
  *   The library name.
  * @return
  *   dlhandle on success.
  */
-void *mlx5_lib_load(const char *name)
+void *mlx4_lib_load(const char *name)
 {
 	char *so_name;
 	void *dlhandle;
@@ -115,7 +115,7 @@ void *mlx5_lib_load(const char *name)
 		if (dlhandle)
 			return dlhandle;
 	}
-	/* Otherwise use the system library search path. This is the historical
+	/* Otherwise use the system libary search path. This is the historical
 	 * behavior of libibverbs
 	 */
 	if (asprintf(&so_name, "lib%s", name) < 0)
@@ -142,12 +142,12 @@ out_dlopen:
  * @return
  *   0 on success.
  */
-int mlx5_lverbs_function_register(void *handle)
+int mlx4_lverbs_function_register(void *handle)
 {
 	char *error;
 	int ret = 0;
 
-	*(void **)(&mlx5_libverbs.ibv_destroy_qp) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_destroy_qp) = dlsym(handle,
 													  "ibv_destroy_qp");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -155,7 +155,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_destroy_cq) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_destroy_cq) = dlsym(handle,
 													  "ibv_destroy_cq");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -163,7 +163,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_dealloc_pd) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_dealloc_pd) = dlsym(handle,
 													  "ibv_dealloc_pd");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -171,7 +171,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_get_device_list) =
+	*(void **)(&mlx4_libverbs.ibv_get_device_list) =
 									dlsym(handle, "ibv_get_device_list");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -179,7 +179,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_open_device) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_open_device) = dlsym(handle,
 													   "ibv_open_device");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -187,7 +187,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_query_device) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_query_device) = dlsym(handle,
 														"ibv_query_device");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -195,7 +195,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_close_device) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_close_device) = dlsym(handle,
 														"ibv_close_device");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -203,22 +203,22 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_free_device_list) =
-									dlsym(handle, "ibv_free_device_list");
+	*(void **)(&mlx4_libverbs.ibv_free_device_list) =
+										dlsym(handle, "ibv_free_device_list");
 	error = dlerror();
 	if ((error) != NULL) {
 		ERROR("%s\n", error);
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_alloc_pd) = dlsym(handle, "ibv_alloc_pd");
+	*(void **)(&mlx4_libverbs.ibv_alloc_pd) = dlsym(handle, "ibv_alloc_pd");
 	error = dlerror();
 	if ((error) != NULL) {
 		ERROR("%s\n", error);
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_get_device_name) =
+	*(void **)(&mlx4_libverbs.ibv_get_device_name) =
 									dlsym(handle, "ibv_get_device_name");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -226,7 +226,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_fork_init) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_fork_init) = dlsym(handle,
 													 "ibv_fork_init");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -234,7 +234,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_destroy_comp_channel) =
+	*(void **)(&mlx4_libverbs.ibv_destroy_comp_channel) =
 									dlsym(handle, "ibv_destroy_comp_channel");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -242,14 +242,14 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_dereg_mr) = dlsym(handle, "ibv_dereg_mr");
+	*(void **)(&mlx4_libverbs.ibv_dereg_mr) = dlsym(handle, "ibv_dereg_mr");
 	error = dlerror();
 	if ((error) != NULL) {
 		ERROR("%s\n", error);
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_create_comp_channel) =
+	*(void **)(&mlx4_libverbs.ibv_create_comp_channel) =
 									dlsym(handle, "ibv_create_comp_channel");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -257,7 +257,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_get_cq_event) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_get_cq_event) = dlsym(handle,
 														"ibv_get_cq_event");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -265,7 +265,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_create_qp) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_create_qp) = dlsym(handle,
 													 "ibv_create_qp");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -273,7 +273,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_ack_async_event) =
+	*(void **)(&mlx4_libverbs.ibv_ack_async_event) =
 									dlsym(handle, "ibv_ack_async_event");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -281,7 +281,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_get_async_event) =
+	*(void **)(&mlx4_libverbs.ibv_get_async_event) =
 									dlsym(handle, "ibv_get_async_event");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -289,14 +289,14 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_reg_mr) = dlsym(handle, "ibv_reg_mr");
+	*(void **)(&mlx4_libverbs.ibv_reg_mr) = dlsym(handle, "ibv_reg_mr");
 	error = dlerror();
 	if ((error) != NULL) {
 		ERROR("%s\n", error);
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_create_cq) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_create_cq) = dlsym(handle,
 													 "ibv_create_cq");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -304,7 +304,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_modify_qp) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_modify_qp) = dlsym(handle,
 													 "ibv_modify_qp");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -312,7 +312,7 @@ int mlx5_lverbs_function_register(void *handle)
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_libverbs.ibv_query_port) = dlsym(handle,
+	*(void **)(&mlx4_libverbs.ibv_query_port) = dlsym(handle,
 													  "ibv_query_port");
 	error = dlerror();
 	if ((error) != NULL) {
@@ -326,44 +326,36 @@ exit:
 }
 
 /**
- * Register libmlx5 functions apis .
+ * Register libmlx4 functions apis .
  *
  * @param handle[in]
  *   The library handle.
  * @return
  *   0 on success.
  */
-int mlx5_lmlx5_function_register(void *handle)
+int mlx4_lmlx4_function_register(void *handle)
 {
 	char *error;
 	int ret = 0;
 
-	*(void **)(&mlx5_lmlx5.mlx5dv_create_cq) = dlsym(handle,
-													 "mlx5dv_create_cq");
+	*(void **)(&mlx4_lmlx4.mlx4dv_init_obj) = dlsym(handle,
+													"mlx4dv_init_obj");
 	error = dlerror();
 	if ((error) != NULL) {
 		ERROR("%s\n", error);
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_lmlx5.mlx5dv_init_obj) = dlsym(handle,
-													"mlx5dv_init_obj");
+	*(void **)(&mlx4_lmlx4.mlx4dv_query_device) = dlsym(handle,
+														"mlx4dv_query_device");
 	error = dlerror();
 	if ((error) != NULL) {
 		ERROR("%s\n", error);
 		ret = EINVAL;
 		goto exit;
 	}
-	*(void **)(&mlx5_lmlx5.mlx5dv_query_device) = dlsym(handle,
-														"mlx5dv_query_device");
-	error = dlerror();
-	if ((error) != NULL) {
-		ERROR("%s\n", error);
-		ret = EINVAL;
-		goto exit;
-	}
-	*(void **)(&mlx5_lmlx5.mlx5dv_set_context_attr) =
-								 dlsym(handle, "mlx5dv_set_context_attr");
+	*(void **)(&mlx4_lmlx4.mlx4dv_set_context_attr) =
+								 dlsym(handle, "mlx4dv_set_context_attr");
 	error = dlerror();
 	if ((error) != NULL) {
 		ERROR("%s\n", error);
@@ -374,71 +366,52 @@ int mlx5_lmlx5_function_register(void *handle)
 exit:
 	return -ret;
 }
-
 /**
- * Function pointer calls mlx5 API .
+ * Function pointer calls mlx4 API .
  *
- * @param context[in]
- *   The ibv context.
- * @param cq_attr[in]
- *   The completion queue attribute.
- * @param mlx5_cq_attr[in]
- *   The mlx5 completion queue attribute.
- * @return
- *   a pointer on success.
- */
-struct ibv_cq_ex *mlx5dv_create_cq(struct ibv_context *context,
-								   struct ibv_cq_init_attr_ex *cq_attr,
-								   struct mlx5dv_cq_init_attr *mlx5_cq_attr)
-{
-	return mlx5_lmlx5.mlx5dv_create_cq(context, cq_attr, mlx5_cq_attr);
-}
-/**
- * Function pointer calls mlx5 API .
- *
- * @param mlx5dv_obj[in]
- *   The mlx5 object.
+ * @param mlx4dv_obj[in]
+ *   The mlx4 object.
  * @param obj_type[in]
  *   The object type.
  * @return
  *   a pointer on success.
  */
-int mlx5dv_init_obj(struct mlx5dv_obj *obj, uint64_t obj_type)
+int mlx4dv_init_obj(struct mlx4dv_obj *obj, uint64_t obj_type)
 {
-	return mlx5_lmlx5.mlx5dv_init_obj(obj, obj_type);
+	return mlx4_lmlx4.mlx4dv_init_obj(obj, obj_type);
 }
 /**
- * Function pointer calls mlx5 API .
+ * Function pointer calls mlx4 API .
  *
  * @param ctx_in[in]
  *   The ibverbs context.
  * @param attrs_out[out]
- *   The mlx5 context.
+ *   The mlx4 context.
  * @return
  *  0 on success.
  */
-int mlx5dv_query_device(struct ibv_context *ctx_in,
-						struct mlx5dv_context *attrs_out)
+int mlx4dv_query_device(struct ibv_context *ctx_in,
+						struct mlx4dv_context *attrs_out)
 {
-	return mlx5_lmlx5.mlx5dv_query_device(ctx_in, attrs_out);
+	return mlx4_lmlx4.mlx4dv_query_device(ctx_in, attrs_out);
 }
 /**
- * Function pointer calls mlx5 API .
+ * Function pointer calls mlx4 API .
  *
  * @param context[in]
  *   The ibverbs context.
  * @param type[in]
- *   The mlx5 context attribute type.
+ *   The mlx4 context attribute type.
  * @param attr[in]
- *   The mlx5 context attribute.
+ *   The mlx4 context attribute.
  * @return
  *  0 on success.
  */
-int mlx5dv_set_context_attr(struct ibv_context *context,
-							enum mlx5dv_set_ctx_attr_type type,
+int mlx4dv_set_context_attr(struct ibv_context *context,
+							enum mlx4dv_set_ctx_attr_type type,
 							void *attr)
 {
-	return mlx5_lmlx5.mlx5dv_set_context_attr(context, type, attr);
+	return mlx4_lmlx4.mlx4dv_set_context_attr(context, type, attr);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -450,7 +423,7 @@ int mlx5dv_set_context_attr(struct ibv_context *context,
  */
 int ibv_destroy_qp(struct ibv_qp *qp)
 {
-	return mlx5_libverbs.ibv_destroy_qp(qp);
+	return mlx4_libverbs.ibv_destroy_qp(qp);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -462,7 +435,7 @@ int ibv_destroy_qp(struct ibv_qp *qp)
  */
 int ibv_destroy_cq(struct ibv_cq *cq)
 {
-	return mlx5_libverbs.ibv_destroy_cq(cq);
+	return mlx4_libverbs.ibv_destroy_cq(cq);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -474,7 +447,7 @@ int ibv_destroy_cq(struct ibv_cq *cq)
  */
 int ibv_dealloc_pd(struct ibv_pd *pd)
 {
-	return mlx5_libverbs.ibv_dealloc_pd(pd);
+	return mlx4_libverbs.ibv_dealloc_pd(pd);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -486,7 +459,7 @@ int ibv_dealloc_pd(struct ibv_pd *pd)
  */
 struct ibv_device **ibv_get_device_list(int *num_devices)
 {
-	return mlx5_libverbs.ibv_get_device_list(num_devices);
+	return mlx4_libverbs.ibv_get_device_list(num_devices);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -501,7 +474,7 @@ struct ibv_device **ibv_get_device_list(int *num_devices)
 int ibv_query_device(struct ibv_context *context,
 					 struct ibv_device_attr *device_attr)
 {
-	return mlx5_libverbs.ibv_query_device(context, device_attr);
+	return mlx4_libverbs.ibv_query_device(context, device_attr);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -513,7 +486,7 @@ int ibv_query_device(struct ibv_context *context,
  */
 int ibv_close_device(struct ibv_context *context)
 {
-	return mlx5_libverbs.ibv_close_device(context);
+	return mlx4_libverbs.ibv_close_device(context);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -523,7 +496,7 @@ int ibv_close_device(struct ibv_context *context)
  */
 void ibv_free_device_list(struct ibv_device **list)
 {
-	return mlx5_libverbs.ibv_free_device_list(list);
+	return mlx4_libverbs.ibv_free_device_list(list);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -535,7 +508,7 @@ void ibv_free_device_list(struct ibv_device **list)
  */
 struct ibv_context *ibv_open_device(struct ibv_device *device)
 {
-	return mlx5_libverbs.ibv_open_device(device);
+	return mlx4_libverbs.ibv_open_device(device);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -547,7 +520,7 @@ struct ibv_context *ibv_open_device(struct ibv_device *device)
  */
 struct ibv_pd *ibv_alloc_pd(struct ibv_context *context)
 {
-	return mlx5_libverbs.ibv_alloc_pd(context);
+	return mlx4_libverbs.ibv_alloc_pd(context);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -559,7 +532,7 @@ struct ibv_pd *ibv_alloc_pd(struct ibv_context *context)
  */
 const char *ibv_get_device_name(struct ibv_device *device)
 {
-	return mlx5_libverbs.ibv_get_device_name(device);
+	return mlx4_libverbs.ibv_get_device_name(device);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -569,7 +542,7 @@ const char *ibv_get_device_name(struct ibv_device *device)
  */
 int ibv_fork_init(void)
 {
-	return mlx5_libverbs.ibv_fork_init();
+	return mlx4_libverbs.ibv_fork_init();
 }
 /**
  * Function pointer calls libibverbs API .
@@ -581,7 +554,7 @@ int ibv_fork_init(void)
  */
 int ibv_destroy_comp_channel(struct ibv_comp_channel *channel)
 {
-	return mlx5_libverbs.ibv_destroy_comp_channel(channel);
+	return mlx4_libverbs.ibv_destroy_comp_channel(channel);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -593,7 +566,7 @@ int ibv_destroy_comp_channel(struct ibv_comp_channel *channel)
  */
 int ibv_dereg_mr(struct ibv_mr *mr)
 {
-	return mlx5_libverbs.ibv_dereg_mr(mr);
+	return mlx4_libverbs.ibv_dereg_mr(mr);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -606,7 +579,7 @@ int ibv_dereg_mr(struct ibv_mr *mr)
 struct ibv_comp_channel *ibv_create_comp_channel(
 											  struct ibv_context *context)
 {
-	return mlx5_libverbs.ibv_create_comp_channel(context);
+	return mlx4_libverbs.ibv_create_comp_channel(context);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -623,7 +596,7 @@ struct ibv_comp_channel *ibv_create_comp_channel(
 int ibv_get_cq_event(struct ibv_comp_channel *channel,
 					 struct ibv_cq **cq, void **cq_context)
 {
-	return mlx5_libverbs.ibv_get_cq_event(channel, cq, cq_context);
+	return mlx4_libverbs.ibv_get_cq_event(channel, cq, cq_context);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -637,7 +610,7 @@ int ibv_get_cq_event(struct ibv_comp_channel *channel,
  */
 void ibv_ack_cq_events(struct ibv_cq *cq, unsigned int nevents)
 {
-	return mlx5_libverbs.ibv_ack_cq_events(cq, nevents);
+	return mlx4_libverbs.ibv_ack_cq_events(cq, nevents);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -652,7 +625,7 @@ void ibv_ack_cq_events(struct ibv_cq *cq, unsigned int nevents)
 struct ibv_qp *ibv_create_qp(struct ibv_pd *pd,
 							 struct ibv_qp_init_attr *qp_init_attr)
 {
-	return mlx5_libverbs.ibv_create_qp(pd, qp_init_attr);
+	return mlx4_libverbs.ibv_create_qp(pd, qp_init_attr);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -662,7 +635,7 @@ struct ibv_qp *ibv_create_qp(struct ibv_pd *pd,
  */
 void ibv_ack_async_event(struct ibv_async_event *event)
 {
-	return mlx5_libverbs.ibv_ack_async_event(event);
+	return mlx4_libverbs.ibv_ack_async_event(event);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -675,7 +648,7 @@ void ibv_ack_async_event(struct ibv_async_event *event)
 int ibv_get_async_event(struct ibv_context *context,
 						struct ibv_async_event *event)
 {
-	return mlx5_libverbs.ibv_get_async_event(context, event);
+	return mlx4_libverbs.ibv_get_async_event(context, event);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -694,7 +667,7 @@ int ibv_get_async_event(struct ibv_context *context,
 struct ibv_mr *ibv_reg_mr(struct ibv_pd *pd, void *addr,
 						  size_t length, int access)
 {
-	return mlx5_libverbs.ibv_reg_mr(pd, addr, length, access);
+	return mlx4_libverbs.ibv_reg_mr(pd, addr, length, access);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -717,7 +690,7 @@ struct ibv_cq *ibv_create_cq(struct ibv_context *context, int cqe,
 							 struct ibv_comp_channel *channel,
 							 int comp_vector)
 {
-	return mlx5_libverbs.ibv_create_cq(context, cqe, cq_context, channel,
+	return mlx4_libverbs.ibv_create_cq(context, cqe, cq_context, channel,
 									   comp_vector);
 }
 /**
@@ -735,7 +708,7 @@ struct ibv_cq *ibv_create_cq(struct ibv_context *context, int cqe,
 int ibv_modify_qp(struct ibv_qp *qp, struct ibv_qp_attr *attr,
 				  int attr_mask)
 {
-	return mlx5_libverbs.ibv_modify_qp(qp, attr, attr_mask);
+	return mlx4_libverbs.ibv_modify_qp(qp, attr, attr_mask);
 }
 /**
  * Function pointer calls libibverbs API .
@@ -754,5 +727,5 @@ int ibv_query_port(struct ibv_context *context, uint8_t port_num,
 {
 	port_attr->link_layer = IBV_LINK_LAYER_UNSPECIFIED;
 	port_attr->reserved   = 0;
-	return mlx5_libverbs.ibv_query_port(context, port_num, port_attr);
+	return mlx4_libverbs.ibv_query_port(context, port_num, port_attr);
 }

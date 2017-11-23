@@ -54,6 +54,9 @@ LDFLAGS += --as-needed
 ifeq ($(CONFIG_RTE_LIBRTE_MLX5_DLL),y)
 LDFLAGS += -ldl
 endif
+ifeq ($(CONFIG_RTE_LIBRTE_MLX4_DLL),y)
+LDFLAGS += -ldl
+endif
 # default path for libs
 _LDLIBS-y += -L$(RTE_SDK_BIN)/lib
 
@@ -143,7 +146,11 @@ ifeq ($(CONFIG_RTE_LIBRTE_KNI),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_KNI)        += -lrte_pmd_kni
 endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_LIO_PMD)        += -lrte_pmd_lio
+ifeq ($(CONFIG_RTE_LIBRTE_MLX4_DLL),y)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX4_PMD)       += -lrte_pmd_mlx4
+else
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX4_PMD)       += -lrte_pmd_mlx4 -libverbs -lmlx4
+endif
 ifeq ($(CONFIG_RTE_LIBRTE_MLX5_DLL),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -lrte_pmd_mlx5
 else
