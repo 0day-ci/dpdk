@@ -135,6 +135,22 @@ create_session(struct ipsec_ctx *ipsec_ctx, struct ipsec_sa *sa)
 							rte_eth_dev_get_sec_ctx(
 							sa->portid);
 			const struct rte_security_capability *sec_cap;
+			uint8_t rss_key[40];
+			struct rte_eth_rss_conf rss_conf = {
+				.rss_key = rss_key,
+				.rss_key_len = 40,
+			};
+			struct rte_eth_dev *eth_dev;
+			union {
+				struct rte_flow_action_rss rss;
+				struct {
+					const struct rte_eth_rss_conf *rss_conf;
+					uint16_t num;
+					uint16_t queue[RTE_MAX_QUEUES_PER_PORT];
+				} local;
+			} action_rss;
+			unsigned int i;
+			unsigned int j;
 
 			sa->sec_session = rte_security_session_create(ctx,
 					&sess_conf, ipsec_ctx->session_pool);
@@ -194,7 +210,16 @@ create_session(struct ipsec_ctx *ipsec_ctx, struct ipsec_sa *sa)
 			sa->action[0].type = RTE_FLOW_ACTION_TYPE_SECURITY;
 			sa->action[0].conf = sa->sec_session;
 
-			sa->action[1].type = RTE_FLOW_ACTION_TYPE_END;
+			sa->action[1].type = RTE_FLOW_ACTION_TYPE_RSS;
+			sa->action[1].conf = &action_rss;
+			eth_dev = ctx->device;
+			rte_eth_dev_rss_hash_conf_get(sa->portid, &rss_conf);
+			for (i = 0, j = 0; i < eth_dev->data->nb_rx_queues; ++i)
+				if (eth_dev->data->rx_queues[i])
+					action_rss.local.queue[j++] = i;
+			action_rss.local.num = j;
+			action_rss.local.rss_conf = &rss_conf;
+			sa->action[2].type = RTE_FLOW_ACTION_TYPE_END;
 
 			sa->attr.egress = (sa->direction ==
 					RTE_SECURITY_IPSEC_SA_DIR_EGRESS);
