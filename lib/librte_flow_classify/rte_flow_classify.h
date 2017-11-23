@@ -273,6 +273,30 @@ rte_flow_classify_table_entry_delete(struct rte_flow_classifier *cls,
 		struct rte_flow_classify_rule *rule);
 
 /**
+ * Flow classifier run.
+ *
+ * As a result of lookup operation, flow classifer idenfies the
+ * table entries that are hit and executes the actions on the packets.
+ *
+ * @param[in] cls
+ *   Flow classifier handle
+ * @param[in] pkts
+ *   Pointer to packets to process
+ * @param[in] nb_pkts
+ *   Number of packets to process
+ * @param[in] pkt_offset
+ *    Offset to store action metadata in the mbuf headroom
+ *
+ * @return
+ *   0 on success, error code otherwise.
+ */
+int
+rte_flow_classifier_run(struct rte_flow_classifier *cls,
+		struct rte_mbuf **pkts,
+		const uint16_t nb_pkts,
+		uint32_t pkt_offset);
+
+/**
  * Query flow classifier for given rule.
  *
  * @param[in] cls

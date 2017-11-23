@@ -4,6 +4,7 @@ EXPERIMENTAL {
 	rte_flow_classifier_create;
 	rte_flow_classifier_free;
 	rte_flow_classifier_query;
+	rte_flow_classifier_run;
 	rte_flow_classify_table_create;
 	rte_flow_classify_table_entry_add;
 	rte_flow_classify_table_entry_delete;

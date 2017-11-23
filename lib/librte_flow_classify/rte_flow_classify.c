@@ -37,6 +37,9 @@
 #include <rte_table_acl.h>
 #include <stdbool.h>
 
+#define RTE_PKT_METADATA_PTR(pkt, offset)         \
+		(&((uint32_t *)(pkt))[offset])
+
 int librte_flow_classify_logtype;
 
 static uint32_t unique_id = 1;
@@ -671,6 +674,59 @@ action_apply(struct rte_flow_classifier *cls,
 		}
 	}
 	return ret;
+}
+
+int
+rte_flow_classifier_run(struct rte_flow_classifier *cls,
+	struct rte_mbuf **pkts,
+	const uint16_t nb_pkts,
+	uint32_t pkt_offset)
+{
+	struct rte_flow_action_mark *mark;
+	struct classify_action *action;
+	uint64_t pkts_mask = RTE_LEN2MASK(nb_pkts, uint64_t);
+	uint64_t action_mask;
+	uint32_t *ptr, i, j;
+	int ret = -EINVAL;
+
+	if (!cls || !pkts  || nb_pkts == 0)
+		return ret;
+
+	for (i = 0; i < cls->num_tables; i++) {
+		if (cls->table_mask & (1LU << i)) {
+			struct rte_cls_table *table = &cls->tables[i];
+			uint64_t lookup_hit_mask;
+
+			ret = table->ops.f_lookup(table->h_table,
+				pkts, pkts_mask, &lookup_hit_mask,
+				(void **)cls->entries);
+			if (ret)
+				return ret;
+
+			if (lookup_hit_mask) {
+				for (j = 0; j < nb_pkts; j++) {
+					uint64_t pkt_mask = 1LLU << j;
+
+					if ((lookup_hit_mask & pkt_mask) == 0)
+						continue;
+					/* Meta-data */
+					enum rte_flow_action_type act_type =
+						RTE_FLOW_ACTION_TYPE_MARK;
+					action = &cls->entries[j]->action;
+					action_mask = action->action_mask;
+
+					if (action_mask & (1LLU << act_type)) {
+						mark = &action->act.mark;
+						ptr = RTE_PKT_METADATA_PTR(
+							pkts[j], pkt_offset);
+						*ptr = mark->id;
+					}
+				}
+			}
+		}
+	}
+
+	return 0;
 }
 
 int
