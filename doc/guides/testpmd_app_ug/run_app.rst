@@ -501,3 +501,7 @@ The commandline options are:
 *   ``--enable-multiseg``
 
     Enables multi segment send Tx offload on all ports.
+
+*   ``--enable-fast-free``
+
+    Enables mbuf fast free Tx offload on all ports.

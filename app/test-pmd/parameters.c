@@ -216,6 +216,8 @@ usage(char* progname)
 	       "requests flow API isolated mode on all ports at initialization time.\n");
 	printf("  --enable-multiseg: "
 	       "enables multi segment send Tx offload on all ports.\n");
+	printf("  --enable-fast-free: "
+	       "enables mbuf fast free Tx offload on all ports.\n");
 }
 
 #ifdef RTE_LIBRTE_CMDLINE
@@ -647,6 +649,7 @@ launch_args_parse(int argc, char** argv)
 		{ "print-event",		1, 0, 0 },
 		{ "mask-event",			1, 0, 0 },
 		{ "enable-multiseg",		0, 0, 0 },
+		{ "enable-fast-free",		0, 0, 0 },
 		{ 0, 0, 0, 0 },
 	};
 
@@ -1122,6 +1125,8 @@ launch_args_parse(int argc, char** argv)
 				}
 			if (!strcmp(lgopts[opt_idx].name, "enable-multiseg"))
 				tx_offloads |= DEV_TX_OFFLOAD_MULTI_SEGS;
+			if (!strcmp(lgopts[opt_idx].name, "enable-fast-free"))
+				tx_offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
 
 			break;
 		case 'h':
