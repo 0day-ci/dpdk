@@ -1577,6 +1577,7 @@ cmd_config_max_pkt_len_parsed(void *parsed_result,
 				__attribute__((unused)) void *data)
 {
 	struct cmd_config_max_pkt_len_result *res = parsed_result;
+	uint64_t rx_offloads = rx_mode.offloads;
 
 	if (!all_ports_stopped()) {
 		printf("Please stop all ports first\n");
@@ -1594,13 +1595,15 @@ cmd_config_max_pkt_len_parsed(void *parsed_result,
 
 		rx_mode.max_rx_pkt_len = res->value;
 		if (res->value > ETHER_MAX_LEN)
-			rx_mode.jumbo_frame = 1;
+			rx_offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 		else
-			rx_mode.jumbo_frame = 0;
+			rx_offloads &= ~DEV_RX_OFFLOAD_JUMBO_FRAME;
 	} else {
 		printf("Unknown parameter\n");
 		return;
 	}
+
+	rx_mode.offloads = rx_offloads;
 
 	init_port_config();
 
@@ -1703,6 +1706,7 @@ cmd_config_rx_mode_flag_parsed(void *parsed_result,
 				__attribute__((unused)) void *data)
 {
 	struct cmd_config_rx_mode_flag *res = parsed_result;
+	uint64_t rx_offloads = rx_mode.offloads;
 
 	if (!all_ports_stopped()) {
 		printf("Please stop all ports first\n");
@@ -1711,48 +1715,48 @@ cmd_config_rx_mode_flag_parsed(void *parsed_result,
 
 	if (!strcmp(res->name, "crc-strip")) {
 		if (!strcmp(res->value, "on"))
-			rx_mode.hw_strip_crc = 1;
+			rx_offloads |= DEV_RX_OFFLOAD_CRC_STRIP;
 		else if (!strcmp(res->value, "off"))
-			rx_mode.hw_strip_crc = 0;
+			rx_offloads &= ~DEV_RX_OFFLOAD_CRC_STRIP;
 		else {
 			printf("Unknown parameter\n");
 			return;
 		}
 	} else if (!strcmp(res->name, "scatter")) {
-		if (!strcmp(res->value, "on"))
-			rx_mode.enable_scatter = 1;
-		else if (!strcmp(res->value, "off"))
-			rx_mode.enable_scatter = 0;
-		else {
+		if (!strcmp(res->value, "on")) {
+			rx_offloads |= DEV_RX_OFFLOAD_SCATTER;
+		} else if (!strcmp(res->value, "off")) {
+			rx_offloads &= ~DEV_RX_OFFLOAD_SCATTER;
+		} else {
 			printf("Unknown parameter\n");
 			return;
 		}
 	} else if (!strcmp(res->name, "rx-cksum")) {
 		if (!strcmp(res->value, "on"))
-			rx_mode.hw_ip_checksum = 1;
+			rx_offloads |= DEV_RX_OFFLOAD_CHECKSUM;
 		else if (!strcmp(res->value, "off"))
-			rx_mode.hw_ip_checksum = 0;
+			rx_offloads &= ~DEV_RX_OFFLOAD_CHECKSUM;
 		else {
 			printf("Unknown parameter\n");
 			return;
 		}
 	} else if (!strcmp(res->name, "rx-timestamp")) {
 		if (!strcmp(res->value, "on"))
-			rx_mode.hw_timestamp = 1;
+			rx_offloads |= DEV_RX_OFFLOAD_TIMESTAMP;
 		else if (!strcmp(res->value, "off"))
-			rx_mode.hw_timestamp = 0;
+			rx_offloads &= ~DEV_RX_OFFLOAD_TIMESTAMP;
 		else {
 			printf("Unknown parameter\n");
 			return;
 		}
 	} else if (!strcmp(res->name, "hw-vlan")) {
 		if (!strcmp(res->value, "on")) {
-			rx_mode.hw_vlan_filter = 1;
-			rx_mode.hw_vlan_strip  = 1;
+			rx_offloads |= (DEV_RX_OFFLOAD_VLAN_FILTER |
+					DEV_RX_OFFLOAD_VLAN_STRIP);
 		}
 		else if (!strcmp(res->value, "off")) {
-			rx_mode.hw_vlan_filter = 0;
-			rx_mode.hw_vlan_strip  = 0;
+			rx_offloads &= ~(DEV_RX_OFFLOAD_VLAN_FILTER |
+					DEV_RX_OFFLOAD_VLAN_STRIP);
 		}
 		else {
 			printf("Unknown parameter\n");
@@ -1760,27 +1764,27 @@ cmd_config_rx_mode_flag_parsed(void *parsed_result,
 		}
 	} else if (!strcmp(res->name, "hw-vlan-filter")) {
 		if (!strcmp(res->value, "on"))
-			rx_mode.hw_vlan_filter = 1;
+			rx_offloads |= DEV_RX_OFFLOAD_VLAN_FILTER;
 		else if (!strcmp(res->value, "off"))
-			rx_mode.hw_vlan_filter = 0;
+			rx_offloads &= ~DEV_RX_OFFLOAD_VLAN_FILTER;
 		else {
 			printf("Unknown parameter\n");
 			return;
 		}
 	} else if (!strcmp(res->name, "hw-vlan-strip")) {
 		if (!strcmp(res->value, "on"))
-			rx_mode.hw_vlan_strip  = 1;
+			rx_offloads |= DEV_RX_OFFLOAD_VLAN_STRIP;
 		else if (!strcmp(res->value, "off"))
-			rx_mode.hw_vlan_strip  = 0;
+			rx_offloads &= ~DEV_RX_OFFLOAD_VLAN_STRIP;
 		else {
 			printf("Unknown parameter\n");
 			return;
 		}
 	} else if (!strcmp(res->name, "hw-vlan-extend")) {
 		if (!strcmp(res->value, "on"))
-			rx_mode.hw_vlan_extend = 1;
+			rx_offloads |= DEV_RX_OFFLOAD_VLAN_EXTEND;
 		else if (!strcmp(res->value, "off"))
-			rx_mode.hw_vlan_extend = 0;
+			rx_offloads &= ~DEV_RX_OFFLOAD_VLAN_EXTEND;
 		else {
 			printf("Unknown parameter\n");
 			return;
@@ -1798,6 +1802,7 @@ cmd_config_rx_mode_flag_parsed(void *parsed_result,
 		printf("Unknown parameter\n");
 		return;
 	}
+	rx_mode.offloads = rx_offloads;
 
 	init_port_config();
 
@@ -3434,7 +3439,14 @@ cmd_tx_vlan_set_parsed(void *parsed_result,
 {
 	struct cmd_tx_vlan_set_result *res = parsed_result;
 
+	if (!all_ports_stopped()) {
+		printf("Please stop all ports first\n");
+		return;
+	}
+
 	tx_vlan_set(res->port_id, res->vlan_id);
+
+	cmd_reconfig_device_queue(RTE_PORT_ALL, 1, 1);
 }
 
 cmdline_parse_token_string_t cmd_tx_vlan_set_tx_vlan =
@@ -3481,7 +3493,14 @@ cmd_tx_vlan_set_qinq_parsed(void *parsed_result,
 {
 	struct cmd_tx_vlan_set_qinq_result *res = parsed_result;
 
+	if (!all_ports_stopped()) {
+		printf("Please stop all ports first\n");
+		return;
+	}
+
 	tx_qinq_set(res->port_id, res->vlan_id, res->vlan_id_outer);
+
+	cmd_reconfig_device_queue(RTE_PORT_ALL, 1, 1);
 }
 
 cmdline_parse_token_string_t cmd_tx_vlan_set_qinq_tx_vlan =
@@ -3587,7 +3606,14 @@ cmd_tx_vlan_reset_parsed(void *parsed_result,
 {
 	struct cmd_tx_vlan_reset_result *res = parsed_result;
 
+	if (!all_ports_stopped()) {
+		printf("Please stop all ports first\n");
+		return;
+	}
+
 	tx_vlan_reset(res->port_id);
+
+	cmd_reconfig_device_queue(RTE_PORT_ALL, 1, 1);
 }
 
 cmdline_parse_token_string_t cmd_tx_vlan_reset_tx_vlan =
@@ -3680,9 +3706,14 @@ cmd_csum_parsed(void *parsed_result,
 	struct cmd_csum_result *res = parsed_result;
 	int hw = 0;
 	uint16_t mask = 0;
+	uint64_t csum_offloads = 0;
 
 	if (port_id_is_invalid(res->port_id, ENABLED_WARN)) {
 		printf("invalid port %d\n", res->port_id);
+		return;
+	}
+	if (!all_ports_stopped()) {
+		printf("Please stop all ports first\n");
 		return;
 	}
 
@@ -3693,22 +3724,34 @@ cmd_csum_parsed(void *parsed_result,
 
 		if (!strcmp(res->proto, "ip")) {
 			mask = TESTPMD_TX_OFFLOAD_IP_CKSUM;
+			csum_offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
 		} else if (!strcmp(res->proto, "udp")) {
 			mask = TESTPMD_TX_OFFLOAD_UDP_CKSUM;
+			csum_offloads |= DEV_TX_OFFLOAD_UDP_CKSUM;
 		} else if (!strcmp(res->proto, "tcp")) {
 			mask = TESTPMD_TX_OFFLOAD_TCP_CKSUM;
+			csum_offloads |= DEV_TX_OFFLOAD_TCP_CKSUM;
 		} else if (!strcmp(res->proto, "sctp")) {
 			mask = TESTPMD_TX_OFFLOAD_SCTP_CKSUM;
+			csum_offloads |= DEV_TX_OFFLOAD_SCTP_CKSUM;
 		} else if (!strcmp(res->proto, "outer-ip")) {
 			mask = TESTPMD_TX_OFFLOAD_OUTER_IP_CKSUM;
+			csum_offloads |= DEV_TX_OFFLOAD_OUTER_IPV4_CKSUM;
 		}
 
-		if (hw)
+		if (hw) {
 			ports[res->port_id].tx_ol_flags |= mask;
-		else
+			ports[res->port_id].dev_conf.txmode.offloads |=
+							csum_offloads;
+		} else {
 			ports[res->port_id].tx_ol_flags &= (~mask);
+			ports[res->port_id].dev_conf.txmode.offloads &=
+							(~csum_offloads);
+		}
 	}
 	csum_show(res->port_id);
+
+	cmd_reconfig_device_queue(RTE_PORT_ALL, 1, 1);
 }
 
 cmdline_parse_token_string_t cmd_csum_csum =
@@ -3832,15 +3875,24 @@ cmd_tso_set_parsed(void *parsed_result,
 
 	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
+	if (!all_ports_stopped()) {
+		printf("Please stop all ports first\n");
+		return;
+	}
 
 	if (!strcmp(res->mode, "set"))
 		ports[res->port_id].tso_segsz = res->tso_segsz;
 
-	if (ports[res->port_id].tso_segsz == 0)
+	if (ports[res->port_id].tso_segsz == 0) {
+		ports[res->port_id].dev_conf.txmode.offloads &=
+						~DEV_TX_OFFLOAD_TCP_TSO;
 		printf("TSO for non-tunneled packets is disabled\n");
-	else
+	} else {
+		ports[res->port_id].dev_conf.txmode.offloads |=
+						DEV_TX_OFFLOAD_TCP_TSO;
 		printf("TSO segment size for non-tunneled packets is %d\n",
 			ports[res->port_id].tso_segsz);
+	}
 
 	/* display warnings if configuration is not supported by the NIC */
 	rte_eth_dev_info_get(res->port_id, &dev_info);
@@ -3849,6 +3901,8 @@ cmd_tso_set_parsed(void *parsed_result,
 		printf("Warning: TSO enabled but not "
 			"supported by port %d\n", res->port_id);
 	}
+
+	cmd_reconfig_device_queue(RTE_PORT_ALL, 1, 1);
 }
 
 cmdline_parse_token_string_t cmd_tso_set_tso =
@@ -3934,13 +3988,27 @@ cmd_tunnel_tso_set_parsed(void *parsed_result,
 
 	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
+	if (!all_ports_stopped()) {
+		printf("Please stop all ports first\n");
+		return;
+	}
 
 	if (!strcmp(res->mode, "set"))
 		ports[res->port_id].tunnel_tso_segsz = res->tso_segsz;
 
-	if (ports[res->port_id].tunnel_tso_segsz == 0)
+	if (ports[res->port_id].tunnel_tso_segsz == 0) {
+		ports[res->port_id].dev_conf.txmode.offloads &=
+			~(DEV_TX_OFFLOAD_VXLAN_TNL_TSO |
+			  DEV_TX_OFFLOAD_GRE_TNL_TSO |
+			  DEV_TX_OFFLOAD_IPIP_TNL_TSO |
+			  DEV_TX_OFFLOAD_GENEVE_TNL_TSO);
 		printf("TSO for tunneled packets is disabled\n");
-	else {
+	} else {
+		ports[res->port_id].dev_conf.txmode.offloads |=
+			(DEV_TX_OFFLOAD_VXLAN_TNL_TSO |
+			 DEV_TX_OFFLOAD_GRE_TNL_TSO |
+			 DEV_TX_OFFLOAD_IPIP_TNL_TSO |
+			 DEV_TX_OFFLOAD_GENEVE_TNL_TSO);
 		printf("TSO segment size for tunneled packets is %d\n",
 			ports[res->port_id].tunnel_tso_segsz);
 
@@ -3966,6 +4034,8 @@ cmd_tunnel_tso_set_parsed(void *parsed_result,
 			printf("Warning: csum set outer-ip must be set to hw "
 				"if outer L3 is IPv4; not necessary for IPv6\n");
 	}
+
+	cmd_reconfig_device_queue(RTE_PORT_ALL, 1, 1);
 }
 
 cmdline_parse_token_string_t cmd_tunnel_tso_set_tso =
@@ -13004,11 +13074,17 @@ cmd_set_macsec_offload_on_parsed(
 	portid_t port_id = res->port_id;
 	int en = (strcmp(res->en_on_off, "on") == 0) ? 1 : 0;
 	int rp = (strcmp(res->rp_on_off, "on") == 0) ? 1 : 0;
+	struct rte_eth_dev_info dev_info;
 
 	if (port_id_is_invalid(port_id, ENABLED_WARN))
 		return;
+	if (!all_ports_stopped()) {
+		printf("Please stop all ports first\n");
+		return;
+	}
 
 	ports[port_id].tx_ol_flags |= TESTPMD_TX_OFFLOAD_MACSEC;
+	ports[port_id].dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_MACSEC_INSERT;
 #ifdef RTE_LIBRTE_IXGBE_PMD
 	ret = rte_pmd_ixgbe_macsec_enable(port_id, en, rp);
 #endif
@@ -13017,6 +13093,13 @@ cmd_set_macsec_offload_on_parsed(
 
 	switch (ret) {
 	case 0:
+		rte_eth_dev_info_get(port_id, &dev_info);
+		if ((dev_info.tx_offload_capa &
+		     DEV_TX_OFFLOAD_MACSEC_INSERT) == 0) {
+			printf("Warning: macsec insert enabled but not "
+				"supported by port %d\n", port_id);
+		}
+		cmd_reconfig_device_queue(RTE_PORT_ALL, 1, 1);
 		break;
 	case -ENODEV:
 		printf("invalid port_id %d\n", port_id);
@@ -13091,14 +13174,21 @@ cmd_set_macsec_offload_off_parsed(
 
 	if (port_id_is_invalid(port_id, ENABLED_WARN))
 		return;
+	if (!all_ports_stopped()) {
+		printf("Please stop all ports first\n");
+		return;
+	}
 
 	ports[port_id].tx_ol_flags &= ~TESTPMD_TX_OFFLOAD_MACSEC;
+	ports[port_id].dev_conf.txmode.offloads &=
+					~DEV_TX_OFFLOAD_MACSEC_INSERT;
 #ifdef RTE_LIBRTE_IXGBE_PMD
 	ret = rte_pmd_ixgbe_macsec_disable(port_id);
 #endif
 
 	switch (ret) {
 	case 0:
+		cmd_reconfig_device_queue(RTE_PORT_ALL, 1, 1);
 		break;
 	case -ENODEV:
 		printf("invalid port_id %d\n", port_id);
