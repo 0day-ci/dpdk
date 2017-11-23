@@ -53,7 +53,9 @@ SRCS-$(CONFIG_RTE_LIBRTE_MLX5_PMD) += mlx5_rss.c
 SRCS-$(CONFIG_RTE_LIBRTE_MLX5_PMD) += mlx5_mr.c
 SRCS-$(CONFIG_RTE_LIBRTE_MLX5_PMD) += mlx5_flow.c
 SRCS-$(CONFIG_RTE_LIBRTE_MLX5_PMD) += mlx5_socket.c
-
+ifeq ($(CONFIG_RTE_LIBRTE_MLX5_DLL),y)
+SRCS-$(CONFIG_RTE_LIBRTE_MLX5_PMD) += lib/mlx5_dll.c
+endif
 # Basic CFLAGS.
 CFLAGS += -O3
 CFLAGS += -std=c11 -Wall -Wextra
@@ -64,7 +66,11 @@ CFLAGS += -D_DEFAULT_SOURCE
 CFLAGS += -D_XOPEN_SOURCE=600
 CFLAGS += $(WERROR_FLAGS)
 CFLAGS += -Wno-strict-prototypes
+ifeq ($(CONFIG_RTE_LIBRTE_MLX5_DLL),y)
+LDLIBS += -ldl
+else
 LDLIBS += -libverbs -lmlx5
+endif
 LDLIBS += -lrte_eal -lrte_mbuf -lrte_mempool -lrte_ring
 LDLIBS += -lrte_ethdev -lrte_net -lrte_kvargs
 LDLIBS += -lrte_bus_pci
@@ -91,7 +97,11 @@ endif
 ifdef CONFIG_RTE_LIBRTE_MLX5_TX_MP_CACHE
 CFLAGS += -DMLX5_PMD_TX_MP_CACHE=$(CONFIG_RTE_LIBRTE_MLX5_TX_MP_CACHE)
 endif
-
+ifeq ($(CONFIG_RTE_LIBRTE_MLX5_DLL),y)
+CFLAGS += -DMLX5_PMD_DLL
+else
+CFLAGS += -UMLX5_PMD_DLL
+endif
 include $(RTE_SDK)/mk/rte.lib.mk
 
 # Generate and clean-up mlx5_autoconf.h.
@@ -105,26 +115,28 @@ endif
 
 mlx5_autoconf.h.new: FORCE
 
+VERBS_H := infiniband/verbs.h
+MLX5DV_H := infiniband/mlx5dv.h
 mlx5_autoconf.h.new: $(RTE_SDK)/buildtools/auto-config-h.sh
 	$Q $(RM) -f -- '$@'
 	$Q sh -- '$<' '$@' \
 		HAVE_IBV_DEVICE_VXLAN_SUPPORT \
-		infiniband/verbs.h \
+		$(VERBS_H) \
 		enum IBV_DEVICE_VXLAN_SUPPORT \
 		$(AUTOCONF_OUTPUT)
 	$Q sh -- '$<' '$@' \
 		HAVE_IBV_WQ_FLAG_RX_END_PADDING \
-		infiniband/verbs.h \
+		$(VERBS_H) \
 		enum IBV_WQ_FLAG_RX_END_PADDING \
 		$(AUTOCONF_OUTPUT)
 	$Q sh -- '$<' '$@' \
 		HAVE_IBV_MLX5_MOD_MPW \
-		infiniband/mlx5dv.h \
+		$(MLX5DV_H) \
 		enum MLX5DV_CONTEXT_FLAGS_MPW_ALLOWED \
 		$(AUTOCONF_OUTPUT)
 	$Q sh -- '$<' '$@' \
 		HAVE_IBV_MLX5_MOD_CQE_128B_COMP \
-		infiniband/mlx5dv.h \
+		$(MLX5DV_H) \
 		enum MLX5DV_CONTEXT_FLAGS_CQE_128B_COMP \
 		$(AUTOCONF_OUTPUT)
 	$Q sh -- '$<' '$@' \
@@ -144,10 +156,9 @@ mlx5_autoconf.h.new: $(RTE_SDK)/buildtools/auto-config-h.sh
 		$(AUTOCONF_OUTPUT)
 	$Q sh -- '$<' '$@' \
 		HAVE_IBV_DEVICE_COUNTERS_SET_SUPPORT \
-		infiniband/verbs.h \
+		$(VERBS_H)  \
 		enum IBV_FLOW_SPEC_ACTION_COUNT \
 		$(AUTOCONF_OUTPUT)
-
 # Create mlx5_autoconf.h or update it in case it differs from the new one.
 
 mlx5_autoconf.h: mlx5_autoconf.h.new
