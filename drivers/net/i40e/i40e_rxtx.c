@@ -2839,6 +2839,17 @@ i40e_set_rx_function(struct rte_eth_dev *dev)
 				     dev->data->port_id);
 
 			dev->rx_pkt_burst = i40e_recv_scattered_pkts_vec;
+#ifdef RTE_ARCH_X86
+			/*
+			 * since AVX frequency can be different to base
+			 * frequency, limit use of AVX2 version to later
+			 * plaforms, not all those that could theoretically
+			 * run it.
+			 */
+			if (rte_cpu_get_flag_enabled(RTE_CPUFLAG_AVX512F))
+				dev->rx_pkt_burst =
+					i40e_recv_scattered_pkts_vec_avx2;
+#endif
 		} else {
 			PMD_INIT_LOG(DEBUG, "Using a Scattered with bulk "
 					   "allocation callback (port=%d).",
@@ -2858,6 +2869,16 @@ i40e_set_rx_function(struct rte_eth_dev *dev)
 			     dev->data->port_id);
 
 		dev->rx_pkt_burst = i40e_recv_pkts_vec;
+#ifdef RTE_ARCH_X86
+		/*
+		 * since AVX frequency can be different to base
+		 * frequency, limit use of AVX2 version to later
+		 * plaforms, not all those that could theoretically
+		 * run it.
+		 */
+		if (rte_cpu_get_flag_enabled(RTE_CPUFLAG_AVX512F))
+			dev->rx_pkt_burst = i40e_recv_pkts_vec_avx2;
+#endif
 	} else if (ad->rx_bulk_alloc_allowed) {
 		PMD_INIT_LOG(DEBUG, "Rx Burst Bulk Alloc Preconditions are "
 				    "satisfied. Rx Burst Bulk Alloc function "
