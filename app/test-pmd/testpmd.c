@@ -601,10 +601,18 @@ init_config(void)
 
 	RTE_ETH_FOREACH_DEV(pid) {
 		port = &ports[pid];
+		rte_eth_dev_info_get(pid, &port->dev_info);
 		/* Apply default Tx configuration for all ports */
 		port->dev_conf.txmode = tx_mode;
-		rte_eth_dev_info_get(pid, &port->dev_info);
-
+		if ((port->dev_info.tx_offload_capa & tx_mode.offloads) !=
+		     tx_mode.offloads) {
+			printf("Some Tx offloads are not supported "
+			       "by port %d: requested 0x%lx supported 0x%lx\n",
+			       pid, tx_mode.offloads,
+			       port->dev_info.tx_offload_capa);
+			port->dev_conf.txmode.offloads &=
+						port->dev_info.tx_offload_capa;
+		}
 		if (numa_support) {
 			if (port_numa[pid] != NUMA_NO_CONFIG)
 				port_per_socket[port_numa[pid]]++;
@@ -2082,6 +2090,15 @@ init_port_config(void)
 	RTE_ETH_FOREACH_DEV(pid) {
 		port = &ports[pid];
 		port->dev_conf.rxmode = rx_mode;
+		if ((port->dev_info.rx_offload_capa & rx_mode.offloads) !=
+		    rx_mode.offloads) {
+			printf("Some Rx offloads are not supported "
+			       "by port %d: requested 0x%lx supported 0x%lx\n",
+			       pid, rx_mode.offloads,
+			       port->dev_info.rx_offload_capa);
+			port->dev_conf.rxmode.offloads &=
+						port->dev_info.rx_offload_capa;
+		}
 		port->dev_conf.fdir_conf = fdir_conf;
 		if (nb_rxq > 1) {
 			port->dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;

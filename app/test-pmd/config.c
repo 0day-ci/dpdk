@@ -2790,16 +2790,17 @@ tx_vlan_set(portid_t port_id, uint16_t vlan_id)
 		printf("Error, as QinQ has been enabled.\n");
 		return;
 	}
+	rte_eth_dev_info_get(port_id, &dev_info);
+	if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_VLAN_INSERT) == 0) {
+		printf("Error: vlan insert is not supported by port %d\n",
+			port_id);
+		return;
+	}
 
 	tx_vlan_reset(port_id);
 	ports[port_id].tx_ol_flags |= TESTPMD_TX_OFFLOAD_INSERT_VLAN;
 	ports[port_id].dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_VLAN_INSERT;
 	ports[port_id].tx_vlan_id = vlan_id;
-	rte_eth_dev_info_get(port_id, &dev_info);
-	if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_VLAN_INSERT) == 0) {
-		printf("Warning: vlan insert enabled but not "
-		       "supported by port %d\n", port_id);
-	}
 }
 
 void
@@ -2820,17 +2821,18 @@ tx_qinq_set(portid_t port_id, uint16_t vlan_id, uint16_t vlan_id_outer)
 		printf("Error, as QinQ hasn't been enabled.\n");
 		return;
 	}
+	rte_eth_dev_info_get(port_id, &dev_info);
+	if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_QINQ_INSERT) == 0) {
+		printf("Error: qinq insert not supported by port %d\n",
+			port_id);
+		return;
+	}
 
 	tx_vlan_reset(port_id);
 	ports[port_id].tx_ol_flags |= TESTPMD_TX_OFFLOAD_INSERT_QINQ;
 	ports[port_id].dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_QINQ_INSERT;
 	ports[port_id].tx_vlan_id = vlan_id;
 	ports[port_id].tx_vlan_id_outer = vlan_id_outer;
-	rte_eth_dev_info_get(port_id, &dev_info);
-	if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_QINQ_INSERT) == 0) {
-		printf("Warning: qinq insert enabled but not "
-		       "supported by port %d\n", port_id);
-	}
 }
 
 void
