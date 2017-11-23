@@ -214,6 +214,8 @@ usage(char* progname)
 	       "disable print of designated event or all of them.\n");
 	printf("  --flow-isolate-all: "
 	       "requests flow API isolated mode on all ports at initialization time.\n");
+	printf("  --enable-multiseg: "
+	       "enables multi segment send Tx offload on all ports.\n");
 }
 
 #ifdef RTE_LIBRTE_CMDLINE
@@ -566,6 +568,8 @@ launch_args_parse(int argc, char** argv)
 	enum { TX, RX };
 	/* Default Rx offloads for all ports. */
 	uint64_t rx_offloads = rx_mode.offloads;
+	/* Default Tx offloads for all ports. */
+	uint64_t tx_offloads = tx_mode.offloads;
 
 	static struct option lgopts[] = {
 		{ "help",			0, 0, 0 },
@@ -642,6 +646,7 @@ launch_args_parse(int argc, char** argv)
 		{ "no-rmv-interrupt",		0, 0, 0 },
 		{ "print-event",		1, 0, 0 },
 		{ "mask-event",			1, 0, 0 },
+		{ "enable-multiseg",		0, 0, 0 },
 		{ 0, 0, 0, 0 },
 	};
 
@@ -1115,6 +1120,8 @@ launch_args_parse(int argc, char** argv)
 					rte_exit(EXIT_FAILURE,
 						 "invalid mask-event argument\n");
 				}
+			if (!strcmp(lgopts[opt_idx].name, "enable-multiseg"))
+				tx_offloads |= DEV_TX_OFFLOAD_MULTI_SEGS;
 
 			break;
 		case 'h':
@@ -1131,4 +1138,5 @@ launch_args_parse(int argc, char** argv)
 
 	/* Set offload configuration from command line parameters. */
 	rx_mode.offloads = rx_offloads;
+	tx_mode.offloads = tx_offloads;
 }

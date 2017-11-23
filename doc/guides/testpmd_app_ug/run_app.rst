@@ -497,3 +497,7 @@ The commandline options are:
     configured flow rules only (see flow command).
 
     Ports that do not support this mode are automatically discarded.
+
+*   ``--enable-multiseg``
+
+    Enables multi segment send Tx offload on all ports.
