@@ -30,7 +30,8 @@
  *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#define _GNU_SOURCE
+#include <stdio.h>
 #include <stddef.h>
 #include <unistd.h>
 #include <string.h>
@@ -39,13 +40,17 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <net/if.h>
-
+#include <dlfcn.h>
 /* Verbs header. */
 /* ISO C doesn't support unnamed structs/unions, disabling -pedantic. */
 #ifdef PEDANTIC
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
+#ifdef MLX5_PMD_DLL
+#include "lib/mlx5_dll.h"
+#else
 #include <infiniband/verbs.h>
+#endif
 #ifdef PEDANTIC
 #pragma GCC diagnostic error "-Wpedantic"
 #endif
@@ -1029,6 +1034,9 @@ static void
 rte_mlx5_pmd_init(void)
 {
 	/* Build the static table for ptype conversion. */
+#ifdef MLX5_PMD_DLL
+	int ret;
+#endif
 	mlx5_set_ptype_table();
 	/*
 	 * RDMAV_HUGEPAGES_SAFE tells ibv_fork_init() we intend to use
@@ -1040,6 +1048,11 @@ rte_mlx5_pmd_init(void)
 	/* Match the size of Rx completion entry to the size of a cacheline. */
 	if (RTE_CACHE_LINE_SIZE == 128)
 		setenv("MLX5_CQE_SIZE", "128", 0);
+#ifdef MLX5_PMD_DLL
+	ret = mlx5_load_libs();
+	if ( ret != 0 )
+		return;
+#endif
 	ibv_fork_init();
 	rte_pci_register(&mlx5_driver);
 }

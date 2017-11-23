@@ -41,8 +41,12 @@
 #ifdef PEDANTIC
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
+#ifdef MLX5_PMD_DLL
+#include "lib/mlx5_dll.h"
+#else
 #include <infiniband/verbs.h>
 #include <infiniband/mlx5dv.h>
+#endif
 #ifdef PEDANTIC
 #pragma GCC diagnostic error "-Wpedantic"
 #endif
