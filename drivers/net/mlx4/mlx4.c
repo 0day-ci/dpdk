@@ -49,7 +49,11 @@
 #ifdef PEDANTIC
 #pragma GCC diagnostic ignored "-Wpedantic"
 #endif
+#ifdef MLX4_PMD_DLL
+#include "lib/mlx4_dll.h"
+#else
 #include <infiniband/verbs.h>
+#endif
 #ifdef PEDANTIC
 #pragma GCC diagnostic error "-Wpedantic"
 #endif
@@ -713,7 +717,15 @@ rte_mlx4_pmd_init(void)
 	 * applications to use fork() safely for purposes other than
 	 * using this PMD, which is not supported in forked processes.
 	 */
+#ifdef MLX4_PMD_DLL
+	int ret;
+#endif
 	setenv("RDMAV_HUGEPAGES_SAFE", "1", 1);
+#ifdef MLX4_PMD_DLL
+	ret = mlx4_load_libs();
+	if ( ret != 0 )
+		return;
+#endif
 	ibv_fork_init();
 	rte_pci_register(&mlx4_driver);
 }
