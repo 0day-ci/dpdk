@@ -270,6 +270,7 @@ struct virtio_hw {
 	struct virtio_pci_common_cfg *common_cfg;
 	struct virtio_net_config *dev_cfg;
 	void	    *virtio_user_dev;
+	rte_spinlock_t sl;
 
 	struct virtqueue **vqs;
 };

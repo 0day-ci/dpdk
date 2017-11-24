@@ -48,6 +48,8 @@
 #include <rte_pci.h>
 #include <rte_bus_pci.h>
 #include <rte_ether.h>
+#include <rte_ip.h>
+#include <rte_arp.h>
 #include <rte_common.h>
 #include <rte_errno.h>
 #include <rte_cpuflags.h>
@@ -55,6 +57,7 @@
 #include <rte_memory.h>
 #include <rte_eal.h>
 #include <rte_dev.h>
+#include <rte_cycles.h>
 
 #include "virtio_ethdev.h"
 #include "virtio_pci.h"
@@ -105,6 +108,13 @@ static int virtio_dev_queue_stats_mapping_set(
 	uint16_t queue_id,
 	uint8_t stat_idx,
 	uint8_t is_rx);
+
+static int make_rarp_packet(struct rte_mbuf *rarp_mbuf,
+		const struct ether_addr *mac);
+static int virtio_dev_pause(struct rte_eth_dev *dev);
+static void virtio_dev_resume(struct rte_eth_dev *dev);
+static void generate_rarp(struct rte_eth_dev *dev);
+static void virtnet_ack_link_announce(struct rte_eth_dev *dev);
 
 /*
  * The set of PCI devices this driver supports
@@ -1249,9 +1259,116 @@ virtio_negotiate_features(struct virtio_hw *hw, uint64_t req_features)
 	return 0;
 }
 
+#define RARP_PKT_SIZE	64
+
+static int
+make_rarp_packet(struct rte_mbuf *rarp_mbuf, const struct ether_addr *mac)
+{
+	struct ether_hdr *eth_hdr;
+	struct arp_hdr  *rarp;
+
+	if (rarp_mbuf->buf_len < RARP_PKT_SIZE) {
+		PMD_DRV_LOG(ERR, "mbuf size too small %u (< %d)",
+				rarp_mbuf->buf_len, RARP_PKT_SIZE);
+		return -1;
+	}
+
+	/* Ethernet header. */
+	eth_hdr = rte_pktmbuf_mtod_offset(rarp_mbuf, struct ether_hdr *, 0);
+	memset(eth_hdr->d_addr.addr_bytes, 0xff, ETHER_ADDR_LEN);
+	ether_addr_copy(mac, &eth_hdr->s_addr);
+	eth_hdr->ether_type = htons(ETHER_TYPE_RARP);
+
+	/* RARP header. */
+	rarp = (struct arp_hdr *)(eth_hdr + 1);
+	rarp->arp_hrd = htons(ARP_HRD_ETHER);
+	rarp->arp_pro = htons(ETHER_TYPE_IPv4);
+	rarp->arp_hln = ETHER_ADDR_LEN;
+	rarp->arp_pln = 4;
+	rarp->arp_op  = htons(ARP_OP_REVREQUEST);
+
+	ether_addr_copy(mac, &rarp->arp_data.arp_sha);
+	ether_addr_copy(mac, &rarp->arp_data.arp_tha);
+	memset(&rarp->arp_data.arp_sip, 0x00, 4);
+	memset(&rarp->arp_data.arp_tip, 0x00, 4);
+
+	rarp_mbuf->data_len = RARP_PKT_SIZE;
+	rarp_mbuf->pkt_len = RARP_PKT_SIZE;
+
+	return 0;
+}
+
+static int
+virtio_dev_pause(struct rte_eth_dev *dev)
+{
+	struct virtio_hw *hw = dev->data->dev_private;
+
+	if (hw->started == 0)
+		return -1;
+	hw->started = 0;
+	/*
+	 * Prevent the worker thread from touching queues to avoid condition,
+	 * 1 ms should be enough for the ongoing Tx function to finish.
+	 */
+	rte_delay_ms(1);
+	return 0;
+}
+
+static void
+virtio_dev_resume(struct rte_eth_dev *dev)
+{
+	struct virtio_hw *hw = dev->data->dev_private;
+
+	hw->started = 1;
+}
+
+static void
+generate_rarp(struct rte_eth_dev *dev)
+{
+	struct virtio_hw *hw = dev->data->dev_private;
+	struct rte_mbuf *rarp_mbuf = NULL;
+	struct virtnet_tx *txvq = dev->data->tx_queues[0];
+	struct virtnet_rx *rxvq = dev->data->rx_queues[0];
+
+	rarp_mbuf = rte_mbuf_raw_alloc(rxvq->mpool);
+	if (rarp_mbuf == NULL) {
+		PMD_DRV_LOG(ERR, "mbuf allocate failed");
+		return;
+	}
+
+	if (make_rarp_packet(rarp_mbuf, (struct ether_addr *)hw->mac_addr)) {
+		rte_pktmbuf_free(rarp_mbuf);
+		rarp_mbuf = NULL;
+		return;
+	}
+
+	/* If virtio port just stopped, no need to send RARP */
+	if (virtio_dev_pause(dev) < -1)
+		return;
+
+	virtio_inject_pkts(txvq, &rarp_mbuf, 1);
+	/* Recover the stored hw status to let worker thread continue */
+	virtio_dev_resume(dev);
+}
+
+static void
+virtnet_ack_link_announce(struct rte_eth_dev *dev)
+{
+	struct virtio_hw *hw = dev->data->dev_private;
+	struct virtio_pmd_ctrl ctrl;
+	int len;
+
+	ctrl.hdr.class = VIRTIO_NET_CTRL_ANNOUNCE;
+	ctrl.hdr.cmd = VIRTIO_NET_CTRL_ANNOUNCE_ACK;
+	len = 0;
+
+	virtio_send_command(hw->cvq, &ctrl, &len, 0);
+}
+
 /*
- * Process Virtio Config changed interrupt and call the callback
- * if link state changed.
+ * Process virtio config changed interrupt. Call the callback
+ * if link state changed; generate gratuitous RARP packet if
+ * the status indicates an ANNOUNCE.
  */
 void
 virtio_interrupt_handler(void *param)
@@ -1274,6 +1391,12 @@ virtio_interrupt_handler(void *param)
 						      NULL, NULL);
 	}
 
+	if (isr & VIRTIO_NET_S_ANNOUNCE) {
+		rte_spinlock_lock(&hw->sl);
+		generate_rarp(dev);
+		virtnet_ack_link_announce(dev);
+		rte_spinlock_unlock(&hw->sl);
+	}
 }
 
 /* set rx and tx handlers according to what is supported */
@@ -1786,6 +1909,8 @@ virtio_dev_configure(struct rte_eth_dev *dev)
 			return -EBUSY;
 		}
 
+	rte_spinlock_init(&hw->sl);
+
 	hw->use_simple_rx = 1;
 	hw->use_simple_tx = 1;
 
@@ -1952,12 +2077,14 @@ virtio_dev_stop(struct rte_eth_dev *dev)
 
 	PMD_INIT_LOG(DEBUG, "stop");
 
+	rte_spinlock_lock(&hw->sl);
 	if (intr_conf->lsc || intr_conf->rxq)
 		virtio_intr_disable(dev);
 
 	hw->started = 0;
 	memset(&link, 0, sizeof(link));
 	virtio_dev_atomic_write_link_status(dev, &link);
+	rte_spinlock_unlock(&hw->sl);
 }
 
 static int
