@@ -890,7 +890,12 @@ rte_cryptodev_enqueue_burst(uint8_t dev_id, uint16_t qp_id,
 }
 
 
-/** Cryptodev symmetric crypto session */
+/** Cryptodev symmetric crypto session
+ * Internally the crytpodev library maintains an association between the
+ * session and an rte_crypto_sym_xform which is specified as an argument to
+ * rte_cryptodev_sym_session_create().  Therefore a session has a fixed xform
+ * chain and each xform has a fixed algo, key, op-type, digest_len etc.
+ */
 struct rte_cryptodev_sym_session {
 	__extension__ void *sess_private_data[0];
 	/**< Private session material */
