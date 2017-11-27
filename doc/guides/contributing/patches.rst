@@ -32,6 +32,42 @@ It is also worth registering for the DPDK `Patchwork <http://dpdk.org/dev/patchw
 The development process requires some familiarity with the ``git`` version control system.
 Refer to the `Pro Git Book <http://www.git-scm.com/book/>`_ for further information.
 
+Source License
+--------------
+
+The DPDK uses the Open Source BSD-3-Clause license for the core libraries and
+drivers. The kernel components are GPLv2 licensed. DPDK usaes single line
+reference to Unique License Identifiers in source files as defined by the Linux
+Foundation's `SPDX project <http://spdx.org/>`_.
+
+For example, to label a file as subject to the BSD-3-Clause license,
+the following text would be used:
+
+Copyright (C) [YEAR] NAME-OF-COPYRIGHT-HOLDER
+``SPDX-License-Identifier:        BSD-3-Clause``
+
+To label a file as dual-licensed with BSD-3-Clause and GPL-2.0 (e.g., for code
+that is shared between the kernel and userspace), the following text would be
+used:
+
+Copyright (C) [YEAR] NAME-OF-COPYRIGHT-HOLDER
+``SPDX-License-Identifier:        BSD-3-Clause OR GPL-2.0``
+
+To label a file as dual-licensed with BSD-3-Clause and LGPL-2.1 (e.g., for code
+that is shared between the kernel and userspace), the following text would be
+used:
+
+Copyright (C) [YEAR] NAME-OF-COPYRIGHT-HOLDER
+``SPDX-License-Identifier:        BSD-3-Clause OR LGPL-2.1``
+
+To label a file as GPL-2.0 (e.g., for code that runs in the kernel), the
+following text would be used:
+
+Copyright (C) [YEAR] NAME-OF-COPYRIGHT-HOLDER
+``SPDX-License-Identifier:        GPL-2.0``
+
+Any new file contributions in DPDK shall adhere to the above scheme.
+It is also being recommended to replace the existing license.
 
 Maintainers and Sub-trees
 -------------------------

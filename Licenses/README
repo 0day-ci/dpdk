@@ -1,0 +1,82 @@
+The DPDK uses the Open Source BSD-3-Clause license for the core libraries and
+drivers. The kernel components are naturally GPLv2 licensed.
+
+Including big blocks of License headers in all files blows up the
+source code with mostly redundant information.  An additional problem
+is that even the same licenses are referred to by a number of
+slightly varying text blocks (full, abbreviated, different
+indentation, line wrapping and/or white space, with obsolete address
+information, ...) which makes validation and automatic processing a nightmare.
+
+To make this easier, DPDK is adpoting the use of a single line reference to
+Unique License Identifiers in source files as defined by the Linux Foundation's
+SPDX project [1].
+
+Adding license information in this fashion, rather than adding full license
+text, can be more efficient for developers; decreases errors; and improves
+automated detection of licenses. The current set of valid, predefined SPDX
+identifiers is set forth on the SPDX License List[2]
+at https://spdx.org/licenses/.
+
+For example, to label a file as subject to the BSD-3-Clause license,
+the following text would be used:
+
+Copyright (C) [YEAR] NAME-OF-COPYRIGHT-HOLDER
+SPDX-License-Identifier:        BSD-3-Clause
+
+To label a file as GPL-2.0 (e.g., for code that runs in the kernel), the
+following text would be used:
+
+Copyright (C) [YEAR] NAME-OF-COPYRIGHT-HOLDER
+SPDX-License-Identifier:        GPL-2.0
+
+To label a file as dual-licensed with BSD-3-Clause and GPL-2.0 (e.g., for code
+that is shared between the kernel and userspace), the following text would be
+used:
+
+Copyright (C) [YEAR] NAME-OF-COPYRIGHT-HOLDER
+SPDX-License-Identifier:        BSD-3-Clause OR GPL-2.0
+
+To label a file as dual-licensed with BSD-3-Clause and LGPL-2.1 (e.g., for code
+that is shared between the kernel and userspace), the following text would be
+used:
+
+Copyright (C) [YEAR] NAME-OF-COPYRIGHT-HOLDER
+SPDX-License-Identifier:        BSD-3-Clause OR LGPL-2.1
+
+Any new file contributions in DPDK shall adhere to the above scheme.
+It is also being recommended to replace the existing license text in the code
+with SPDX-License-Identifiers.
+
+Note: DPDK currently adhere to it's IP policies[3]. Any exception to this shall
+be approved by DPDK tech board and DPDK Governing Board. Steps for any exception
+approval:
+1. Mention the appropriate license identifier form SPDX. If the license is not
+   listed in SPDX Licenses. It is the submitters responsibiliity to get it
+   fist listed.
+2. Get the required approval from the DPDK Technical Board. Technical board may
+   advise the author to check alternate means first. If no other alternative
+   are found and the merit of the contributions are important for DPDK's
+   mission, it may decide on such exception with two-thirds vote of the members.
+3. Technical board then approach Governing board for such limited approval for
+   the given contribution only.
+
+Any approvals shall be documented in "Licenses/exceptions.txt" with record
+dates.
+
+Projects like U-boot have been been using SPDX License Idenfiers successfully
+[2]. They have been referered in implementing SPDX based guidelines in DPDK.
+
+
+[1] http://spdx.org/
+[2] http://spdx.org/licenses/
+[3] http://dpdk.org/about/charter
+[4] https://www.denx.de/wiki/U-Boot/Licensing
+
+DPDK project supported licenses are:
+
+Full name				        SPDX Identifier	OSI Approved	File name		URI
+=======================================================================================================================================
+GNU General Public License v2.0 only		GPL-2.0		Y		gpl-2.0.txt		http://spdx.org/licenses/GPL-2.0.html#licenseText
+GNU Lesser General Public License v2.1 or later	LGPL-2.1+	Y		lgpl-2.1.txt		http://spdx.org/licenses/LGPL-2.1.html#licenseText
+BSD 3-clause "New" or "Revised" License		BSD-3-Clause	Y		bsd-3-clause.txt	http://spdx.org/licenses/BSD-3-Clause#licenseText
