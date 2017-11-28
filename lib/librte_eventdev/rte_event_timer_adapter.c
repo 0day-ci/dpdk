@@ -48,6 +48,8 @@
 
 static struct rte_event_timer_adapter adapters[MAX_EVENT_TIMER_ADAPTERS];
 
+extern const struct rte_event_timer_adapter_ops sw_event_adapter_timer_ops;
+
 static inline int
 adapter_valid(const struct rte_event_timer_adapter *adapter)
 {
@@ -207,6 +209,12 @@ rte_event_timer_adapter_create_ext(
 		}
 	}
 
+	/* If eventdev PMD did not provide ops, use default software
+	 * implementation.
+	 */
+	if (adapter->ops == NULL)
+		adapter->ops = &sw_event_adapter_timer_ops;
+
 	/* Allow driver to do some setup */
 	FUNC_PTR_OR_NULL_RET_WITH_ERRNO(adapter->ops->init, -ENOTSUP);
 	ret = adapter->ops->init(adapter);
@@ -312,6 +320,12 @@ rte_event_timer_adapter_lookup(uint16_t adapter_id)
 		rte_errno = -EINVAL;
 		return NULL;
 	}
+
+	/* If eventdev PMD did not provide ops, use default software
+	 * implementation.
+	 */
+	if (adapter->ops == NULL)
+		adapter->ops = &sw_event_adapter_timer_ops;
 
 	/* Set fast-path function pointers */
 	adapter->arm_burst = adapter->ops->arm_burst;

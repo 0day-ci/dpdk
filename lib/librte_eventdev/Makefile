@@ -46,6 +46,7 @@ SRCS-y += rte_eventdev.c
 SRCS-y += rte_event_ring.c
 SRCS-y += rte_event_eth_rx_adapter.c
 SRCS-y += rte_event_timer_adapter.c
+SRCS-y += sw_event_timer_adapter.c
 
 # export include files
 SYMLINK-y-include += rte_eventdev.h
