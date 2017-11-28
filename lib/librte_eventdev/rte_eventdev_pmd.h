@@ -52,6 +52,7 @@ extern "C" {
 #include <rte_malloc.h>
 
 #include "rte_eventdev.h"
+#include "rte_event_timer_adapter_driver.h"
 
 /* Logging Macros */
 #define RTE_EDEV_LOG_ERR(...) \
@@ -466,6 +467,9 @@ typedef int (*eventdev_eth_rx_adapter_caps_get_t)
 
 struct rte_event_eth_rx_adapter_queue_conf *queue_conf;
 
+typedef int (*eventdev_timer_adapter_caps_get_t)(const struct rte_eventdev *dev,
+		uint32_t *caps, const struct rte_event_timer_adapter_ops **ops);
+
 /**
  * Add ethernet Rx queues to event device. This callback is invoked if
  * the caps returned from rte_eventdev_eth_rx_adapter_caps_get(, eth_port_id)
@@ -650,6 +654,9 @@ struct rte_eventdev_ops {
 	/**< Get ethernet Rx stats */
 	eventdev_eth_rx_adapter_stats_reset eth_rx_adapter_stats_reset;
 	/**< Reset ethernet Rx stats */
+
+	eventdev_timer_adapter_caps_get_t timer_adapter_caps_get;
+	/**< Get timer adapter capabilities */
 };
 
 /**

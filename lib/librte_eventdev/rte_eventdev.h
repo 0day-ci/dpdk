@@ -1025,6 +1025,9 @@ struct rte_event {
  * @see struct rte_event_eth_rx_adapter_queue_conf::rx_queue_flags
  */
 
+#define RTE_EVENT_TIMER_ADAPTER_CAP_INTERNAL_PORT (1ULL << 1)
+/**< This flag is set when the timer mechanism is in HW. */
+
 /**
  * Retrieve the event device's ethdev Rx adapter capabilities for the
  * specified ethernet port

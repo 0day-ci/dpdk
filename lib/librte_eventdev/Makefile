@@ -45,6 +45,7 @@ LDLIBS += -lrte_eal -lrte_ring -lrte_ethdev -lrte_hash
 SRCS-y += rte_eventdev.c
 SRCS-y += rte_event_ring.c
 SRCS-y += rte_event_eth_rx_adapter.c
+SRCS-y += rte_event_timer_adapter.c
 
 # export include files
 SYMLINK-y-include += rte_eventdev.h
@@ -54,6 +55,7 @@ SYMLINK-y-include += rte_eventdev_pmd_vdev.h
 SYMLINK-y-include += rte_event_ring.h
 SYMLINK-y-include += rte_event_eth_rx_adapter.h
 SYMLINK-y-include += rte_event_timer_adapter.h
+SYMLINK-y-include += rte_event_timer_adapter_driver.h
 
 # versioning export map
 EXPORT_MAP := rte_eventdev_version.map
