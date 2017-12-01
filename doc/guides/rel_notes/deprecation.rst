@@ -8,6 +8,11 @@ API and ABI deprecation notices are to be posted here.
 Deprecation Notices
 -------------------
 
+* ethdev: an ABI changes for ``rte_ethdev`` are planned in v18.05.
+  The size and layout of struct rte_eth_dev will change.
+  Mainly to accommodate queue specific RX/TX function pointers, plus
+  reorganize RX/TX callback related information.
+
 * eal: several API and ABI changes are planned for ``rte_devargs`` in v18.02.
   The format of device command line parameters will change. The bus will need
   to be explicitly stated in the device declaration. The enum ``rte_devtype``
