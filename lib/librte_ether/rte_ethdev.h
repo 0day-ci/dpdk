@@ -1694,6 +1694,10 @@ typedef uint16_t (*rte_tx_callback_fn)(uint16_t port, uint16_t queue,
  * @internal
  * Structure used to hold information about the callbacks to be called for a
  * queue on RX and TX.
+ * On RX: user-supplied functions called from rte_eth_rx_burst to post-process
+ * received packets before passing them to the user
+ * On TX: user-supplied functions called from rte_eth_tx_burst to pre-process
+ * received packets before passing them to the driver for transmission.
  */
 struct rte_eth_rxtx_callback {
 	struct rte_eth_rxtx_callback *next;
@@ -1715,6 +1719,24 @@ enum rte_eth_dev_state {
 
 /**
  * @internal
+ * Structure to hold process non-shareable information
+ * about RX/TX queue of the ethernet device.
+ */
+struct rte_eth_queue_local {
+	/**
+	 * placeholder for queue specific rx/tx and tx_preapare
+	 * functions pointers
+	 */
+	eth_rx_burst_t rx_pkt_burst; /**< receive function pointer. */
+	eth_tx_burst_t tx_pkt_burst; /**< transmit function pointer. */
+	eth_tx_prep_t tx_pkt_prepare; /**< transmit prepare function pointer. */
+
+	struct rte_eth_rxtx_callback *cbs;
+	/**< list of user supplied callbacks */
+} __rte_cache_aligned;
+
+/**
+ * @internal
  * The generic data structure associated with each ethernet device.
  *
  * Pointers to burst-oriented packet receive and transmit functions are
@@ -1730,19 +1752,13 @@ struct rte_eth_dev {
 	struct rte_eth_dev_data *data;  /**< Pointer to device data */
 	const struct eth_dev_ops *dev_ops; /**< Functions exported by PMD */
 	struct rte_device *device; /**< Backing device */
+
+	struct rte_eth_queue_local *rx_ql;  /**< RX queues local data */
+	struct rte_eth_queue_local *tx_ql;  /**< TX queues local data */
+
 	struct rte_intr_handle *intr_handle; /**< Device interrupt handle */
 	/** User application callbacks for NIC interrupts */
 	struct rte_eth_dev_cb_list link_intr_cbs;
-	/**
-	 * User-supplied functions called from rx_burst to post-process
-	 * received packets before passing them to the user
-	 */
-	struct rte_eth_rxtx_callback *post_rx_burst_cbs[RTE_MAX_QUEUES_PER_PORT];
-	/**
-	 * User-supplied functions called from tx_burst to pre-process
-	 * received packets before passing them to the driver for transmission.
-	 */
-	struct rte_eth_rxtx_callback *pre_tx_burst_cbs[RTE_MAX_QUEUES_PER_PORT];
 	enum rte_eth_dev_state state; /**< Flag indicating the port state */
 	void *security_ctx; /**< Context for security ops */
 } __rte_cache_aligned;
@@ -2883,29 +2899,37 @@ static inline uint16_t
 rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id,
 		 struct rte_mbuf **rx_pkts, const uint16_t nb_pkts)
 {
+	uint16_t nb_rx;
 	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
 
 #ifdef RTE_LIBRTE_ETHDEV_DEBUG
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, 0);
 	RTE_FUNC_PTR_OR_ERR_RET(*dev->rx_pkt_burst, 0);
 
-	if (queue_id >= dev->data->nb_rx_queues) {
+	if (queue_id >= dev->data->nb_rx_queues || dev->rx_ql == NULL) {
 		RTE_PMD_DEBUG_TRACE("Invalid RX queue_id=%d\n", queue_id);
 		return 0;
 	}
 #endif
-	int16_t nb_rx = (*dev->rx_pkt_burst)(dev->data->rx_queues[queue_id],
+	nb_rx = (*dev->rx_pkt_burst)(dev->data->rx_queues[queue_id],
 			rx_pkts, nb_pkts);
 
 #ifdef RTE_ETHDEV_RXTX_CALLBACKS
-	struct rte_eth_rxtx_callback *cb = dev->post_rx_burst_cbs[queue_id];
+	{
+		struct rte_eth_queue_local *ql;
+		struct rte_eth_rxtx_callback *cb;
 
-	if (unlikely(cb != NULL)) {
-		do {
-			nb_rx = cb->fn.rx(port_id, queue_id, rx_pkts, nb_rx,
+		ql = dev->rx_ql + queue_id;
+		cb = ql->cbs;
+
+		if (unlikely(cb != NULL)) {
+			do {
+				nb_rx = cb->fn.rx(port_id, queue_id,
+						rx_pkts, nb_rx,
 						nb_pkts, cb->param);
-			cb = cb->next;
-		} while (cb != NULL);
+				cb = cb->next;
+			} while (cb != NULL);
+		}
 	}
 #endif
 
@@ -3151,21 +3175,28 @@ rte_eth_tx_burst(uint16_t port_id, uint16_t queue_id,
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, 0);
 	RTE_FUNC_PTR_OR_ERR_RET(*dev->tx_pkt_burst, 0);
 
-	if (queue_id >= dev->data->nb_tx_queues) {
+	if (queue_id >= dev->data->nb_tx_queues || dev->tx_ql == NULL) {
 		RTE_PMD_DEBUG_TRACE("Invalid TX queue_id=%d\n", queue_id);
 		return 0;
 	}
 #endif
 
 #ifdef RTE_ETHDEV_RXTX_CALLBACKS
-	struct rte_eth_rxtx_callback *cb = dev->pre_tx_burst_cbs[queue_id];
+	{
+		struct rte_eth_queue_local *ql;
+		struct rte_eth_rxtx_callback *cb;
 
-	if (unlikely(cb != NULL)) {
-		do {
-			nb_pkts = cb->fn.tx(port_id, queue_id, tx_pkts, nb_pkts,
-					cb->param);
-			cb = cb->next;
-		} while (cb != NULL);
+		ql = dev->tx_ql + queue_id;
+		cb = ql->cbs;
+
+		if (unlikely(cb != NULL)) {
+			do {
+				nb_pkts = cb->fn.tx(port_id, queue_id,
+						tx_pkts, nb_pkts,
+						cb->param);
+				cb = cb->next;
+			} while (cb != NULL);
+		}
 	}
 #endif
 
