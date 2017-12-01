@@ -482,7 +482,7 @@ free_rxtx_cbs(struct rte_eth_rxtx_callback *cbs)
 static void
 reset_queue_local(struct rte_eth_queue_local *ql)
 {
-	free_rxtx_cbs(ql->cbs);
+	free_rxtx_cbs(ql->cbs.head);
 	memset(ql, 0, sizeof(*ql));
 }
 
@@ -3172,6 +3172,79 @@ rte_eth_dev_filter_ctrl(uint16_t port_id, enum rte_filter_type filter_type,
 	return (*dev->dev_ops->filter_ctrl)(dev, filter_type, filter_op, arg);
 }
 
+#ifdef RTE_ETHDEV_RXTX_CALLBACKS
+
+/*
+ * Helper routine - contains common code to add RX/TX queue callbacks
+ * to the list.
+ */
+static struct rte_eth_rxtx_callback *
+add_rxtx_callback(struct rte_eth_rxtx_cbs *cbs, int32_t first,
+	struct rte_eth_rxtx_callback *cb, rte_spinlock_t *lock)
+{
+	struct rte_eth_rxtx_callback *tail, **pt;
+
+	rte_spinlock_lock(lock);
+
+	/* Add callback to the head of the list. */
+	if (first != 0) {
+		cb->next = cbs->head;
+		rte_smp_wmb();
+		cbs->head = cb;
+
+	/* Add callback to the tail of the list. */
+	} else {
+		for (pt = &cbs->head; *pt != NULL; pt = &tail->next)
+			tail = *pt;
+
+		*pt = cb;
+	}
+
+	rte_spinlock_unlock(lock);
+	return cb;
+}
+
+/*
+ * Helper routine - contains common code to delete RX/TX queue callbacks
+ * from the FIFO list.
+ */
+static int
+del_rxtx_callback(struct rte_eth_rxtx_cbs *cbs,
+	struct rte_eth_rxtx_callback *user_cb, rte_spinlock_t *lock)
+{
+	int32_t ret;
+	struct rte_eth_rxtx_callback *cb, **prev_cb;
+
+	ret = -EINVAL;
+	rte_spinlock_lock(lock);
+
+	for (prev_cb = &cbs->head; *prev_cb != NULL; prev_cb = &cb->next) {
+
+		cb = *prev_cb;
+		if (cb == user_cb) {
+			/* Remove the user cb from the callback list. */
+			*prev_cb = cb->next;
+			ret = 0;
+			break;
+		}
+	}
+
+	rte_spinlock_unlock(lock);
+
+	/*
+	 * first make sure datapath doesn't use removed callback anymore,
+	 * then free the callback structure.
+	 */
+	if (ret == 0) {
+		__rte_eth_rxtx_cbs_wait(cbs);
+		rte_free(cb);
+	}
+
+	return ret;
+}
+
+#endif /* RTE_ETHDEV_RXTX_CALLBACKS */
+
 void *
 rte_eth_add_rx_callback(uint16_t port_id, uint16_t queue_id,
 		rte_rx_callback_fn fn, void *user_param)
@@ -3180,14 +3253,16 @@ rte_eth_add_rx_callback(uint16_t port_id, uint16_t queue_id,
 	rte_errno = ENOTSUP;
 	return NULL;
 #endif
+	struct rte_eth_rxtx_callback *cb;
+
 	/* check input parameters */
 	if (!rte_eth_dev_is_valid_port(port_id) || fn == NULL ||
 		    queue_id >= rte_eth_devices[port_id].data->nb_rx_queues) {
 		rte_errno = EINVAL;
 		return NULL;
 	}
-	struct rte_eth_rxtx_callback *cb = rte_zmalloc(NULL, sizeof(*cb), 0);
 
+	cb = rte_zmalloc(NULL, sizeof(*cb), 0);
 	if (cb == NULL) {
 		rte_errno = ENOMEM;
 		return NULL;
@@ -3196,22 +3271,8 @@ rte_eth_add_rx_callback(uint16_t port_id, uint16_t queue_id,
 	cb->fn.rx = fn;
 	cb->param = user_param;
 
-	rte_spinlock_lock(&rte_eth_rx_cb_lock);
-	/* Add the callbacks in fifo order. */
-	struct rte_eth_rxtx_callback *tail =
-		rte_eth_devices[port_id].rx_ql[queue_id].cbs;
-
-	if (!tail) {
-		rte_eth_devices[port_id].rx_ql[queue_id].cbs = cb;
-
-	} else {
-		while (tail->next)
-			tail = tail->next;
-		tail->next = cb;
-	}
-	rte_spinlock_unlock(&rte_eth_rx_cb_lock);
-
-	return cb;
+	return add_rxtx_callback(&rte_eth_devices[port_id].rx_ql[queue_id].cbs,
+		0, cb, &rte_eth_rx_cb_lock);
 }
 
 void *
@@ -3222,6 +3283,8 @@ rte_eth_add_first_rx_callback(uint16_t port_id, uint16_t queue_id,
 	rte_errno = ENOTSUP;
 	return NULL;
 #endif
+	struct rte_eth_rxtx_callback *cb;
+
 	/* check input parameters */
 	if (!rte_eth_dev_is_valid_port(port_id) || fn == NULL ||
 		queue_id >= rte_eth_devices[port_id].data->nb_rx_queues) {
@@ -3229,7 +3292,7 @@ rte_eth_add_first_rx_callback(uint16_t port_id, uint16_t queue_id,
 		return NULL;
 	}
 
-	struct rte_eth_rxtx_callback *cb = rte_zmalloc(NULL, sizeof(*cb), 0);
+	cb = rte_zmalloc(NULL, sizeof(*cb), 0);
 
 	if (cb == NULL) {
 		rte_errno = ENOMEM;
@@ -3239,14 +3302,8 @@ rte_eth_add_first_rx_callback(uint16_t port_id, uint16_t queue_id,
 	cb->fn.rx = fn;
 	cb->param = user_param;
 
-	rte_spinlock_lock(&rte_eth_rx_cb_lock);
-	/* Add the callbacks at fisrt position*/
-	cb->next = rte_eth_devices[port_id].rx_ql[queue_id].cbs;
-	rte_smp_wmb();
-	rte_eth_devices[port_id].rx_ql[queue_id].cbs = cb;
-	rte_spinlock_unlock(&rte_eth_rx_cb_lock);
-
-	return cb;
+	return add_rxtx_callback(&rte_eth_devices[port_id].rx_ql[queue_id].cbs,
+		1, cb, &rte_eth_rx_cb_lock);
 }
 
 void *
@@ -3257,6 +3314,8 @@ rte_eth_add_tx_callback(uint16_t port_id, uint16_t queue_id,
 	rte_errno = ENOTSUP;
 	return NULL;
 #endif
+	struct rte_eth_rxtx_callback *cb;
+
 	/* check input parameters */
 	if (!rte_eth_dev_is_valid_port(port_id) || fn == NULL ||
 		    queue_id >= rte_eth_devices[port_id].data->nb_tx_queues) {
@@ -3264,8 +3323,7 @@ rte_eth_add_tx_callback(uint16_t port_id, uint16_t queue_id,
 		return NULL;
 	}
 
-	struct rte_eth_rxtx_callback *cb = rte_zmalloc(NULL, sizeof(*cb), 0);
-
+	cb = rte_zmalloc(NULL, sizeof(*cb), 0);
 	if (cb == NULL) {
 		rte_errno = ENOMEM;
 		return NULL;
@@ -3274,22 +3332,8 @@ rte_eth_add_tx_callback(uint16_t port_id, uint16_t queue_id,
 	cb->fn.tx = fn;
 	cb->param = user_param;
 
-	rte_spinlock_lock(&rte_eth_tx_cb_lock);
-	/* Add the callbacks in fifo order. */
-	struct rte_eth_rxtx_callback *tail =
-		rte_eth_devices[port_id].tx_ql[queue_id].cbs;
-
-	if (!tail) {
-		rte_eth_devices[port_id].tx_ql[queue_id].cbs = cb;
-
-	} else {
-		while (tail->next)
-			tail = tail->next;
-		tail->next = cb;
-	}
-	rte_spinlock_unlock(&rte_eth_tx_cb_lock);
-
-	return cb;
+	return add_rxtx_callback(&rte_eth_devices[port_id].tx_ql[queue_id].cbs,
+		0, cb, &rte_eth_tx_cb_lock);
 }
 
 int
@@ -3299,31 +3343,16 @@ rte_eth_remove_rx_callback(uint16_t port_id, uint16_t queue_id,
 #ifndef RTE_ETHDEV_RXTX_CALLBACKS
 	return -ENOTSUP;
 #endif
+	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
+
 	/* Check input parameters. */
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 	if (user_cb == NULL ||
 			queue_id >= rte_eth_devices[port_id].data->nb_rx_queues)
 		return -EINVAL;
 
-	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
-	struct rte_eth_rxtx_callback *cb;
-	struct rte_eth_rxtx_callback **prev_cb;
-	int ret = -EINVAL;
-
-	rte_spinlock_lock(&rte_eth_rx_cb_lock);
-	prev_cb = &dev->rx_ql[queue_id].cbs;
-	for (; *prev_cb != NULL; prev_cb = &cb->next) {
-		cb = *prev_cb;
-		if (cb == user_cb) {
-			/* Remove the user cb from the callback list. */
-			*prev_cb = cb->next;
-			ret = 0;
-			break;
-		}
-	}
-	rte_spinlock_unlock(&rte_eth_rx_cb_lock);
-
-	return ret;
+	return del_rxtx_callback(&dev->rx_ql[queue_id].cbs, user_cb,
+		&rte_eth_rx_cb_lock);
 }
 
 int
@@ -3333,31 +3362,16 @@ rte_eth_remove_tx_callback(uint16_t port_id, uint16_t queue_id,
 #ifndef RTE_ETHDEV_RXTX_CALLBACKS
 	return -ENOTSUP;
 #endif
+	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
+
 	/* Check input parameters. */
 	RTE_ETH_VALID_PORTID_OR_ERR_RET(port_id, -EINVAL);
 	if (user_cb == NULL ||
 			queue_id >= rte_eth_devices[port_id].data->nb_tx_queues)
 		return -EINVAL;
 
-	struct rte_eth_dev *dev = &rte_eth_devices[port_id];
-	int ret = -EINVAL;
-	struct rte_eth_rxtx_callback *cb;
-	struct rte_eth_rxtx_callback **prev_cb;
-
-	rte_spinlock_lock(&rte_eth_tx_cb_lock);
-	prev_cb = &dev->tx_ql[queue_id].cbs;
-	for (; *prev_cb != NULL; prev_cb = &cb->next) {
-		cb = *prev_cb;
-		if (cb == user_cb) {
-			/* Remove the user cb from the callback list. */
-			*prev_cb = cb->next;
-			ret = 0;
-			break;
-		}
-	}
-	rte_spinlock_unlock(&rte_eth_tx_cb_lock);
-
-	return ret;
+	return del_rxtx_callback(&dev->tx_ql[queue_id].cbs, user_cb,
+		&rte_eth_tx_cb_lock);
 }
 
 int

@@ -1709,6 +1709,23 @@ struct rte_eth_rxtx_callback {
 };
 
 /**
+ * @internal
+ * Structure used to hold list of RX/TX callbacks, plus usage counter.
+ * Usage counter is incremented each time (rx|tx)_burst starts/stops
+ * using callback list.
+ */
+struct rte_eth_rxtx_cbs {
+	struct rte_eth_rxtx_callback *head; /**< head of callbacks list */
+	uint32_t use; /**< usage counter */
+};
+
+/*
+ * Odd number means that callback list is used by datapath (RX/TX)
+ * Even number means that callback list is not used by datapath (RX/TX)
+ */
+#define	RTE_ETH_RXTX_CBS_INUSE	1
+
+/**
  * A set of values to describe the possible states of an eth device.
  */
 enum rte_eth_dev_state {
@@ -1731,7 +1748,7 @@ struct rte_eth_queue_local {
 	eth_tx_burst_t tx_pkt_burst; /**< transmit function pointer. */
 	eth_tx_prep_t tx_pkt_prepare; /**< transmit prepare function pointer. */
 
-	struct rte_eth_rxtx_callback *cbs;
+	struct rte_eth_rxtx_cbs cbs;
 	/**< list of user supplied callbacks */
 } __rte_cache_aligned;
 
@@ -2814,6 +2831,60 @@ int rte_eth_dev_get_vlan_offload(uint16_t port_id);
 int rte_eth_dev_set_vlan_pvid(uint16_t port_id, uint16_t pvid, int on);
 
 /**
+ * @internal
+ * Marks given callback list as used by datapath (RX/TX).
+ * @param cbs
+ *  Pointer to the callback list structure.
+ */
+static __rte_always_inline void
+__rte_eth_rxtx_cbs_inuse(struct rte_eth_rxtx_cbs *cbs)
+{
+	cbs->use++;
+	/* make sure no store/load reordering could happen */
+	rte_smp_mb();
+}
+
+/**
+ * @internal
+ * Marks given callback list as not used by datapath (RX/TX).
+ * @param cbs
+ *  Pointer to the callback list structure.
+ */
+static __rte_always_inline void
+__rte_eth_rxtx_cbs_unuse(struct rte_eth_rxtx_cbs *cbs)
+{
+	/* make sure all previous loads are completed */
+	rte_smp_rmb();
+	cbs->use++;
+}
+
+/**
+ * @internal
+ * Waits till datapath (RX/TX) finished using given callback list.
+ * @param cbs
+ *  Pointer to the callback list structure.
+ */
+static inline void
+__rte_eth_rxtx_cbs_wait(const struct rte_eth_rxtx_cbs *cbs)
+{
+	uint32_t nuse, puse;
+
+	/* make sure all previous loads and stores are completed */
+	rte_smp_mb();
+
+	puse = cbs->use;
+
+	/* in use, busy wait till current RX/TX iteration is finished */
+	if ((puse & RTE_ETH_RXTX_CBS_INUSE) != 0) {
+		do {
+			rte_pause();
+			rte_compiler_barrier();
+			nuse = cbs->use;
+		} while (nuse == puse);
+	}
+}
+
+/**
  *
  * Retrieve a burst of input packets from a receive queue of an Ethernet
  * device. The retrieved packets are stored in *rte_mbuf* structures whose
@@ -2911,6 +2982,7 @@ rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id,
 		return 0;
 	}
 #endif
+
 	nb_rx = (*dev->rx_pkt_burst)(dev->data->rx_queues[queue_id],
 			rx_pkts, nb_pkts);
 
@@ -2920,15 +2992,15 @@ rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id,
 		struct rte_eth_rxtx_callback *cb;
 
 		ql = dev->rx_ql + queue_id;
-		cb = ql->cbs;
+		if (unlikely(ql->cbs.head != NULL)) {
 
-		if (unlikely(cb != NULL)) {
-			do {
-				nb_rx = cb->fn.rx(port_id, queue_id,
-						rx_pkts, nb_rx,
-						nb_pkts, cb->param);
-				cb = cb->next;
-			} while (cb != NULL);
+			__rte_eth_rxtx_cbs_inuse(&ql->cbs);
+
+			for (cb = ql->cbs.head; cb != NULL; cb = cb->next)
+				nb_rx = cb->fn.rx(port_id, queue_id, rx_pkts,
+					nb_rx, nb_pkts, cb->param);
+
+			__rte_eth_rxtx_cbs_unuse(&ql->cbs);
 		}
 	}
 #endif
@@ -3187,20 +3259,21 @@ rte_eth_tx_burst(uint16_t port_id, uint16_t queue_id,
 		struct rte_eth_rxtx_callback *cb;
 
 		ql = dev->tx_ql + queue_id;
-		cb = ql->cbs;
+		if (unlikely(ql->cbs.head != NULL)) {
 
-		if (unlikely(cb != NULL)) {
-			do {
-				nb_pkts = cb->fn.tx(port_id, queue_id,
-						tx_pkts, nb_pkts,
-						cb->param);
-				cb = cb->next;
-			} while (cb != NULL);
+			__rte_eth_rxtx_cbs_inuse(&ql->cbs);
+
+			for (cb = ql->cbs.head; cb != NULL; cb = cb->next)
+				nb_pkts = cb->fn.tx(port_id, queue_id, tx_pkts,
+					nb_pkts, cb->param);
+
+			__rte_eth_rxtx_cbs_unuse(&ql->cbs);
 		}
 	}
 #endif
 
-	return (*dev->tx_pkt_burst)(dev->data->tx_queues[queue_id], tx_pkts, nb_pkts);
+	return (*dev->tx_pkt_burst)(dev->data->tx_queues[queue_id], tx_pkts,
+		nb_pkts);
 }
 
 /**
@@ -4199,16 +4272,10 @@ void *rte_eth_add_tx_callback(uint16_t port_id, uint16_t queue_id,
  * This function is used to removed callbacks that were added to a NIC port
  * queue using rte_eth_add_rx_callback().
  *
- * Note: the callback is removed from the callback list but it isn't freed
- * since the it may still be in use. The memory for the callback can be
- * subsequently freed back by the application by calling rte_free():
- *
- * - Immediately - if the port is stopped, or the user knows that no
- *   callbacks are in flight e.g. if called from the thread doing RX/TX
- *   on that queue.
- *
- * - After a short delay - where the delay is sufficient to allow any
- *   in-flight callbacks to complete.
+ * Note: that after callback is removed from the callback list associated
+ * with it memory is freed, and user shouldn't refer it any more.
+ * After successfull completion of that function user can safely release
+ * any resources associated with that callback.
  *
  * @param port_id
  *   The port identifier of the Ethernet device.
