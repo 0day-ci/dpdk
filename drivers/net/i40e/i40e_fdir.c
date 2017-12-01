@@ -671,6 +671,7 @@ i40e_fdir_configure(struct rte_eth_dev *dev)
 		return -EINVAL;
 	}
 	/* configure flex payload */
+	i40e_flex_payload_reg_cfg(hw, !!conf->nb_payloads);
 	for (i = 0; i < conf->nb_payloads; i++)
 		i40e_set_flx_pld_cfg(pf, &conf->flex_set[i]);
 	/* configure flex mask*/

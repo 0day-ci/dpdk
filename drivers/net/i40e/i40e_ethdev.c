@@ -701,17 +701,6 @@ RTE_PMD_REGISTER_KMOD_DEP(net_i40e, "* igb_uio | uio_pci_generic | vfio-pci");
 static inline void i40e_GLQF_reg_init(struct i40e_hw *hw)
 {
 	/*
-	 * Force global configuration for flexible payload
-	 * to the first 16 bytes of the corresponding L2/L3/L4 paylod.
-	 * This should be removed from code once proper
-	 * configuration API is added to avoid configuration conflicts
-	 * between ports of the same device.
-	 */
-	I40E_WRITE_REG(hw, I40E_GLQF_ORT(33), 0x000000E0);
-	I40E_WRITE_REG(hw, I40E_GLQF_ORT(34), 0x000000E3);
-	I40E_WRITE_REG(hw, I40E_GLQF_ORT(35), 0x000000E6);
-
-	/*
 	 * Initialize registers for parsing packet type of QinQ
 	 * This should be removed from code once proper
 	 * configuration API is added to avoid configuration conflicts
@@ -1435,6 +1424,24 @@ i40e_rm_fdir_filter_list(struct i40e_pf *pf)
 	}
 }
 
+void i40e_flex_payload_reg_cfg(struct i40e_hw *hw, bool enable)
+{
+	if (enable) {
+		/*
+		 * Set global configuration for flexible payload
+		 * to the first 16 bytes of the corresponding L2/L3/L4 paylod.
+		 */
+		I40E_WRITE_REG(hw, I40E_GLQF_ORT(33), 0x000000E0);
+		I40E_WRITE_REG(hw, I40E_GLQF_ORT(34), 0x000000E3);
+		I40E_WRITE_REG(hw, I40E_GLQF_ORT(35), 0x000000E6);
+	} else {
+		/* Disable flexible payload in global configuration */
+		I40E_WRITE_REG(hw, I40E_GLQF_ORT(33), 0x00000000);
+		I40E_WRITE_REG(hw, I40E_GLQF_ORT(34), 0x00000000);
+		I40E_WRITE_REG(hw, I40E_GLQF_ORT(35), 0x00000000);
+	}
+}
+
 static int
 eth_i40e_dev_uninit(struct rte_eth_dev *dev)
 {
@@ -1477,6 +1484,9 @@ eth_i40e_dev_uninit(struct rte_eth_dev *dev)
 	/* Disable flow control */
 	hw->fc.requested_mode = I40E_FC_NONE;
 	i40e_set_fc(hw, &aq_fail, TRUE);
+
+	/* Disable flexible payload in global configuration */
+	i40e_flex_payload_reg_cfg(hw, false);
 
 	/* uninitialize pf host driver */
 	i40e_pf_host_uninit(dev);
