@@ -73,7 +73,7 @@
 #define UDP_DST_PORT 1024
 
 #define IP_SRC_ADDR ((192U << 24) | (168 << 16) | (0 << 8) | 1)
-#define IP_DST_ADDR ((192U << 24) | (168 << 16) | (0 << 8) | 2)
+#define IP_DST_ADDR ((192U << 24) | (168 << 16))
 
 #define IP_DEFTTL  64   /* from RFC 1340. */
 #define IP_VERSION 0x40
@@ -81,6 +81,7 @@
 #define IP_VHL_DEF (IP_VERSION | IP_HDRLEN)
 
 static struct ipv4_hdr  pkt_ip_hdr;  /**< IP header of transmitted packets. */
+static __thread uint8_t ip_var; /**< IP address variation */
 static struct udp_hdr pkt_udp_hdr; /**< UDP header of transmitted packets. */
 
 static void
@@ -187,6 +188,7 @@ pkt_burst_transmit(struct fwd_stream *fs)
 	struct rte_mbuf *pkt_seg;
 	struct rte_mempool *mbp;
 	struct ether_hdr eth_hdr;
+	struct ipv4_hdr *ip_hdr;
 	uint16_t nb_tx;
 	uint16_t nb_pkt;
 	uint16_t vlan_tci, vlan_tci_outer;
@@ -263,6 +265,14 @@ pkt_burst_transmit(struct fwd_stream *fs)
 		copy_buf_to_pkt(&eth_hdr, sizeof(eth_hdr), pkt, 0);
 		copy_buf_to_pkt(&pkt_ip_hdr, sizeof(pkt_ip_hdr), pkt,
 				sizeof(struct ether_hdr));
+		ip_hdr = rte_pktmbuf_mtod_offset(pkt, struct ipv4_hdr *,
+						 sizeof(struct ether_hdr));
+		/*
+		 * Generate multiple flows by varying IP dest addr.
+		 */
+		ip_hdr->dst_addr =
+			rte_cpu_to_be_32(IP_DST_ADDR | (ip_var++ << 8) |
+					 (rte_lcore_id() + 1));
 		copy_buf_to_pkt(&pkt_udp_hdr, sizeof(pkt_udp_hdr), pkt,
 				sizeof(struct ether_hdr) +
 				sizeof(struct ipv4_hdr));
