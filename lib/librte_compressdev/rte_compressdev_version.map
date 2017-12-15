@@ -1,0 +1,50 @@
+EXPERIMENTAL {
+        global:
+
+        rte_compressdevs;
+	rte_compressdev_allocate_driver;
+	rte_compressdev_callback_register;
+	rte_compressdev_callback_unregister;
+	rte_compressdev_close;
+	rte_compressdev_configure;
+	rte_compressdev_count;
+	rte_compressdev_device_count_by_driver;
+	rte_compressdev_devices_get;
+	rte_compressdev_driver_id_get;
+	rte_compressdev_driver_name_get;
+	rte_compressdev_get_dev_id;
+	rte_compressdev_get_feature_name;
+	rte_compressdev_get_header_session_size;
+	rte_compressdev_get_private_session_size;
+	rte_compressdev_info_get;
+	rte_compressdev_name_get;
+	rte_compressdev_pmd_allocate;
+	rte_compressdev_pmd_callback_process;
+	rte_compressdev_pmd_create;
+	rte_compressdev_pmd_create_dev_name;
+	rte_compressdev_pmd_destroy;
+	rte_compressdev_pmd_get_dev;
+	rte_compressdev_pmd_get_named_dev;
+	rte_compressdev_pmd_is_valid_dev;
+	rte_compressdev_pmd_parse_input_args;
+	rte_compressdev_pmd_release_device;
+	rte_compressdev_queue_pair_count;
+	rte_compressdev_queue_pair_setup;
+	rte_compressdev_queue_pair_start;
+	rte_compressdev_queue_pair_stop;
+	rte_compressdev_queue_pair_attach_comp_session;
+	rte_compressdev_queue_pair_detach_comp_session;
+	rte_compressdev_session_create;
+	rte_compressdev_session_init;
+	rte_compressdev_session_clear;
+	rte_compressdev_session_terminate;
+	rte_compressdev_socket_id;
+	rte_compressdev_start;
+	rte_compressdev_stats_get;
+	rte_compressdev_stats_reset;
+	rte_compressdev_stop;
+	rte_comp_op_pool_create;
+
+        local: *;
+};
+	
