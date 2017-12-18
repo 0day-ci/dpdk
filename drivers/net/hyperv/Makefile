@@ -40,6 +40,9 @@ EXPORT_MAP := rte_pmd_hyperv_version.map
 CFLAGS += -O3
 CFLAGS += -g
 CFLAGS += -std=c11 -pedantic -Wall -Wextra
+CFLAGS += -D_XOPEN_SOURCE=600
+CFLAGS += -D_BSD_SOURCE
+CFLAGS += -D_DEFAULT_SOURCE
 CFLAGS += $(WERROR_FLAGS)
 
 # Dependencies.
@@ -47,6 +50,7 @@ LDLIBS += -lrte_bus_vdev
 LDLIBS += -lrte_eal
 LDLIBS += -lrte_ethdev
 LDLIBS += -lrte_kvargs
+LDLIBS += -lrte_net
 
 # Source files.
 SRCS-$(CONFIG_RTE_LIBRTE_HYPERV_PMD) += hyperv.c
