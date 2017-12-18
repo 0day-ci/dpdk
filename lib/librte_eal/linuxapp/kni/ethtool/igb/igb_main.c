@@ -1034,14 +1034,16 @@ static void igb_set_interrupt_capability(struct igb_adapter *adapter, bool msix)
 #ifdef HAVE_PCI_ENABLE_MSIX
 			err = pci_enable_msix(pdev,
 			                      adapter->msix_entries, numvecs);
+			if (err == 0)
+				break;
 #else
 			err = pci_enable_msix_range(pdev,
 					adapter->msix_entries,
 					numvecs,
 					numvecs);
-#endif
-			if (err == 0)
+			if (err < 0)
 				break;
+#endif
 		}
 		/* MSI-X failed, so fall through and try MSI */
 		dev_warn(pci_dev_to_dev(pdev), "Failed to initialize MSI-X interrupts. "
