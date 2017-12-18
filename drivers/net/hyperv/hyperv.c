@@ -62,6 +62,7 @@
 #define HYPERV_DRIVER net_hyperv
 #define HYPERV_ARG_IFACE "iface"
 #define HYPERV_ARG_MAC "mac"
+#define HYPERV_ARG_FORCE "force"
 #define HYPERV_PROBE_MS 1000
 
 #define NETVSC_CLASS_ID "{f8615163-df3e-46c5-913f-f2d2f965ed0e}"
@@ -504,6 +505,9 @@ hyperv_alarm(void *arg)
  *   - struct rte_kvargs *kvargs:
  *     Device arguments provided to current driver instance.
  *
+ *   - int force:
+ *     Accept specified interface even if not detected as NetVSC.
+ *
  *   - unsigned int specified:
  *     Number of specific netdevices provided as device arguments.
  *
@@ -521,6 +525,7 @@ hyperv_netvsc_probe(const struct if_nameindex *iface,
 {
 	const char *name = va_arg(ap, const char *);
 	struct rte_kvargs *kvargs = va_arg(ap, struct rte_kvargs *);
+	int force = va_arg(ap, int);
 	unsigned int specified = va_arg(ap, unsigned int);
 	unsigned int *matched = va_arg(ap, unsigned int *);
 	unsigned int i;
@@ -567,9 +572,11 @@ hyperv_netvsc_probe(const struct if_nameindex *iface,
 	if (!hyperv_iface_is_netvsc(iface)) {
 		if (!specified)
 			return 0;
-		WARN("interface \"%s\" (index %u) is not NetVSC, skipping",
-		     iface->if_name, iface->if_index);
-		return 0;
+		WARN("interface \"%s\" (index %u) is not NetVSC, %s",
+		     iface->if_name, iface->if_index,
+		     force ? "using anyway (forced)" : "skipping");
+		if (!force)
+			return 0;
 	}
 	/* Create interface context. */
 	ctx = calloc(1, sizeof(*ctx));
@@ -700,6 +707,7 @@ hyperv_vdev_probe(struct rte_vdev_device *dev)
 	static const char *const hyperv_arg[] = {
 		HYPERV_ARG_IFACE,
 		HYPERV_ARG_MAC,
+		HYPERV_ARG_FORCE,
 		NULL,
 	};
 	const char *name = rte_vdev_device_name(dev);
@@ -708,6 +716,7 @@ hyperv_vdev_probe(struct rte_vdev_device *dev)
 						     hyperv_arg);
 	unsigned int specified = 0;
 	unsigned int matched = 0;
+	int force = 0;
 	unsigned int i;
 	int ret;
 
@@ -719,13 +728,15 @@ hyperv_vdev_probe(struct rte_vdev_device *dev)
 	for (i = 0; i != kvargs->count; ++i) {
 		const struct rte_kvargs_pair *pair = &kvargs->pairs[i];
 
-		if (!strcmp(pair->key, HYPERV_ARG_IFACE) ||
-		    !strcmp(pair->key, HYPERV_ARG_MAC))
+		if (!strcmp(pair->key, HYPERV_ARG_FORCE))
+			force = !!atoi(pair->value);
+		else if (!strcmp(pair->key, HYPERV_ARG_IFACE) ||
+			 !strcmp(pair->key, HYPERV_ARG_MAC))
 			++specified;
 	}
 	rte_eal_alarm_cancel(hyperv_alarm, NULL);
 	/* Gather interfaces. */
-	ret = hyperv_foreach_iface(hyperv_netvsc_probe, name, kvargs,
+	ret = hyperv_foreach_iface(hyperv_netvsc_probe, name, kvargs, force,
 				   specified, &matched);
 	if (ret < 0)
 		goto error;
@@ -784,4 +795,5 @@ RTE_PMD_REGISTER_VDEV(HYPERV_DRIVER, hyperv_vdev);
 RTE_PMD_REGISTER_ALIAS(HYPERV_DRIVER, eth_hyperv);
 RTE_PMD_REGISTER_PARAM_STRING(net_hyperv,
 			      HYPERV_ARG_IFACE "=<string> "
-			      HYPERV_ARG_MAC "=<string>");
+			      HYPERV_ARG_MAC "=<string> "
+			      HYPERV_ARG_FORCE "=<int>");

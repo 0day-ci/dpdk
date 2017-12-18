@@ -110,5 +110,10 @@ The following device parameters are supported:
   Same as ``iface`` except a suitable NetVSC interface is located using its
   MAC address.
 
+- ``force`` [int]
+
+  If nonzero, forces the use of specified interfaces even if not detected as
+  NetVSC.
+
 Not specifying either ``iface`` or ``mac`` makes this PMD attach itself to
 all NetVSC interfaces found on the system.
