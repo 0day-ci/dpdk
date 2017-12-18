@@ -281,6 +281,12 @@ CONFIG_RTE_LIBRTE_NFP_DEBUG=n
 CONFIG_RTE_LIBRTE_MRVL_PMD=n
 
 #
+# Compile Microsoft Hyper-V/Azure driver
+#
+CONFIG_RTE_LIBRTE_HYPERV_PMD=n
+CONFIG_RTE_LIBRTE_HYPERV_DEBUG=n
+
+#
 # Compile burst-oriented Broadcom BNXT PMD driver
 #
 CONFIG_RTE_LIBRTE_BNXT_PMD=y

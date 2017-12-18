@@ -1,7 +1,7 @@
 #   BSD LICENSE
 #
-#   Copyright(c) 2010-2016 Intel Corporation. All rights reserved.
-#   All rights reserved.
+#   Copyright 2017 6WIND S.A.
+#   Copyright 2017 Mellanox
 #
 #   Redistribution and use in source and binary forms, with or without
 #   modification, are permitted provided that the following conditions
@@ -13,7 +13,7 @@
 #       notice, this list of conditions and the following disclaimer in
 #       the documentation and/or other materials provided with the
 #       distribution.
-#     * Neither the name of Intel Corporation nor the names of its
+#     * Neither the name of 6WIND S.A. nor the names of its
 #       contributors may be used to endorse or promote products derived
 #       from this software without specific prior written permission.
 #
@@ -28,26 +28,27 @@
 #   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 #   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 #   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
 
-#include "common_base"
+include $(RTE_SDK)/mk/rte.vars.mk
 
-CONFIG_RTE_EXEC_ENV="linuxapp"
-CONFIG_RTE_EXEC_ENV_LINUXAPP=y
+# Properties of the generated library.
+LIB = librte_pmd_hyperv.a
+LIBABIVER := 1
+EXPORT_MAP := rte_pmd_hyperv_version.map
 
-CONFIG_RTE_EAL_NUMA_AWARE_HUGEPAGES=y
-CONFIG_RTE_EAL_IGB_UIO=y
-CONFIG_RTE_EAL_VFIO=y
-CONFIG_RTE_KNI_KMOD=y
-CONFIG_RTE_LIBRTE_KNI=y
-CONFIG_RTE_LIBRTE_PMD_KNI=y
-CONFIG_RTE_LIBRTE_VHOST=y
-CONFIG_RTE_LIBRTE_VHOST_NUMA=y
-CONFIG_RTE_LIBRTE_PMD_VHOST=y
-CONFIG_RTE_LIBRTE_PMD_AF_PACKET=y
-CONFIG_RTE_LIBRTE_PMD_TAP=y
-CONFIG_RTE_LIBRTE_AVP_PMD=y
-CONFIG_RTE_LIBRTE_HYPERV_PMD=y
-CONFIG_RTE_LIBRTE_NFP_PMD=y
-CONFIG_RTE_LIBRTE_POWER=y
-CONFIG_RTE_VIRTIO_USER=y
+# Additional compilation flags.
+CFLAGS += -O3
+CFLAGS += -g
+CFLAGS += -std=c11 -pedantic -Wall -Wextra
+CFLAGS += $(WERROR_FLAGS)
+
+# Dependencies.
+LDLIBS += -lrte_bus_vdev
+LDLIBS += -lrte_eal
+LDLIBS += -lrte_ethdev
+LDLIBS += -lrte_kvargs
+
+# Source files.
+SRCS-$(CONFIG_RTE_LIBRTE_HYPERV_PMD) += hyperv.c
+
+include $(RTE_SDK)/mk/rte.lib.mk

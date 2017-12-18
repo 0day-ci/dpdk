@@ -1,6 +1,6 @@
 ..  BSD LICENSE
-    Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
-    All rights reserved.
+    Copyright 2017 6WIND S.A.
+    Copyright 2017 Mellanox
 
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions
@@ -12,7 +12,7 @@
     notice, this list of conditions and the following disclaimer in
     the documentation and/or other materials provided with the
     distribution.
-    * Neither the name of Intel Corporation nor the names of its
+    * Neither the name of 6WIND S.A. nor the names of its
     contributors may be used to endorse or promote products derived
     from this software without specific prior written permission.
 
@@ -28,65 +28,22 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Network Interface Controller Drivers
-====================================
+HYPERV poll mode driver
+=======================
 
-.. toctree::
-    :maxdepth: 3
-    :numbered:
+The HYPERV PMD (librte_pmd_hyperv) provides support for NetVSC interfaces
+and associated SR-IOV virtual function (VF) devices found in Linux virtual
+machines running on Microsoft Hyper-V_ (including Azure) platforms.
 
-    overview
-    features
-    build_and_test
-    ark
-    avp
-    bnx2x
-    bnxt
-    cxgbe
-    dpaa
-    dpaa2
-    e1000em
-    ena
-    enic
-    fm10k
-    hyperv
-    i40e
-    ixgbe
-    intel_vf
-    kni
-    liquidio
-    mlx4
-    mlx5
-    mrvl
-    nfp
-    octeontx
-    qede
-    sfc_efx
-    szedata2
-    tap
-    thunderx
-    virtio
-    vhost
-    vmxnet3
-    pcap_ring
-    fail_safe
+.. _Hyper-V: https://docs.microsoft.com/en-us/windows-hardware/drivers/network/overview-of-hyper-v
 
-**Figures**
+Build options
+-------------
 
-:numref:`figure_single_port_nic` :ref:`figure_single_port_nic`
+- ``CONFIG_RTE_LIBRTE_HYPERV_PMD`` (default ``y``)
 
-:numref:`figure_perf_benchmark` :ref:`figure_perf_benchmark`
+   Toggle compilation of this driver.
 
-:numref:`figure_fast_pkt_proc` :ref:`figure_fast_pkt_proc`
+- ``CONFIG_RTE_LIBRTE_HYPERV_DEBUG`` (default ``n``)
 
-:numref:`figure_inter_vm_comms` :ref:`figure_inter_vm_comms`
-
-:numref:`figure_host_vm_comms` :ref:`figure_host_vm_comms`
-
-:numref:`figure_host_vm_comms_qemu` :ref:`figure_host_vm_comms_qemu`
-
-:numref:`figure_vmxnet3_int` :ref:`figure_vmxnet3_int`
-
-:numref:`figure_vswitch_vm` :ref:`figure_vswitch_vm`
-
-:numref:`figure_vm_vm_comms` :ref:`figure_vm_vm_comms`
+   Toggle additional debugging code.

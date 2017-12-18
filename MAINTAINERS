@@ -451,6 +451,12 @@ F: drivers/net/mrvl/
 F: doc/guides/nics/mrvl.rst
 F: doc/guides/nics/features/mrvl.ini
 
+Microsoft hyperv
+M: Adrien Mazarguil <adrien.mazarguil@6wind.com>
+F: drivers/net/hyperv/
+F: doc/guides/nics/hyperv.rst
+F: doc/guides/nics/features/hyperv.ini
+
 Netcope szedata2
 M: Matej Vido <vido@cesnet.cz>
 F: drivers/net/szedata2/
