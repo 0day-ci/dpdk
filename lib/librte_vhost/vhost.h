@@ -108,12 +108,14 @@ struct vhost_virtqueue {
 
 	/* Backend value to determine if device should started/stopped */
 	int			backend;
+	int			enabled;
+	int			access_ok;
+	rte_spinlock_t		access_lock;
+
 	/* Used to notify the guest (trigger interrupt) */
 	int			callfd;
 	/* Currently unused as polling mode is enabled */
 	int			kickfd;
-	int			enabled;
-	int			access_ok;
 
 	/* Physical address of used ring, for logging */
 	uint64_t		log_guest_addr;
@@ -301,6 +303,25 @@ vhost_log_used_vring(struct virtio_net *dev, struct vhost_virtqueue *vq,
 {
 	vhost_log_write(dev, vq->log_guest_addr + offset, len);
 }
+
+static __rte_always_inline int
+vhost_user_access_trylock(struct vhost_virtqueue *vq)
+{
+	return rte_spinlock_trylock(&vq->access_lock);
+}
+
+static __rte_always_inline void
+vhost_user_access_lock(struct vhost_virtqueue *vq)
+{
+	rte_spinlock_lock(&vq->access_lock);
+}
+
+static __rte_always_inline void
+vhost_user_access_unlock(struct vhost_virtqueue *vq)
+{
+	rte_spinlock_unlock(&vq->access_lock);
+}
+
 
 /* Macros for printing using RTE_LOG */
 #define RTE_LOGTYPE_VHOST_CONFIG RTE_LOGTYPE_USER1

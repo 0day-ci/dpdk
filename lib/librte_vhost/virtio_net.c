@@ -44,6 +44,7 @@
 #include <rte_udp.h>
 #include <rte_sctp.h>
 #include <rte_arp.h>
+#include <rte_spinlock.h>
 
 #include "iotlb.h"
 #include "vhost.h"
@@ -326,8 +327,11 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 	}
 
 	vq = dev->virtqueue[queue_id];
+
+	vhost_user_access_lock(vq);
+
 	if (unlikely(vq->enabled == 0))
-		return 0;
+		goto out_access_unlock;
 
 	if (dev->features & (1ULL << VIRTIO_F_IOMMU_PLATFORM))
 		vhost_user_iotlb_rd_lock(vq);
@@ -418,6 +422,9 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 out:
 	if (dev->features & (1ULL << VIRTIO_F_IOMMU_PLATFORM))
 		vhost_user_iotlb_rd_unlock(vq);
+
+out_access_unlock:
+	vhost_user_access_unlock(vq);
 
 	return count;
 }
@@ -651,8 +658,11 @@ virtio_dev_merge_rx(struct virtio_net *dev, uint16_t queue_id,
 	}
 
 	vq = dev->virtqueue[queue_id];
+
+	vhost_user_access_lock(vq);
+
 	if (unlikely(vq->enabled == 0))
-		return 0;
+		goto out_access_unlock;
 
 	if (dev->features & (1ULL << VIRTIO_F_IOMMU_PLATFORM))
 		vhost_user_iotlb_rd_lock(vq);
@@ -714,6 +724,9 @@ virtio_dev_merge_rx(struct virtio_net *dev, uint16_t queue_id,
 out:
 	if (dev->features & (1ULL << VIRTIO_F_IOMMU_PLATFORM))
 		vhost_user_iotlb_rd_unlock(vq);
+
+out_access_unlock:
+	vhost_user_access_unlock(vq);
 
 	return pkt_idx;
 }
@@ -1180,8 +1193,12 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 	}
 
 	vq = dev->virtqueue[queue_id];
-	if (unlikely(vq->enabled == 0))
+
+	if (unlikely(vhost_user_access_trylock(vq) == 0))
 		return 0;
+
+	if (unlikely(vq->enabled == 0))
+		goto out_access_unlock;
 
 	vq->batch_copy_nb_elems = 0;
 
@@ -1240,7 +1257,7 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 		if (rarp_mbuf == NULL) {
 			RTE_LOG(ERR, VHOST_DATA,
 				"Failed to allocate memory for mbuf.\n");
-			return 0;
+			goto out;
 		}
 
 		if (make_rarp_packet(rarp_mbuf, &dev->mac)) {
@@ -1355,6 +1372,9 @@ rte_vhost_dequeue_burst(int vid, uint16_t queue_id,
 out:
 	if (dev->features & (1ULL << VIRTIO_F_IOMMU_PLATFORM))
 		vhost_user_iotlb_rd_unlock(vq);
+
+out_access_unlock:
+	vhost_user_access_unlock(vq);
 
 	if (unlikely(rarp_mbuf != NULL)) {
 		/*
