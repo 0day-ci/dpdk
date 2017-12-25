@@ -157,7 +157,7 @@ vring_translate(struct virtio_net *dev, struct vhost_virtqueue *vq)
 		goto out;
 
 	size = sizeof(struct vring_desc) * vq->size;
-	vq->desc = (struct vring_desc *)(uintptr_t)vhost_iova_to_vva(dev, vq,
+	vq->desc = (struct vring_desc *)(uintptr_t)__vhost_iova_to_vva(dev, vq,
 						vq->ring_addrs.desc_user_addr,
 						size, VHOST_ACCESS_RW);
 	if (!vq->desc)
@@ -165,7 +165,8 @@ vring_translate(struct virtio_net *dev, struct vhost_virtqueue *vq)
 
 	size = sizeof(struct vring_avail);
 	size += sizeof(uint16_t) * vq->size;
-	vq->avail = (struct vring_avail *)(uintptr_t)vhost_iova_to_vva(dev, vq,
+	vq->avail = (struct vring_avail *)(uintptr_t)__vhost_iova_to_vva(dev,
+						vq,
 						vq->ring_addrs.avail_user_addr,
 						size, VHOST_ACCESS_RW);
 	if (!vq->avail)
@@ -173,7 +174,7 @@ vring_translate(struct virtio_net *dev, struct vhost_virtqueue *vq)
 
 	size = sizeof(struct vring_used);
 	size += sizeof(struct vring_used_elem) * vq->size;
-	vq->used = (struct vring_used *)(uintptr_t)vhost_iova_to_vva(dev, vq,
+	vq->used = (struct vring_used *)(uintptr_t)__vhost_iova_to_vva(dev, vq,
 						vq->ring_addrs.used_user_addr,
 						size, VHOST_ACCESS_RW);
 	if (!vq->used)
