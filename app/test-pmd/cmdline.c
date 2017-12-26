@@ -40,6 +40,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <fcntl.h>
 #ifndef __linux__
 #ifndef __FreeBSD__
 #include <net/socket.h>
@@ -15776,9 +15777,19 @@ cmdline_parse_ctx_t main_ctx[] = {
 void
 cmdline_read_from_file(const char *filename)
 {
+	int fd;
 	struct cmdline *cl;
 
-	cl = cmdline_file_new(main_ctx, "testpmd> ", filename);
+	if (!filename)
+		return;
+	fd = open(filename, O_RDONLY, 0);
+	if (fd < 0) {
+		printf("File open() failed\n");
+		return;
+	}
+
+	cl = cmdline_new(main_ctx, "testpmd> ", fd,
+			 verbose_level & 0x8000 ? STDOUT_FILENO : -1);
 	if (cl == NULL) {
 		printf("Failed to create file based cmdline context: %s\n",
 		       filename);
