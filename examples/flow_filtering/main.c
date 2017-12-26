@@ -173,6 +173,17 @@ init_port(void)
 		}
 	}
 
+	for (i = 0; i < nr_queues; i++) {
+		ret = rte_eth_tx_queue_setup(port_id, i, 512,
+				rte_eth_dev_socket_id(port_id),
+				NULL);
+		if (ret < 0) {
+			rte_exit(EXIT_FAILURE,
+				":: Tx queue setup failed: err=%d, port=%u\n",
+				ret, port_id);
+		}
+	}
+
 	rte_eth_promiscuous_enable(port_id);
 	ret = rte_eth_dev_start(port_id);
 	if (ret < 0) {
