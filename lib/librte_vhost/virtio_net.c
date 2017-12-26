@@ -52,6 +52,34 @@
 
 #define MAX_BATCH_LEN 256
 
+#define vhost_used_event(vr) \
+	(*(volatile uint16_t*)&(vr)->avail->ring[(vr)->size])
+
+static __rte_always_inline void
+vhost_notify(struct virtio_net *dev,  struct vhost_virtqueue *vq)
+{
+	/* Don't notify guest if we don't reach index specified by guest. */
+	if (dev->features & (1ULL << VIRTIO_RING_F_EVENT_IDX)) {
+		uint16_t old = vq->signalled_used;
+		uint16_t new = vq->last_used_idx;
+
+		LOG_DEBUG(VHOST_DATA, "%s: used_event_idx=%d, old=%d, new=%d\n",
+			__func__,
+			vhost_used_event(vq),
+			old, new);
+		if (vring_need_event(vhost_used_event(vq), new, old)
+			&& (vq->callfd >= 0)) {
+			vq->signalled_used = vq->last_used_idx;
+			eventfd_write(vq->callfd, (eventfd_t) 1);
+		}
+	} else {
+		/* Kick the guest if necessary. */
+		if (!(vq->avail->flags & VRING_AVAIL_F_NO_INTERRUPT)
+			&& (vq->callfd >= 0))
+			eventfd_write(vq->callfd, (eventfd_t)1);
+	}
+}
+
 static bool
 is_valid_virt_queue_idx(uint32_t idx, int is_tx, uint32_t nr_vring)
 {
@@ -410,11 +438,7 @@ virtio_dev_rx(struct virtio_net *dev, uint16_t queue_id,
 
 	/* flush used->idx update before we read avail->flags. */
 	rte_mb();
-
-	/* Kick the guest if necessary. */
-	if (!(vq->avail->flags & VRING_AVAIL_F_NO_INTERRUPT)
-			&& (vq->callfd >= 0))
-		eventfd_write(vq->callfd, (eventfd_t)1);
+	vhost_notify(dev, vq);
 out:
 	if (dev->features & (1ULL << VIRTIO_F_IOMMU_PLATFORM))
 		vhost_user_iotlb_rd_unlock(vq);
@@ -704,11 +728,7 @@ virtio_dev_merge_rx(struct virtio_net *dev, uint16_t queue_id,
 
 		/* flush used->idx update before we read avail->flags. */
 		rte_mb();
-
-		/* Kick the guest if necessary. */
-		if (!(vq->avail->flags & VRING_AVAIL_F_NO_INTERRUPT)
-				&& (vq->callfd >= 0))
-			eventfd_write(vq->callfd, (eventfd_t)1);
+		vhost_notify(dev, vq);
 	}
 
 out:
@@ -1106,11 +1126,7 @@ update_used_idx(struct virtio_net *dev, struct vhost_virtqueue *vq,
 	vq->used->idx += count;
 	vhost_log_used_vring(dev, vq, offsetof(struct vring_used, idx),
 			sizeof(vq->used->idx));
-
-	/* Kick guest if required. */
-	if (!(vq->avail->flags & VRING_AVAIL_F_NO_INTERRUPT)
-			&& (vq->callfd >= 0))
-		eventfd_write(vq->callfd, (eventfd_t)1);
+	vhost_notify(dev, vq);
 }
 
 static __rte_always_inline struct zcopy_mbuf *
