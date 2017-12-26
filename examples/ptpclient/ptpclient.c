@@ -77,7 +77,10 @@ uint8_t ptp_enabled_port_nb;
 static uint8_t ptp_enabled_ports[RTE_MAX_ETHPORTS];
 
 static const struct rte_eth_conf port_conf_default = {
-	.rxmode = { .max_rx_pkt_len = ETHER_MAX_LEN }
+	.rxmode = {
+		.max_rx_pkt_len = ETHER_MAX_LEN,
+		.ignore_offload_bitfield = 1,
+	},
 };
 
 static const struct ether_addr ether_multicast = {
@@ -216,6 +219,11 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 	if (port >= rte_eth_dev_count())
 		return -1;
 
+	rte_eth_dev_info_get(port, &dev_info);
+	if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
+		port_conf.txmode.offloads |=
+			DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+
 	/* Configure the Ethernet device. */
 	retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
 	if (retval != 0)
@@ -239,9 +247,9 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 		/* Setup txq_flags */
 		struct rte_eth_txconf *txconf;
 
-		rte_eth_dev_info_get(q, &dev_info);
 		txconf = &dev_info.default_txconf;
-		txconf->txq_flags = 0;
+		txconf->txq_flags = ETH_TXQ_FLAGS_IGNORE;
+		txconf->offloads = port_conf.txmode.offloads;
 
 		retval = rte_eth_tx_queue_setup(port, q, nb_txd,
 				rte_eth_dev_socket_id(port), txconf);
