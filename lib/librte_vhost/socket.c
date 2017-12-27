@@ -749,6 +749,9 @@ rte_vhost_driver_unregister(const char *path)
 		struct vhost_user_socket *vsocket = vhost_user.vsockets[i];
 
 		if (!strcmp(vsocket->path, path)) {
+			int del_fds[MAX_FDS];
+			int num_of_fds = 0, i;
+
 			if (vsocket->is_server) {
 				fdset_del(&vhost_user.fdset, vsocket->socket_fd);
 				close(vsocket->socket_fd);
@@ -763,7 +766,7 @@ rte_vhost_driver_unregister(const char *path)
 			     conn = next) {
 				next = TAILQ_NEXT(conn, next);
 
-				fdset_del(&vhost_user.fdset, conn->connfd);
+				del_fds[num_of_fds++] = conn->connfd;
 				RTE_LOG(INFO, VHOST_CONFIG,
 					"free connfd = %d for device '%s'\n",
 					conn->connfd, path);
@@ -777,6 +780,10 @@ rte_vhost_driver_unregister(const char *path)
 			pthread_mutex_destroy(&vsocket->conn_mutex);
 			free(vsocket->path);
 			free(vsocket);
+
+			for(i=0;i<num_of_fds;i++){
+				fdset_del(&vhost_user.fdset, del_fds[i]);
+			}
 
 			count = --vhost_user.vsocket_cnt;
 			vhost_user.vsockets[i] = vhost_user.vsockets[count];
