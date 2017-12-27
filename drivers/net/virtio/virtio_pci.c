@@ -695,6 +695,7 @@ vtpci_init(struct rte_pci_device *dev, struct virtio_hw *hw)
 		return 0;
 	}
 
+	hw->use_msix = VIRTIO_MSIX_NONE;
 	PMD_INIT_LOG(INFO, "trying with legacy virtio pci.");
 	if (rte_pci_ioport_map(dev, 0, VTPCI_IO(hw)) < 0) {
 		if (dev->kdrv == RTE_KDRV_UNKNOWN &&
