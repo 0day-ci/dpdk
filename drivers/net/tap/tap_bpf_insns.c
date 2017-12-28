@@ -697,3 +697,63 @@ static int bpf_load(enum bpf_prog_type type,
 
 	return sys_bpf(BPF_PROG_LOAD, &attr, sizeof(attr));
 }
+
+/**
+ * Create BPF map for RSS rules
+ *
+ * @param[in] key_size
+ *   map RSS key size
+ *
+ * @param[in] value_size
+ *   Map RSS value size
+ *
+ * @param[in] max_entries
+ *   Map max number of RSS entries (limit on max RSS rules)
+ *
+ * @return
+ *   -1 if BPF map couldn't be created, map fd otherwise
+ */
+int tap_flow_bpf_rss_map_create(unsigned int key_size,
+		unsigned int value_size,
+		unsigned int max_entries)
+{
+	union bpf_attr attr;
+
+	bzero(&attr, sizeof(attr));
+	attr.map_type    = BPF_MAP_TYPE_HASH;
+	attr.key_size    = key_size;
+	attr.value_size  = value_size;
+	attr.max_entries = max_entries;
+
+	return sys_bpf(BPF_MAP_CREATE, &attr, sizeof(attr));
+}
+
+/**
+ * Update RSS entry in BPF map
+ *
+ * @param[in] fd
+ *   RSS map fd
+ *
+ * @param[in] key
+ *   Pointer to RSS key whose entry is updated
+ *
+ * @param[in] value
+ *   Pointer to RSS new updated value
+ *
+ * @return
+ *   -1 if RSS entry failed to be updated, 0 otherwise
+ */
+int tap_flow_bpf_update_rss_elem(int fd, void *key, void *value)
+{
+	union bpf_attr attr;
+
+	bzero(&attr, sizeof(attr));
+
+	attr.map_type = BPF_MAP_TYPE_HASH;
+	attr.map_fd = fd;
+	attr.key = ptr_to_u64(key);
+	attr.value = ptr_to_u64(value);
+	attr.flags = BPF_ANY;
+
+	return sys_bpf(BPF_MAP_UPDATE_ELEM, &attr, sizeof(attr));
+}
