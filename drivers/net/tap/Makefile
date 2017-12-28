@@ -39,6 +39,9 @@ EXPORT_MAP := rte_pmd_tap_version.map
 
 LIBABIVER := 1
 
+# TAP_MAX_QUEUES must be a power of 2 as it will be used for masking */
+TAP_MAX_QUEUES = 16
+
 CFLAGS += -O3
 CFLAGS += -I$(SRCDIR)
 CFLAGS += -I.
@@ -47,6 +50,8 @@ LDLIBS += -lrte_eal -lrte_mbuf -lrte_mempool -lrte_ring
 LDLIBS += -lrte_ethdev -lrte_net -lrte_kvargs -lrte_hash
 LDLIBS += -lrte_bus_vdev
 
+CFLAGS += -DTAP_MAX_QUEUES=$(TAP_MAX_QUEUES)
+
 #
 # all source are stored in SRCS-y
 #
@@ -54,6 +59,7 @@ SRCS-$(CONFIG_RTE_LIBRTE_PMD_TAP) += rte_eth_tap.c
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_TAP) += tap_flow.c
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_TAP) += tap_netlink.c
 SRCS-$(CONFIG_RTE_LIBRTE_PMD_TAP) += tap_tcmsgs.c
+SRCS-$(CONFIG_RTE_LIBRTE_PMD_TAP) += tap_bpf_insns.c
 
 include $(RTE_SDK)/mk/rte.lib.mk
 
@@ -79,6 +85,11 @@ tap_autoconf.h.new: $(RTE_SDK)/buildtools/auto-config-h.sh
 		HAVE_TC_VLAN_ID \
 		linux/pkt_cls.h \
 		enum TCA_FLOWER_KEY_VLAN_PRIO \
+		$(AUTOCONF_OUTPUT)
+	$Q sh -- '$<' '$@' \
+		HAVE_BPF_PROG_LOAD \
+		linux/bpf.h \
+		enum BPF_PROG_LOAD \
 		$(AUTOCONF_OUTPUT)
 
 # Create tap_autoconf.h or update it in case it differs from the new one.

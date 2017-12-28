@@ -50,6 +50,8 @@
 #define GROUP_SHIFT 12
 #define MAX_GROUP GROUP_MASK
 
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+
 /**
  * These index are actually in reversed order: their priority is processed
  * by subtracting their value to the lowest priority (PRIORITY_MASK).
@@ -79,5 +81,8 @@ int tap_flow_implicit_destroy(struct pmd_internals *pmd,
 			      enum implicit_rule_index idx);
 int tap_flow_implicit_flush(struct pmd_internals *pmd,
 			    struct rte_flow_error *error);
+
+int tap_flow_bpf_cls_q(__u32 queue_idx);
+int tap_flow_bpf_calc_l3_l4_hash(__u32 key_idx, int map_fd);
 
 #endif /* _TAP_FLOW_H_ */
