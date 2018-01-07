@@ -428,7 +428,7 @@ parse_portnuma_config(const char *q_arg)
 		if (port_id_is_invalid(port_id, ENABLED_WARN) ||
 			port_id == (portid_t)RTE_PORT_ALL) {
 			printf("Valid port range is [0");
-			RTE_ETH_FOREACH_DEV(pid)
+			RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id)
 				printf(", %d", pid);
 			printf("]\n");
 			return -1;
@@ -489,7 +489,7 @@ parse_ringnuma_config(const char *q_arg)
 		if (port_id_is_invalid(port_id, ENABLED_WARN) ||
 			port_id == (portid_t)RTE_PORT_ALL) {
 			printf("Valid port range is [0");
-			RTE_ETH_FOREACH_DEV(pid)
+			RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id)
 				printf(", %d", pid);
 			printf("]\n");
 			return -1;

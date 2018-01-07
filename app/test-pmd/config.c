@@ -155,7 +155,7 @@ nic_stats_display(portid_t port_id)
 
 	if (port_id_is_invalid(port_id, ENABLED_WARN)) {
 		printf("Valid port range is [0");
-		RTE_ETH_FOREACH_DEV(pid)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id)
 			printf(", %d", pid);
 		printf("]\n");
 		return;
@@ -235,7 +235,7 @@ nic_stats_clear(portid_t port_id)
 
 	if (port_id_is_invalid(port_id, ENABLED_WARN)) {
 		printf("Valid port range is [0");
-		RTE_ETH_FOREACH_DEV(pid)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id)
 			printf(", %d", pid);
 		printf("]\n");
 		return;
@@ -252,10 +252,9 @@ nic_xstats_display(portid_t port_id)
 	struct rte_eth_xstat_name *xstats_names;
 
 	printf("###### NIC extended statistics for port %-2d\n", port_id);
-	if (!rte_eth_dev_is_valid_port(port_id)) {
-		printf("Error: Invalid port number %i\n", port_id);
+
+	if (port_id_is_invalid(port_id, ENABLED_WARN))
 		return;
-	}
 
 	/* Get count */
 	cnt_xstats = rte_eth_xstats_get_names(port_id, NULL, 0);
@@ -320,7 +319,7 @@ nic_stats_mapping_display(portid_t port_id)
 
 	if (port_id_is_invalid(port_id, ENABLED_WARN)) {
 		printf("Valid port range is [0");
-		RTE_ETH_FOREACH_DEV(pid)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id)
 			printf(", %d", pid);
 		printf("]\n");
 		return;
@@ -439,7 +438,7 @@ port_infos_display(portid_t port_id)
 
 	if (port_id_is_invalid(port_id, ENABLED_WARN)) {
 		printf("Valid port range is [0");
-		RTE_ETH_FOREACH_DEV(pid)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id)
 			printf(", %d", pid);
 		printf("]\n");
 		return;
@@ -724,10 +723,15 @@ port_offload_cap_display(portid_t port_id)
 int
 port_id_is_invalid(portid_t port_id, enum print_warning warning)
 {
+	struct rte_eth_dev_owner owner;
+	int ret;
+
 	if (port_id == (portid_t)RTE_PORT_ALL)
 		return 0;
 
-	if (rte_eth_dev_is_valid_port(port_id))
+	ret = rte_eth_dev_owner_get(port_id, &owner);
+
+	if (ret == 0 && owner.id == my_owner.id)
 		return 0;
 
 	if (warning == ENABLED_WARN)
@@ -2309,7 +2313,7 @@ set_fwd_ports_mask(uint64_t portmask)
 		return;
 	}
 	nb_pt = 0;
-	RTE_ETH_FOREACH_DEV(i) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id) {
 		if (! ((uint64_t)(1ULL << i) & portmask))
 			continue;
 		portlist[nb_pt++] = i;
@@ -2448,10 +2452,9 @@ set_tx_pkt_segments(unsigned *seg_lengths, unsigned nb_segs)
 void
 setup_gro(const char *onoff, portid_t port_id)
 {
-	if (!rte_eth_dev_is_valid_port(port_id)) {
-		printf("invalid port id %u\n", port_id);
+	if (port_id_is_invalid(port_id, ENABLED_WARN))
 		return;
-	}
+
 	if (test_done == 0) {
 		printf("Before enable/disable GRO,"
 				" please stop forwarding first\n");
@@ -2510,10 +2513,9 @@ show_gro(portid_t port_id)
 
 	param = &gro_ports[port_id].param;
 
-	if (!rte_eth_dev_is_valid_port(port_id)) {
-		printf("Invalid port id %u.\n", port_id);
+	if (port_id_is_invalid(port_id, ENABLED_WARN))
 		return;
-	}
+
 	if (gro_ports[port_id].enable) {
 		printf("GRO type: TCP/IPv4\n");
 		if (gro_flush_cycles == GRO_DEFAULT_FLUSH_CYCLES) {
@@ -2531,10 +2533,9 @@ show_gro(portid_t port_id)
 void
 setup_gso(const char *mode, portid_t port_id)
 {
-	if (!rte_eth_dev_is_valid_port(port_id)) {
-		printf("invalid port id %u\n", port_id);
+	if (port_id_is_invalid(port_id, ENABLED_WARN))
 		return;
-	}
+
 	if (strcmp(mode, "on") == 0) {
 		if (test_done == 0) {
 			printf("before enabling GSO,"

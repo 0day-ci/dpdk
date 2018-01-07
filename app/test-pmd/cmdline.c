@@ -1357,7 +1357,7 @@ cmd_config_speed_all_parsed(void *parsed_result,
 			&link_speed) < 0)
 		return;
 
-	RTE_ETH_FOREACH_DEV(pid) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id) {
 		ports[pid].dev_conf.link_speeds = link_speed;
 	}
 
@@ -1851,7 +1851,7 @@ cmd_config_rss_parsed(void *parsed_result,
 	struct cmd_config_rss *res = parsed_result;
 	struct rte_eth_rss_conf rss_conf = { .rss_key_len = 0, };
 	int diag;
-	uint8_t i;
+	uint16_t pid;
 
 	if (!strcmp(res->value, "all"))
 		rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_TCP |
@@ -1885,12 +1885,12 @@ cmd_config_rss_parsed(void *parsed_result,
 		return;
 	}
 	rss_conf.rss_key = NULL;
-	for (i = 0; i < rte_eth_dev_count(); i++) {
-		diag = rte_eth_dev_rss_hash_update(i, &rss_conf);
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id) {
+		diag = rte_eth_dev_rss_hash_update(pid, &rss_conf);
 		if (diag < 0)
 			printf("Configuration of RSS hash at ethernet port %d "
 				"failed with error (%d): %s.\n",
-				i, -diag, strerror(-diag));
+				pid, -diag, strerror(-diag));
 	}
 }
 
@@ -3681,10 +3681,8 @@ cmd_csum_parsed(void *parsed_result,
 	int hw = 0;
 	uint16_t mask = 0;
 
-	if (port_id_is_invalid(res->port_id, ENABLED_WARN)) {
-		printf("invalid port %d\n", res->port_id);
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
-	}
 
 	if (!strcmp(res->mode, "set")) {
 
@@ -4282,8 +4280,8 @@ cmd_gso_show_parsed(void *parsed_result,
 {
 	struct cmd_gso_show_result *res = parsed_result;
 
-	if (!rte_eth_dev_is_valid_port(res->cmd_pid)) {
-		printf("invalid port id %u\n", res->cmd_pid);
+	if (port_id_is_invalid(res->cmd_pid, ENABLED_WARN)) {
+		printf("invalid/not owned port id %u\n", res->cmd_pid);
 		return;
 	}
 	if (!strcmp(res->cmd_keyword, "gso")) {
@@ -5293,7 +5291,12 @@ static void cmd_create_bonded_device_parsed(void *parsed_result,
 				port_id);
 
 		/* Update number of ports */
-		nb_ports = rte_eth_dev_count();
+		if (rte_eth_dev_owner_set(port_id, &my_owner) != 0) {
+			printf("Error: cannot own new attached port %d\n",
+			       port_id);
+			return;
+		}
+		nb_ports++;
 		reconfig(port_id, res->socket);
 		rte_eth_promiscuous_enable(port_id);
 	}
@@ -5402,10 +5405,8 @@ static void cmd_set_bond_mon_period_parsed(void *parsed_result,
 	struct cmd_set_bond_mon_period_result *res = parsed_result;
 	int ret;
 
-	if (res->port_num >= nb_ports) {
-		printf("Port id %d must be less than %d\n", res->port_num, nb_ports);
+	if (port_id_is_invalid(res->port_num, ENABLED_WARN))
 		return;
-	}
 
 	ret = rte_eth_bond_link_monitoring_set(res->port_num, res->period_ms);
 
@@ -5463,11 +5464,8 @@ cmd_set_bonding_agg_mode(void *parsed_result,
 	struct cmd_set_bonding_agg_mode_policy_result *res = parsed_result;
 	uint8_t policy = AGG_BANDWIDTH;
 
-	if (res->port_num >= nb_ports) {
-		printf("Port id %d must be less than %d\n",
-				res->port_num, nb_ports);
+	if (port_id_is_invalid(res->port_num, ENABLED_WARN))
 		return;
-	}
 
 	if (!strcmp(res->policy, "bandwidth"))
 		policy = AGG_BANDWIDTH;
@@ -5726,7 +5724,7 @@ static void cmd_set_promisc_mode_parsed(void *parsed_result,
 
 	/* all ports */
 	if (allports) {
-		RTE_ETH_FOREACH_DEV(i) {
+		RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id) {
 			if (enable)
 				rte_eth_promiscuous_enable(i);
 			else
@@ -5806,7 +5804,7 @@ static void cmd_set_allmulti_mode_parsed(void *parsed_result,
 
 	/* all ports */
 	if (allports) {
-		RTE_ETH_FOREACH_DEV(i) {
+		RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id) {
 			if (enable)
 				rte_eth_allmulticast_enable(i);
 			else
@@ -6540,31 +6538,31 @@ static void cmd_showportall_parsed(void *parsed_result,
 	struct cmd_showportall_result *res = parsed_result;
 	if (!strcmp(res->show, "clear")) {
 		if (!strcmp(res->what, "stats"))
-			RTE_ETH_FOREACH_DEV(i)
+			RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id)
 				nic_stats_clear(i);
 		else if (!strcmp(res->what, "xstats"))
-			RTE_ETH_FOREACH_DEV(i)
+			RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id)
 				nic_xstats_clear(i);
 	} else if (!strcmp(res->what, "info"))
-		RTE_ETH_FOREACH_DEV(i)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id)
 			port_infos_display(i);
 	else if (!strcmp(res->what, "stats"))
-		RTE_ETH_FOREACH_DEV(i)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id)
 			nic_stats_display(i);
 	else if (!strcmp(res->what, "xstats"))
-		RTE_ETH_FOREACH_DEV(i)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id)
 			nic_xstats_display(i);
 	else if (!strcmp(res->what, "fdir"))
-		RTE_ETH_FOREACH_DEV(i)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id)
 			fdir_get_infos(i);
 	else if (!strcmp(res->what, "stat_qmap"))
-		RTE_ETH_FOREACH_DEV(i)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id)
 			nic_stats_mapping_display(i);
 	else if (!strcmp(res->what, "dcb_tc"))
-		RTE_ETH_FOREACH_DEV(i)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id)
 			port_dcb_info_display(i);
 	else if (!strcmp(res->what, "cap"))
-		RTE_ETH_FOREACH_DEV(i)
+		RTE_ETH_FOREACH_DEV_OWNED_BY(i, my_owner.id)
 			port_offload_cap_display(i);
 }
 
@@ -10484,10 +10482,8 @@ cmd_flow_director_mask_parsed(void *parsed_result,
 	struct rte_eth_fdir_masks *mask;
 	struct rte_port *port;
 
-	if (res->port_id > nb_ports) {
-		printf("Invalid port, range is [0, %d]\n", nb_ports - 1);
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
-	}
 
 	port = &ports[res->port_id];
 	/** Check if the port is not started **/
@@ -10685,10 +10681,8 @@ cmd_flow_director_flex_mask_parsed(void *parsed_result,
 	uint16_t i;
 	int ret;
 
-	if (res->port_id > nb_ports) {
-		printf("Invalid port, range is [0, %d]\n", nb_ports - 1);
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
-	}
 
 	port = &ports[res->port_id];
 	/** Check if the port is not started **/
@@ -10839,12 +10833,10 @@ cmd_flow_director_flxpld_parsed(void *parsed_result,
 	struct cmd_flow_director_flexpayload_result *res = parsed_result;
 	struct rte_eth_flex_payload_cfg flex_cfg;
 	struct rte_port *port;
-	int ret = 0;
+	int ret;
 
-	if (res->port_id > nb_ports) {
-		printf("Invalid port, range is [0, %d]\n", nb_ports - 1);
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
-	}
 
 	port = &ports[res->port_id];
 	/** Check if the port is not started **/
@@ -11560,7 +11552,7 @@ cmd_config_l2_tunnel_eth_type_all_parsed
 	entry.l2_tunnel_type = str2fdir_l2_tunnel_type(res->l2_tunnel_type);
 	entry.ether_type = res->eth_type_val;
 
-	RTE_ETH_FOREACH_DEV(pid) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id) {
 		rte_eth_dev_l2_tunnel_eth_type_conf(pid, &entry);
 	}
 }
@@ -11676,7 +11668,7 @@ cmd_config_l2_tunnel_en_dis_all_parsed(
 	else
 		en = 0;
 
-	RTE_ETH_FOREACH_DEV(pid) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id) {
 		rte_eth_dev_l2_tunnel_offload_set(pid,
 						  &entry,
 						  ETH_L2_TUNNEL_ENABLE_MASK,
@@ -14203,10 +14195,8 @@ cmd_ddp_add_parsed(
 	int file_num;
 	int ret = -ENOTSUP;
 
-	if (res->port_id > nb_ports) {
-		printf("Invalid port, range is [0, %d]\n", nb_ports - 1);
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
-	}
 
 	if (!all_ports_stopped()) {
 		printf("Please stop all ports first\n");
@@ -14285,10 +14275,8 @@ cmd_ddp_del_parsed(
 	uint32_t size;
 	int ret = -ENOTSUP;
 
-	if (res->port_id > nb_ports) {
-		printf("Invalid port, range is [0, %d]\n", nb_ports - 1);
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
-	}
 
 	if (!all_ports_stopped()) {
 		printf("Please stop all ports first\n");
@@ -14600,10 +14588,8 @@ cmd_ddp_get_list_parsed(
 #endif
 	int ret = -ENOTSUP;
 
-	if (res->port_id > nb_ports) {
-		printf("Invalid port, range is [0, %d]\n", nb_ports - 1);
+	if (port_id_is_invalid(res->port_id, ENABLED_WARN))
 		return;
-	}
 
 #ifdef RTE_LIBRTE_I40E_PMD
 	size = PROFILE_INFO_SIZE * MAX_PROFILE_NUM + 4;
@@ -15821,7 +15807,7 @@ cmd_reconfig_device_queue(portid_t id, uint8_t dev, uint8_t queue)
 	if (id == (portid_t)RTE_PORT_ALL) {
 		portid_t pid;
 
-		RTE_ETH_FOREACH_DEV(pid) {
+		RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id) {
 			/* check if need_reconfig has been set to 1 */
 			if (ports[pid].need_reconfig == 0)
 				ports[pid].need_reconfig = dev;

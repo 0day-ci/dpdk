@@ -79,6 +79,8 @@
 #define NUMA_NO_CONFIG 0xFF
 #define UMA_NO_CONFIG  0xFF
 
+#define TESTPMD_OWNER_NAME "TestPMD"
+
 typedef uint8_t  lcoreid_t;
 typedef uint16_t portid_t;
 typedef uint16_t queueid_t;
@@ -409,6 +411,7 @@ extern unsigned int socket_ids[RTE_MAX_NUMA_NODES];
  * nb_fwd_ports <= nb_cfg_ports <= nb_ports
  */
 extern portid_t nb_ports; /**< Number of ethernet ports probed at init time. */
+extern struct rte_eth_dev_owner my_owner; /**< Unique owner. */
 extern portid_t nb_cfg_ports; /**< Number of configured ports. */
 extern portid_t nb_fwd_ports; /**< Number of forwarding ports. */
 extern portid_t fwd_ports_ids[RTE_MAX_ETHPORTS];

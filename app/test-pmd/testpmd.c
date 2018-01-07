@@ -136,6 +136,11 @@ struct fwd_lcore **fwd_lcores; /**< For all probed logical cores. */
 lcoreid_t nb_lcores;           /**< Number of probed logical cores. */
 
 /*
+ * My port owner structure used to own Ethernet ports.
+ */
+struct rte_eth_dev_owner my_owner; /**< Unique owner. */
+
+/*
  * Test Forwarding Configuration.
  *    nb_fwd_lcores <= nb_cfg_lcores <= nb_lcores
  *    nb_fwd_ports  <= nb_cfg_ports  <= nb_ports
@@ -483,7 +488,7 @@ set_default_fwd_ports_config(void)
 	portid_t pt_id;
 	int i = 0;
 
-	RTE_ETH_FOREACH_DEV(pt_id)
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pt_id, my_owner.id)
 		fwd_ports_ids[i++] = pt_id;
 
 	nb_cfg_ports = nb_ports;
@@ -607,7 +612,7 @@ init_config(void)
 		fwd_lcores[lc_id]->cpuid_idx = lc_id;
 	}
 
-	RTE_ETH_FOREACH_DEV(pid) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id) {
 		port = &ports[pid];
 		rte_eth_dev_info_get(pid, &port->dev_info);
 
@@ -733,7 +738,7 @@ init_fwd_streams(void)
 	queueid_t q;
 
 	/* set socket id according to numa or not */
-	RTE_ETH_FOREACH_DEV(pid) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id) {
 		port = &ports[pid];
 		if (nb_rxq > port->dev_info.max_rx_queues) {
 			printf("Fail: nb_rxq(%d) is greater than "
@@ -1027,9 +1032,8 @@ run_pkt_fwd_on_lcore(struct fwd_lcore *fc, packet_fwd_t pkt_fwd)
 	uint64_t tics_per_1sec;
 	uint64_t tics_datum;
 	uint64_t tics_current;
-	uint8_t idx_port, cnt_ports;
+	uint16_t idx_port;
 
-	cnt_ports = rte_eth_dev_count();
 	tics_datum = rte_rdtsc();
 	tics_per_1sec = rte_get_timer_hz();
 #endif
@@ -1044,11 +1048,10 @@ run_pkt_fwd_on_lcore(struct fwd_lcore *fc, packet_fwd_t pkt_fwd)
 			tics_current = rte_rdtsc();
 			if (tics_current - tics_datum >= tics_per_1sec) {
 				/* Periodic bitrate calculation */
-				for (idx_port = 0;
-						idx_port < cnt_ports;
-						idx_port++)
+				RTE_ETH_FOREACH_DEV_OWNED_BY(idx_port,
+							     my_owner.id)
 					rte_stats_bitrate_calc(bitrate_data,
-						idx_port);
+							       idx_port);
 				tics_datum = tics_current;
 			}
 		}
@@ -1386,7 +1389,7 @@ all_ports_started(void)
 	portid_t pi;
 	struct rte_port *port;
 
-	RTE_ETH_FOREACH_DEV(pi) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pi, my_owner.id) {
 		port = &ports[pi];
 		/* Check if there is a port which is not started */
 		if ((port->port_status != RTE_PORT_STARTED) &&
@@ -1404,7 +1407,7 @@ all_ports_stopped(void)
 	portid_t pi;
 	struct rte_port *port;
 
-	RTE_ETH_FOREACH_DEV(pi) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pi, my_owner.id) {
 		port = &ports[pi];
 		if ((port->port_status != RTE_PORT_STOPPED) &&
 			(port->slave_flag == 0))
@@ -1453,7 +1456,7 @@ start_port(portid_t pid)
 
 	if(dcb_config)
 		dcb_test = 1;
-	RTE_ETH_FOREACH_DEV(pi) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pi, my_owner.id) {
 		if (pid != pi && pid != (portid_t)RTE_PORT_ALL)
 			continue;
 
@@ -1634,7 +1637,7 @@ stop_port(portid_t pid)
 
 	printf("Stopping ports...\n");
 
-	RTE_ETH_FOREACH_DEV(pi) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pi, my_owner.id) {
 		if (pid != pi && pid != (portid_t)RTE_PORT_ALL)
 			continue;
 
@@ -1677,7 +1680,7 @@ close_port(portid_t pid)
 
 	printf("Closing ports...\n");
 
-	RTE_ETH_FOREACH_DEV(pi) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pi, my_owner.id) {
 		if (pid != pi && pid != (portid_t)RTE_PORT_ALL)
 			continue;
 
@@ -1728,7 +1731,7 @@ reset_port(portid_t pid)
 
 	printf("Resetting ports...\n");
 
-	RTE_ETH_FOREACH_DEV(pi) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pi, my_owner.id) {
 		if (pid != pi && pid != (portid_t)RTE_PORT_ALL)
 			continue;
 
@@ -1773,14 +1776,18 @@ attach_port(char *identifier)
 	if (rte_eth_dev_attach(identifier, &pi))
 		return;
 
+	if (rte_eth_dev_owner_set(pi, &my_owner) != 0) {
+		printf("Error: cannot own new attached port %d\n", pi);
+		return;
+	}
+	nb_ports++;
+
 	socket_id = (unsigned)rte_eth_dev_socket_id(pi);
 	/* if socket_id is invalid, set to 0 */
 	if (check_socket_id(socket_id) < 0)
 		socket_id = 0;
 	reconfig(pi, socket_id);
 	rte_eth_promiscuous_enable(pi);
-
-	nb_ports = rte_eth_dev_count();
 
 	ports[pi].port_status = RTE_PORT_STOPPED;
 
@@ -1795,6 +1802,9 @@ detach_port(portid_t port_id)
 
 	printf("Detaching a port...\n");
 
+	if (port_id_is_invalid(port_id, ENABLED_WARN))
+		return;
+
 	if (!port_is_closed(port_id)) {
 		printf("Please close port first\n");
 		return;
@@ -1808,7 +1818,7 @@ detach_port(portid_t port_id)
 		return;
 	}
 
-	nb_ports = rte_eth_dev_count();
+	nb_ports--;
 
 	printf("Port '%s' is detached. Now total ports is %d\n",
 			name, nb_ports);
@@ -1826,7 +1836,7 @@ pmd_test_exit(void)
 
 	if (ports != NULL) {
 		no_link_check = 1;
-		RTE_ETH_FOREACH_DEV(pt_id) {
+		RTE_ETH_FOREACH_DEV_OWNED_BY(pt_id, my_owner.id) {
 			printf("\nShutting down port %d...\n", pt_id);
 			fflush(stdout);
 			stop_port(pt_id);
@@ -1858,7 +1868,7 @@ check_all_ports_link_status(uint32_t port_mask)
 	fflush(stdout);
 	for (count = 0; count <= MAX_CHECK_TIME; count++) {
 		all_ports_up = 1;
-		RTE_ETH_FOREACH_DEV(portid) {
+		RTE_ETH_FOREACH_DEV_OWNED_BY(portid, my_owner.id) {
 			if ((port_mask & (1 << portid)) == 0)
 				continue;
 			memset(&link, 0, sizeof(link));
@@ -1948,6 +1958,8 @@ eth_event_callback(portid_t port_id, enum rte_eth_event_type type, void *param,
 
 	switch (type) {
 	case RTE_ETH_EVENT_INTR_RMV:
+		if (port_id_is_invalid(port_id, ENABLED_WARN))
+			break;
 		if (rte_eal_alarm_set(100000,
 				rmv_event_callback, (void *)(intptr_t)port_id))
 			fprintf(stderr, "Could not set up deferred device removal\n");
@@ -2083,7 +2095,7 @@ init_port_config(void)
 	portid_t pid;
 	struct rte_port *port;
 
-	RTE_ETH_FOREACH_DEV(pid) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(pid, my_owner.id) {
 		port = &ports[pid];
 		port->dev_conf.rxmode = rx_mode;
 		port->dev_conf.fdir_conf = fdir_conf;
@@ -2394,7 +2406,12 @@ main(int argc, char** argv)
 	rte_pdump_init(NULL);
 #endif
 
-	nb_ports = (portid_t) rte_eth_dev_count();
+	if (rte_eth_dev_owner_new(&my_owner.id))
+		rte_panic("Failed to get unique owner identifier\n");
+	snprintf(my_owner.name, sizeof(my_owner.name), TESTPMD_OWNER_NAME);
+	RTE_ETH_FOREACH_DEV_OWNED_BY(port_id, RTE_ETH_DEV_NO_OWNER)
+		if (rte_eth_dev_owner_set(port_id, &my_owner) == 0)
+			nb_ports++;
 	if (nb_ports == 0)
 		RTE_LOG(WARNING, EAL, "No probed ethernet devices\n");
 
@@ -2442,7 +2459,7 @@ main(int argc, char** argv)
 		rte_exit(EXIT_FAILURE, "Start ports failed\n");
 
 	/* set all ports to promiscuous mode by default */
-	RTE_ETH_FOREACH_DEV(port_id)
+	RTE_ETH_FOREACH_DEV_OWNED_BY(port_id, my_owner.id)
 		rte_eth_promiscuous_enable(port_id);
 
 	/* Init metrics library */

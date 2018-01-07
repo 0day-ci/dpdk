@@ -2621,7 +2621,7 @@ comp_port(struct context *ctx, const struct token *token,
 
 	(void)ctx;
 	(void)token;
-	RTE_ETH_FOREACH_DEV(p) {
+	RTE_ETH_FOREACH_DEV_OWNED_BY(p, my_owner.id) {
 		if (buf && i == ent)
 			return snprintf(buf, size, "%u", p);
 		++i;
