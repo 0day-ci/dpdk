@@ -85,6 +85,9 @@ static rte_spinlock_t rte_eth_rx_cb_lock = RTE_SPINLOCK_INITIALIZER;
 /* spinlock for add/remove tx callbacks */
 static rte_spinlock_t rte_eth_tx_cb_lock = RTE_SPINLOCK_INITIALIZER;
 
+/* spinlock for shared data allocation */
+static rte_spinlock_t rte_eth_share_data_alloc = RTE_SPINLOCK_INITIALIZER;
+
 /* spinlock for eth device ownership management stored in shared memory */
 static rte_spinlock_t *rte_eth_dev_ownership_lock;
 
@@ -233,21 +236,27 @@ struct rte_eth_dev *
 rte_eth_dev_allocate(const char *name)
 {
 	uint16_t port_id;
-	struct rte_eth_dev *eth_dev;
+	struct rte_eth_dev *eth_dev = NULL;
+
+	/* Synchronize share data one time allocation between local threads. */
+	rte_spinlock_lock(&rte_eth_share_data_alloc);
+	if (rte_eth_dev_data == NULL)
+		rte_eth_dev_share_data_alloc();
+	rte_spinlock_unlock(&rte_eth_share_data_alloc);
+
+	/* Synchronize port creation between primary and secondary threads. */
+	rte_spinlock_lock(rte_eth_dev_ownership_lock);
 
 	port_id = rte_eth_dev_find_free_port();
 	if (port_id == RTE_MAX_ETHPORTS) {
 		RTE_PMD_DEBUG_TRACE("Reached maximum number of Ethernet ports\n");
-		return NULL;
+		goto unlock;
 	}
-
-	if (rte_eth_dev_data == NULL)
-		rte_eth_dev_share_data_alloc();
 
 	if (rte_eth_dev_allocated(name) != NULL) {
 		RTE_PMD_DEBUG_TRACE("Ethernet Device with name %s already allocated!\n",
 				name);
-		return NULL;
+		goto unlock;
 	}
 
 	eth_dev = eth_dev_get(port_id);
@@ -255,6 +264,8 @@ rte_eth_dev_allocate(const char *name)
 	eth_dev->data->port_id = port_id;
 	eth_dev->data->mtu = ETHER_MTU;
 
+unlock:
+	rte_spinlock_unlock(rte_eth_dev_ownership_lock);
 	return eth_dev;
 }
 
@@ -267,10 +278,16 @@ struct rte_eth_dev *
 rte_eth_dev_attach_secondary(const char *name)
 {
 	uint16_t i;
-	struct rte_eth_dev *eth_dev;
+	struct rte_eth_dev *eth_dev = NULL;
 
+	/* Synchronize share data one time attachment between local threads. */
+	rte_spinlock_lock(&rte_eth_share_data_alloc);
 	if (rte_eth_dev_data == NULL)
 		rte_eth_dev_share_data_alloc();
+	rte_spinlock_unlock(&rte_eth_share_data_alloc);
+
+	/* Synchronize port attachment to primary port creation and release. */
+	rte_spinlock_lock(rte_eth_dev_ownership_lock);
 
 	for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
 		if (strcmp(rte_eth_dev_data[i].name, name) == 0)
@@ -280,12 +297,12 @@ rte_eth_dev_attach_secondary(const char *name)
 		RTE_PMD_DEBUG_TRACE(
 			"device %s is not driven by the primary process\n",
 			name);
-		return NULL;
+	} else {
+		eth_dev = eth_dev_get(i);
+		RTE_ASSERT(eth_dev->data->port_id == i);
 	}
 
-	eth_dev = eth_dev_get(i);
-	RTE_ASSERT(eth_dev->data->port_id == i);
-
+	rte_spinlock_unlock(rte_eth_dev_ownership_lock);
 	return eth_dev;
 }
 
