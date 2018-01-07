@@ -42,6 +42,7 @@
 #include <rte_devargs.h>
 
 #define FAILSAFE_DRIVER_NAME "Fail-safe PMD"
+#define FAILSAFE_OWNER_NAME "Fail-safe"
 
 #define PMD_FAILSAFE_MAC_KVARG "mac"
 #define PMD_FAILSAFE_HOTPLUG_POLL_KVARG "hotplug_poll"
@@ -139,6 +140,7 @@ struct fs_priv {
 	uint32_t mac_addr_pool[FAILSAFE_MAX_ETHADDR];
 	/* current capabilities */
 	struct rte_eth_dev_info infos;
+	struct rte_eth_dev_owner my_owner; /* Unique owner. */
 	/*
 	 * Fail-safe state machine.
 	 * This level will be tracking state of the EAL and eth

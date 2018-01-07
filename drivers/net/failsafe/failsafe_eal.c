@@ -69,6 +69,16 @@ fs_bus_init(struct rte_eth_dev *dev)
 			ERROR("sub_device %d init went wrong", i);
 			return -ENODEV;
 		}
+		ret = rte_eth_dev_owner_set(j, &PRIV(dev)->my_owner);
+		if (ret) {
+			/*
+			 * It is unexpected for a fail-safe sub-device
+			 * to be owned by another DPDK entity.
+			 */
+			ERROR("sub_device %d owner set failed (%s)", i,
+			      strerror(ret));
+			return ret;
+		}
 		SUB_ID(sdev) = i;
 		sdev->fs_dev = dev;
 		sdev->dev = ETH(sdev)->device;
