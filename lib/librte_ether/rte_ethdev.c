@@ -70,7 +70,10 @@
 
 static const char *MZ_RTE_ETH_DEV_DATA = "rte_eth_dev_data";
 struct rte_eth_dev rte_eth_devices[RTE_MAX_ETHPORTS];
+/* ports data array stored in shared memory */
 static struct rte_eth_dev_data *rte_eth_dev_data;
+/* next owner identifier stored in shared memory */
+static uint16_t *rte_eth_next_owner_id;
 static uint8_t eth_dev_last_created_port;
 
 /* spinlock for eth device callbacks */
@@ -81,6 +84,9 @@ static rte_spinlock_t rte_eth_rx_cb_lock = RTE_SPINLOCK_INITIALIZER;
 
 /* spinlock for add/remove tx callbacks */
 static rte_spinlock_t rte_eth_tx_cb_lock = RTE_SPINLOCK_INITIALIZER;
+
+/* spinlock for eth device ownership management stored in shared memory */
+static rte_spinlock_t *rte_eth_dev_ownership_lock;
 
 /* store statistics names and its offset in stats structure  */
 struct rte_eth_xstats_name_off {
@@ -152,14 +158,18 @@ rte_eth_find_next(uint16_t port_id)
 }
 
 static void
-rte_eth_dev_data_alloc(void)
+rte_eth_dev_share_data_alloc(void)
 {
 	const unsigned flags = 0;
 	const struct rte_memzone *mz;
+	const unsigned int data_size = RTE_MAX_ETHPORTS *
+						sizeof(*rte_eth_dev_data);
 
 	if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+		/* Allocate shared memory for port data and ownership */
 		mz = rte_memzone_reserve(MZ_RTE_ETH_DEV_DATA,
-				RTE_MAX_ETHPORTS * sizeof(*rte_eth_dev_data),
+				data_size + sizeof(*rte_eth_next_owner_id) +
+				sizeof(*rte_eth_dev_ownership_lock),
 				rte_socket_id(), flags);
 	} else
 		mz = rte_memzone_lookup(MZ_RTE_ETH_DEV_DATA);
@@ -167,9 +177,17 @@ rte_eth_dev_data_alloc(void)
 		rte_panic("Cannot allocate memzone for ethernet port data\n");
 
 	rte_eth_dev_data = mz->addr;
-	if (rte_eal_process_type() == RTE_PROC_PRIMARY)
-		memset(rte_eth_dev_data, 0,
-				RTE_MAX_ETHPORTS * sizeof(*rte_eth_dev_data));
+	rte_eth_next_owner_id = (uint16_t *)((uintptr_t)mz->addr +
+					     data_size);
+	rte_eth_dev_ownership_lock = (rte_spinlock_t *)
+		((uintptr_t)rte_eth_next_owner_id +
+		 sizeof(*rte_eth_next_owner_id));
+
+	if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+		memset(rte_eth_dev_data, 0, data_size);
+		*rte_eth_next_owner_id = RTE_ETH_DEV_NO_OWNER + 1;
+		rte_spinlock_init(rte_eth_dev_ownership_lock);
+	}
 }
 
 struct rte_eth_dev *
@@ -224,7 +242,7 @@ rte_eth_dev_allocate(const char *name)
 	}
 
 	if (rte_eth_dev_data == NULL)
-		rte_eth_dev_data_alloc();
+		rte_eth_dev_share_data_alloc();
 
 	if (rte_eth_dev_allocated(name) != NULL) {
 		RTE_PMD_DEBUG_TRACE("Ethernet Device with name %s already allocated!\n",
@@ -252,7 +270,7 @@ rte_eth_dev_attach_secondary(const char *name)
 	struct rte_eth_dev *eth_dev;
 
 	if (rte_eth_dev_data == NULL)
-		rte_eth_dev_data_alloc();
+		rte_eth_dev_share_data_alloc();
 
 	for (i = 0; i < RTE_MAX_ETHPORTS; i++) {
 		if (strcmp(rte_eth_dev_data[i].name, name) == 0)
@@ -277,8 +295,12 @@ rte_eth_dev_release_port(struct rte_eth_dev *eth_dev)
 	if (eth_dev == NULL)
 		return -EINVAL;
 
-	memset(eth_dev->data, 0, sizeof(struct rte_eth_dev_data));
+	rte_spinlock_lock(rte_eth_dev_ownership_lock);
+
 	eth_dev->state = RTE_ETH_DEV_UNUSED;
+	memset(eth_dev->data, 0, sizeof(struct rte_eth_dev_data));
+
+	rte_spinlock_unlock(rte_eth_dev_ownership_lock);
 	return 0;
 }
 
@@ -291,6 +313,174 @@ rte_eth_dev_is_valid_port(uint16_t port_id)
 		return 0;
 	else
 		return 1;
+}
+
+static int
+rte_eth_is_valid_owner_id(uint16_t owner_id)
+{
+	if (owner_id == RTE_ETH_DEV_NO_OWNER ||
+	    (*rte_eth_next_owner_id > RTE_ETH_DEV_NO_OWNER &&
+	     *rte_eth_next_owner_id <= owner_id)) {
+		RTE_LOG(ERR, EAL, "Invalid owner_id=%d.\n", owner_id);
+		return 0;
+	}
+	return 1;
+}
+
+uint16_t
+rte_eth_find_next_owned_by(uint16_t port_id, const uint16_t owner_id)
+{
+	while (port_id < RTE_MAX_ETHPORTS &&
+	       (rte_eth_devices[port_id].state != RTE_ETH_DEV_ATTACHED ||
+	       rte_eth_devices[port_id].data->owner.id != owner_id))
+		port_id++;
+
+	if (port_id >= RTE_MAX_ETHPORTS)
+		return RTE_MAX_ETHPORTS;
+
+	return port_id;
+}
+
+int
+rte_eth_dev_owner_new(uint16_t *owner_id)
+{
+	int ret = 0;
+
+	rte_spinlock_lock(rte_eth_dev_ownership_lock);
+
+	if (*rte_eth_next_owner_id == RTE_ETH_DEV_NO_OWNER) {
+		/* Counter wrap around. */
+		RTE_PMD_DEBUG_TRACE("Reached maximum number of Ethernet port owners.\n");
+		ret = -EUSERS;
+	} else {
+		*owner_id = (*rte_eth_next_owner_id)++;
+	}
+
+	rte_spinlock_unlock(rte_eth_dev_ownership_lock);
+	return ret;
+}
+
+int
+rte_eth_dev_owner_set(const uint16_t port_id,
+		      const struct rte_eth_dev_owner *owner)
+{
+	struct rte_eth_dev_owner *port_owner;
+	int ret = 0;
+	int sret;
+
+	rte_spinlock_lock(rte_eth_dev_ownership_lock);
+
+	if (!rte_eth_dev_is_valid_port(port_id)) {
+		RTE_PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
+		ret = -ENODEV;
+		goto unlock;
+	}
+
+	if (!rte_eth_is_valid_owner_id(owner->id)) {
+		ret = -EINVAL;
+		goto unlock;
+	}
+
+	port_owner = &rte_eth_devices[port_id].data->owner;
+	if (port_owner->id != RTE_ETH_DEV_NO_OWNER &&
+	    port_owner->id != owner->id) {
+		RTE_LOG(ERR, EAL,
+			"Cannot set owner to port %d already owned by %s_%05d.\n",
+			port_id, port_owner->name, port_owner->id);
+		ret = -EPERM;
+		goto unlock;
+	}
+
+	sret = snprintf(port_owner->name, RTE_ETH_MAX_OWNER_NAME_LEN, "%s",
+			owner->name);
+	if (sret < 0 || sret >= RTE_ETH_MAX_OWNER_NAME_LEN) {
+		memset(port_owner->name, 0, RTE_ETH_MAX_OWNER_NAME_LEN);
+		RTE_LOG(ERR, EAL, "Invalid owner name.\n");
+		ret = -EINVAL;
+		goto unlock;
+	}
+
+	port_owner->id = owner->id;
+	RTE_PMD_DEBUG_TRACE("Port %d owner is %s_%05d.\n", port_id,
+			    owner->name, owner->id);
+
+unlock:
+	rte_spinlock_unlock(rte_eth_dev_ownership_lock);
+	return ret;
+}
+
+int
+rte_eth_dev_owner_unset(const uint16_t port_id, const uint16_t owner_id)
+{
+	struct rte_eth_dev_owner *port_owner;
+	int ret = 0;
+
+	rte_spinlock_lock(rte_eth_dev_ownership_lock);
+
+	if (!rte_eth_dev_is_valid_port(port_id)) {
+		RTE_PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
+		ret = -ENODEV;
+		goto unlock;
+	}
+
+	if (!rte_eth_is_valid_owner_id(owner_id)) {
+		ret = -EINVAL;
+		goto unlock;
+	}
+
+	port_owner = &rte_eth_devices[port_id].data->owner;
+	if (port_owner->id != owner_id) {
+		RTE_LOG(ERR, EAL, "Cannot unset port %d owner (%s_%05d) by"
+			" a different owner with id %5d.\n", port_id,
+			port_owner->name, port_owner->id, owner_id);
+		ret = -EPERM;
+		goto unlock;
+	}
+	RTE_PMD_DEBUG_TRACE("Port %d owner %s_%05d has removed.\n", port_id,
+			    port_owner->name, port_owner->id);
+
+	memset(port_owner, 0, sizeof(struct rte_eth_dev_owner));
+
+unlock:
+	rte_spinlock_unlock(rte_eth_dev_ownership_lock);
+	return ret;
+}
+
+void
+rte_eth_dev_owner_delete(const uint16_t owner_id)
+{
+	uint16_t port_id;
+
+	rte_spinlock_lock(rte_eth_dev_ownership_lock);
+
+	if (rte_eth_is_valid_owner_id(owner_id)) {
+		RTE_ETH_FOREACH_DEV_OWNED_BY(port_id, owner_id)
+			memset(&rte_eth_devices[port_id].data->owner, 0,
+			       sizeof(struct rte_eth_dev_owner));
+		RTE_PMD_DEBUG_TRACE("All port owners owned by %05d identifier"
+				    " have removed.\n", owner_id);
+	}
+
+	rte_spinlock_unlock(rte_eth_dev_ownership_lock);
+}
+
+int
+rte_eth_dev_owner_get(const uint16_t port_id, struct rte_eth_dev_owner *owner)
+{
+	int ret = 0;
+
+	rte_spinlock_lock(rte_eth_dev_ownership_lock);
+
+	if (!rte_eth_dev_is_valid_port(port_id)) {
+		RTE_PMD_DEBUG_TRACE("Invalid port_id=%d\n", port_id);
+		ret = -ENODEV;
+	} else {
+		rte_memcpy(owner, &rte_eth_devices[port_id].data->owner,
+			   sizeof(*owner));
+	}
+
+	rte_spinlock_unlock(rte_eth_dev_ownership_lock);
+	return ret;
 }
 
 int

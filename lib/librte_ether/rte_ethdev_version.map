@@ -198,6 +198,18 @@ DPDK_17.11 {
 
 } DPDK_17.08;
 
+DPDK_18.02 {
+	global:
+
+	rte_eth_dev_owner_delete;
+	rte_eth_dev_owner_get;
+	rte_eth_dev_owner_new;
+	rte_eth_dev_owner_set;
+	rte_eth_dev_owner_unset;
+	rte_eth_find_next_owned_by;
+
+} DPDK_17.11;
+
 EXPERIMENTAL {
 	global:
 
