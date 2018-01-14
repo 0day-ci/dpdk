@@ -459,6 +459,15 @@ set nbport (num)
 
 This is equivalent to the ``--nb-ports`` command-line option.
 
+set eth-peer
+~~~~~~~~~~~~
+
+Set the forwarding peer address for certain port::
+
+   testpmd> set eth-peer (port_id) (perr_addr)
+
+This is equivalent to the ``--eth-peer`` command-line option.
+
 set nbcore
 ~~~~~~~~~~
 

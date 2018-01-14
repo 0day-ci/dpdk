@@ -603,6 +603,7 @@ int set_fwd_lcores_list(unsigned int *lcorelist, unsigned int nb_lc);
 int set_fwd_lcores_mask(uint64_t lcoremask);
 void set_fwd_lcores_number(uint16_t nb_lc);
 
+void set_fwd_eth_peer(portid_t port_id, char *peer_addr);
 void set_fwd_ports_list(unsigned int *portlist, unsigned int nb_pt);
 void set_fwd_ports_mask(uint64_t portmask);
 void set_fwd_ports_number(uint16_t nb_pt);
