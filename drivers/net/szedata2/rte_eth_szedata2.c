@@ -50,7 +50,6 @@
 #include <rte_memcpy.h>
 #include <rte_kvargs.h>
 #include <rte_dev.h>
-#include <rte_atomic.h>
 
 #include "rte_eth_szedata2.h"
 #include "szedata2_iobuf.h"
@@ -1173,14 +1172,15 @@ static int
 eth_link_update(struct rte_eth_dev *dev,
 		int wait_to_complete __rte_unused)
 {
-	struct rte_eth_link link;
-	struct rte_eth_link *link_ptr = &link;
-	struct rte_eth_link *dev_link = &dev->data->dev_link;
 	struct pmd_internals *internals = (struct pmd_internals *)
 		dev->data->dev_private;
 	const volatile struct szedata2_ibuf *ibuf;
 	uint32_t i;
 	bool link_is_up = false;
+	struct rte_eth_link link = {
+		.link_duplex = ETH_LINK_FULL_DUPLEX,
+		.link_autoneg = ETH_LINK_FIXED,
+	};
 
 	switch (get_link_speed(internals)) {
 	case SZEDATA2_LINK_SPEED_10G:
@@ -1197,9 +1197,6 @@ eth_link_update(struct rte_eth_dev *dev,
 		break;
 	}
 
-	/* szedata2 uses only full duplex */
-	link.link_duplex = ETH_LINK_FULL_DUPLEX;
-
 	for (i = 0; i < szedata2_ibuf_count; i++) {
 		ibuf = ibuf_ptr_by_index(internals->pci_rsc, i);
 		/*
@@ -1212,13 +1209,9 @@ eth_link_update(struct rte_eth_dev *dev,
 		}
 	}
 
-	link.link_status = (link_is_up) ? ETH_LINK_UP : ETH_LINK_DOWN;
+	link.link_status = link_is_up ? ETH_LINK_UP : ETH_LINK_DOWN;
 
-	link.link_autoneg = ETH_LINK_FIXED;
-
-	rte_atomic64_cmpset((uint64_t *)dev_link, *(uint64_t *)dev_link,
-			*(uint64_t *)link_ptr);
-
+	rte_eth_linkstatus_set(dev, &link);
 	return 0;
 }
 
