@@ -20,7 +20,6 @@
 #include <rte_debug.h>
 #include <rte_pci.h>
 #include <rte_bus_pci.h>
-#include <rte_atomic.h>
 #include <rte_branch_prediction.h>
 #include <rte_memory.h>
 #include <rte_eal.h>
@@ -786,58 +785,6 @@ static const struct rte_ixgbe_xstats_name_off rte_ixgbevf_stats_strings[] = {
 
 #define IXGBEVF_NB_XSTATS (sizeof(rte_ixgbevf_stats_strings) /	\
 		sizeof(rte_ixgbevf_stats_strings[0]))
-
-/**
- * Atomically reads the link status information from global
- * structure rte_eth_dev.
- *
- * @param dev
- *   - Pointer to the structure rte_eth_dev to read from.
- *   - Pointer to the buffer to be saved with the link status.
- *
- * @return
- *   - On success, zero.
- *   - On failure, negative value.
- */
-static inline int
-rte_ixgbe_dev_atomic_read_link_status(struct rte_eth_dev *dev,
-				struct rte_eth_link *link)
-{
-	struct rte_eth_link *dst = link;
-	struct rte_eth_link *src = &(dev->data->dev_link);
-
-	if (rte_atomic64_cmpset((uint64_t *)dst, *(uint64_t *)dst,
-					*(uint64_t *)src) == 0)
-		return -1;
-
-	return 0;
-}
-
-/**
- * Atomically writes the link status information into global
- * structure rte_eth_dev.
- *
- * @param dev
- *   - Pointer to the structure rte_eth_dev to read from.
- *   - Pointer to the buffer to be saved with the link status.
- *
- * @return
- *   - On success, zero.
- *   - On failure, negative value.
- */
-static inline int
-rte_ixgbe_dev_atomic_write_link_status(struct rte_eth_dev *dev,
-				struct rte_eth_link *link)
-{
-	struct rte_eth_link *dst = &(dev->data->dev_link);
-	struct rte_eth_link *src = link;
-
-	if (rte_atomic64_cmpset((uint64_t *)dst, *(uint64_t *)dst,
-					*(uint64_t *)src) == 0)
-		return -1;
-
-	return 0;
-}
 
 /*
  * This function is the same as ixgbe_is_sfp() in base/ixgbe.h.
@@ -2758,7 +2705,7 @@ ixgbe_dev_stop(struct rte_eth_dev *dev)
 
 	/* Clear recorded link status */
 	memset(&link, 0, sizeof(link));
-	rte_ixgbe_dev_atomic_write_link_status(dev, &link);
+	rte_eth_linkstatus_set(dev, &link);
 
 	if (!rte_intr_allow_others(intr_handle))
 		/* resume to the default handler */
@@ -3943,7 +3890,7 @@ ixgbe_dev_link_update_share(struct rte_eth_dev *dev,
 			    int wait_to_complete, int vf)
 {
 	struct ixgbe_hw *hw = IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
-	struct rte_eth_link link, old;
+	struct rte_eth_link old;
 	ixgbe_link_speed link_speed = IXGBE_LINK_SPEED_UNKNOWN;
 	struct ixgbe_interrupt *intr =
 		IXGBE_DEV_PRIVATE_TO_INTR(dev->data->dev_private);
@@ -3952,13 +3899,13 @@ ixgbe_dev_link_update_share(struct rte_eth_dev *dev,
 	u32 speed = 0;
 	int wait = 1;
 	bool autoneg = false;
+	struct rte_eth_link link = {
+		.link_status = ETH_LINK_DOWN,
+		.link_duplex = ETH_LINK_HALF_DUPLEX,
+		.link_autoneg = ETH_LINK_AUTONEG,
+	};
 
-	link.link_status = ETH_LINK_DOWN;
-	link.link_speed = 0;
-	link.link_duplex = ETH_LINK_HALF_DUPLEX;
-	link.link_autoneg = ETH_LINK_AUTONEG;
-	memset(&old, 0, sizeof(old));
-	rte_ixgbe_dev_atomic_read_link_status(dev, &old);
+	rte_eth_linkstatus_get(dev, &old);
 
 	hw->mac.get_link_status = true;
 
@@ -3982,14 +3929,14 @@ ixgbe_dev_link_update_share(struct rte_eth_dev *dev,
 	if (diag != 0) {
 		link.link_speed = ETH_SPEED_NUM_100M;
 		link.link_duplex = ETH_LINK_FULL_DUPLEX;
-		rte_ixgbe_dev_atomic_write_link_status(dev, &link);
+		rte_eth_linkstatus_set(dev, &link);
 		if (link.link_status == old.link_status)
 			return -1;
 		return 0;
 	}
 
 	if (link_up == 0) {
-		rte_ixgbe_dev_atomic_write_link_status(dev, &link);
+		rte_eth_linkstatus_set(dev, &link);
 		intr->flags |= IXGBE_FLAG_NEED_LINK_CONFIG;
 		if (link.link_status == old.link_status)
 			return -1;
@@ -4026,7 +3973,7 @@ ixgbe_dev_link_update_share(struct rte_eth_dev *dev,
 		link.link_speed = ETH_SPEED_NUM_10G;
 		break;
 	}
-	rte_ixgbe_dev_atomic_write_link_status(dev, &link);
+	rte_eth_linkstatus_set(dev, &link);
 
 	if (link.link_status == old.link_status)
 		return -1;
@@ -4230,8 +4177,7 @@ ixgbe_dev_link_status_print(struct rte_eth_dev *dev)
 	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_eth_link link;
 
-	memset(&link, 0, sizeof(link));
-	rte_ixgbe_dev_atomic_read_link_status(dev, &link);
+	rte_eth_linkstatus_get(dev, &link);
 	if (link.link_status) {
 		PMD_INIT_LOG(INFO, "Port %d: Link Up - speed %u Mbps - %s",
 					(int)(dev->data->port_id),
@@ -4266,7 +4212,6 @@ ixgbe_dev_interrupt_action(struct rte_eth_dev *dev,
 	struct ixgbe_interrupt *intr =
 		IXGBE_DEV_PRIVATE_TO_INTR(dev->data->dev_private);
 	int64_t timeout;
-	struct rte_eth_link link;
 	struct ixgbe_hw *hw =
 		IXGBE_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 
@@ -4283,9 +4228,10 @@ ixgbe_dev_interrupt_action(struct rte_eth_dev *dev,
 	}
 
 	if (intr->flags & IXGBE_FLAG_NEED_LINK_UPDATE) {
+		struct rte_eth_link link;
+
 		/* get the link status before link update, for predicting later */
-		memset(&link, 0, sizeof(link));
-		rte_ixgbe_dev_atomic_read_link_status(dev, &link);
+		rte_eth_linkstatus_get(dev, &link);
 
 		ixgbe_dev_link_update(dev, 0);
 
@@ -6804,9 +6750,8 @@ ixgbe_start_timecounters(struct rte_eth_dev *dev)
 	uint32_t shift = 0;
 
 	/* Get current link speed. */
-	memset(&link, 0, sizeof(link));
 	ixgbe_dev_link_update(dev, 1);
-	rte_ixgbe_dev_atomic_read_link_status(dev, &link);
+	rte_eth_linkstatus_get(dev, &link);
 
 	switch (link.link_speed) {
 	case ETH_SPEED_NUM_100M:
