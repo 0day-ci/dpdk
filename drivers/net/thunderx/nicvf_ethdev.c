@@ -15,7 +15,6 @@
 #include <sys/queue.h>
 
 #include <rte_alarm.h>
-#include <rte_atomic.h>
 #include <rte_branch_prediction.h>
 #include <rte_byteorder.h>
 #include <rte_common.h>
@@ -67,20 +66,6 @@ nicvf_init_log(void)
 	nicvf_logtype_driver = rte_log_register("pmd.nicvf.driver");
 	if (nicvf_logtype_driver >= 0)
 		rte_log_set_level(nicvf_logtype_driver, RTE_LOG_NOTICE);
-}
-
-static inline int
-nicvf_atomic_write_link_status(struct rte_eth_dev *dev,
-			       struct rte_eth_link *link)
-{
-	struct rte_eth_link *dst = &dev->data->dev_link;
-	struct rte_eth_link *src = link;
-
-	if (rte_atomic64_cmpset((uint64_t *)dst, *(uint64_t *)dst,
-		*(uint64_t *)src) == 0)
-		return -1;
-
-	return 0;
 }
 
 static inline void
@@ -163,7 +148,9 @@ nicvf_dev_link_update(struct rte_eth_dev *dev, int wait_to_complete)
 		memset(&link, 0, sizeof(link));
 		nicvf_set_eth_link_status(nic, &link);
 	}
-	return nicvf_atomic_write_link_status(dev, &link);
+
+	rte_eth_linkstatus_set(dev, &link);
+	return 0;
 }
 
 static int
