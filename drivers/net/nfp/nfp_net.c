@@ -213,57 +213,6 @@ nn_cfg_writeq(struct nfp_net_hw *hw, int off, uint64_t val)
 	nn_writeq(rte_cpu_to_le_64(val), hw->ctrl_bar + off);
 }
 
-/*
- * Atomically reads link status information from global structure rte_eth_dev.
- *
- * @param dev
- *   - Pointer to the structure rte_eth_dev to read from.
- *   - Pointer to the buffer to be saved with the link status.
- *
- * @return
- *   - On success, zero.
- *   - On failure, negative value.
- */
-static inline int
-nfp_net_dev_atomic_read_link_status(struct rte_eth_dev *dev,
-				    struct rte_eth_link *link)
-{
-	struct rte_eth_link *dst = link;
-	struct rte_eth_link *src = &dev->data->dev_link;
-
-	if (rte_atomic64_cmpset((uint64_t *)dst, *(uint64_t *)dst,
-				*(uint64_t *)src) == 0)
-		return -1;
-
-	return 0;
-}
-
-/*
- * Atomically writes the link status information into global
- * structure rte_eth_dev.
- *
- * @param dev
- *   - Pointer to the structure rte_eth_dev to read from.
- *   - Pointer to the buffer to be saved with the link status.
- *
- * @return
- *   - On success, zero.
- *   - On failure, negative value.
- */
-static inline int
-nfp_net_dev_atomic_write_link_status(struct rte_eth_dev *dev,
-				     struct rte_eth_link *link)
-{
-	struct rte_eth_link *dst = &dev->data->dev_link;
-	struct rte_eth_link *src = link;
-
-	if (rte_atomic64_cmpset((uint64_t *)dst, *(uint64_t *)dst,
-				*(uint64_t *)src) == 0)
-		return -1;
-
-	return 0;
-}
-
 static void
 nfp_net_rx_queue_release_mbufs(struct nfp_net_rxq *rxq)
 {
@@ -1017,8 +966,7 @@ nfp_net_link_update(struct rte_eth_dev *dev, __rte_unused int wait_to_complete)
 
 	hw = NFP_NET_DEV_PRIVATE_TO_HW(dev->data->dev_private);
 
-	memset(&old, 0, sizeof(old));
-	nfp_net_dev_atomic_read_link_status(dev, &old);
+	rte_eth_linkstatus_get(dev, &old);
 
 	nn_link_status = nn_cfg_readl(hw, NFP_NET_CFG_STS);
 
@@ -1038,11 +986,10 @@ nfp_net_link_update(struct rte_eth_dev *dev, __rte_unused int wait_to_complete)
 		link.link_speed = ls_to_ethtool[nn_link_status];
 
 	if (old.link_status != link.link_status) {
-		nfp_net_dev_atomic_write_link_status(dev, &link);
-		if (link.link_status)
-			PMD_DRV_LOG(INFO, "NIC Link is Up\n");
-		else
-			PMD_DRV_LOG(INFO, "NIC Link is Down\n");
+		rte_eth_linkstatus_set(dev, &link);
+
+		PMD_DRV_LOG(INFO, "NIC Link is %s\n",
+			    link.link_status ? "Up" : "Down");
 		return 0;
 	}
 
@@ -1376,8 +1323,7 @@ nfp_net_dev_link_status_print(struct rte_eth_dev *dev)
 	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	struct rte_eth_link link;
 
-	memset(&link, 0, sizeof(link));
-	nfp_net_dev_atomic_read_link_status(dev, &link);
+	rte_eth_linkstatus_get(dev, &link);
 	if (link.link_status)
 		RTE_LOG(INFO, PMD, "Port %d: Link Up - speed %u Mbps - %s\n",
 			dev->data->port_id, link.link_speed,
@@ -1430,9 +1376,7 @@ nfp_net_dev_interrupt_handler(void *param)
 
 	PMD_DRV_LOG(DEBUG, "We got a LSC interrupt!!!\n");
 
-	/* get the link status */
-	memset(&link, 0, sizeof(link));
-	nfp_net_dev_atomic_read_link_status(dev, &link);
+	rte_eth_linkstatus_get(dev, &link);
 
 	nfp_net_link_update(dev, 0);
 
