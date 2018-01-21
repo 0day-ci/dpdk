@@ -14,7 +14,6 @@
 #include <rte_string_fns.h>
 #include <rte_memzone.h>
 #include <rte_malloc.h>
-#include <rte_atomic.h>
 #include <rte_branch_prediction.h>
 #include <rte_pci.h>
 #include <rte_bus_pci.h>
@@ -779,46 +778,6 @@ static const struct eth_dev_ops virtio_eth_dev_ops = {
 	.mac_addr_remove         = virtio_mac_addr_remove,
 	.mac_addr_set            = virtio_mac_addr_set,
 };
-
-static inline int
-virtio_dev_atomic_read_link_status(struct rte_eth_dev *dev,
-				struct rte_eth_link *link)
-{
-	struct rte_eth_link *dst = link;
-	struct rte_eth_link *src = &(dev->data->dev_link);
-
-	if (rte_atomic64_cmpset((uint64_t *)dst, *(uint64_t *)dst,
-			*(uint64_t *)src) == 0)
-		return -1;
-
-	return 0;
-}
-
-/**
- * Atomically writes the link status information into global
- * structure rte_eth_dev.
- *
- * @param dev
- *   - Pointer to the structure rte_eth_dev to read from.
- *   - Pointer to the buffer to be saved with the link status.
- *
- * @return
- *   - On success, zero.
- *   - On failure, negative value.
- */
-static inline int
-virtio_dev_atomic_write_link_status(struct rte_eth_dev *dev,
-		struct rte_eth_link *link)
-{
-	struct rte_eth_link *dst = &(dev->data->dev_link);
-	struct rte_eth_link *src = link;
-
-	if (rte_atomic64_cmpset((uint64_t *)dst, *(uint64_t *)dst,
-					*(uint64_t *)src) == 0)
-		return -1;
-
-	return 0;
-}
 
 static void
 virtio_update_stats(struct rte_eth_dev *dev, struct rte_eth_stats *stats)
@@ -1977,8 +1936,10 @@ static void
 virtio_dev_stop(struct rte_eth_dev *dev)
 {
 	struct virtio_hw *hw = dev->data->dev_private;
-	struct rte_eth_link link;
 	struct rte_intr_conf *intr_conf = &dev->data->dev_conf.intr_conf;
+	struct rte_eth_link link = {
+		.link_status = ETH_LINK_DOWN,
+	};
 
 	PMD_INIT_LOG(DEBUG, "stop");
 
@@ -1987,8 +1948,7 @@ virtio_dev_stop(struct rte_eth_dev *dev)
 		virtio_intr_disable(dev);
 
 	hw->started = 0;
-	memset(&link, 0, sizeof(link));
-	virtio_dev_atomic_write_link_status(dev, &link);
+	rte_eth_linkstatus_set(dev, &link);
 	rte_spinlock_unlock(&hw->state_lock);
 }
 
@@ -1998,8 +1958,7 @@ virtio_dev_link_update(struct rte_eth_dev *dev, __rte_unused int wait_to_complet
 	struct rte_eth_link link, old;
 	uint16_t status;
 	struct virtio_hw *hw = dev->data->dev_private;
-	memset(&link, 0, sizeof(link));
-	virtio_dev_atomic_read_link_status(dev, &link);
+	rte_eth_linkstatus_get(dev, &link);
 	old = link;
 	link.link_duplex = ETH_LINK_FULL_DUPLEX;
 	link.link_speed  = ETH_SPEED_NUM_10G;
@@ -2023,7 +1982,7 @@ virtio_dev_link_update(struct rte_eth_dev *dev, __rte_unused int wait_to_complet
 	} else {
 		link.link_status = ETH_LINK_UP;
 	}
-	virtio_dev_atomic_write_link_status(dev, &link);
+	rte_eth_linkstatus_set(dev, &link);
 
 	return (old.link_status == link.link_status) ? -1 : 0;
 }
