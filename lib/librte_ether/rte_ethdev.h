@@ -2221,6 +2221,68 @@ int rte_eth_dev_set_link_down(uint16_t port_id);
  */
 void rte_eth_dev_close(uint16_t port_id);
 
+
+/**
+ * @internal
+ * Atomically set the link status for the specific device.
+ * It is for use by DPDK device driver use only.
+ * User applications should not call it
+ *
+ * @param dev
+ *  Pointer to struct rte_eth_dev.
+ * @param link
+ *  New link status value.
+ * @return
+ *  1 if link status has changed;
+ *  0 if link status is unchanged.
+ */
+static inline int
+rte_eth_linkstatus_set(struct rte_eth_dev *dev,
+		       const struct rte_eth_link *new_link)
+{
+	volatile uint64_t *dev_link
+		 = (volatile uint64_t *)&(dev->data->dev_link);
+	union {
+		uint64_t val64;
+		struct rte_eth_link link;
+	} orig;
+
+	RTE_BUILD_BUG_ON(sizeof(*new_link) != sizeof(uint64_t));
+
+	orig.val64 = rte_atomic64_exchange(dev_link,
+					   *(const uint64_t *)new_link);
+
+	return orig.link.link_status != new_link->link_status;
+}
+
+/**
+ * @internal
+ * Atomically get the link speed and status.
+ *
+ * @param dev
+ *  Pointer to struct rte_eth_dev.
+ * @param link
+ *  link status value.
+ */
+static inline void
+rte_eth_linkstatus_get(const struct rte_eth_dev *dev,
+		       struct rte_eth_link *link)
+{
+	volatile uint64_t *src = (uint64_t *)&(dev->data->dev_link);
+	uint64_t *dst = (uint64_t *)link;
+
+	RTE_BUILD_BUG_ON(sizeof(*link) != sizeof(uint64_t));
+
+	/* can't use rte_atomic64_read because it returns signed int */
+#ifdef __LP64__
+	*dst = *src;
+#else
+	do {
+		*dst = *src;
+	} while (!rte_atomic64_cmpset(src, *dst, *dst));
+#endif
+}
+
 /**
  * Reset a Ethernet device and keep its port id.
  *
