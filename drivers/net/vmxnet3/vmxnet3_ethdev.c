@@ -20,7 +20,6 @@
 #include <rte_debug.h>
 #include <rte_pci.h>
 #include <rte_bus_pci.h>
-#include <rte_atomic.h>
 #include <rte_branch_prediction.h>
 #include <rte_memory.h>
 #include <rte_memzone.h>
@@ -158,59 +157,6 @@ gpa_zone_reserve(struct rte_eth_dev *dev, uint32_t size,
 		return mz;
 
 	return rte_memzone_reserve_aligned(z_name, size, socket_id, 0, align);
-}
-
-/**
- * Atomically reads the link status information from global
- * structure rte_eth_dev.
- *
- * @param dev
- *   - Pointer to the structure rte_eth_dev to read from.
- *   - Pointer to the buffer to be saved with the link status.
- *
- * @return
- *   - On success, zero.
- *   - On failure, negative value.
- */
-
-static int
-vmxnet3_dev_atomic_read_link_status(struct rte_eth_dev *dev,
-				    struct rte_eth_link *link)
-{
-	struct rte_eth_link *dst = link;
-	struct rte_eth_link *src = &(dev->data->dev_link);
-
-	if (rte_atomic64_cmpset((uint64_t *)dst, *(uint64_t *)dst,
-				*(uint64_t *)src) == 0)
-		return -1;
-
-	return 0;
-}
-
-/**
- * Atomically writes the link status information into global
- * structure rte_eth_dev.
- *
- * @param dev
- *   - Pointer to the structure rte_eth_dev to write to.
- *   - Pointer to the buffer to be saved with the link status.
- *
- * @return
- *   - On success, zero.
- *   - On failure, negative value.
- */
-static int
-vmxnet3_dev_atomic_write_link_status(struct rte_eth_dev *dev,
-				     struct rte_eth_link *link)
-{
-	struct rte_eth_link *dst = &(dev->data->dev_link);
-	struct rte_eth_link *src = link;
-
-	if (rte_atomic64_cmpset((uint64_t *)dst, *(uint64_t *)dst,
-				*(uint64_t *)src) == 0)
-		return -1;
-
-	return 0;
 }
 
 /*
@@ -817,8 +763,10 @@ vmxnet3_dev_start(struct rte_eth_dev *dev)
 static void
 vmxnet3_dev_stop(struct rte_eth_dev *dev)
 {
-	struct rte_eth_link link;
 	struct vmxnet3_hw *hw = dev->data->dev_private;
+	struct rte_eth_link link = {
+		.link_status = ETH_LINK_DOWN,
+	};
 
 	PMD_INIT_FUNC_TRACE();
 
@@ -852,8 +800,7 @@ vmxnet3_dev_stop(struct rte_eth_dev *dev)
 	vmxnet3_dev_clear_queues(dev);
 
 	/* Clear recorded link status */
-	memset(&link, 0, sizeof(link));
-	vmxnet3_dev_atomic_write_link_status(dev, &link);
+	rte_eth_linkstatus_set(dev, &link);
 }
 
 /*
@@ -1132,23 +1079,24 @@ __vmxnet3_dev_link_update(struct rte_eth_dev *dev,
 			  __rte_unused int wait_to_complete)
 {
 	struct vmxnet3_hw *hw = dev->data->dev_private;
-	struct rte_eth_link old = { 0 }, link;
+	struct rte_eth_link old;
+	struct rte_eth_link link = {
+		.link_speed = ETH_SPEED_NUM_10G,
+		.link_duplex = ETH_LINK_FULL_DUPLEX,
+		.link_autoneg = ETH_LINK_AUTONEG,
+		.link_status = ETH_LINK_DOWN,
+	};
 	uint32_t ret;
 
-	memset(&link, 0, sizeof(link));
-	vmxnet3_dev_atomic_read_link_status(dev, &old);
+	rte_eth_linkstatus_get(dev, &old);
 
 	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_CMD, VMXNET3_CMD_GET_LINK);
 	ret = VMXNET3_READ_BAR1_REG(hw, VMXNET3_REG_CMD);
 
-	if (ret & 0x1) {
+	if (ret & 0x1)
 		link.link_status = ETH_LINK_UP;
-		link.link_duplex = ETH_LINK_FULL_DUPLEX;
-		link.link_speed = ETH_SPEED_NUM_10G;
-		link.link_autoneg = ETH_LINK_AUTONEG;
-	}
 
-	vmxnet3_dev_atomic_write_link_status(dev, &link);
+	rte_eth_linkstatus_set(dev, &link);
 
 	return (old.link_status == link.link_status) ? -1 : 0;
 }
