@@ -1,4 +1,4 @@
-/*-
+/*
  *   BSD LICENSE
  *
  *   Copyright(c) Broadcom Limited.
@@ -200,9 +200,37 @@ alloc_mem_err:
 	return rc;
 }
 
+static int bnxt_vnic_rss_configure(struct bnxt *bp, struct bnxt_vnic_info *vnic)
+{
+	unsigned int rss_idx, fw_idx, i;
+
+	if (vnic->rss_table && vnic->hash_type) {
+		/*
+		 * Fill the RSS hash & redirection table with
+		 * ring group ids for all VNICs
+		 */
+		for (rss_idx = 0, fw_idx = 0; rss_idx < HW_HASH_INDEX_SIZE;
+			rss_idx++, fw_idx++) {
+			for (i = 0; i < bp->rx_cp_nr_rings; i++) {
+				fw_idx %= bp->rx_cp_nr_rings;
+				if (vnic->fw_grp_ids[fw_idx] !=
+				    INVALID_HW_RING_ID)
+					break;
+				fw_idx++;
+			}
+			if (i == bp->rx_cp_nr_rings)
+				return 0;
+			vnic->rss_table[rss_idx] =
+				vnic->fw_grp_ids[fw_idx];
+		}
+		return bnxt_hwrm_vnic_rss_cfg(bp, vnic);
+	}
+	return 0;
+}
+
 static int bnxt_init_chip(struct bnxt *bp)
 {
-	unsigned int i, rss_idx, fw_idx;
+	unsigned int i;
 	struct rte_eth_link new;
 	struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(bp->eth_dev);
 	struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
@@ -279,27 +307,12 @@ static int bnxt_init_chip(struct bnxt *bp)
 				i, rc);
 			goto err_out;
 		}
-		if (vnic->rss_table && vnic->hash_type) {
-			/*
-			 * Fill the RSS hash & redirection table with
-			 * ring group ids for all VNICs
-			 */
-			for (rss_idx = 0, fw_idx = 0;
-			     rss_idx < HW_HASH_INDEX_SIZE;
-			     rss_idx++, fw_idx++) {
-				if (vnic->fw_grp_ids[fw_idx] ==
-				    INVALID_HW_RING_ID)
-					fw_idx = 0;
-				vnic->rss_table[rss_idx] =
-						vnic->fw_grp_ids[fw_idx];
-			}
-			rc = bnxt_hwrm_vnic_rss_cfg(bp, vnic);
-			if (rc) {
-				PMD_DRV_LOG(ERR,
-					"HWRM vnic %d set RSS failure rc: %x\n",
-					i, rc);
-				goto err_out;
-			}
+
+		rc = bnxt_vnic_rss_configure(bp, vnic);
+		if (rc) {
+			PMD_DRV_LOG(ERR,
+				    "HWRM vnic set RSS failure rc: %x\n", rc);
+			goto err_out;
 		}
 
 		bnxt_hwrm_vnic_plcmode_cfg(bp, vnic);
@@ -321,8 +334,7 @@ static int bnxt_init_chip(struct bnxt *bp)
 	     !RTE_ETH_DEV_SRIOV(bp->eth_dev).active) &&
 	    bp->eth_dev->data->dev_conf.intr_conf.rxq != 0) {
 		intr_vector = bp->eth_dev->data->nb_rx_queues;
-		PMD_DRV_LOG(INFO, "%s(): intr_vector = %d\n", __func__,
-			intr_vector);
+		PMD_DRV_LOG(INFO, "intr_vector = %d\n", intr_vector);
 		if (intr_vector > bp->rx_cp_nr_rings) {
 			PMD_DRV_LOG(ERR, "At most %d intr queues supported",
 					bp->rx_cp_nr_rings);
@@ -342,9 +354,9 @@ static int bnxt_init_chip(struct bnxt *bp)
 				" intr_vec", bp->eth_dev->data->nb_rx_queues);
 			return -ENOMEM;
 		}
-		PMD_DRV_LOG(DEBUG, "%s(): intr_handle->intr_vec = %p "
+		PMD_DRV_LOG(DEBUG, "intr_handle->intr_vec = %p "
 			"intr_handle->nb_efd = %d intr_handle->max_intr = %d\n",
-			 __func__, intr_handle->intr_vec, intr_handle->nb_efd,
+			 intr_handle->intr_vec, intr_handle->nb_efd,
 			intr_handle->max_intr);
 	}
 
@@ -2842,8 +2854,8 @@ bnxt_get_eeprom_length_op(struct rte_eth_dev *dev)
 	uint32_t dir_entries;
 	uint32_t entry_length;
 
-	PMD_DRV_LOG(INFO, "%s(): %04x:%02x:%02x:%02x\n",
-		__func__, bp->pdev->addr.domain, bp->pdev->addr.bus,
+	PMD_DRV_LOG(INFO, "%04x:%02x:%02x:%02x\n",
+		bp->pdev->addr.domain, bp->pdev->addr.bus,
 		bp->pdev->addr.devid, bp->pdev->addr.function);
 
 	rc = bnxt_hwrm_nvm_get_dir_info(bp, &dir_entries, &entry_length);
@@ -2861,8 +2873,8 @@ bnxt_get_eeprom_op(struct rte_eth_dev *dev,
 	uint32_t index;
 	uint32_t offset;
 
-	PMD_DRV_LOG(INFO, "%s(): %04x:%02x:%02x:%02x in_eeprom->offset = %d "
-		"len = %d\n", __func__, bp->pdev->addr.domain,
+	PMD_DRV_LOG(INFO, "%04x:%02x:%02x:%02x in_eeprom->offset = %d "
+		"len = %d\n", bp->pdev->addr.domain,
 		bp->pdev->addr.bus, bp->pdev->addr.devid,
 		bp->pdev->addr.function, in_eeprom->offset, in_eeprom->length);
 
@@ -2930,8 +2942,8 @@ bnxt_set_eeprom_op(struct rte_eth_dev *dev,
 	uint8_t index, dir_op;
 	uint16_t type, ext, ordinal, attr;
 
-	PMD_DRV_LOG(INFO, "%s(): %04x:%02x:%02x:%02x in_eeprom->offset = %d "
-		"len = %d\n", __func__, bp->pdev->addr.domain,
+	PMD_DRV_LOG(INFO, "%04x:%02x:%02x:%02x in_eeprom->offset = %d "
+		"len = %d\n", bp->pdev->addr.domain,
 		bp->pdev->addr.bus, bp->pdev->addr.devid,
 		bp->pdev->addr.function, in_eeprom->offset, in_eeprom->length);
 
@@ -2966,6 +2978,49 @@ bnxt_set_eeprom_op(struct rte_eth_dev *dev,
 
 	return bnxt_hwrm_flash_nvram(bp, type, ordinal, ext, attr,
 				     in_eeprom->data, in_eeprom->length);
+	return 0;
+}
+
+int bnxt_rx_queue_start(struct rte_eth_dev *dev, uint16_t rx_queue_id)
+{
+	struct bnxt *bp = (struct bnxt *)dev->data->dev_private;
+	struct rte_eth_conf *dev_conf = &bp->eth_dev->data->dev_conf;
+	struct bnxt_rx_queue *rxq = bp->rx_queues[rx_queue_id];
+	struct bnxt_vnic_info *vnic = NULL;
+
+	dev->data->rx_queue_state[rx_queue_id] = RTE_ETH_QUEUE_STATE_STARTED;
+	rxq->rx_deferred_start = false;
+	PMD_DRV_LOG(INFO, "Rx queue started %d\n", rx_queue_id);
+	if (dev_conf->rxmode.mq_mode & ETH_MQ_RX_RSS_FLAG) {
+		vnic = rxq->vnic;
+		if (vnic->fw_grp_ids[rx_queue_id] != INVALID_HW_RING_ID)
+			return 0;
+		PMD_DRV_LOG(DEBUG, "vnic = %p fw_grp_id = %d\n",
+			vnic, bp->grp_info[rx_queue_id + 1].fw_grp_id);
+		vnic->fw_grp_ids[rx_queue_id] =
+					bp->grp_info[rx_queue_id + 1].fw_grp_id;
+		return bnxt_vnic_rss_configure(bp, vnic);
+	}
+
+	return 0;
+}
+
+int bnxt_rx_queue_stop(struct rte_eth_dev *dev, uint16_t rx_queue_id)
+{
+	struct bnxt *bp = (struct bnxt *)dev->data->dev_private;
+	struct rte_eth_conf *dev_conf = &bp->eth_dev->data->dev_conf;
+	struct bnxt_rx_queue *rxq = bp->rx_queues[rx_queue_id];
+	struct bnxt_vnic_info *vnic = NULL;
+
+	dev->data->rx_queue_state[rx_queue_id] = RTE_ETH_QUEUE_STATE_STOPPED;
+	rxq->rx_deferred_start = true;
+	PMD_DRV_LOG(DEBUG, "Rx queue stopped\n");
+
+	if (dev_conf->rxmode.mq_mode & ETH_MQ_RX_RSS_FLAG) {
+		vnic = rxq->vnic;
+		vnic->fw_grp_ids[rx_queue_id] = INVALID_HW_RING_ID;
+		return bnxt_vnic_rss_configure(bp, vnic);
+	}
 	return 0;
 }
 
@@ -3023,6 +3078,10 @@ static const struct eth_dev_ops bnxt_dev_ops = {
 	.rx_queue_count = bnxt_rx_queue_count_op,
 	.rx_descriptor_status = bnxt_rx_descriptor_status_op,
 	.tx_descriptor_status = bnxt_tx_descriptor_status_op,
+	.rx_queue_start = bnxt_rx_queue_start,
+	.rx_queue_stop = bnxt_rx_queue_stop,
+	.tx_queue_start = bnxt_tx_queue_start,
+	.tx_queue_stop = bnxt_tx_queue_stop,
 	.filter_ctrl = bnxt_filter_ctrl_op,
 	.dev_supported_ptypes_get = bnxt_dev_supported_ptypes_get_op,
 	.get_eeprom_length    = bnxt_get_eeprom_length_op,
